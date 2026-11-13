@@ -3,7 +3,7 @@ import { RATIO_PRESETS, formatRatio, parseRatio } from "../app/export-size";
 import { esc } from "./format";
 import { openMoreMenu } from "./more-menu";
 import type { MenuItem } from "./more-menu";
-import { createBar, isOff, syncGroups, syncScroll } from "./bar";
+import { createBar, isOff, OPEN_SECTION_EVENT, syncGroups, syncScroll } from "./bar";
 import { liveNumber } from "./live";
 import { isContainer } from "../doc/containers";
 import type { CanvasObject, LayoutPatch, SheetLayout } from "../doc/model";
@@ -33,6 +33,8 @@ import { newInk, swatchBackground } from "../render/ink";
 import { penFromSlider, sliderFromPen } from "../interaction/pen-width";
 
 export interface ToolbarActions {
+  /** Open the command palette, to find an option or action by its name (ADR 0197). */
+  findCommand(): void;
   importFiles(files: File[]): void;
   /** Save a screenshot of the canvas to the library (ADR 0080). */
   screenshot(): void;
@@ -230,6 +232,20 @@ const kindOf = (o: CanvasObject): string => (isContainer(o) ? "sheet" : o.kind =
 /** The features of a font worth offering, with the words that name them (a font only shows the ones it has). */
 const FONT_FEATURES: Record<string, string> = { liga: "Ligatures", dlig: "Discretionary ligatures", smcp: "Small capitals", c2sc: "Capitals to small capitals", tnum: "Tabular numbers", pnum: "Proportional numbers", onum: "Old-style numbers", lnum: "Lining numbers", frac: "Fractions", zero: "Slashed zero", case: "Case-sensitive forms", sups: "Superscript", subs: "Subscript", titl: "Titling forms", swsh: "Swashes", salt: "Stylistic alternates", ordn: "Ordinals" };
 
+/** The sections of a selection's options in the Properties bar, in their fixed order (ADR 0197): Look first, then what is the kind's own, then the sheet's. */
+export const SECTIONS: ReadonlyArray<{ id: string; label: string; hint: string }> = [
+  { id: "look", label: "Look", hint: "Look: fill, outline, size of the line, adjustments" },
+  { id: "text", label: "Text", hint: "Text: font, size, colour, lines and letters, alignment" },
+  { id: "shape", label: "Shape", hint: "Shape: corners, sides and points, speech balloon" },
+  { id: "picture", label: "Picture", hint: "Picture: crop and flip" },
+  { id: "size", label: "Size", hint: "Size: the shape of its box, presets, turn, and whether a sheet fits what is on it" },
+  { id: "layout", label: "Layout", hint: "Layout: the auto layout's flow, and where the items sit in it" },
+  { id: "spacing", label: "Spacing", hint: "Spacing: the gaps between items and the padding inside the sheet" },
+  { id: "order", label: "Columns & order", hint: "Columns and order: a grid's columns and rows, the row height, the order of the items, saved layouts" },
+  { id: "inlayout", label: "In layout", hint: "In layout: how it takes part in its sheet's auto layout" },
+  { id: "position", label: "On sheet", hint: "On sheet: where it is on its sheet, and how it follows the sheet" },
+];
+
 export function mountToolbar(root: HTMLElement, editor: EditorState, doc: DocumentStore, actions: ToolbarActions): void {
   root.innerHTML = `
     <div class="rail" data-cmd-group="Tools">
@@ -272,6 +288,7 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
     <div class="toolbar" data-cmd-group="Properties" role="toolbar" aria-label="Tool options" hidden>
       <div class="tb-options-row">
       <div class="tb-group tb-options tb-subject" data-for="select node" role="radiogroup" aria-label="Edit which kind of item" hidden></div>
+      <div class="tb-group tb-options tb-sections" data-for="select node" role="tablist" aria-label="Sections of the selection's options" data-no-command hidden></div>
       <div class="tb-group tb-options" data-for="" data-mask-paint role="group" aria-label="Paint the mask">
         <button type="button" data-mask-ink="show" aria-label="Paint the mask in white: the Pen shows" title="Paint the mask in white: the Pen shows">${ICONS.sun}</button>
         <button type="button" data-mask-ink="hide" aria-label="Paint the mask in black: the Pen hides" title="Paint the mask in black: the Pen hides">${ICONS.moon}</button>
@@ -285,52 +302,52 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
         <label class="tb-count" data-tips-wrap hidden>Points <input type="number" data-tips min="3" max="24" step="1" inputmode="numeric" aria-label="Star points"></label>
       </div>
       <div class="tb-group tb-options" data-for="select node" data-shape-props>
-        <button type="button" data-kind="picture shape stroke text" data-adjust hidden aria-haspopup="dialog" aria-expanded="false" aria-label="Adjust the picture" title="Adjust the picture, shape or text: exposure, contrast, colour, blur and more. The original is not changed.">${ICONS.slidersVertical}</button>
-        <button type="button" data-kind="picture shape stroke text" data-adjust-reset hidden aria-label="Reset the adjustments" title="Reset the adjustments of the selected pictures">${ICONS.listRestart}</button>
-        <label class="tb-count" data-kind="shape picture" data-scrub="radius" data-sel-radius-wrap hidden title="Drag the field left or right to change it">Radius <input type="text" data-sel-radius size="8" inputmode="decimal" aria-label="Corner radius (px)" title="Corner radius, in px at this zoom. Several values (one for every corner) set them each; double-click the dot on the shape to open its corners out."></label>
-        <label class="tb-count" data-kind="shape" data-scrub="smooth" data-sel-smooth-wrap hidden title="Drag the field left or right to change it">Smooth <input type="number" data-sel-smooth min="0" max="100" step="5" inputmode="numeric" aria-label="Corner smoothing (%)" title="Corner smoothing: the rounded corners start farther out and blend into the line"></label>
-        <label class="tb-count" data-kind="shape" data-scrub="sides" data-sel-sides-wrap hidden title="Drag the field left or right to change it">Sides <input type="number" data-sel-sides min="3" max="24" step="1" inputmode="numeric" aria-label="Polygon sides"></label>
-        <label class="tb-count" data-kind="shape" data-scrub="tips" data-sel-tips-wrap hidden title="Drag the field left or right to change it">Points <input type="number" data-sel-tips min="3" max="24" step="1" inputmode="numeric" aria-label="Star points"></label>
-        <label class="tb-count" data-kind="any" data-pin-wrap hidden title="How it follows its sheet when the sheet is resized">Pin
+        <button type="button" data-kind="picture shape stroke text" data-adjust  data-section="look"hidden aria-haspopup="dialog" aria-expanded="false" aria-label="Adjust the picture" title="Adjust the picture, shape or text: exposure, contrast, colour, blur and more. The original is not changed.">${ICONS.slidersVertical}</button>
+        <button type="button" data-kind="picture shape stroke text" data-adjust-reset data-section="look" hidden aria-label="Reset the adjustments" title="Reset the adjustments of the selected pictures">${ICONS.listRestart}</button>
+        <label class="tb-count" data-kind="shape picture" data-scrub="radius" data-section="shape" data-sel-radius-wrap hidden title="Drag the field left or right to change it">Radius <input type="text" data-sel-radius size="8" inputmode="decimal" aria-label="Corner radius (px)" title="Corner radius, in px at this zoom. Several values (one for every corner) set them each; double-click the dot on the shape to open its corners out."></label>
+        <label class="tb-count" data-kind="shape" data-scrub="smooth" data-section="shape" data-sel-smooth-wrap hidden title="Drag the field left or right to change it">Smooth <input type="number" data-sel-smooth min="0" max="100" step="5" inputmode="numeric" aria-label="Corner smoothing (%)" title="Corner smoothing: the rounded corners start farther out and blend into the line"></label>
+        <label class="tb-count" data-kind="shape" data-scrub="sides" data-section="shape" data-sel-sides-wrap hidden title="Drag the field left or right to change it">Sides <input type="number" data-sel-sides min="3" max="24" step="1" inputmode="numeric" aria-label="Polygon sides"></label>
+        <label class="tb-count" data-kind="shape" data-scrub="tips" data-section="shape" data-sel-tips-wrap hidden title="Drag the field left or right to change it">Points <input type="number" data-sel-tips min="3" max="24" step="1" inputmode="numeric" aria-label="Star points"></label>
+        <label class="tb-count" data-kind="any" data-pin-wrap data-section="position" hidden title="How it follows its sheet when the sheet is resized">Pin
           <select data-pin-h aria-label="Pin horizontally: how it follows the sheet's width"><option value="left">Left</option><option value="right">Right</option><option value="both">Left and right</option><option value="center">Centre</option><option value="scale">Scale</option></select>
           <select data-pin-v aria-label="Pin vertically: how it follows the sheet's height"><option value="top">Top</option><option value="bottom">Bottom</option><option value="both">Top and bottom</option><option value="center">Middle</option><option value="scale">Scale</option></select></label>
-        <button type="button" data-kind="picture" data-crop hidden aria-pressed="false" aria-label="Crop the picture" title="Crop: drag a side or a corner of the picture; drag outward to bring back what was cut. Enter or Escape finishes.">${ICONS.crop}</button>
-        <button type="button" data-kind="picture" data-uncrop hidden aria-label="Show the whole picture" title="Show the whole picture again (the crop is removed)">${ICONS.fullscreen}</button>
-        <button type="button" data-kind="picture" data-flip="x" hidden aria-pressed="false" aria-label="Flip horizontally" title="Flip horizontally: mirror the picture left to right in its box">${ICONS.flipHorizontal}</button>
-        <button type="button" data-kind="picture" data-flip="y" hidden aria-pressed="false" aria-label="Flip vertically" title="Flip vertically: mirror the picture top to bottom in its box">${ICONS.flipVertical}</button>
-        <button type="button" data-kind="picture" data-unflip hidden aria-label="Reset flip" title="Reset flip: show the picture the right way round again">${ICONS.resetFlip}</button>
-        <span class="tb-count" data-kind="any" data-on-sheet hidden title="Where it is on its sheet, in per cent of the sheet: X and Y from its top-left corner, W and H of its width and height">On sheet
+        <button type="button" data-kind="picture" data-crop hidden data-section="picture" aria-pressed="false" aria-label="Crop the picture" title="Crop: drag a side or a corner of the picture; drag outward to bring back what was cut. Enter or Escape finishes.">${ICONS.crop}</button>
+        <button type="button" data-kind="picture" data-uncrop hidden data-section="picture" aria-label="Show the whole picture" title="Show the whole picture again (the crop is removed)">${ICONS.fullscreen}</button>
+        <button type="button" data-kind="picture" data-flip="x" hidden data-section="picture" aria-pressed="false" aria-label="Flip horizontally" title="Flip horizontally: mirror the picture left to right in its box">${ICONS.flipHorizontal}</button>
+        <button type="button" data-kind="picture" data-flip="y" hidden data-section="picture" aria-pressed="false" aria-label="Flip vertically" title="Flip vertically: mirror the picture top to bottom in its box">${ICONS.flipVertical}</button>
+        <button type="button" data-kind="picture" data-unflip hidden data-section="picture" aria-label="Reset flip" title="Reset flip: show the picture the right way round again">${ICONS.resetFlip}</button>
+        <span class="tb-count" data-kind="any" data-on-sheet data-section="position" hidden title="Where it is on its sheet, in per cent of the sheet: X and Y from its top-left corner, W and H of its width and height">On sheet
           <label>X <input type="number" data-on-x step="any" inputmode="decimal" aria-label="Position from the left of the sheet (per cent of its width)"></label> <label>Y <input type="number" data-on-y step="any" inputmode="decimal" aria-label="Position from the top of the sheet (per cent of its height)"></label>
           <span data-on-size><label>W <input type="number" data-on-w min="0" step="any" inputmode="decimal" aria-label="Width (per cent of the sheet's width)"></label> <label>H <input type="number" data-on-h min="0" step="any" inputmode="decimal" aria-label="Height (per cent of the sheet's height)"></label></span> %</span>
-        <span class="tb-count" data-kind="sheet shape" data-sheet-size hidden title="The shape of its box: width ÷ height. A sheet has a shape, not a size; the size is chosen when it is exported (Export in the Actions bar)">
+        <span class="tb-count" data-kind="sheet shape" data-sheet-size data-section="size" hidden title="The shape of its box: width ÷ height. A sheet has a shape, not a size; the size is chosen when it is exported (Export in the Actions bar)">
           <label>Ratio <input type="text" data-sheet-ratio size="11" spellcheck="false" autocomplete="off" inputmode="text" aria-label="Shape: width to height, like 16:9, 1.5 or A4" title="Type a ratio (16:9, 3/2, 1.5, A4, letter, square) or a size in px (2000 x 1920, or 2000x1920px, becomes 25 : 24), then Enter. Add portrait or landscape to turn it."></label>
           <select data-sheet-preset aria-label="Shape preset" title="A common shape: the sheet or shape takes it, keeping its area and its top-left corner"><option value="">Shapes…</option><optgroup label="Custom" data-custom-ratios></optgroup>${["Basic", "Screen", "Paper", "Social"].map((g) => `<optgroup label="${g}">${RATIO_PRESETS.filter((r) => r.group === g).map((r) => `<option value="${r.ratio}">${r.label}</option>`).join("")}</optgroup>`).join("")}</select>
           <button type="button" data-sheet-turn aria-label="Turn it on its side: swap its width and height" title="Turn it on its side: portrait ⇄ landscape (the same area)">${ICONS.arrowRightLeft}</button>
           <button type="button" data-sheet-scale aria-pressed="false" aria-label="Scale contents with the sheet" title="Scale contents (kept with this sheet): when the sheet is resized, everything on it grows with it, whatever its pins say">${ICONS.sheetScale}</button></span>
-        <span class="tb-count" data-kind="sheet" data-auto-layout hidden title="Auto layout: how what is on the sheet is placed. Lengths in px as seen now">
+        <span class="tb-count" data-kind="sheet" data-auto-layout data-section="layout" hidden title="Auto layout: how what is on the sheet is placed. Lengths in px as seen now">
           <span class="seg" role="radiogroup" aria-label="Flow">${[["row", "Row: items left to right", ICONS.flowRow], ["column", "Column: items top to bottom", ICONS.flowColumn], ["wrap", "Wrap: rows that break at the sheet's width", ICONS.flowWrap], ["grid", "Grid: columns and rows", ICONS.flowGrid], ["masonry", "Masonry: columns of one width, each item in the shortest", ICONS.flowMasonry], ["justified", "Justified rows: each row one height, as wide as the sheet", ICONS.flowJustified]].map(([v, t, i]) => `<button type="button" role="radio" data-layout-flow="${v}" aria-checked="false" aria-label="${t}" title="${t}">${i}</button>`).join("")}</span>
-          <label>Gap <input type="number" data-layout-gap="0" min="0" step="any" inputmode="decimal" aria-label="Gap between items along the flow (px)" title="Gap between items along the flow"></label><label><input type="number" data-layout-gap="1" min="0" step="any" inputmode="decimal" aria-label="Gap between lines (px)" title="Gap between lines (a wrap or a grid)"></label>
-          <label>Pad <input type="number" data-layout-pad="h" min="0" step="any" inputmode="decimal" aria-label="Padding left and right (px)" title="Padding left and right"></label><label><input type="number" data-layout-pad="v" min="0" step="any" inputmode="decimal" aria-label="Padding top and bottom (px)" title="Padding top and bottom"></label>
-          <span data-layout-pad-sides hidden>${[["t", "top"], ["r", "right"], ["b", "bottom"], ["l", "left"]].map(([k, n]) => `<label>${n!.charAt(0).toUpperCase()} <input type="number" data-layout-pad="${k}" min="0" step="any" inputmode="decimal" aria-label="Padding ${n} (px)" title="Padding ${n}"></label>`).join("")}</span>
-          <button type="button" data-layout-pad-each aria-pressed="false" aria-label="Padding of each side" title="Padding of each side: top, right, bottom, left">${ICONS.maximize}</button>
+          <label data-section="spacing">Gap <input type="number" data-layout-gap="0" min="0" step="any" inputmode="decimal" aria-label="Gap between items along the flow (px)" title="Gap between items along the flow"></label><label data-section="spacing"><input type="number" data-layout-gap="1" min="0" step="any" inputmode="decimal" aria-label="Gap between lines (px)" title="Gap between lines (a wrap or a grid)"></label>
+          <label data-section="spacing">Pad <input type="number" data-layout-pad="h" min="0" step="any" inputmode="decimal" aria-label="Padding left and right (px)" title="Padding left and right"></label><label data-section="spacing"><input type="number" data-layout-pad="v" min="0" step="any" inputmode="decimal" aria-label="Padding top and bottom (px)" title="Padding top and bottom"></label>
+          <span data-section="spacing" data-layout-pad-sides hidden>${[["t", "top"], ["r", "right"], ["b", "bottom"], ["l", "left"]].map(([k, n]) => `<label>${n!.charAt(0).toUpperCase()} <input type="number" data-layout-pad="${k}" min="0" step="any" inputmode="decimal" aria-label="Padding ${n} (px)" title="Padding ${n}"></label>`).join("")}</span>
+          <button type="button" data-section="spacing" data-layout-pad-each aria-pressed="false" aria-label="Padding of each side" title="Padding of each side: top, right, bottom, left">${ICONS.maximize}</button>
           <select data-layout-align aria-label="Items across the flow" title="Items across the flow: at the start, the centre or the end of their line (and the block of lines in a sheet with room for them)"><option value="start">Start</option><option value="centre">Centre</option><option value="end">End</option></select>
           <select data-layout-justify aria-label="Items along the flow" title="Items along the flow, in a sheet with room for them: packed at the start, the centre or the end, or spread between"><option value="start">Pack start</option><option value="centre">Pack centre</option><option value="end">Pack end</option><option value="between">Spread</option></select>
-          <label title="The sheet's size: it fits what is on it, or you set its width (or height) and the other side fits, or you set both (what does not fit is cut off at its edge)">Size <select data-layout-size aria-label="Sheet size"><option value="fit">Fits contents</option><option value="w">Set width</option><option value="h">Set height</option><option value="fixed">Set size</option></select></label>
-          <button type="button" data-layout-overflow hidden title="Some of what is on the sheet runs past its edge and is cut off: click to make the sheet fit it">Doesn't fit: Fit</button>
-          <label data-layout-columns-wrap hidden>Columns <input type="number" data-layout-columns min="1" max="1024" step="1" inputmode="numeric" placeholder="auto" aria-label="Columns" title="Columns of the grid or masonry (empty: chosen as the list beside it says)"></label>
-          <select data-layout-colsby hidden aria-label="Columns when none are set" title="Columns when none are set: by the number of items (about as many as rows), or by their shapes (a board about as wide as tall, or one that fills a sheet whose size is set)"><option value="count">Auto: by count</option><option value="shape">Auto: by shape</option></select>
-          <button type="button" data-layout-tracks hidden aria-haspopup="dialog" aria-expanded="false" aria-label="Columns and rows" title="Columns and rows: each as large as what is in it, a set size, or a share of the room">${ICONS.layoutTracks}</button>
-          <label data-layout-rowh-wrap hidden>Row <input type="number" data-layout-rowh min="1" step="any" inputmode="decimal" aria-label="Row height aimed at (px)" title="The height a row aims at before it is made as wide as the sheet"></label>
-          <select data-layout-sort aria-label="Order of the items" title="Order of the items: the stacking order (as Layers lists it), or kept by a rule as things are added"><option value="">Stacking order</option><option value="name-asc">Name A–Z</option><option value="name-desc">Name Z–A</option><option value="date">Newest first</option><option value="size">Largest first</option><option value="type">By kind</option></select>
-          <button type="button" data-layout-styles aria-haspopup="menu" aria-label="Layout styles" title="Layout styles: your saved layouts, and save this one">${ICONS.layoutStyles}</button></span>
-        <span class="tb-count" data-kind="any" data-in-layout hidden title="How it takes part in its sheet's auto layout">In layout
+          <label data-section="size" title="The sheet's size: it fits what is on it, or you set its width (or height) and the other side fits, or you set both (what does not fit is cut off at its edge)">Size <select data-layout-size aria-label="Sheet size"><option value="fit">Fits contents</option><option value="w">Set width</option><option value="h">Set height</option><option value="fixed">Set size</option></select></label>
+          <button type="button" data-section="*" data-layout-overflow hidden title="Some of what is on the sheet runs past its edge and is cut off: click to make the sheet fit it">Doesn't fit: Fit</button>
+          <label data-section="order" data-layout-columns-wrap hidden>Columns <input type="number" data-layout-columns min="1" max="1024" step="1" inputmode="numeric" placeholder="auto" aria-label="Columns" title="Columns of the grid or masonry (empty: chosen as the list beside it says)"></label>
+          <select data-section="order" data-layout-colsby hidden aria-label="Columns when none are set" title="Columns when none are set: by the number of items (about as many as rows), or by their shapes (a board about as wide as tall, or one that fills a sheet whose size is set)"><option value="count">Auto: by count</option><option value="shape">Auto: by shape</option></select>
+          <button type="button" data-section="order" data-layout-tracks hidden aria-haspopup="dialog" aria-expanded="false" aria-label="Columns and rows" title="Columns and rows: each as large as what is in it, a set size, or a share of the room">${ICONS.layoutTracks}</button>
+          <label data-section="order" data-layout-rowh-wrap hidden>Row <input type="number" data-layout-rowh min="1" step="any" inputmode="decimal" aria-label="Row height aimed at (px)" title="The height a row aims at before it is made as wide as the sheet"></label>
+          <select data-section="order" data-layout-sort aria-label="Order of the items" title="Order of the items: the stacking order (as Layers lists it), or kept by a rule as things are added"><option value="">Stacking order</option><option value="name-asc">Name A–Z</option><option value="name-desc">Name Z–A</option><option value="date">Newest first</option><option value="size">Largest first</option><option value="type">By kind</option></select>
+          <button type="button" data-section="order" data-layout-styles aria-haspopup="menu" aria-label="Layout styles" title="Layout styles: your saved layouts, and save this one">${ICONS.layoutStyles}</button></span>
+        <span class="tb-count" data-kind="any" data-in-layout data-section="inlayout" hidden title="How it takes part in its sheet's auto layout">In layout
           <select data-in-fill aria-label="Fill: stretch to the room" title="Its size in the layout: its own, or stretched to the room along an axis"><option value="none">Own size</option><option value="x">Fill width</option><option value="y">Fill height</option><option value="both">Fill both</option></select>
           <button type="button" data-in-free aria-pressed="false" aria-label="Keep out of the layout" title="Keep out of the layout: it stays where it is put, the others flow round it">${ICONS.layoutFree}</button>
           <span data-in-span-wrap hidden>Span <input type="number" data-in-span="0" min="1" max="1024" step="1" inputmode="numeric" aria-label="Columns it spans" title="Columns it spans"><input type="number" data-in-span="1" min="1" max="1024" step="1" inputmode="numeric" aria-label="Rows it spans" title="Rows it spans"></span>
           <span data-in-limits hidden>${[["0", "W"], ["1", "H"]].map(([i, a]) => `<span data-in-limit-axis="${i}"><label>Min ${a} <input type="number" data-in-min="${i}" min="0" max="100" step="1" inputmode="numeric" aria-label="Least ${a === "W" ? "width" : "height"}, % of the room" title="Its least ${a === "W" ? "width" : "height"} as it fills, in % of the room inside the sheet (0: none)"></label><label>Max ${a} <input type="number" data-in-max="${i}" min="0" max="100" step="1" inputmode="numeric" aria-label="Most ${a === "W" ? "width" : "height"}, % of the room" title="Its most ${a === "W" ? "width" : "height"} as it fills, in % of the room inside the sheet (0: none)"></label></span>`).join("")}</span></span>
-        <label class="tb-count" data-kind="shape" data-scrub="inner" data-sel-inner-wrap hidden title="Drag the field left or right to change it">Ratio <input type="number" data-sel-inner min="5" max="95" step="1" inputmode="numeric" aria-label="Star ratio (percent)" title="Inner radius as a percent of the outer one"></label>
+        <label class="tb-count" data-kind="shape" data-scrub="inner" data-sel-inner-wrap data-section="shape" hidden title="Drag the field left or right to change it">Ratio <input type="number" data-sel-inner min="5" max="95" step="1" inputmode="numeric" aria-label="Star ratio (percent)" title="Inner radius as a percent of the outer one"></label>
       </div>
-      <div class="tb-group tb-options" data-for="text note select node" data-kind="text">
+      <div class="tb-group tb-options" data-for="text note select node" data-kind="text"> data-section="text"
         <button type="button" data-balloon-panel hidden aria-label="Speech balloon and text in shape" title="Speech balloon and text in shape: body, tails, words, padding, alignment, connectors">${ICONS.speechBalloon}</button>
         <button type="button" data-text-box data-text-wrap hidden aria-haspopup="dialog" aria-expanded="false" aria-label="Paragraph and box options" title="Paragraph and box: space between paragraphs, first line, case, most lines, set height">${ICONS.textBox}</button>
         <button type="button" class="swatch swatch-paint" data-text-colour data-text-wrap hidden aria-haspopup="dialog" aria-expanded="false" aria-label="Text colour" title="Text colour: open the colour picker (with transparency)"><span data-paint-chip></span></button>
@@ -343,15 +360,15 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
         <label class="tb-count" data-text-wrap hidden title="Line height: a multiple of the text size. Drag the field to change it.">Line <input type="number" data-text-line min="0.5" max="5" step="0.05" aria-label="Line height"></label>
         <label class="tb-count" data-text-wrap hidden title="Letter spacing: a share of the text size. Drag the field to change it.">Letters <input type="number" data-text-track min="-50" max="200" step="1" aria-label="Letter spacing (percent of the text size)"></label>
       </div>
-      <div class="tb-group tb-options" data-for="text note select node" data-kind="text" role="radiogroup" aria-label="Text alignment">
+      <div class="tb-group tb-options" data-for="text note select node" data-kind="text" role="radiogroup" aria-label="Text alignment" data-section="text">
         ${TEXT_ALIGNS.map((a) => `<button type="button" role="radio" class="shape-kind" data-text-wrap hidden data-text-align="${a.id}" aria-label="${a.label}" title="${a.label}">${a.icon}</button>`).join("")}
       </div>
-      <div class="tb-group tb-options" data-for="text note select node" data-kind="text" role="radiogroup" aria-label="Text width">
+      <div class="tb-group tb-options" data-for="text note select node" data-kind="text" role="radiogroup" aria-label="Text width" data-section="text">
         ${TEXT_FITS.map((a) => `<button type="button" role="radio" class="shape-kind" data-text-wrap hidden data-text-fit="${a.id}" aria-label="${a.label}" title="${a.title}">${a.icon}</button>`).join("")}
       </div>
       <div class="tb-group tb-options" data-for="select node" data-sel-colours data-no-command hidden role="group" aria-label="Colours of the selection"></div>
-      <div class="tb-group tb-options" data-for="shape balloon path select node" data-kind="shape sheet picture">
-        <button type="button" data-balloon-panel hidden aria-label="Speech balloon and text in shape" title="Speech balloon and text in shape: body, tails, words, padding, alignment, connectors">${ICONS.speechBalloon}</button>
+      <div class="tb-group tb-options" data-for="shape balloon path select node" data-kind="shape sheet picture" data-section="look">
+        <button type="button" data-balloon-panel data-section="shape" hidden aria-label="Speech balloon and text in shape" title="Speech balloon and text in shape: body, tails, words, padding, alignment, connectors">${ICONS.speechBalloon}</button>
         <button type="button" class="swatch swatch-paint" data-kind="shape sheet" data-paint="fill" aria-haspopup="dialog" aria-expanded="false" aria-label="Fill" title="Fill colour: open the colour picker"><span data-paint-chip></span><b class="swatch-name">Fill</b></button>
         <button type="button" class="swatch swatch-paint" data-paint="stroke" aria-haspopup="dialog" aria-expanded="false" aria-label="Outline" title="Outline colour: open the colour picker"><span data-paint-chip></span><b class="swatch-name">Outline</b></button>
       <label class="tb-count" data-scrub="outline-w" data-outline-w-wrap hidden title="Outline width, in px at this zoom (0: none). Drag the field left or right to change it">Width <input type="number" data-outline-w min="0" step="0.5" inputmode="decimal" aria-label="Outline width (px at this zoom)"></label>
@@ -361,7 +378,7 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
         <input type="range" class="size" data-shape-width min="0" max="100" step="1" aria-label="Outline width" title="Outline width (screen px at this zoom); all the way left: no outline">
         <span class="size-out" data-shape-out></span>
       </div>
-      <div class="tb-group tb-options" data-for="pen select" data-kind="stroke tool" role="group" aria-label="Size">
+      <div class="tb-group tb-options" data-for="pen select" data-kind="stroke tool" role="group" aria-label="Size" data-section="look">
         ${PEN_WIDTHS.map(
           (w) => `<button type="button" class="width" data-pen-only data-width="${w}" aria-label="Pen width ${w} px" title="Pen width ${w} px"><span style="height:${Math.max(2, w)}px"></span></button>`,
         ).join("")}
@@ -372,7 +389,7 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
         <button type="button" class="stab" data-stab aria-pressed="false" aria-label="Stabilizer" title="Stabilizer: smooths hand wobble; the brush follows the pointer on a rope">${ICONS.waves}</button>
         <input type="range" class="size" data-strength min="1" max="100" step="1" aria-label="Stabilizer strength" title="Stabilizer strength (rope length)" hidden>
       </div>
-      <div class="tb-group tb-options" data-for="pen select" data-kind="stroke shape tool" role="group" aria-label="Keep size">
+      <div class="tb-group tb-options" data-for="pen select" data-kind="stroke shape tool" role="group" aria-label="Keep size" data-section="look">
         <button type="button" class="follow" data-kind="stroke tool" data-pen-only data-follow aria-pressed="false" aria-label="Pen size follows zoom" title="Pen size follows zoom: while drawing, the pen keeps its size on screen when you zoom (the line gets thinner or thicker along its length)">${ICONS.scaling}</button>
         <button type="button" class="lock" data-kind="shape" data-lock-radius aria-pressed="false" hidden aria-label="Lock corner radius" title="Lock corner radius: resizing a shape keeps its corner radius (off: the radius scales with the shape, so it keeps its look)">${ICONS.squareRoundCorner}</button>
         <button type="button" class="lock" data-kind="stroke tool" data-lock aria-pressed="false" aria-label="Lock thickness" title="Lock thickness: new strokes keep this width on the canvas at any zoom; resizing a stroke keeps its line width">${ICONS.lock}</button>
@@ -393,6 +410,9 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
       <div class="tb-group tb-options" data-for="lasso" role="radiogroup" aria-label="Lasso selects">
         <button type="button" role="radio" data-filter="strokes" title="Lasso selects strokes only">Strokes</button>
         <button type="button" role="radio" data-filter="all" title="Lasso selects strokes and fully enclosed media">All</button>
+      </div>
+      <div class="tb-group tb-options tb-find" data-for="*" data-no-command>
+        <button type="button" data-find aria-label="Find an option or action by its name" title="Find an option or action by its name (Ctrl+K)">${ICONS.findCommand}</button>
       </div>
       </div>
     </div>
@@ -415,6 +435,61 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
     if (group.parentElement !== home) home.append(group);
   };
   placeColours();
+  // Sections (ADR 0197): every control of a selection belongs to one (Look first, then what is the kind's own, then the sheet's), and the bar
+  // shows one at a time, chosen by tabs at its start, so it never needs to scroll and a thing is always in the same tab. A group's section is
+  // its controls' (a control may name its own).
+  for (const el of root.querySelectorAll<HTMLElement>(".tb-options-row [data-section]")) {
+    if (!el.querySelector("[data-section]") && !el.classList.contains("tb-group")) continue;
+    for (const c of el.children) if (!(c as HTMLElement).dataset["section"]) (c as HTMLElement).dataset["section"] = el.dataset["section"]!;
+    el.removeAttribute("data-section");
+  }
+  const sectionTabs = root.querySelector<HTMLElement>(".tb-sections")!;
+  /** The tab last opened for each kind of selection (as its chips name it), so a sheet opens again where it was left. */
+  const openSection = new Map<string, string>();
+  let sectionKey = "";
+  root.querySelector<HTMLElement>("[data-find]")!.addEventListener("click", () => actions.findCommand());
+  sectionTabs.addEventListener("click", (e) => {
+    const t = (e.target as HTMLElement).closest<HTMLElement>("[data-section-tab]");
+    if (!t) return;
+    openSection.set(sectionKey, t.dataset["sectionTab"]!);
+    update();
+  });
+  // (the command palette runs a control of another tab: that tab is opened first; commands/from-bars.ts)
+  root.addEventListener(OPEN_SECTION_EVENT, (e) => {
+    openSection.set(sectionKey, (e as CustomEvent<string>).detail);
+    update();
+  });
+  /** Show only the open section's controls (`picking`: a selection is being edited; a tool's own options are few and show whole). */
+  const organize = (row: HTMLElement, picking: boolean, key: string): void => {
+    // ("*": shown in every section, as a warning that something does not fit)
+    const all = [...row.querySelectorAll<HTMLElement>("[data-section]")].filter((el) => el.dataset["section"] !== "*");
+    for (const el of row.querySelectorAll<HTMLElement>("[data-section-off]")) el.removeAttribute("data-section-off");
+    const offIn = (el: HTMLElement): boolean => {
+      for (let e: HTMLElement | null = el; e && e !== row; e = e.parentElement) if (isOff(e)) return true;
+      return false;
+    };
+    const present = picking ? SECTIONS.filter((sec) => all.some((el) => el.dataset["section"] === sec.id && !offIn(el))) : [];
+    sectionKey = key;
+    if (present.length < 2) {
+      sectionTabs.hidden = true;
+      return;
+    }
+    const want = openSection.get(key);
+    const open = present.find((sec) => sec.id === want) ?? present[0]!;
+    for (const el of all) if (el.dataset["section"] !== open.id) el.setAttribute("data-section-off", "");
+    // (a group, or a set of fields in it, left with nothing to show goes too: deepest first)
+    for (const g of [...row.querySelectorAll<HTMLElement>(".tb-group, .tb-count")].reverse()) {
+      if (g === sectionTabs || g.hidden || g.dataset["section"]) continue;
+      const kids = [...g.children] as HTMLElement[];
+      if (kids.length && kids.every((c) => isOff(c) || c.hasAttribute("data-section-off"))) g.setAttribute("data-section-off", "");
+    }
+    const html = present.map((sec) => `<button type="button" role="tab" class="tb-chip" data-section-tab="${sec.id}" aria-selected="${sec === open}" title="${sec.hint}">${sec.label}</button>`).join("");
+    if (sectionTabs.dataset["html"] !== html) {
+      sectionTabs.dataset["html"] = html;
+      sectionTabs.innerHTML = html;
+    }
+    sectionTabs.hidden = false;
+  };
   // The corner-radius lock, snap and the axis-aligned box are a bar of their own beside the Actions bar. It joins that bar's wrapper (the same parent, so the
   // two line up) in `update`, once the Actions bar exists (it is mounted after this one); its clicks are handled here.
   const pickBar = createBar("Selection options", "Selection");
@@ -1312,8 +1387,9 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
     root.querySelector<HTMLElement>("[data-mask-paint]")!.dataset["for"] = editor.maskEdit ? "pen" : ""; // (only while a brush mask is painted)
     for (const b of root.querySelectorAll<HTMLElement>("[data-mask-ink]")) b.setAttribute("aria-pressed", String(b.dataset["maskInk"] !== "done" && editor.maskEdit?.ink === (b.dataset["maskInk"] === "show" ? "#ffffff" : "#000000")));
     const rowTool = editor.editingText ? "text" : editor.tool; // (while a text is typed in, the bar offers the text's options, whatever tool is active)
-    syncGroups(row, (g) => g.dataset["for"]!.split(" ").includes(rowTool));
-    root.querySelector<HTMLElement>(".toolbar")!.hidden = ![...row.querySelectorAll<HTMLElement>(":scope > .tb-group")].some((g) => !g.hidden);
+    syncGroups(row, (g) => g.dataset["for"] === "*" || g.dataset["for"]!.split(" ").includes(rowTool));
+    organize(row, picking && editor.selection.size > 0, chosen ?? "");
+    root.querySelector<HTMLElement>(".toolbar")!.hidden = ![...row.querySelectorAll<HTMLElement>(":scope > .tb-group:not(.tb-find)")].some((g) => !g.hidden);
     syncScroll(row);
     syncGroups(colourBar.row, (g) => g.dataset["for"]!.split(" ").includes(rowTool));
     colourBar.el.hidden = ![...colourBar.row.querySelectorAll<HTMLElement>(":scope > .tb-group")].some((g) => !g.hidden);

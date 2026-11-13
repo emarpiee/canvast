@@ -1,4 +1,5 @@
 import type { Command } from "./types";
+import { OPEN_SECTION_EVENT } from "../ui/bar";
 
 /**
  * Every control of the bars as a command (ADR 0129), read from the page, so a button added to a bar is in the palette without a line of
@@ -8,7 +9,10 @@ import type { Command } from "./types";
  */
 const CONTROLS = "button, input:not([type=hidden]):not([type=file]), select";
 
-const usable = (el: HTMLElement): boolean => !el.closest("[hidden], [data-off], [data-no-command]") && el.getClientRects().length > 0 && !(el as HTMLButtonElement).disabled;
+/** In a section of the Properties bar that is not open (ADR 0197): it can still be used, its section is opened first. */
+const inClosedSection = (el: HTMLElement): HTMLElement | null => (el.closest("[data-section-off]") ? el.closest<HTMLElement>("[data-section]") : null);
+
+const usable = (el: HTMLElement): boolean => !el.closest("[hidden], [data-off], [data-no-command]") && (el.getClientRects().length > 0 || !!inClosedSection(el)) && !(el as HTMLButtonElement).disabled;
 
 /** The words a control is called by: its accessible name, else its tooltip, else its text. */
 const labelOf = (el: HTMLElement): string => (el.getAttribute("aria-label") ?? el.title ?? el.textContent ?? "").replace(/\s+/g, " ").trim();
@@ -41,6 +45,8 @@ export function barCommands(root: ParentNode = document): Command[] {
         words: `${label} ${field ? "field" : "button"}`,
         enabled: () => usable(el),
         run: () => {
+          const closed = inClosedSection(el);
+          if (closed) el.dispatchEvent(new CustomEvent(OPEN_SECTION_EVENT, { detail: closed.dataset["section"], bubbles: true }));
           if (field) {
             el.focus();
             if (el instanceof HTMLInputElement) el.select();

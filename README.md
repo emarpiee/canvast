@@ -401,7 +401,7 @@ Let a sheet lay its pictures out in a grid that stays tidy as you add more.
 | On a sheet | `Shift+A`, **Auto layout** in the Sheets menu of the Actions bar, or the layout badge on the sheet's row in Layers. It reads the layout from where things are, so they stay put |
 | On loose things | `Shift+A`, or **Auto layout on a new sheet** in the Sheets menu: a new sheet round them (with no fill) that lays them out and fits them |
 
-| Control (Properties bar, sheet selected) | What it does |
+| Control (Properties bar, sheet selected: the Size, Layout, Spacing and Columns & order tabs) | What it does |
 | --- | --- |
 | **Flow** | **Row**, **column**, **wrap** (rows that break at the sheet's width), **grid**, **masonry** or **justified rows** (see below) |
 | **Gap** | Between items along the flow, and between lines |
@@ -470,7 +470,7 @@ Line studies up along their bottom edges.
 | **Size** menu | Gives the selected pictures, note cards, shapes, strokes and text the width or height of the smallest, the middle or the largest of them, in proportion. **Reset size** puts pictures, videos, GIFs, sounds and note cards back to the size they are placed at, at the current zoom (one pixel of the file for one of the screen; a note card at Settings > Notes > Note tool card size), about their middle. Several selected keep their layout: they move apart only as far as it takes to keep their gaps |
 | **Copy, cut, paste, duplicate** | `Ctrl/⌘+C`, `X`, `V`, `D`; `Alt`+drag copies |
 | **Groups** | `Ctrl/⌘+G`; a group (also a boolean group) counts as one thing; its shapes line up with each other only when you select them one by one (in Layers, or inside the group). A group or several selected move from anywhere in their box, gaps too; press outside it to draw a selection box |
-| **Kind chips** | With a mixed selection, chips at the start of the Actions bar (All, Pictures, Media, Shapes, Strokes, Texts) narrow it to one kind |
+| **Kind chips** | With a mixed selection, chips at the start of the Properties bar (All, Pictures, Media, Shapes, Strokes, Texts) narrow both bars to one kind |
 | **Hide and lock** | *Show all hidden* and *Unlock all* bring everything back |
 
 **Snapping** (the magnet button turns it off; *Snap to the grid* and *Snap distance* are in Settings > Drawing):
@@ -2188,8 +2188,8 @@ node scripts/hidden-items.mjs encrypt ~/Art/my-workspace ~/decrypted/sketch.png
 | Part | Where | What it does |
 | --- | --- | --- |
 | **Tool rail** | Left | Undo and Redo, the tools (Import after Note), then Screenshot and Search |
-| **Properties bar** | Top | The options of the tool or of what is selected |
-| **Actions bar** | Bottom, or with the selection | What can be done with the selection, grouped in menus (Align, Arrange, Shapes, Masks, Path tools, Sheets, Export, Initial state) that list only what applies. It sits at the bottom or follows the selection (Settings). When wider than the window it shows a fade and an arrow; the mouse wheel scrolls it sideways |
+| **Properties bar** | Top | How the tool or what is selected looks and behaves: settings only. With a selection, tabs at its start show one section at a time, in a fixed order: **Look** first (fill, outline, adjustments), then what is the kind's own (**Text**, **Shape**, **Picture**), then the sheet's (**Size**, **Layout**, **Spacing**, **Columns & order**, **In layout**, **On sheet**). Each kind of selection opens on the tab used last. **Find** at its end opens the command palette |
+| **Actions bar** | Bottom, or with the selection | What can be done with the selection: actions only, in groups named over their buttons (Items, Files, Edit shapes, Arrange, Attach, Selection, Find), always in that order, some of them menus (Align, Arrange, Shapes, Masks, Path tools, Sheets, Export, Initial state) that list only what applies. It sits at the bottom or follows the selection (Settings). When wider than the window it shows a fade and an arrow; the mouse wheel scrolls it sideways |
 | **Panels** | Either side, or floating | Layers, Bookmarks, Tags, Styles, Adjust, Pattern, Speech balloon: they float or dock to either side, are resizable, and can minimize when inactive. *Reset the panel layout* puts them back |
 | **Zen mode** | `Z`, or the leaf button | Fades the bars and panels until the pointer is over them |
 | **Screenshot** | The camera button | Saves the selection, or the whole view, to the library. Settings choose the format, quality, name, folder and tags, and whether to include the canvas pattern and the interface, a transparent background, and a copy on the clipboard |
@@ -2308,7 +2308,7 @@ Change any shortcut, with a warning when two clash.
 | Bring to front · send to back | `Ctrl/⌘+]` · `Ctrl/⌘+[` |
 | Bookmarks | `[` previous · `]` next · `Alt+1` … `Alt+9` go to bookmark 1 to 9 |
 | Previous view · next view | `Alt+Shift+←` · `Alt+Shift+→` |
-| Command palette | `Ctrl/⌘+K` (`@kind` narrows it; commands can take a value; macros record and replay) |
+| Command palette | `Ctrl/⌘+K`, or **Find** at the end of either bar (`@kind` narrows it; commands can take a value; macros record and replay). An option on a tab of the Properties bar that is not open is found too: running it opens its tab |
 | Context menu | Right-click the canvas |
 | Search | `Ctrl+F` (library: `Ctrl+Shift+F`); on the canvas `#` searches tags, `@` bookmarks, `/` is the command palette and `?` the shortcut list |
 | Focus on selection · fit everything | `F` · `F` again |

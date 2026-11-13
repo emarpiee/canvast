@@ -455,12 +455,15 @@ input[type="range"], .media-scrub, .tb-count[data-scrub] input, input[data-scrub
 :is(.tb-options-row, .ctx-bar, .hud-controls, #toolbar > .dock, .set-tabs) { scroll-padding-inline: var(--sp-10); }
 /* Switched off: for another kind of item than the one being edited (ui/toolbar.ts). */
 [data-off] { display: none !important; }
+/* In a section of the Properties bar that is not open (ADR 0197): its tab shows it. */
+[data-section-off] { display: none !important; }
+.toolbar button[role="tab"][aria-selected="true"] { background: var(--hud-accent); color: var(--hud-accent-fg); }
 .toolbar .tb-chip { width: auto; padding: 0 var(--s-6); font: var(--font-meta); }
 .tb-group { display: flex; gap: var(--s-1); align-items: center; }
 .tb-group[hidden] { display: none; }
 /* The one separator of every bar of groups (the options bar, the dock, any new one): a line before a group that follows a group that is shown,
    never before the first one shown, whatever hidden groups come before it. */
-.tb-group:not([hidden]) ~ .tb-group:not([hidden]) { margin-left: var(--gap); padding-left: var(--near); border-left: 1px solid var(--hud-border); }
+.tb-group:not([hidden], [data-section-off]) ~ .tb-group:not([hidden], [data-section-off]) { margin-left: var(--gap); padding-left: var(--near); border-left: 1px solid var(--hud-border); }
 
 .toolbar button,
 .hud-controls button {
@@ -1013,6 +1016,10 @@ dialog.confirm .secret-field .prompt-input { padding-right: calc(var(--icon-xl) 
 .ctx-bar::-webkit-scrollbar { display: none; }
 .ctx-bar[hidden] { display: none; }
 .ctx-bar .tb-group { flex: none; }
+/* A group with its name over its controls (ADR 0197): the Actions bar's groups say what they hold. */
+.tb-captioned { flex-direction: column; align-items: stretch; gap: 0; }
+.tb-captioned > .tb-row { display: flex; gap: var(--s-1); align-items: center; justify-content: center; }
+.tb-cap { padding-inline: var(--s-2); font: var(--font-meta); color: var(--hud-muted); line-height: 1; text-align: center; white-space: nowrap; }
 .ctx-bar button { display: inline-flex; flex: none; align-items: center; justify-content: center; color: inherit; background: transparent; border: 0; cursor: pointer; }
 .ctx-bar button[hidden] { display: none; }
 /* A button that opens a menu of tools wears a small corner mark (bottom right), so it reads as a group without changing the bar's size. */

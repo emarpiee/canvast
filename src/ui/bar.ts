@@ -5,11 +5,18 @@
  */
 
 /** A control or group is out: hidden by its own logic, or switched off because it is not for the kind being edited (`data-off`). */
+/** Sent from a control of the Properties bar (bubbling) to open the section it is in (ADR 0197): the detail is the section's id. */
+export const OPEN_SECTION_EVENT = "canvast:open-section";
+
+/** A group of a bar with its name shown over its controls (ADR 0197): the controls go in `.tb-row`. */
+export const captionedGroup = (name: string, items: string): string => `<div class="tb-group tb-captioned" role="group" aria-label="${name}"><span class="tb-cap" aria-hidden="true">${name}</span><div class="tb-row">${items}</div></div>`;
+
 export const isOff = (e: HTMLElement): boolean => !!e.hidden || e.hasAttribute("data-off");
 
 /** Show each direct group of `bar` that `wanted` allows (default: all) and that has a control showing; hide the others. */
 export function syncGroups(bar: HTMLElement, wanted: (group: HTMLElement) => boolean = () => true): void {
-  for (const g of bar.querySelectorAll<HTMLElement>(":scope > .tb-group")) g.hidden = g.hasAttribute("data-off") || !wanted(g) || ![...g.children].some((c) => !isOff(c as HTMLElement));
+  // (a group with its name shown holds its controls in a row under the name: those are what count)
+  for (const g of bar.querySelectorAll<HTMLElement>(":scope > .tb-group")) g.hidden = g.hasAttribute("data-off") || !wanted(g) || ![...(g.querySelector(":scope > .tb-row") ?? g).children].some((c) => !isOff(c as HTMLElement));
 }
 
 /**

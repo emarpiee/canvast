@@ -1589,6 +1589,7 @@ async function start(): Promise<void> {
   let lastGrid: { cmd: Extract<LayoutCommand, { grid: unknown }>; ids: string } | null = null;
   const hintLine = { current: null as null | { refresh(): void } };
   mountToolbar(document.getElementById("toolbar")!, editor, doc, {
+    findCommand: () => palette.open(),
     importFiles,
     openSearch: (prefix) => canvasSearch.open(prefix),
     screenshot: () => void takeScreenshot(),
@@ -2327,6 +2328,7 @@ async function start(): Promise<void> {
       },
       setFlag: (flag) => setFlag(doc, editor, flag),
       deleteSelection: () => deleteSelection(doc, editor),
+      findCommand: () => palette.open(),
     },
     () => appView !== "canvas" || textEditor.isOpen,
     () => settings.get("ui.actions"),

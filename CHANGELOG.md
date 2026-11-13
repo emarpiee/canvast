@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.57.23 — The bars organised (2026-11-13)
+
+- **Changed:** the Properties bar shows a selection's options in tabs at its start (Look, Text, Shape, Picture, Size, Layout, Spacing, Columns & order, In layout, On sheet), one at a time, so it no longer scrolls sideways; Look is always first and each kind of selection opens on the tab used last.
+- **Changed:** the Actions bar's groups show their names over their buttons (Items, Files, Edit shapes, Arrange, Attach, Selection).
+- **Added:** **Find** at the end of both bars opens the command palette; an option on a tab that is not open is found too, and running it opens its tab.
+- **Changed:** auto layout's Size choice is in the Size tab, beside the sheet's ratio; Gap and Pad are in Spacing; columns, row height, order and saved layouts in Columns & order.
+
 ## 0.57.22 — Auto layout audited: pictures keep their shape (2026-11-13)
 
 - **Fixed:** a picture set to Fill on a laid-out sheet was stretched out of shape (a wide photograph squashed into a tall cell); it now grows as large as its room allows and keeps its shape. Its choice reads Fill the room.

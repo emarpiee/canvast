@@ -7,7 +7,7 @@ import { ICONS } from "./icons";
 import { GAP_LABEL, GAP_ORDER } from "../doc/arrange";
 import type { GapKey } from "../doc/arrange";
 import { LAYOUT_MENU } from "./toolbar";
-import { syncGroups, syncScroll } from "./bar";
+import { captionedGroup, syncGroups, syncScroll } from "./bar";
 import { isContainer } from "../doc/containers";
 import { closeMoreMenu, MENU_GAP, openMoreMenu } from "./more-menu";
 import { mediaBarTop } from "./media-player";
@@ -164,6 +164,8 @@ export interface ContextActions {
   setKeepTidy(on: boolean): void;
   setFlag(flag: "hidden" | "locked"): void;
   deleteSelection(): void;
+  /** Open the command palette, to find an option or action by its name. */
+  findCommand(): void;
 }
 
 const GAP_HINT: Record<GapKey, string> = { none: "Items touch", tight: "A thin space between items", normal: "A normal space between items", wide: "A wide space between items", wider: "The widest space between items" };
@@ -184,7 +186,8 @@ export function mountContextBar(host: HTMLElement, editor: EditorState, doc: Doc
   bar.setAttribute("aria-label", "Selection actions");
   bar.hidden = true;
   const btn = (act: string, icon: string, label: string, extra = ""): string => `<button type="button" data-ctx="${act}" ${extra} aria-label="${label}" title="${label}">${icon}</button>`;
-  const group = (name: string, ...items: string[]): string => `<div class="tb-group" role="group" aria-label="${name}">${items.join("")}</div>`;
+  // (each group shows its name over its buttons, so a thing is found by the name of its group: ADR 0197)
+  const group = (name: string, ...items: string[]): string => captionedGroup(name, items.join(""));
   const layoutButtons = (head: string): string =>
     LAYOUT_MENU.find((g) => g.head.startsWith(head))!.items.map((i) => btn("layout", i.icon, head === "Align" ? `Align ${i.label.toLowerCase()}` : head === "Arrange" ? `Arrange in a grid: ${i.label.toLowerCase()}` : `Distribute ${i.label.toLowerCase()}`, `data-layout="${i.id}"`)).join("");
   bar.innerHTML =
@@ -206,7 +209,8 @@ export function mountContextBar(host: HTMLElement, editor: EditorState, doc: Doc
     group("Attach",
       btn("attach", ICONS.link, "Attach the selected objects to another object: they follow the object you click next when it moves", 'aria-pressed="false"'),
       btn("detach", ICONS.unlink, "Detach the selected objects: they stop following another object")) +
-    group("Selection", btn("lock", ICONS.lockKeyhole, "Lock selection"), btn("hide", ICONS.eyeOff, "Hide selection"), btn("delete", ICONS.trash, "Delete selection"));
+    group("Selection", btn("lock", ICONS.lockKeyhole, "Lock selection"), btn("hide", ICONS.eyeOff, "Hide selection"), btn("delete", ICONS.trash, "Delete selection")) +
+    group("Find", btn("find", ICONS.findCommand, "Find an option or action by its name (Ctrl+K)"));
   // The bar is placed inside a wrapper, which the selection options bar (ui/toolbar.ts) joins: one parent for both, so they line up.
   const wrap = document.createElement("div");
   wrap.className = "ctx-wrap";
@@ -401,6 +405,7 @@ export function mountContextBar(host: HTMLElement, editor: EditorState, doc: Doc
       case "lock": actions.setFlag("locked"); break;
       case "hide": actions.setFlag("hidden"); break;
       case "delete": actions.deleteSelection(); break;
+      case "find": actions.findCommand(); break;
     }
   });
   // The bar must not start a drag or a selection change on the canvas below it.

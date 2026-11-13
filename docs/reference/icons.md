@@ -338,3 +338,4 @@ One icon per function: two buttons that do different things never share an icon,
 | `arrow-down-1-0` | Library sidebar sort: in your order (saved searches) |
 | `radio-tower` | Settings tab: Sharing (this workspace on the local network) |
 | `cast` | Switch workspace: Connect to a shared workspace (another computer's, on the local network) |
+| `text-search` | Find (Properties and Actions bars): the command palette, to find any option or action by name |
