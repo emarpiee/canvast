@@ -135,6 +135,9 @@ test("a text's chips are Text, Text outline and Paragraph, every field named in 
   await p.keyboard.press("t");
   await p.mouse.click(500, 420);
   await p.keyboard.type("abc");
+  // while typing, the format bar stands where the Properties bar is: just above the words, as the chips stand above a selection (placeAbove)
+  await expect.poll(async () => { const [f, w] = [(await p.locator(".text-format").boundingBox())!, (await p.getByTestId("text-editor").boundingBox())!]; return w.y - (f.y + f.height); }, "above the words, near them").toBeGreaterThan(0);
+  expect((await p.getByTestId("text-editor").boundingBox())!.y - ((await p.locator(".text-format").boundingBox())!.y + (await p.locator(".text-format").boundingBox())!.height)).toBeLessThan(80);
   await p.keyboard.press("Escape");
   await p.keyboard.press("v");
   await select(app, [(await objects(app)).at(-1)!.id]);

@@ -47,6 +47,13 @@ Unverified / Committed / Next bounded task**.
 - **Committed:** v0.57.19 on `main`.
 - **Next bounded task:** retake the README screenshots in Stone when the owner says.
 
+## v0.58.24: the text format bar stands where the Properties bar does (2026-11-14)
+
+- **Implemented:** `ui/near-selection.ts`: `placeAbove` (one call for the chips by the selection and the format bar) and `boxOfElementIn`; the text editor takes the Properties place (`ui.properties`) and has `follow()`, called after each frame (`textFollow` in `main.ts`); its groups are `captionedGroup`s with the shared `hoverNames`; its menus open with `keepOpen` and a `refresh` that ticks the heading or list where the caret is; `setMenuAvoid` gives the words being typed while they are. Tests: `text.spec.ts`'s `format()` closes the menu with Escape after a choice (and checks the text is still typed); `bar-layouts.spec.ts` checks the format bar above the words.
+- **Tested:** build and typecheck here. Scratch in Chromium and Firefox: near, the bar 38 px above the words; at the top, under the bars; the Paragraph menu stays open after Heading 2 then Heading 1, ticking each; Escape closes the menu and the text is still typed; the menu opens above the bar, the words in view.
+- **Unverified:** the E2E specs themselves (on GitHub).
+- **Committed:** v0.58.24 on `main`.
+
 ## v0.58.23: the vibrance test measures colourfulness (2026-11-14)
 
 - **Implemented:** `adjust.test.ts` "vibrance lifts a dull colour more than a vivid one" compares OKLab chroma before and after (it failed on 0.58.22's CI: the vivid red, cut at the edge of sRGB, moved its RGB spread by 25).

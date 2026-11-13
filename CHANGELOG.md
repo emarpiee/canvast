@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.58.24 — The text format bar stands where the Properties bar does (2026-11-14)
+
+- **Changed:** while words are typed, their format bar stands where the Properties bar is: just above the words when it is near the selection, at the top otherwise (the rule of the chips by the selection, shared).
+- **Changed:** the format bar's groups are named as the Actions bar's (Style, Words, Paragraph, Finish), under, over, on hover or not, as Settings > Appearance says.
+- **Changed:** its menus (size, paragraph, list) stay open after a choice, ticking the choice made, until Escape or a press outside, as every group menu of a bar.
+- **Fixed:** a menu of the format bar could cover the words being typed.
+
 ## 0.58.23 — Vibrance test measures colourfulness (2026-11-14)
 
 - **Fixed:** the unit test of vibrance measured the change of the RGB spread, which a colour kept inside sRGB in OKLab moves differently; it measures how much more colourful each colour becomes (OKLab chroma): a dull one about 1.9 times, a vivid one about 1.04.

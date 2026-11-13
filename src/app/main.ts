@@ -883,6 +883,7 @@ async function start(): Promise<void> {
   let appView: AppView = "canvas";
   let contextUpdate: () => void = () => undefined;
   let propsFollow: () => void = () => undefined;
+  let textFollow: () => void = () => undefined; // (set once the text editor is made: a frame can come before)
   let drawCount = 0;
   const draw = (): void => {
     drawCount++;
@@ -895,6 +896,7 @@ async function start(): Promise<void> {
       quality.record(ms);
       contextUpdate();
       propsFollow();
+      textFollow(); // (the format bar of the words being typed where the Properties bar is)
     }
     const waiters = frameWaiters;
     frameWaiters = [];
@@ -1165,7 +1167,8 @@ async function start(): Promise<void> {
     await Promise.all(fonts.map((e) => fontLoader.ensure(e.hash)));
     return fonts.map((e) => ({ hash: e.hash, name: e.name.replace(/\.[A-Za-z0-9]{1,5}$/, ""), unusable: fontLoader.state(e.hash) === "failed" ? fontLoader.reason(e.hash) : "" }));
   };
-  const textEditor = mountTextEditor(host, view, doc, editor, libraryFonts);
+  const textEditor = mountTextEditor(host, view, doc, editor, libraryFonts, () => settings.get("ui.properties"));
+  textFollow = textEditor.follow;
   const copySelectedMarkdown = (): void => {
     const md = doc.ordered().flatMap((o) => (o.kind === "text" && editor.selection.has(o.id) ? [o.md] : []));
     if (!md.length) return;
@@ -2171,6 +2174,12 @@ async function start(): Promise<void> {
   // The selection action bar follows the selection box (updated after each drawn frame).
   // Menus and pickers keep off the selected items.
   setMenuAvoid(() => {
+    // (while words are typed, they are what a menu of the format bar must not cover: the change it makes is seen there)
+    const typed = textEditor.isOpen && appView === "canvas" ? document.querySelector<HTMLElement>(".text-editor:not([hidden])") : null;
+    if (typed) {
+      const [r, c] = [typed.getBoundingClientRect(), canvas.getBoundingClientRect()];
+      return { left: r.left - c.left, top: r.top - c.top, right: r.right - c.left, bottom: r.bottom - c.top };
+    }
     const b = editor.selectionBoxOnScreen;
     if (!b || editor.selection.size === 0 || appView !== "canvas") return null; // (the canvas's selection is not on the screen in another view)
     const xs = b.frame.corners.map((c) => c[0]);

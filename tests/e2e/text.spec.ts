@@ -37,7 +37,13 @@ function isText(c: [number, number, number]): boolean {
 /** A command of the text format bar that sits in one of its menus (ADR 0198): open the menu, choose the row. */
 async function format(p: Page, menu: string, item: string): Promise<void> {
   await p.getByRole("toolbar", { name: "Text format" }).getByRole("button", { name: menu }).click();
-  await p.locator(".pop-menu").getByRole("menuitem", { name: item }).click();
+  // (a choice among several, a heading level or a kind of list, is a ticked row: a menuitemradio)
+  await p.locator(".pop-menu").getByRole("menuitem", { name: item }).or(p.locator(".pop-menu").getByRole("menuitemradio", { name: item })).click();
+  // (the menu stays open after a choice, as every group menu of a bar: Escape closes it, the text still being typed)
+  await expect(p.locator(".pop-menu"), "still open after a choice").toBeVisible();
+  await p.keyboard.press("Escape");
+  await expect(p.locator(".pop-menu")).toHaveCount(0);
+  await expect(p.getByTestId("text-editor"), "Escape closed the menu, not the text").toBeVisible();
 }
 
 test("type, format, save, reload and copy a text object as Markdown", async ({ app }) => {

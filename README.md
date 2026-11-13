@@ -830,7 +830,7 @@ Set a cover's type: a title and a subtitle in fonts of your own.
 
 | Feature | What it does |
 | --- | --- |
-| **Formatting** | Bold, italic, underline, strikethrough, links, colour and size of any range, headings, bulleted, numbered and nested lists (`Tab` nests a list item). The bar over the words keeps them in groups: **Style**, **Words** (the size menu and the font), **Paragraph** (the paragraph and list menus) and **Finish**. **Copy Markdown** is one click away |
+| **Formatting** | Bold, italic, underline, strikethrough, links, colour and size of any range, headings, bulleted, numbered and nested lists (`Tab` nests a list item). The format bar stands where the Properties bar does (at the top, or just above the words being typed) and keeps its tools in named groups: **Style**, **Words** (the size menu and the font), **Paragraph** (the paragraph and list menus) and **Finish**. Its menus stay open after a choice, ticking the one made, until `Esc` or a press outside, and never cover the words. **Copy Markdown** is one click away |
 | **Look** | Colour or gradient, outline, size, line height, letter spacing, alignment, auto or fixed width, paragraph spacing, indent, case, line limit, a set height, kerning, OpenType features and the axes of variable fonts |
 | **Fonts** | Import `.ttf`, `.otf`, `.woff` or `.woff2` into the library, including variable fonts. One text may use several fonts. Right-to-left and mixed-direction text are supported |
 | **Paragraph and box** | At the start of the text's bar: the paragraph and card settings (a text can sit on a coloured card; **Make note files** turns such texts into notes) |

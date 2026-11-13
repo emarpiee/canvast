@@ -2,7 +2,7 @@ import type { PathObject } from "../doc/model";
 import { flowOf } from "../text/shape-flow";
 import { copyPlainText } from "../app/system-clipboard";
 import * as D from "../core/dyadic";
-import { syncScroll } from "./bar";
+import { captionedGroup, hoverNames, syncScroll } from "./bar";
 import { newInk } from "../render/ink";
 import type { WorldPoint } from "../core/camera";
 import { lookAt, worldToScreen } from "../core/camera";
@@ -27,6 +27,7 @@ import type { MenuItem } from "./more-menu";
 import { esc } from "./format";
 import { openColourPopover } from "./colour-popover";
 import { promptDialog } from "./confirm";
+import { boxOfElementIn, placeAbove } from "./near-selection";
 
 /**
  * WYSIWYG text editing with a native contenteditable overlay placed exactly
@@ -94,6 +95,8 @@ export interface TextEditor {
   look(): ReturnType<typeof lookOf> | null;
   /** Change the look of the text being edited (stored when the edit is finished). */
   restyle(look: TextLook): void;
+  /** Keep the format bar where the Properties bar is (ADR 0198): above the words being typed when it is by the selection; called every frame. */
+  follow(): void;
 }
 
 export function mountTextEditor(
@@ -102,6 +105,8 @@ export function mountTextEditor(
   doc: DocumentStore,
   editor: EditorState,
   fonts: () => Promise<Array<{ hash: string; name: string; unusable: string }>> = async () => [],
+  /** Where the Properties bar is (the setting): the format bar of the words being typed stands there too. */
+  place: () => "bar" | "near" = () => "bar",
 ): TextEditor {
   const box = document.createElement("div");
   box.className = "text-editor";
@@ -119,13 +124,15 @@ export function mountTextEditor(
   bar.hidden = true;
   const button = (f: { cmd?: string; menu?: string; icon: string; label: string }): string =>
     `<button type="button" ${f.menu ? `data-format-menu="${f.menu}" aria-haspopup="menu" aria-expanded="false"` : `data-cmd="${f.cmd}"`} aria-label="${f.label}" title="${f.label}">${f.icon}</button>`;
-  bar.innerHTML = FORMAT_GROUPS.map((g) => `<div class="tb-group" role="group" aria-label="${g.name}">${[...g.buttons.map(button), ...g.menus.map((m) => button({ menu: m.id, icon: m.icon, label: m.label }))].join("")}</div>`).join("");
+  // (named groups as the Actions bar's and the Properties chips': their names as Settings > Appearance > group names say, on hover in a layer)
+  bar.innerHTML = FORMAT_GROUPS.map((g) => captionedGroup(g.name, [...g.buttons.map(button), ...g.menus.map((m) => button({ menu: m.id, icon: m.icon, label: m.label }))].join(""))).join("");
   const fontSelect = document.createElement("select");
   fontSelect.dataset["fontOfWords"] = "";
   fontSelect.setAttribute("aria-label", "Font of the selected words");
   fontSelect.title = "Font of the selected words";
-  bar.querySelector('[aria-label="Words"]')!.append(fontSelect);
+  bar.querySelector('[aria-label="Words"] > .tb-row')!.append(fontSelect);
   host.append(box, bar);
+  const names = hoverNames(bar, host);
 
   let target: TextObject | null = null;
   let isNew = false;
@@ -438,13 +445,24 @@ export function mountTextEditor(
     const menuBtn = (e.target as HTMLElement).closest<HTMLElement>("[data-format-menu]");
     const menu = menuBtn && FORMAT_MENUS.get(menuBtn.dataset["formatMenu"]!);
     if (menuBtn && menu) {
-      // (a choice of the menu runs on the words still selected in the text: the text takes the focus back first)
-      openMoreMenu(menuBtn, menu.items.map((f): MenuItem => ({ id: f.cmd, label: f.label, hint: f.hint, icon: f.icon, run: () => run(f.cmd, menuBtn) })), menu.label);
+      // (a choice of the menu runs on the words still selected in the text: the text takes the focus back first; the menu stays open, as
+      // every group menu of a bar, with the choice now made ticked, until Escape or a press outside)
+      const items = (): MenuItem[] => menu.items.map((f): MenuItem => ({ id: f.cmd, label: f.label, hint: f.hint, icon: f.icon, ...(isOn(f.cmd) === null ? {} : { checked: isOn(f.cmd)! }), run: () => run(f.cmd, menuBtn) }));
+      openMoreMenu(menuBtn, items(), menu.label, { keepOpen: true, refresh: items });
       return;
     }
     const cmd = (e.target as HTMLElement).closest<HTMLElement>("[data-cmd]")?.dataset["cmd"];
     if (cmd) run(cmd, e.target as HTMLElement);
   });
+  /** Whether a menu's choice is what the words where the caret is have (a heading level, a kind of list); null: not a choice of that kind. */
+  const isOn = (cmd: string): boolean | null => {
+    const block = (document.queryCommandValue("formatBlock") || "p").toLowerCase().replace(/[<>]/g, "");
+    if (cmd === "h1" || cmd === "h2" || cmd === "h3") return block === cmd;
+    if (cmd === "p") return !["h1", "h2", "h3"].includes(block);
+    if (cmd === "ul") return document.queryCommandState("insertUnorderedList");
+    if (cmd === "ol") return document.queryCommandState("insertOrderedList");
+    return null;
+  };
   const run = (cmd: string, from: HTMLElement): void => {
     box.focus({ preventScroll: true });
     if (cmd === "done") commit();
@@ -527,7 +545,17 @@ export function mountTextEditor(
     return true;
   };
 
+  /** The format bar where the Properties bar is: under the bars at the top (the stylesheet), or just above the words being typed. */
+  const follow = (): void => {
+    const near = !bar.hidden && place() === "near";
+    bar.classList.toggle("is-near", near);
+    if (near) placeAbove(bar, boxOfElementIn(host, box));
+    else if (bar.style.left || bar.style.top) bar.style.left = bar.style.top = "";
+    if (!bar.hidden) names.place(); // (its group names, shown on hover, over or under it where it now is)
+  };
+
   return {
+    follow,
     open,
     commit,
     add,

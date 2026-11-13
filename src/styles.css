@@ -800,6 +800,7 @@ dialog.confirm .secret-field .prompt-input { padding-right: calc(var(--icon-xl) 
 /* The text format bar (ui/text-editor.ts) is a bar like the others (ADR 0128): a fixed place, top centre under the Properties bar, never attached to the text, scrolling sideways when it is wider than the room. */
 .text-format { position: absolute; z-index: var(--z-edge); left: 50%; top: calc(var(--bar-bottom, 56px) + var(--near)); transform: translateX(-50%); flex-wrap: nowrap; max-width: calc(100% - 2 * var(--edge)); overflow-x: auto; scrollbar-width: none; }
 .text-format::-webkit-scrollbar { display: none; }
+.text-format.is-near { transform: none; } /* (placed just above the words being typed, as the Properties chips by the selection: placeAbove) */
 
 /* Floating Layers panel (ui/layers-panel.ts) */
 #side-panels, #side-panels-left { position: absolute; top: calc(var(--bar-bottom, 56px) + var(--edge)); right: var(--edge); width: 268px; max-height: calc(100% - 140px); display: flex; flex-direction: column; gap: var(--s-4); pointer-events: none; z-index: var(--z-edge); }
@@ -1027,8 +1028,8 @@ dialog.confirm .secret-field .prompt-input { padding-right: calc(var(--icon-xl) 
 .bar-name { position: absolute; top: 0; padding: var(--s-1) var(--s-4); font: var(--font-meta); line-height: 1; color: var(--hud-muted); white-space: nowrap; background: var(--hud-bg); border: 1px solid var(--hud-border); border-radius: var(--r-pill); transform: translate(-50%, calc(-100% - var(--near))); }
 :root[data-group-names="bottom-hover"] .bar-name { top: 100%; transform: translate(-50%, var(--near)); }
 @media (any-hover: hover) {
-  :root[data-group-names$="hover"] :is(.ctx-bar, .props-row) .tb-captioned > .tb-cap { display: none; }
-  :root[data-group-names$="hover"] :is(.ctx-wrap:has(> .ctx-bar:is(:hover, :focus-within)), .props-near:is(:hover, :focus-within), .props-chips:is(:hover, :focus-within)) > .bar-names { display: block; }
+  :root[data-group-names$="hover"] :is(.ctx-bar, .props-row, .text-format) .tb-captioned > .tb-cap { display: none; }
+  :root[data-group-names$="hover"] :is(.ctx-wrap:has(> .ctx-bar:is(:hover, :focus-within)), .props-near:is(:hover, :focus-within), .props-chips:is(:hover, :focus-within), :has(> .text-format:is(:hover, :focus-within))) > .bar-names { display: block; }
 }
 .ctx-bar button { display: inline-flex; flex: none; align-items: center; justify-content: center; color: inherit; background: transparent; border: 0; cursor: pointer; }
 .ctx-bar button[hidden] { display: none; }
