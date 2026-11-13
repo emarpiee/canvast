@@ -19,7 +19,8 @@ async function balloon(s: Scene, b: Balloon): Promise<string> {
   await s.tool("select");
   await s.select([id]);
   if (b.kind) {
-    await p.locator("[data-bln='preset']").selectOption(b.kind); // (the balloon's Body options, in the Properties bar)
+    await (await s.control("[data-bln='preset']")).selectOption(b.kind); // (the balloon's Body chip)
+    await p.keyboard.press("Escape"); // (its options closed: the words are typed next)
   }
   // its words first (a double-click in the body, where it was drawn), then its tail to the speaker
   await p.mouse.dblclick((x0 + x1) / 2, (y0 + y1) / 2);
@@ -98,7 +99,8 @@ test("balloon-kinds", async ({ scene: s }) => {
   made.push(await balloon(s, { box: [300, 600, 700, 670], words: "LATER THAT NIGHT.", kind: "caption", fill: "#f3e3a6" }));
   await s.select([made[2]!]);
   await s.settle();
-  await s.shot("balloon-kinds", await s.around({ objects: made, els: ["[data-bl-group='body']"], pad: 30 }));
+  await s.control("[data-bln='preset']"); // (the Body chip's options open: its Preset)
+  await s.shot("balloon-kinds", await s.around({ objects: made, els: ["[data-bln='preset']", ...(await s.chipEls())], pad: 30 }));
 });
 
 test("balloons", async ({ scene: s }) => {
@@ -113,7 +115,8 @@ test("balloons", async ({ scene: s }) => {
   await s.fit([pic!], 0.62, [0.4, 0.5]);
   await s.select([id]);
   await s.settle();
-  await s.shot("balloons", await s.around({ objects: [pic!], els: ["[data-bl-group='body']"], pad: 24 }));
+  await s.control("[data-bln='tail']"); // (the Tail chip's options open: where the tail points is the picture's point)
+  await s.shot("balloons", await s.around({ objects: [pic!], els: ["[data-bln='tail']", ...(await s.chipEls())], pad: 24 }));
 });
 
 test("text", async ({ scene: s }) => {
@@ -138,5 +141,6 @@ test("text", async ({ scene: s }) => {
   await s.p.keyboard.type("THE CROSSING");
   await s.p.keyboard.press("Control+a");
   await s.settle();
-  await s.shot("text", await s.around({ objects: [pic!, sub], els: ["[data-text-size]"], pad: 30 }));
+  await s.control("[data-text-size]"); // (its chip's options open, framed with what they edit)
+  await s.shot("text", await s.around({ objects: [pic!, sub], els: ["[data-text-size]", ...(await s.chipEls())], pad: 30 }));
 });

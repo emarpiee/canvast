@@ -26,7 +26,7 @@ const curve = (pts: Array<[number, number]>, n = 10): Array<[number, number]> =>
 async function shape(s: Scene, kind: string, from: [number, number], to: [number, number], fill: string): Promise<string> {
   const before = new Set(await s.ids());
   await s.tool("shape");
-  await s.p.locator(`[data-shape-kind="${kind}"]`).click();
+  await (await s.control(`[data-shape-kind="${kind}"]`)).click();
   await s.app.drag({ x: from[0], y: from[1] }, { x: to[0], y: to[1] }, 4);
   const id = (await s.ids()).find((i) => !before.has(i))!;
   await s.paint(id, "fill", fill);
@@ -52,7 +52,8 @@ test("pen", async ({ scene: s }) => {
     await line(s, curve([at(0.5, 0.12), at(0.42, 0.35), at(0.52, 0.6), at(0.47, 0.92)]));
   }
   await s.settle();
-  await s.shot("pen", await s.around({ objects: ids, els: ["[data-pen-kind]"], pad: 24 }));
+  await s.control("[data-pen-kind]"); // (its chip's options open, framed with what they edit)
+  await s.shot("pen", await s.around({ objects: ids, els: ["[data-pen-kind]", ...(await s.chipEls())], pad: 24 }));
 });
 
 test("shape-kinds", async ({ scene: s }) => {
@@ -67,7 +68,8 @@ test("shape-kinds", async ({ scene: s }) => {
     await shape(s, "rect", [470, 520], [970, 590], "#2a3038"),
   ];
   await s.tool("shape");
-  await s.shot("shape-kinds", await s.around({ objects: ids, els: ['[data-shape-kind="rect"]', '[data-shape-kind="star"]'], pad: 30 }));
+  await s.control('[data-shape-kind="rect"]'); // (its chip's options open, framed with what they edit)
+  await s.shot("shape-kinds", await s.around({ objects: ids, els: ['[data-shape-kind="rect"]', '[data-shape-kind="star"]', ...(await s.chipEls())], pad: 30 }));
 });
 
 // A wave crest built as an icon is: circles joined, then circles cut out of it for the curl and the claws.
@@ -133,7 +135,7 @@ test("fill-gradient", async ({ scene: s }) => {
   await s.canvas("Sky");
   const id = await shape(s, "rect", [420, 250], [900, 600], "#f2a65a");
   await s.select([id!]);
-  await s.p.locator('[data-paint="fill"]').filter({ visible: true }).first().click();
+  await (await s.control('[data-paint="fill"]')).click();
   await s.p.locator('.colour-pop [data-mode="linear"]').click();
   await s.settle();
   await s.shot("fill-gradient", await s.around({ objects: [id!], els: [".colour-pop"], pad: 30 }));
@@ -201,7 +203,7 @@ test("colour-picker", async ({ scene: s }) => {
   const b = (await s.box([pic!]))!;
   const sw = await shape(s, "rect", [b.maxX + 30, b.minY], [b.maxX + 150, b.minY + 120], "#1f3a5f");
   await s.select([sw]);
-  await s.p.locator('[data-paint="fill"]').filter({ visible: true }).first().click();
+  await (await s.control('[data-paint="fill"]')).click();
   await s.settle();
   await s.shot("colour-picker", await s.around({ objects: [pic!, sw], els: [".colour-pop"], pad: 24 }));
 });
@@ -229,12 +231,13 @@ test("pen-stabilizer", async ({ scene: s }) => {
   const b = (await s.box([pic!]))!;
   await s.tool("pen");
   await setPenColour(s.p, "#7a2e1f");
-  const stab = s.p.locator("[data-stab]");
+  const stab = await s.control("[data-stab]");
   if ((await stab.getAttribute("aria-pressed")) !== "true") await stab.click();
   // the horse's back and rump as one long line, drawn with a shaky hand: the stabilizer keeps it calm
   const at = (x: number, y: number): [number, number] => [b.maxX + 40 + (b.maxX - b.minX) * x, b.minY + (b.maxY - b.minY) * y];
   const pts = curve([at(0.02, 0.35), at(0.2, 0.24), at(0.42, 0.3), at(0.62, 0.26), at(0.8, 0.4), at(0.86, 0.7)], 24).map(([x, y], i) => [x + Math.sin(i * 1.7) * 3, y + Math.cos(i * 2.3) * 3] as [number, number]);
   await line(s, pts);
   await s.settle();
-  await s.shot("pen-stabilizer", await s.around({ objects: await s.ids(), els: ["[data-stab]"], pad: 30 }));
+  await s.control("[data-stab]"); // (its chip's options open, framed with what they edit)
+  await s.shot("pen-stabilizer", await s.around({ objects: await s.ids(), els: ["[data-stab]", ...(await s.chipEls())], pad: 30 }));
 });

@@ -292,11 +292,11 @@ Crop a study down to the part you are learning from, without changing the file.
 
 Mirror a drawing to see its proportions with fresh eyes.
 
-![De Gheyn's two studies of a saddled horse beside a mirrored copy, labelled original and flipped, the Flip buttons in the bar above](docs/screenshots/flip.webp)
+![De Gheyn's two studies of a saddled horse beside a mirrored copy, labelled original and flipped, the Flip buttons in the Picture chip's options above the copy](docs/screenshots/flip.webp)
 
 Give a print rounded corners and a thin outline, as a card on a mood board.
 
-![Hokusai's Mystical Bird with rounded corners and a cream outline, the corner radius in the bar above](docs/screenshots/corners.webp)
+![Hokusai's Mystical Bird with rounded corners and a cream outline, the corner radius in the Shape chip's options above it](docs/screenshots/corners.webp)
 
 | Feature | What it does |
 | --- | --- |
@@ -375,7 +375,7 @@ A sheet (`C`) is an area that holds other objects and cuts them at its edge: a b
 
 Put a print and its label on a sheet: the sheet holds them, moves them as one and cuts what goes past its edges.
 
-![Mary Delany's Botanical Study and its label on a cream sheet, the sheet selected with its ratio in the bar above](docs/screenshots/sheets.webp)
+![Mary Delany's Botanical Study and its label on a cream sheet, the sheet selected with its ratio in the Size chip's options above it](docs/screenshots/sheets.webp)
 
 | Feature | What it does |
 | --- | --- |
@@ -395,7 +395,7 @@ Auto layout places what is on a sheet by rules, so a board, a page of panels or 
 
 Let a sheet lay its pictures out in a grid that stays tidy as you add more.
 
-![The horse board's sheet selected, its pictures in a three-column grid, the gap and padding handles on it, the auto layout controls in the bar above](docs/screenshots/auto-layout.webp)
+![The horse board's sheet selected, its pictures in a three-column grid, the gap and padding handles on it, the Layout chip's options open above it](docs/screenshots/auto-layout.webp)
 
 | Turn it on | |
 | --- | --- |
@@ -553,11 +553,11 @@ The **Pen** (`P`) draws strokes with pressure, tilt and a stabilizer, made at th
 
 Find the gesture: draw a line of action over each figure, from the head through the weight to the foot that carries it.
 
-![Three Degas dancers with a red line of action drawn over each with the Pen, the Pen's kinds in the bar above](docs/screenshots/pen.webp)
+![Three Degas dancers with a red line of action drawn over each with the Pen, the Pen's kinds in the Brush chip's options](docs/screenshots/pen.webp)
 
 Draw a long, calm contour: the stabilizer smooths the wobble of the hand.
 
-![Delacroix's Study of a Horse beside a long ink line of a horse's back drawn with the Pen, the Stabilizer on in the bar above](docs/screenshots/pen-stabilizer.webp)
+![Delacroix's Study of a Horse beside a long ink line of a horse's back drawn with the Pen, the Stabilizer on in the Brush chip's options](docs/screenshots/pen-stabilizer.webp)
 
 | Setting | What it does |
 | --- | --- |
@@ -573,7 +573,7 @@ Draw a long, calm contour: the stabilizer smooths the wobble of the hand.
 
 Block in a composition as flat value shapes before painting.
 
-![A landscape thumbnail made of shapes in four greys: sky, sun, two hills and a near ground, the Shape tool's kinds in the bar above](docs/screenshots/shape-kinds.webp)
+![A landscape thumbnail made of shapes in four greys: sky, sun, two hills and a near ground, the Shape tool's kinds in the Shape chip's options](docs/screenshots/shape-kinds.webp)
 
 | Feature | What it does |
 | --- | --- |
@@ -791,11 +791,11 @@ Press `K`, drag to draw a balloon, and double-click it to type its words.
 
 Pick the balloon that fits the line: speech, thought, a shout or a caption box.
 
-![Four lettered balloons: a speech balloon, a thought cloud with bubbles, a burst shouting Look out! and a yellow caption box, the Preset choice of the Speech balloon panel](docs/screenshots/balloon-kinds.webp)
+![Four lettered balloons: a speech balloon, a thought cloud with bubbles, a burst shouting Look out! and a yellow caption box, the Preset in the selected balloon's Body chip](docs/screenshots/balloon-kinds.webp)
 
 Point a balloon's tail at the speaker.
 
-![A speech balloon over Le Prince's peasants fording a stream, its tail pointing at them, selected with its handles, the Speech balloon panel open](docs/screenshots/balloons.webp)
+![A speech balloon over Le Prince's peasants fording a stream, its tail pointing at them, selected with its handles, its Tail chip's options open](docs/screenshots/balloons.webp)
 
 | Part | What you can do |
 | --- | --- |
@@ -820,7 +820,7 @@ Press `T`, click and type. Text is stored as Markdown, and you can zoom into a l
 
 Set a cover's type: a title and a subtitle in fonts of your own.
 
-![Hokusai's Great Wave with the title THE CROSSING being set in Bangers above it and a subtitle in Cormorant Garamond italic, the text bar above](docs/screenshots/text.webp)
+![Hokusai's Great Wave with the title THE CROSSING being set in Bangers above it and a subtitle in Cormorant Garamond italic, the Text chip's options open](docs/screenshots/text.webp)
 
 | Making text | |
 | --- | --- |

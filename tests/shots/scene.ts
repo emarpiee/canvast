@@ -4,7 +4,7 @@
 // picture of just what the README section is about. Every shot is declared in manifest.ts; `npm run check:shots` matches it to the README.
 import { readFileSync, mkdirSync, readdirSync } from "node:fs";
 import { resolve } from "node:path";
-import type { Page } from "@playwright/test";
+import type { Locator, Page } from "@playwright/test";
 import { test as base, expect, chooseInMenu, type App } from "../e2e/harness";
 import { SHOTS } from "./manifest";
 
@@ -52,6 +52,8 @@ export class Scene {
     await this.p.evaluate(([t, h, pt, d]) => {
       const s = window.__canvastDebug.setSetting;
       s("ui.theme", t); s("ui.hue", h); s("ui.pattern", pt); s("ui.density", d); s("ui.names", "off");
+      // (the app's own places, as a person sees it: the specs keep the bar at the top, harness.ts)
+      s("ui.properties", "near"); s("ui.groupNames", "top");
     }, [theme, hue, pattern, density] as const);
     await this.settle();
   }
@@ -90,11 +92,32 @@ export class Scene {
     }, [dx, dy]);
     await this.settle(100);
   }
+  /**
+   * A control of the Properties bar wherever it stands: shown (in the bar, or in a chip's form already open), else in the form of its chip,
+   * opened (its section's chip, by the selection or at the top: ADR 0198).
+   */
+  async control(sel: string): Promise<Locator> {
+    const shown = this.p.locator(sel).filter({ visible: true });
+    if (await shown.count()) return shown.first();
+    const section = await this.p.locator(sel).first().evaluate((el) => (el.closest("[data-section]") as HTMLElement | null)?.dataset["section"] ?? null);
+    expect(section, `${sel} belongs to a section of the Properties bar`).not.toBeNull();
+    const chip = this.p.locator(`.props-near:not([hidden]) [data-vchip="${section}"], .props-chips:not([hidden]) [data-vchip="${section}"]`).first();
+    if ((await chip.getAttribute("aria-expanded")) !== "true") await chip.click();
+    const inForm = this.p.locator(`.vchip-pop ${sel}`).filter({ visible: true }).first();
+    await expect(inForm, `${sel} in the ${section} chip's options`).toBeVisible();
+    return inForm;
+  }
+  /** The chips of the Properties bar and the open chip's form, to frame with what they edit (those on the screen). */
+  async chipEls(): Promise<string[]> {
+    const out: string[] = [];
+    for (const sel of [".props-near:not([hidden])", ".props-chips:not([hidden])", ".vchip-pop"]) if (await this.p.locator(sel).filter({ visible: true }).count()) out.push(sel);
+    return out;
+  }
   /** Paint an object's fill or outline with a colour, through the bar's picker. */
   async paint(id: string, which: "fill" | "stroke", colour: string): Promise<void> {
     await this.tool("select");
     await this.select([id]);
-    await this.p.locator(`[data-paint="${which}"]`).filter({ visible: true }).first().click();
+    await (await this.control(`[data-paint="${which}"]`)).click();
     await this.hex(colour);
     await this.select([]);
   }
@@ -220,7 +243,7 @@ export class Scene {
   }
   /** The Text tool's font, by part of its name (a font in the library). */
   async font(part: string): Promise<void> {
-    const sel = this.p.locator("select[data-text-font]").filter({ visible: true }).first();
+    const sel = await this.control("select[data-text-font]");
     const norm = (x: string): string => x.toLowerCase().replace(/[^a-z0-9]/g, "");
     const label = await sel.evaluate((s: HTMLSelectElement, w: string) => [...s.options].find((o) => o.text.toLowerCase().replace(/[^a-z0-9]/g, "").includes(w))?.text ?? null, norm(part));
     expect(label, `a font named like "${part}" in the library`).not.toBeNull();

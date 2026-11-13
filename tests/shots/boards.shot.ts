@@ -47,15 +47,17 @@ test("auto-layout", async ({ scene: s }) => {
   await expect.poll(async () => (await s.objects()).some((o) => o.container)).toBe(true);
   const sheet = (await s.objects()).find((o) => o.container)!.id;
   await s.select([sheet]);
-  await s.p.locator('[data-layout-flow="grid"]').click();
+  await (await s.control('[data-layout-flow="grid"]')).click();
   for (const [sel, v] of [["[data-layout-columns]", "3"], ['[data-layout-gap="0"]', "40"], ['[data-layout-gap="1"]', "40"], ['[data-layout-pad="h"]', "48"], ['[data-layout-pad="v"]', "48"]] as const) {
-    await s.p.locator(sel).fill(v);
-    await s.p.locator(sel).press("Enter");
+    const field = await s.control(sel);
+    await field.fill(v);
+    await field.press("Enter");
   }
   await s.fit([sheet], 0.7, [0.5, 0.55]);
   await s.select([sheet]);
   await s.settle();
-  await s.shot("auto-layout", await s.around({ objects: [sheet], els: ["[data-auto-layout]"], pad: 30 }));
+  await s.control('[data-layout-flow="grid"]'); // (the Layout chip's options open)
+  await s.shot("auto-layout", await s.around({ objects: [sheet], els: ['[data-layout-flow="grid"]', ...(await s.chipEls())], pad: 30 }));
 });
 
 /** Pictures of every shape on a new sheet with auto layout, picked; its flow and lengths set in the bar (a field and its value). */
@@ -67,10 +69,11 @@ async function laidOut(s: Scene, art: string[], flow: string, fields: ReadonlyAr
   await expect.poll(async () => (await s.objects()).some((o) => o.container)).toBe(true);
   const sheet = (await s.objects()).find((o) => o.container)!.id;
   await s.select([sheet]);
-  await s.p.locator(`[data-layout-flow="${flow}"]`).click();
+  await (await s.control(`[data-layout-flow="${flow}"]`)).click();
   for (const [sel, v] of fields) {
-    await s.p.locator(sel).fill(v);
-    await s.p.locator(sel).press("Enter");
+    const field = await s.control(sel);
+    await field.fill(v);
+    await field.press("Enter");
   }
   return sheet;
 }
@@ -93,9 +96,9 @@ test("layout-justified", async ({ scene: s }) => {
   const sheet = await laidOut(s, art, "justified", [['[data-layout-gap="0"]', "14"], ['[data-layout-gap="1"]', "14"], ['[data-layout-pad="h"]', "20"], ['[data-layout-pad="v"]', "20"]]);
   // (rows about a quarter of the sheet's width tall, and the sheet as tall as its rows)
   const w = (await s.box([sheet]))!;
-  await s.p.locator("[data-layout-rowh]").fill(String(Math.round((w.maxX - w.minX) / 4.5)));
-  await s.p.locator("[data-layout-rowh]").press("Enter");
-  const size = s.p.locator("[data-layout-size]");
+  await (await s.control("[data-layout-rowh]")).fill(String(Math.round((w.maxX - w.minX) / 4.5)));
+  await (await s.control("[data-layout-rowh]")).press("Enter");
+  const size = await s.control("[data-layout-size]");
   if ((await size.inputValue()) !== "w") await size.selectOption("w");
   await expect(size).toHaveValue("w");
   await s.fit([sheet], 0.66, [0.5, 0.47]);
@@ -112,16 +115,16 @@ test("layout-tracks", async ({ scene: s }) => {
   // (the front picture, Bonheur's wide horse fair, spans all three columns: a wide establishing panel)
   const first = (await s.objects()).filter((o) => o.kind === "image").map((o) => o.id).at(-1)!;
   await s.select([first]);
-  await s.p.locator('[data-in-span="0"]').fill("3");
-  await s.p.locator('[data-in-span="0"]').press("Enter");
+  await (await s.control('[data-in-span="0"]')).fill("3");
+  await (await s.control('[data-in-span="0"]')).press("Enter");
   // (made larger in its own shape: the columns it spans widen round it)
-  const w0 = Number(await s.p.locator("[data-on-w]").inputValue()), h0 = Number(await s.p.locator("[data-on-h]").inputValue());
-  await s.p.locator("[data-on-w]").fill(String(Math.round(w0 * 260) / 100));
-  await s.p.locator("[data-on-h]").fill(String(Math.round(h0 * 260) / 100));
-  await s.p.locator("[data-on-h]").press("Enter");
+  const w0 = Number(await (await s.control("[data-on-w]")).inputValue()), h0 = Number(await (await s.control("[data-on-h]")).inputValue());
+  await (await s.control("[data-on-w]")).fill(String(Math.round(w0 * 260) / 100));
+  await (await s.control("[data-on-h]")).fill(String(Math.round(h0 * 260) / 100));
+  await (await s.control("[data-on-h]")).press("Enter");
   await s.fit([sheet], 0.5, [0.62, 0.55]);
   await s.select([sheet]);
-  await s.p.locator("[data-layout-tracks]").click();
+  await (await s.control("[data-layout-tracks]")).click();
   await s.p.locator('button[data-track="c:1:fr"]').click();
   await expect(s.p.getByRole("dialog", { name: "Columns and rows" })).toBeVisible();
   await s.settle();
@@ -143,7 +146,7 @@ test("crop", async ({ scene: s }) => {
   const [id] = await s.place([h!]);
   await s.fit([id!], 0.6);
   await s.select([id!]);
-  await s.p.locator("[data-crop]").click();
+  await (await s.control("[data-crop]")).click();
   const b = (await s.box([id!]))!;
   await s.app.drag({ x: b.maxX - 2, y: (b.minY + b.maxY) / 2 }, { x: b.minX + (b.maxX - b.minX) * 0.55, y: (b.minY + b.maxY) / 2 }, 6);
   await s.settle();
@@ -158,15 +161,16 @@ test("flip", async ({ scene: s }) => {
   const ids = await s.placeRow([h!, h!]);
   await s.fit(ids, 0.6);
   await s.select([ids[1]!]);
-  await s.p.locator('[data-flip="x"]').click();
-  await expect(s.p.locator('[data-flip="x"]')).toHaveAttribute("aria-pressed", "true");
+  await (await s.control('[data-flip="x"]')).click();
+  await expect(await s.control('[data-flip="x"]')).toHaveAttribute("aria-pressed", "true");
   await s.select([]);
   const [a, b] = [(await s.box([ids[0]!]))!, (await s.box([ids[1]!]))!];
   const t1 = await s.text(a.minX, a.minY - 44, "original", { size: 26, font: "caveat", colour: "#e8c27a" });
   const t2 = await s.text(b.minX, b.minY - 44, "flipped: proportions with fresh eyes", { size: 26, font: "caveat", colour: "#e8c27a" });
   await s.select([ids[1]!]);
   await s.settle();
-  await s.shot("flip", await s.around({ objects: [...ids, t1, t2], els: ['[data-flip="x"]'], pad: 36 }));
+  await s.control('[data-flip="x"]'); // (its chip's options open, framed with what they edit)
+  await s.shot("flip", await s.around({ objects: [...ids, t1, t2], els: ['[data-flip="x"]', ...(await s.chipEls())], pad: 36 }));
 });
 
 test("corners", async ({ scene: s }) => {
@@ -176,14 +180,15 @@ test("corners", async ({ scene: s }) => {
   const [id] = await s.place([h!]);
   await s.fit([id!], 0.55);
   await s.select([id!]);
-  const r = s.p.locator("[data-sel-radius-wrap] input");
+  const r = await s.control("[data-sel-radius-wrap] input");
   await r.fill("44");
   await r.press("Enter");
-  await s.p.locator('[data-paint="stroke"]').filter({ visible: true }).first().click();
+  await (await s.control('[data-paint="stroke"]')).click();
   await s.p.locator('.colour-pop [data-mode="solid"]').click();
   await s.hex("#5b4636");
   await s.settle();
-  await s.shot("corners", await s.around({ objects: [id!], els: ["[data-sel-radius-wrap]"], pad: 36 }));
+  await s.control("[data-sel-radius-wrap]"); // (its chip's options open, framed with what they edit)
+  await s.shot("corners", await s.around({ objects: [id!], els: ["[data-sel-radius-wrap]", ...(await s.chipEls())], pad: 36 }));
 });
 
 test("adjust-values", async ({ scene: s }) => {
@@ -250,7 +255,8 @@ test("sheets", async ({ scene: s }) => {
   await s.fit([sheet], 0.62);
   await s.select([sheet]);
   await s.settle();
-  await s.shot("sheets", await s.around({ objects: [sheet], els: ["[data-sheet-ratio]"], pad: 30 }));
+  await s.control("[data-sheet-ratio]"); // (the Size chip's options open: its Ratio)
+  await s.shot("sheets", await s.around({ objects: [sheet], els: ["[data-sheet-ratio]", ...(await s.chipEls())], pad: 30 }));
 });
 
 test("arrange", async ({ scene: s }) => {

@@ -210,9 +210,9 @@ test("export", async ({ scene: s }) => {
   await expect.poll(async () => (await s.objects()).some((o) => o.container)).toBe(true);
   const pg = (await s.objects()).find((o) => o.container)!.id;
   await s.select([pg]);
-  await s.p.locator('[data-layout-flow="grid"]').click();
-  await s.p.locator("[data-layout-columns]").fill("2");
-  await s.p.locator("[data-layout-columns]").press("Enter");
+  await (await s.control('[data-layout-flow="grid"]')).click();
+  await (await s.control("[data-layout-columns]")).fill("2");
+  await (await s.control("[data-layout-columns]")).press("Enter");
   await s.select([pg]);
   await exportWith(s.p, "exportpic");
   await s.settle(1000);
