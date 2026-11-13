@@ -2203,6 +2203,18 @@ node scripts/hidden-items.mjs encrypt ~/Art/my-workspace ~/decrypted/sketch.png
 
 Keep the canvas clear: the options of what is selected can be a few short chips that say what each group is set to, a panel, or chips right above the selection. Settings > Appearance > **Properties** chooses; the controls are the same in each.
 
+Round a print's corners from its Shape chip, the bar at the top a few short chips.
+
+![Hokusai's Great Wave selected with its corners rounded, the top bar as three chips (Look, Shape 28 px, Size with its ratio) and the Shape chip open on its Radius field](docs/screenshots/value-chips.webp)
+
+Lay a study sheet out with every option of its auto layout in the Properties panel.
+
+![A sheet of four horse and dancer studies in a grid, the Properties panel beside it with Look folded to its colours and the Size and Auto layout options open](docs/screenshots/properties-panel.webp)
+
+Set a cover title with its options right above it and its actions right under it.
+
+![The title THE CROSSING over Hokusai's Great Wave, selected, with value chips above it (Text, Look) and the Actions bar's groups as chips under it](docs/screenshots/near-selection.webp)
+
 | Choice | How it shows |
 | --- | --- |
 | **In the bar at the top** | Every option in one row (the default) |
