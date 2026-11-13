@@ -47,6 +47,15 @@ Unverified / Committed / Next bounded task**.
 - **Committed:** v0.57.19 on `main`.
 - **Next bounded task:** retake the README screenshots in Stone when the owner says.
 
+## v0.58.0: release (2026-11-13)
+
+- **Implemented:** the release of 0.57.1 to 0.57.22 (adjustment shapes, 3D line art, PDF page extract, auto layout for real boards, Conceal folder, markdown in notes, the Stone brand, issue #2).
+- **Tested:** Tests, CI and Pan and zoom green on 29c121f9 (one tiles count race on chromium-cpu passed on re-run); auto layout audited 122/122 in Chromium and Firefox.
+- **Known failures:** none.
+- **Unverified:** touch input on the new auto layout and 3D view; live reflow cost with many laid-out sheets.
+- **Committed:** v0.58.0 on `main`, released.
+- **Next bounded task:** the bars-organized branch (ADR 0197) after the owner tries it.
+
 ## v0.57.22: auto layout audited (2026-11-13)
 
 - **Implemented:** `placeItems` contains a filling picture in its room (`ItemSize.keep`), the Fill choice of a picture offers Own size and Fill the room (`InLayoutState.keepShape`); `liveNumber` takes an emptied field as a value where asked (Columns).

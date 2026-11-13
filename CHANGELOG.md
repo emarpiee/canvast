@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.58.0 — Adjustment shapes, 3D line art, auto layout for real boards, a warm grey brand (2026-11-13)
+
+Everything since 0.57.0, in one release (0.57.1 to 0.57.22).
+
+- **Added:** adjustment shapes: a shape's adjustments act on what lies under it, inside its outline (a blurred or pixelated part of a picture), with blur types (motion, zoom, spin), pixelate, advanced controls and stronger ranges.
+- **Added:** line art of 3D models from their own edges: outline, creases and hidden edges, shading (hatching, dots, stippling), a hand-drawn look, eight Line styles and your own, *Save the lines as SVG*; the 3D view in tabs, usable on a small screen with pinch.
+- **Added:** **Extract this page** in the PDF view: the page becomes a picture in the library, at 150, 300 or 600 dots an inch.
+- **Added:** auto layout grows up: live reflow while dragging, **Masonry** and **Justified rows**, a grid's columns and rows (hug, set size, share) and spans, padding and gap handles on the canvas, an **Order** rule (name, newest first, largest, kind), **Layout styles**, a filling thing's least and most size, columns chosen by the items' shapes, and **Keep it tidy** in Arrange.
+- **Added:** **Conceal folder** in the Library: a folder's items are listed only when it is opened.
+- **Added:** markdown in notes: pasted markdown words become formats, copying gives markdown, *Lines with marks into lists*, and *Markdown marks make formats* (off at first).
+- **Added:** the outline's width in the bar.
+- **Changed:** a laid-out sheet's size is one plain choice (Fits contents, Set width, Set height, Set size); resizing one by hand keeps the other side fitting, and **Doesn't fit: Fit** shows when something runs past a sheet of a set size.
+- **Changed:** the brand and the default theme are a warm grey, Stone, with the logo's orange dot; the README's one-minute animation is made again with the new features.
+- **Changed:** Library folders open with a click on their row; Settings uses the room of a wide screen.
+- **Fixed:** the Layers panel's opacity slider could not be dragged with a mouse (issue #2).
+- **Fixed:** a picture set to Fill in an auto layout was stretched out of shape; emptying Columns did not go back to automatic; auto layout settings and a picture's library date were lost on reload and paste; aligning things on a laid-out sheet was undone at once.
+- **Fixed:** wheel and touchpad zoom stuttered on views with large pictures (tiles built and thrown away at every level), and a zoom-out showed a blurred strip at the bottom of the view.
+- **Fixed:** long films in the desktop app play at once instead of after their whole file is read.
+- **Fixed:** an adjustment shape drew a thin line round itself; long note titles were cut off on their cards; a setting's choice with quotes in its value was lost.
+
 ## 0.57.22 — Auto layout audited: pictures keep their shape (2026-11-13)
 
 - **Fixed:** a picture set to Fill on a laid-out sheet was stretched out of shape (a wide photograph squashed into a tall cell); it now grows as large as its room allows and keeps its shape. Its choice reads Fill the room.
