@@ -154,7 +154,7 @@ for (const [i, pg] of PAGES.entries()) {
   await A.esc();
   if (i === 2) await buildGlyph();
   if (i === 7) await drawCrosses();
-  for (const [u, v, str, size, hex, bold] of [...pg.labels].sort((m, n) => m[3] - n[3])) // (small first: a click inside a big text's box would edit it)
+  for (const [u, v, str, size, hex, bold] of [...pg.labels].sort((m, n) => m[3] - n[3] || n[1] - m[1])) // (small first, and lower first: a click inside a text's box would edit it)
    await A.text(...sc(u, v), str, +(size * K).toFixed(3), hex, bold ? FONT.b : FONT.r);
   // the page becomes a sheet, named after it
   await p.keyboard.press("c");

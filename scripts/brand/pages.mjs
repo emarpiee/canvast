@@ -1,8 +1,8 @@
 // The canvast brand board: nine pages of 1600 × 1000 units. Each page is an SVG (pasted into the app) plus its labels
 // [x, y, text, size, colour, bold] (x = left edge, y = middle of the capitals, both in page units), typed with the Text tool.
 export const PW = 1600, PH = 1000;
-// The palette is the app's default theme (src/styles.css, hue 178, Viridian) in light mode: ultra = --hud-accent, ink = --hud-fg, paper = --theme-bg, muted = --hud-muted; spark is the orange of --canvas-axis, lifted so the dot reads on the tile.
-export const C = { ultra: "#007B69", ink: "#172522", paper: "#E8F3F0", spark: "#FFA460", haze: "#C3E7DE", white: "#F8FDFC", muted: "#4D5C58", mutedD: "#9CA8A4", line: "#CCD7D4", red: "#C92F33", dkLine: "#273A35", dkGrid: "#1C2A26", dkGridMajor: "#20322E" };
+// The palette is the app's default theme (src/styles.css, hue 70 at 20%, Stone) in light mode: ultra = --hud-accent, ink = --hud-fg, paper = --theme-bg, muted = --hud-muted; spark is the orange of --canvas-axis, lifted so the dot reads on the tile.
+export const C = { ultra: "#71685E", ink: "#232120", paper: "#F1F0EE", spark: "#FFA460", haze: "#E1DDD8", white: "#FCFCFB", muted: "#5A5856", mutedD: "#A6A4A3", line: "#D5D4D2", red: "#C92F33", dkLine: "#373533", dkGrid: "#282624", dkGridMajor: "#2F2D2B" };
 
 // The mark on a 64-unit grid: a canvas (the frame), a window cut from it, a little low and to the right (you lean in to look), and the point in
 // the window's middle (the dot). The owner's chosen drawing, made on a 24-unit grid, scaled to 64 exactly: keep these numbers as they are.
@@ -37,7 +37,7 @@ function page(n, title, lead, { dark = false } = {}) {
     [100, 162, String(n).padStart(2, "0"), 20, C.spark, true],
     [100, 214, title, 56, fg, true],
     ...lead.map((t, i) => [100, 292 + i * 32, t, 20, mu, false]),
-    [100, 952, "© 2026 canvast · Brand guidelines 1.0", 12, mu, false],
+    [100, 952, "© 2026 canvast · Brand guidelines 1.1", 12, mu, false],
     [1452, 952, `${String(n).padStart(2, "0")} / 09`, 12, mu, false],
   ];
   const body = r(0, 0, PW, PH, dark ? C.ink : C.paper) + line(100, 96, 1500, 96, dark ? C.dkLine : C.line, 1.5);
@@ -52,12 +52,12 @@ function cover() {
   for (let x = 50; x < PW; x += 50) grid += line(x, 0, x, PH, x % 200 ? C.dkGrid : C.dkGridMajor, x % 200 ? 1 : 1.5);
   for (let y = 50; y < PH; y += 50) grid += line(0, y, PW, y, y % 200 ? C.dkGrid : C.dkGridMajor, y % 200 ? 1 : 1.5);
   const body = r(0, 0, PW, PH, C.ink) + grid +
-    `<g clip-path="url(#pg)">${mark(1130, -150, 1300, { tile: null, c: "#1B2A26", dot: null })}</g>` +
+    mark(1130, -150, 1300, { tile: null, c: "#282624", dot: null }) + // (runs off the page: the sheet the page becomes clips it)
     mark(HERO.x, HERO.y, HERO.size) +
     line(150, 760, 1450, 760, C.dkLine, 1.5);
   const labels = [
     [150, 120, "Brand guidelines", 18, C.mutedD, false],
-    [1268, 120, "1.0 · October 2026", 18, C.mutedD, false],
+    [1268, 120, "1.1 · November 2026", 18, C.mutedD, false],
     [632, 452, "canvast", 168, C.paper, true],
     [640, 590, "Every point is a canvas.", 40, C.haze, false],
     [150, 832, "An endless canvas in one file: zoom without limit, draw, place pictures, all offline.", 22, C.mutedD, false],
@@ -102,7 +102,7 @@ function construction() {
   const { x, y, u } = GRID, S = 64 * u;
   let b = P.body + r(x, y, S, S, C.white);
   for (let i = 0; i <= 64; i++) {
-    const major = i % 8 === 0, col = major ? "#BCC7C4" : "#E1EAE8", w = major ? 1.2 : 0.8;
+    const major = i % 8 === 0, col = major ? "#C5C4C2" : "#E8E7E6", w = major ? 1.2 : 0.8;
     b += line(x + i * u, y, x + i * u, y + S, col, w) + line(x, y + i * u, x + S, y + i * u, col, w);
   }
   b += `<rect x="${x}" y="${y}" width="${S}" height="${S}" rx="${14 * u}" fill="${C.ultra}" opacity="0.07"/>`;
@@ -189,7 +189,7 @@ function space(pixels) {
 
 // 06 · Colour -------------------------------------------------------------------------------------------------------------
 export const SWATCHES = [
-  ["Viridian", C.ultra, "The tile, links, the main", "accent of the interface"],
+  ["Stone", C.ultra, "The tile, links, the main", "accent of the interface"],
   ["Spark", C.spark, "The dot. A point, never a", "field: keep it small"],
   ["Ink", C.ink, "Text, dark grounds, the", "one-colour mark"],
   ["Paper", C.paper, "Light grounds; the glyph", "on the tile"],
@@ -197,7 +197,7 @@ export const SWATCHES = [
 ];
 const rgb = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16)).join(" · ");
 function colour() {
-  const P = page(6, "Colour", ["Five colours, the app's default theme. Viridian carries the brand, Spark marks the point, Ink and Paper do the rest.", "White on Viridian is 5.2 : 1, Spark on Viridian 2.7 : 1 (enough for the dot, not for text)."]);
+  const P = page(6, "Colour", ["Five colours, the app's default theme. Stone carries the brand, Spark marks the point, Ink and Paper do the rest.", "White on Stone is 5.5 : 1, Spark on Stone 2.8 : 1 (enough for the dot, not for text)."]);
   let b = P.body;
   const labels = [...P.labels];
   const w = 264, gap = 20;
@@ -261,7 +261,7 @@ function misuse() {
     const x = 100 + (i % 4) * (w + 40), y = 370 + Math.floor(i / 4) * (h + 40);
     if (i === 7) {
       b += `<g clip-path="url(#busy)">`;
-      for (let k = 0; k < 14; k++) b += `<path d="M${x - 200 + k * 48} ${y + h}L${x + k * 48} ${y}" stroke="${[C.ultra, C.spark, "#2F9A86", "#FFC79A", "#008672"][k % 5]}" stroke-width="30"/>`;
+      for (let k = 0; k < 14; k++) b += `<path d="M${x - 200 + k * 48} ${y + h}L${x + k * 48} ${y}" stroke="${[C.ultra, C.spark, "#8F857A", "#FFC79A", "#7B7166"][k % 5]}" stroke-width="30"/>`;
       b += `</g>` + mark(x + 100, y + 40, s);
       b = b.replace("<g clip-path=\"url(#busy)\">", `<clipPath id="busy"><rect x="${x}" y="${y}" width="${w}" height="${h}" rx="12"/></clipPath><g clip-path="url(#busy)">`);
     } else b += card(x, y, w, h) + draw(x + 100, y + 40);
@@ -274,15 +274,15 @@ function misuse() {
 
 // 09 · In use -------------------------------------------------------------------------------------------------------------
 function inUse() {
-  const P = page(9, "In use", ["The tile is the favicon, the app icon and the face of every .canvast file. Let it sit on Viridian or Ink,", "and let the frame run off an edge when there is room: the canvas goes on beyond it."]);
+  const P = page(9, "In use", ["The tile is the favicon, the app icon and the face of every .canvast file. Let it sit on Stone or Ink,", "and let the frame run off an edge when there is room: the canvas goes on beyond it."]);
   let b = P.body;
   const labels = [...P.labels];
   // a browser tab
-  b += card(100, 370, 640, 220, "#DEEBE8") + r(120, 392, 300, 52, C.white, 12) + mark(138, 406, 24) + r(120, 444, 600, 126, C.white, 10) + r(140, 462, 560, 40, "#ECF4F2", 20);
+  b += card(100, 370, 640, 220, "#E9E7E6") + r(120, 392, 300, 52, C.white, 12) + mark(138, 406, 24) + r(120, 444, 600, 126, C.white, 10) + r(140, 462, 560, 40, "#F3F2F1", 20);
   labels.push([176, 418, "Untitled · canvast", 16, C.ink, false], [164, 482, "file:///home/me/canvast.html", 15, C.muted, false], [100, 610, "Favicon · 16 and 32 px, the same drawing", 14, C.muted, false]);
   // a dock
-  b += card(780, 370, 720, 220, "#B7D1CA") + r(860, 470, 560, 100, "#FFFFFF", 26, `opacity="0.55"`);
-  const greys = ["#7C958F", "#A4BAB4", "#627B74", "#91ABA4"];
+  b += card(780, 370, 720, 220, "#CDCAC6") + r(860, 470, 560, 100, "#FFFFFF", 26, `opacity="0.55"`);
+  const greys = ["#918E8B", "#B6B4B1", "#777471", "#A7A4A0"];
   [0, 1, 2, 3, 4].forEach((k) => { const x = 880 + k * 108; b += k === 2 ? mark(x, 478, 84) + `<circle cx="${x + 42}" cy="${582}" r="4" fill="${C.ink}"/>` : r(x, 478, 84, 84, greys[k % 4], 20); });
   labels.push([780, 610, "App icon · the primary tile, no extra effects", 14, C.muted, false]);
   // a .canvast file
@@ -292,7 +292,7 @@ function inUse() {
   labels.push([206, 838, ".canvast", 16, C.ink, true], [100, 910, "Document icon", 14, C.muted, false]);
   // a social card (1200 × 630)
   const sx = 440, sy = 650, sw = 457, sh = 240;
-  b += `<clipPath id="soc"><rect x="${sx}" y="${sy}" width="${sw}" height="${sh}" rx="12"/></clipPath><g clip-path="url(#soc)">` + r(sx, sy, sw, sh, C.ultra) + mark(sx + 190, sy - 30, 340, { tile: null, c: "#1C8D7A", dot: C.spark }) + `</g>`;
+  b += `<clipPath id="soc"><rect x="${sx}" y="${sy}" width="${sw}" height="${sh}" rx="12"/></clipPath><g clip-path="url(#soc)">` + r(sx, sy, sw, sh, C.ultra) + mark(sx + 190, sy - 30, 340, { tile: null, c: "#82786E", dot: C.spark }) + `</g>`;
   labels.push([sx + 30, sy + 150, "canvast", 48, C.white, true], [sx + 32, sy + 196, "An endless canvas, offline.", 16, C.haze, false], [sx, 910, "Social card · 1200 × 630", 14, C.muted, false]);
   // the opening screen
   const lx = 937, ly = 650, lw = 563, lh = 240;

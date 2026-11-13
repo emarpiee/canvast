@@ -15,8 +15,8 @@ import { FONT_DIR } from "./lib.mjs";
 const out = process.argv[2];
 if (!out) { console.log("usage: node scripts/brand/cover.mjs <out.png | out.webp>"); process.exit(1); }
 const W = 1600, H = +(process.argv[3] ?? 640), BAR = 44;
-// The light theme's canvas tokens (src/styles.css at hue 178): --canvas-grid, --canvas-axis, --canvas-selection, --canvas-handle-fill
-const T = { grid: "#667671", axis: "#C96736", sel: C.ultra, handle: "#FFFFFF" };
+// The light theme's canvas tokens (src/styles.css at hue 70, 20%): --canvas-grid, --canvas-axis, --canvas-selection, --canvas-handle-fill
+const T = { grid: "#73716F", axis: "#C96736", sel: C.ultra, handle: "#FFFFFF" };
 const O = { x: 1190, y: Math.round((H - BAR) / 2 + 20) }, S = 272; // the origin, and the tile centred on it (its dot is the origin)
 const tx = O.x - S / 2, ty = O.y - S / 2;
 

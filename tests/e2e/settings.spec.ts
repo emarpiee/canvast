@@ -327,7 +327,7 @@ test("theme colour: the hue and colourfulness dials recolour the interface but n
   await p.getByTestId("view-settings").click();
   await panel.getByRole("tab", { name: "Appearance" }).click();
   await panel.getByRole("button", { name: /Reset Theme colour/ }).click();
-  expect(await p.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue("--hue").trim())).toBe("178");
+  expect(await p.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue("--hue").trim())).toBe("70");
   expect(app.consoleErrors).toEqual([]);
 });
 

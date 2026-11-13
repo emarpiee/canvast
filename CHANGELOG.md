@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.57.17 — A warm grey brand (2026-11-13)
+
+- **Changed:** the brand and the app's default theme are a warm grey, Stone (theme colour 70°, colourfulness 20%), instead of Viridian; the logo keeps its orange dot. Viridian stays a Theme colour preset, and Stone is a new one.
+- **Changed:** the canvas's origin axes are always the brand's orange and the snap guides always magenta, whatever the theme colour, so they stay easy to see on a grey theme.
+- **Changed:** the favicon, the desktop app's icon and window background, the logo files, the README header, the cover, the social preview and the brand board are drawn again in the new colours.
+
 ## 0.57.16 — Auto layout columns by the items' shapes (2026-11-13)
 
 - **Added:** **Auto: by shape** for a grid's or masonry's columns when none are set: from the items' shapes, a board about as wide as tall, or one that fills a sheet whose size you set (ADR 0195). New layouts and Keep it tidy start with it.

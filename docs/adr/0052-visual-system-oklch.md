@@ -18,3 +18,7 @@
 ## Not built
 
 Per-element colour overrides, user-defined palettes, a separate hue for the dark theme, and a light-table (white or grey surround) canvas mode.
+
+## Amendment (0.57.17)
+
+The default is now Stone, a warm grey (theme colour 70, colourfulness 20%), with Stone added as the first preset; the origin axes and snap guides no longer follow the theme colour, so they stay visible on a grey theme.

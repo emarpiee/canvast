@@ -38,6 +38,15 @@ Unverified / Committed / Next bounded task**.
 | 5 | Creative editing, including **arrange selected items in a grid (A–Z, Z–A, by date, size, type), align and distribute** | **done** ([ADR 0036](adr/0036-arrange-align-distribute.md)) |
 | WF | Workspace folder and the desktop app ([ADR 0177](adr/0177-workspace-folder-desktop-app.md)): Electron shell, the workspace as a folder of files, encrypted hidden items, outside changes; Linux packages (AppImage with updates, `.deb`, `.rpm`, `.tar.gz`, x86_64 and aarch64) | **done** (v0.49.0; packages v0.50.33 to 0.50.35) |
 
+## v0.57.17: a warm grey brand (2026-11-13)
+
+- **Implemented:** default theme Stone (`--hue` 70, `--vivid` 0.2; settings `ui.hue` 70, `ui.vivid` 20; Stone first preset, Viridian kept); origin axes and snap guides fixed colours (orange, magenta), not tinted by the theme; favicon, desktop window background, brand palette (`scripts/brand/pages.mjs`, `cover.mjs`) and the files made from it (icons, header logo, cover, social preview, board and its previews).
+- **Tested:** typecheck and build here; `settings.spec` (Reset puts hue 70 back) on GitHub.
+- **Known failures:** none known yet.
+- **Unverified:** README screenshots still show Viridian (left as they are on the owner's word); contrast spec on GitHub.
+- **Committed:** v0.57.17 on `main`.
+- **Next bounded task:** read this push's runs; retake the README shots when the owner says.
+
 ## v0.57.16: auto layout columns by the items' shapes (2026-11-13)
 
 - **Implemented:** ADR 0195. `SheetLayout.columnsBy` ("count" absent, "shape"); `columnsOf` (auto-layout.ts, exported for the bar): masonry √(Σh/w × wide/tall), grid `shapedColumns` (arrange.ts, the one rule with Arrange's `gridShape`); a sheet whose size is set both ways fills it, else about square; `guessLayout` and Keep it tidy start with "shape"; the bar's list beside Columns (hidden when a number or tracks are set); the Tracks popover starts from the columns there are now.

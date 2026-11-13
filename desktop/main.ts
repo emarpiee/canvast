@@ -1215,7 +1215,7 @@ async function openWindow(workspace: string): Promise<void> {
     height: 900,
     show: !hidden,
     title: `${basename(workspace)} — canvast ${app.getVersion()}`, // (the version, as the browser tab shows it)
-    backgroundColor: nativeTheme.shouldUseDarkColors ? "#101816" : "#e8f3f0", // (the app's own background before the page paints; Electron takes no oklch())
+    backgroundColor: nativeTheme.shouldUseDarkColors ? "#171615" : "#f1f0ee", // (the app's own background before the page paints; Electron takes no oklch())
     webPreferences: {
       partition,
       preload: join(__dirname, "preload.cjs"),
