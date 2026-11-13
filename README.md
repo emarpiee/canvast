@@ -311,7 +311,7 @@ Give a print rounded corners and a thin outline, as a card on a mood board.
 
 ### Adjust
 
-The **Adjust** panel changes how a picture, video, GIF, shape, pen stroke or text looks, in stacks you can reorder, hide and copy. The file itself is never changed.
+The **Adjust** panel changes how a picture, video, GIF, shape, pen stroke or text looks, in stacks you can reorder, hide and copy. The file itself is never changed. It opens from the **Adjust** group of the Actions bar, which also resets, copies and pastes the adjustments of what is selected.
 
 Make a value study: the same painting in grey with more contrast, to read its light and dark masses.
 
@@ -331,7 +331,7 @@ Give prints a soft drop shadow so they read as paper laid on a table.
 
 | How it works | |
 | --- | --- |
-| Stacks | Reorder, hide, and **Copy** and **Paste adjustments** to move a whole stack between items. Each group has its own *Reset* |
+| Stacks | Reorder, hide, and **Copy** and **Paste adjustments** (the Adjust group of the Actions bar) to move a whole stack between items. Each group has its own *Reset* |
 | Ranges | Past 100 where a stronger change means something: exposure, temperature, tint and the three primaries from -200 to 200, contrast, saturation and vibrance up to 200, blur up to 400, sharpen and grain up to 200, a shadow's blur and spread up to 400 and its offset to ±300 |
 | Blur types and pixelate | The blur's *Type*: **Soft**, **Motion** (with its *Angle*), **Zoom** or **Spin**, as wide as a soft blur of the same number. **Pixelate** makes square cells, a tenth of the object at 100 |
 | Advanced controls | The arrow before Blur, Sharpen, Grain and Pixelate folds out their own settings (open ones stay open on this device). **Blur**: its type; for Motion the *Angle* and *Offset* (the streak behind or ahead instead of on both sides), for Zoom and Spin the *Centre across* and *down*; *Quality* (fewer or more copies). **Sharpen**: *Radius*, one to ten pixels. **Grain**: *Size* and *Colour* (grey to coloured). **Pixelate**: *Shape*, squares or round dots. Each starts where the adjustment was before, so nothing already made changes |
@@ -469,7 +469,8 @@ Line studies up along their bottom edges.
 | **On a sheet with auto layout** | The sheet places what is on it: Align and distribute are greyed out (the sheet's own alignment is in the bar), and an Arrange order becomes the sheet's Order rule |
 | **Size** menu | Gives the selected pictures, note cards, shapes, strokes and text the width or height of the smallest, the middle or the largest of them, in proportion. **Reset size** puts pictures, videos, GIFs, sounds and note cards back to the size they are placed at, at the current zoom (one pixel of the file for one of the screen; a note card at Settings > Notes > Note tool card size), about their middle. Several selected keep their layout: they move apart only as far as it takes to keep their gaps |
 | **Copy, cut, paste, duplicate** | `Ctrl/⌘+C`, `X`, `V`, `D`; `Alt`+drag copies |
-| **Groups** | `Ctrl/⌘+G`; a group (also a boolean group) counts as one thing; its shapes line up with each other only when you select them one by one (in Layers, or inside the group). A group or several selected move from anywhere in their box, gaps too; press outside it to draw a selection box |
+| **Groups** | `Ctrl/⌘+G`; a click on a group (also a boolean group) selects all of it; its shapes line up with each other only when you select them one by one (in Layers, or inside the group). A group or several selected move from anywhere in their box, gaps too; press outside it to draw a selection box |
+| **Selection box and lasso** | Take what they touch. A group comes whole only when all of it is inside; otherwise only the parts touched (a pencil or ink line, a boolean group and a pattern always come whole). Nothing smaller than 2 pixels on the screen is taken, such as what lies deep inside a dot when zoomed far out |
 | **Kind chips** | With a mixed selection, chips at the start of the Actions bar (All, Pictures, Media, Shapes, Strokes, Texts) narrow it to one kind |
 | **Hide and lock** | *Show all hidden* and *Unlock all* bring everything back |
 
@@ -828,7 +829,7 @@ Set a cover's type: a title and a subtitle in fonts of your own.
 
 | Feature | What it does |
 | --- | --- |
-| **Formatting** | Bold, italic, underline, strikethrough, links, colour and size of any range, headings, bulleted, numbered and nested lists (`Tab` nests a list item). **Copy Markdown** is one click away |
+| **Formatting** | Bold, italic, underline, strikethrough, links, colour and size of any range, headings, bulleted, numbered and nested lists (`Tab` nests a list item). The bar over the words keeps them in groups: **Style**, **Words** (the size menu and the font), **Paragraph** (the paragraph and list menus) and **Finish**. **Copy Markdown** is one click away |
 | **Look** | Colour or gradient, outline, size, line height, letter spacing, alignment, auto or fixed width, paragraph spacing, indent, case, line limit, a set height, kerning, OpenType features and the axes of variable fonts |
 | **Fonts** | Import `.ttf`, `.otf`, `.woff` or `.woff2` into the library, including variable fonts. One text may use several fonts. Right-to-left and mixed-direction text are supported |
 | **Paragraph and box** | At the start of the text's bar: the paragraph and card settings (a text can sit on a coloured card; **Make note files** turns such texts into notes) |
@@ -2188,15 +2189,16 @@ node scripts/hidden-items.mjs encrypt ~/Art/my-workspace ~/decrypted/sketch.png
 | Part | Where | What it does |
 | --- | --- | --- |
 | **Tool rail** | Left | Undo and Redo, the tools (Import after Note), then Screenshot and Search |
-| **Properties bar** | Top | The options of the tool or of what is selected |
-| **Actions bar** | Bottom, or with the selection | What can be done with the selection, in named groups (Items, Files, Edit shapes, Arrange, Attach, Selection), always in that order, some of them menus (Align, Arrange, Shapes, Masks, Path tools, Sheets, Export, Initial state) that list only what applies. The names show under or over the buttons, or only on hover, floating over or under the bar without moving it (not offered on a touch screen), or not at all (Settings > Appearance). It sits at the bottom or follows the selection (Settings). When wider than the window it shows a fade and an arrow; the mouse wheel scrolls it sideways |
+| **Properties bar** | Top, or by the selection | The options of the tool or of what is selected. With *Properties* set to *Near the selection* (Settings > Appearance) they are named chips just above what is selected, each showing its first value; a chip opens its options as a short form, one named option a row. With nothing selected, or another tool picked, the chips stand at the top. On a small window the chips scroll sideways |
+| **Actions bar** | Bottom, or with the selection | What can be done with the selection, in named groups (Items, Files, Adjust, Edit shapes, Arrange, Attach, Selection, Find), always in that order, some of them menus (Align, Arrange, Shapes, Masks, Path tools, Sheets, Export, Initial state) that list only what applies. The names show under or over the buttons, or only on hover, floating over or under the bar without moving it (not offered on a touch screen), or not at all (Settings > Appearance). It sits at the bottom or follows the selection (Settings). When wider than the window it shows a fade and an arrow; the mouse wheel scrolls it sideways |
 | **Panels** | Either side, or floating | Layers, Bookmarks, Tags, Styles, Adjust, Pattern, Speech balloon: they float or dock to either side, are resizable, and can minimize when inactive. *Reset the panel layout* puts them back |
 | **Zen mode** | `Z`, or the leaf button | Fades the bars and panels until the pointer is over them |
 | **Screenshot** | The camera button | Saves the selection, or the whole view, to the library. Settings choose the format, quality, name, folder and tags, and whether to include the canvas pattern and the interface, a transparent background, and a copy on the clipboard |
 | **Hint line** | Bottom | What the tool does, and what each key does over a handle |
 | **Notices** | Above the Actions bar | Report results, often with a *View* button that opens what was made. They fade after a time that fits their length (an error stays to be read), and stack above the Actions bar, never over it |
 | **Long work** | A notice | Exporting, importing, opening a library, moving files, deleting everything: a notice with a progress bar and its current stage, which stays until the work ends and then says the result |
-| **Layouts** | | Adapt to large, medium and phone-sized screens, with scroll cues on bars that scroll |
+| **Layouts** | | Adapt to large, medium and phone-sized screens, with scroll cues on bars that scroll. The panels keep their place when the options at the top come and go |
+| **Lists** | Every dropdown | One list in the app's look, placed off the selection. The arrow keys move through it, and a choice rested on for a moment is taken with the list still open (a font can be tried at once); `Enter` or a click takes it and closes the list, `Esc` closes it, typing jumps to a choice |
 
 ### The command palette
 
@@ -2267,7 +2269,7 @@ Make the app yours: theme, theme colour, density and the canvas.
 | Media and playback | Players: starting volume and step sizes. The library viewer: its edges (a click on the left or right goes to the previous or next item), how long the player stays while a video plays, slideshow time |
 | Saving to the library | Extracted frames and PDF pages (format, quality, a page's resolution, folder, name, tags) and edited pictures (format, quality, folder, name, tags), and the folder and tags of what is saved to the library from the canvas, one pair for each kind: pictures from Export… (*Exports*, `export`), patterns (*Patterns*, `pattern`) and shapes saved as SVG (*Shapes*, `shape`); screenshots have theirs in the Screenshot group. In the desktop app, Keep file names and Sort files by kind |
 | Screenshot | Format, quality, pattern, transparency, interface, clipboard, folder, name and tags |
-| Appearance | Theme (system, light, dark), theme colour (or adaptive, from the canvas background), colourfulness, information shown, hints and tooltips, canvas pattern, Actions bar place and its group names, item names, density (comfortable, compact, dense), round or sharp corners, Zen mode; panels: minimize inactive ones, how many stay open |
+| Appearance | Theme (system, light, dark), theme colour (or adaptive, from the canvas background), colourfulness, information shown, hints and tooltips, canvas pattern, Actions bar place and its group names, *Properties* (in the bar at the top, or near the selection), item names, density (comfortable, compact, dense), round or sharp corners, Zen mode; panels: minimize inactive ones, how many stay open |
 | Performance | Adaptive quality, fixed quality level, memory for pictures, animation and its speed |
 | Storage | Space used and whether the browser keeps the data; the library folder (choose it, move files in and out, the library index and its automatic saving); how saving is going; backups (export, Advanced export, changes only, files as ZIP, import); in the desktop app, where deleted files go and when `.trash` is emptied; *Start from scratch* (delete all data, after a warning with a backup offered first) |
 | Privacy | The word that begins hidden mode, remembering the Hidden password until the tab closes, the passwords of the workspace and of the Hidden items, Lock now and New key; what stays on your machine |
