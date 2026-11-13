@@ -47,6 +47,13 @@ Unverified / Committed / Next bounded task**.
 - **Committed:** v0.57.19 on `main`.
 - **Next bounded task:** retake the README screenshots in Stone when the owner says.
 
+## v0.58.21: a choice in a list keeps its picker open (2026-11-14)
+
+- **Implemented:** `ui/combobox.ts` takes the presses in its list (pointer, mouse, touch, click) at the window, first, and stops them there, and its keys with `stopImmediatePropagation`, so no "a press outside closes me" or Escape of what the field is in hears them; the current choice is scrolled to inside the list only (`scrollIntoView` scrolled the panel around it, and a scroll outside closes the list); hidden options are left out (their index kept). The overflow button of auto layout has `ICONS.shrink` (the registry's "Fit the sheet to what is on it"), a `data-name` and an `aria-label`. `.vchip-ic` has `--s-4` after it. `--bar-bottom` keeps the room of the main options row only; the colours row adds its height while shown (0.58.19 kept it too, and `styles.spec.ts:64` failed in four projects: the Styles panel, docked left, stayed over the place the test clicks).
+- **Tested:** build and typecheck here. Scratch in Chromium and Firefox: the colour picker's kind and format lists, the Adjust panel's Gradient map and a chip's form: a choice by a click, by the keys and Escape each leave them open. The test steps of `styles.spec.ts:64` make their text again (they did not on 0.58.19, and did on 0.58.18). The panels' top for nine tools at 1256 and 427 px, bar and chips: unchanged.
+- **Unverified:** the whole E2E suite (on GitHub).
+- **Committed:** v0.58.21 on `main`.
+
 ## v0.58.20: no lag while dragging on a large canvas (2026-11-14)
 
 - **Implemented:** a marquee's moves and a move's steps after its first call `editor.redraw()` (the canvas only), not `editor.changed()` (every bar and panel); the texture of moved things still follows (`followPreview` also on redraw). The Layers panel redraws on an editor change only when the selection or its being open changed, and finds the parts of every row through one index (`rowMembersIndex`, `doc/layer-move.ts`: the same members as `rowMembers` for all 7,022 rows of the showcase). `syncScroll` measures once a frame.

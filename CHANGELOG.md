@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.58.21 — A choice in a list keeps its picker open (2026-11-14)
+
+- **Fixed:** choosing in a dropdown inside the colour picker (its kind, its format), the Adjust panel or a chip's options closed what the dropdown was in; a press in the list, and Enter or Escape there, are the list's alone now.
+- **Fixed:** the dropdown in the Adjust panel's Gradient map closed as soon as it opened when the panel was scrolled, and a dropdown listed choices the app hides.
+- **Fixed:** in the options of auto layout, *Doesn't fit: Fit* was a bare line of words; it is a row with its icon, *Fit the sheet to what is on it*.
+- **Changed:** more room between a chip's icon and its value.
+- **Fixed:** since 0.58.19, the side panels stayed lower for good once the colours of a selection had shown under the Properties bar; only the Properties bar's own row keeps its room now.
+
 ## 0.58.20 — No lag while dragging on a large canvas (2026-11-14)
 
 - **Fixed:** drawing a marquee or dragging selected things lagged on a canvas with thousands of layers while the Layers panel was open (each move redrew the whole list, and each row looked through every object). The panels and bars are no longer refreshed at each step of a marquee or a move, only when it starts and ends; the Layers panel redraws only when what it lists or what is selected changes, and finds each row's parts at once.

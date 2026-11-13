@@ -2382,8 +2382,13 @@ async function start(): Promise<void> {
     const dock = barBox.querySelector<HTMLElement>(".dock")?.getBoundingClientRect();
     root.setProperty("--dock-w", `${Math.ceil(dock ? dock.width : 0)}px`);
     // Side panels start below the toolbar, however many rows it wraps to: the Properties bar, or its chips at the top (ADR 0198).
+    // The options' row (the Properties bar, or its chips at the top) comes and goes with the tool and the selection (none for the Hand):
+    // the panels, the rail of a small window and what else starts under the bars keep their place, at the lowest that row has reached for
+    // this window and these settings. A row under it that shows only now and then (the colours of a selection) moves them only while shown.
     const shownOpts = [...barBox.querySelectorAll<HTMLElement>(".toolbar")].filter((t) => !t.hidden && !t.closest(".props-park"));
-    const bottoms = [navBox.getBoundingClientRect().bottom, dock?.bottom ?? 0, ...shownOpts.map((t) => t.getBoundingClientRect().bottom)];
+    const extra = (t: HTMLElement): boolean => t.dataset["cmdGroup"] === "Colours";
+    const mainRows = shownOpts.filter((t) => !extra(t));
+    const extraRows = shownOpts.filter(extra);
     // On a phone the three bars stack in rows. Their places come from measured heights (never from a guessed row height), so the gap between
     // the rows is the same everywhere: the rows are positioned by these (stylesheet: --nav-bottom, --dock-h), and the bottom of the last row follows.
     const near = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--near")) || 6;
@@ -2392,18 +2397,23 @@ async function start(): Promise<void> {
     root.setProperty("--nav-bottom", `${Math.ceil(navBottom)}px`);
     root.setProperty("--rail-right", `${Math.ceil(barBox.querySelector<HTMLElement>(".rail")?.getBoundingClientRect().right ?? 0)}px`);
     root.setProperty("--dock-h", `${Math.ceil(dockH)}px`);
+    const heightOf = (rows: HTMLElement[]): number => rows.reduce((t, r) => t + r.getBoundingClientRect().height, 0);
+    let main: number;
+    let below: number;
     if (window.matchMedia("(max-width: 640px)").matches) {
-      const optsH = barBox.getBoundingClientRect().height; // the whole column: the Properties bar and the rows under it (colours of the selection)
-      // (the rows' own places are not final until the stylesheet has used the numbers above: only this sum counts)
-      bottoms.splice(0, bottoms.length, navBottom + near + dockH + (optsH ? near + optsH : 0));
+      // (the rows' own places are not final until the stylesheet has used the numbers above: only these sums count)
+      const mainH = heightOf(mainRows), extraH = heightOf(extraRows);
+      main = navBottom + near + dockH + (mainH ? near + mainH : 0);
+      below = extraH ? near + extraH : 0;
+    } else {
+      main = Math.max(navBottom, dock?.bottom ?? 0, ...mainRows.map((t) => t.getBoundingClientRect().bottom));
+      below = Math.max(0, ...extraRows.map((t) => t.getBoundingClientRect().bottom - main));
     }
-    // The options come and go with the tool and the selection (none for the Hand, chips by the selection): the panels, the rail of a small
-    // window and what else starts under the bars keep their place, at the lowest the bars have reached for this window and these settings.
     const html = document.documentElement;
     const key = `${appView}|${innerWidth}|${barBox.querySelector(".props-park .toolbar") ? "near" : "bar"}|${html.dataset["groupNames"] ?? ""}|${html.dataset["density"] ?? ""}|${getComputedStyle(html).getPropertyValue("--ui-scale")}`;
-    const lowest = Math.max(Math.ceil(Math.max(...bottoms)), barBottoms.get(key) ?? 0);
-    barBottoms.set(key, lowest);
-    root.setProperty("--bar-bottom", `${lowest}px`);
+    const kept = Math.max(Math.ceil(main), barBottoms.get(key) ?? 0);
+    barBottoms.set(key, kept);
+    root.setProperty("--bar-bottom", `${Math.ceil(kept + below)}px`);
     for (const el of [barBox.querySelector<HTMLElement>(".dock"), document.querySelector<HTMLElement>(".hud-controls")]) if (el) syncScroll(el);
     // The hint line takes all the room the bottom-right controls leave (it was given a fixed width that they outgrew).
     const hc = document.querySelector<HTMLElement>(".hud-controls");

@@ -3308,7 +3308,7 @@ dialog.choice-dialog { width: min(var(--choice-w), calc(100vw - var(--sp-10))); 
 .props-row .tb-group { flex: none; }
 /* A chip: the section's icon and what it is set to; it opens its options. As compact as an Actions bar button. */
 .vchip { display: inline-flex; flex: none; align-items: center; gap: var(--s-2); height: var(--ctl); padding: 0 var(--s-4); color: inherit; font: var(--font-control); white-space: nowrap; background: transparent; border: 1px solid transparent; border-radius: var(--ctl-r, var(--r-md)); cursor: pointer; }
-.vchip-ic { display: inline-flex; }
+.vchip-ic { display: inline-flex; margin-inline-end: var(--s-4); } /* (room between the section's icon and what it shows) */
 .vchip .vchip-ic svg { width: var(--icon-md); height: var(--icon-md); }
 .vchip:hover { background: var(--hud-hover); }
 .vchip[aria-expanded="true"] { border-color: var(--hud-accent); background: var(--hud-hover); }

@@ -37,7 +37,11 @@ function highlight(i: number, dwell: boolean): void {
   if (!n) return;
   open.at = Math.max(0, Math.min(n - 1, i));
   open.items.forEach((it, k) => it.classList.toggle("is-active", k === open!.at));
-  open.items[open.at]!.scrollIntoView({ block: "nearest" });
+  // (within the list only: scrollIntoView also scrolls the panel or page around it, and a scroll outside the list closes it)
+  const it = open.items[open.at]!;
+  const pop = open.pop;
+  if (it.offsetTop < pop.scrollTop) pop.scrollTop = it.offsetTop;
+  else if (it.offsetTop + it.offsetHeight > pop.scrollTop + pop.clientHeight) pop.scrollTop = it.offsetTop + it.offsetHeight - pop.clientHeight;
   clearTimeout(open.timer);
   // (a choice the keys rest on is taken after a moment, the list staying open: a font tried without closing anything)
   if (dwell) open.timer = window.setTimeout(() => apply(open?.at ?? -1), DWELL_MS);
@@ -77,8 +81,14 @@ function openFor(select: HTMLSelectElement): void {
       head.className = "combo-group";
       head.textContent = child.label;
       pop.append(head);
-      for (const o of child.querySelectorAll("option")) pop.append(row(o, index++));
-    } else if (child instanceof HTMLOptionElement) pop.append(row(child, index++));
+      for (const o of child.querySelectorAll("option")) {
+        if (!o.hidden) pop.append(row(o, index));
+        index++;
+      }
+    } else if (child instanceof HTMLOptionElement) {
+      if (!child.hidden) pop.append(row(child, index)); // (an option the app hides is no choice: its place is kept, so the index stays the field's)
+      index++;
+    }
   }
   pop.style.minWidth = `${select.getBoundingClientRect().width}px`;
   // (inside a modal dialog the list belongs to it: what is outside a modal cannot be used)
@@ -87,18 +97,10 @@ function openFor(select: HTMLSelectElement): void {
   select.setAttribute("aria-expanded", "true");
   placeMenu(pop, select);
   highlight(Math.max(0, items.findIndex((it) => Number(it.dataset["index"]) === select.selectedIndex)), false);
-  pop.addEventListener("pointerdown", (e) => e.preventDefault()); // (the field keeps the focus, and with it the keys)
   pop.addEventListener("pointermove", (e) => {
     const it = (e.target as HTMLElement).closest<HTMLElement>(".combo-item");
     const i = it ? items.indexOf(it) : -1;
     if (i >= 0 && i !== open?.at) highlight(i, false);
-  });
-  pop.addEventListener("click", (e) => {
-    const it = (e.target as HTMLElement).closest<HTMLElement>(".combo-item");
-    const i = it ? items.indexOf(it) : -1;
-    if (i < 0) return;
-    apply(i);
-    closeCombobox();
   });
 }
 
@@ -107,6 +109,21 @@ let installed = false;
 export function installCombobox(): void {
   if (installed) return;
   installed = true;
+  // A press in the list is the list's alone, before anything else hears it: it lies outside the popover, menu or picker its field is in,
+  // whose "a press outside closes me" would close it (choosing the colour picker's kind closed the picker).
+  for (const type of ["pointerdown", "mousedown", "pointerup", "mouseup", "click", "touchstart", "touchend"]) {
+    window.addEventListener(type, (e) => {
+      if (!open || !open.pop.contains(e.target as Node)) return;
+      e.stopPropagation();
+      if (type === "pointerdown" || type === "mousedown") e.preventDefault(); // (the field keeps the focus, and with it the keys)
+      if (type !== "click") return;
+      const it = (e.target as HTMLElement).closest<HTMLElement>(".combo-item");
+      const i = it ? open.items.indexOf(it) : -1;
+      if (i < 0) return;
+      apply(i);
+      closeCombobox();
+    }, true);
+  }
   document.addEventListener("pointerdown", (e) => {
     const t = e.target as HTMLElement;
     if (open && !open.pop.contains(t) && t !== open.select) closeCombobox();
@@ -120,14 +137,15 @@ export function installCombobox(): void {
   document.addEventListener("mousedown", (e) => {
     if (e.button === 0 && usable(e.target)) e.preventDefault();
   }, true);
-  document.addEventListener("keydown", (e) => {
+  // (before anything else hears them, and alone: Escape or Enter in the list is not also the popover's or the picker's around it)
+  window.addEventListener("keydown", (e) => {
     const s = e.target;
     if (!usable(s)) return;
     const k = e.key;
     if (!open || open.select !== s) {
       if (k === "ArrowDown" || k === "ArrowUp" || k === " " || k === "Enter" || k === "F4") {
         e.preventDefault();
-        e.stopPropagation();
+        e.stopImmediatePropagation();
         openFor(s);
       }
       return;
@@ -152,7 +170,7 @@ export function installCombobox(): void {
       if (i >= 0) highlight(i, true);
     } else return;
     e.preventDefault();
-    e.stopPropagation();
+    e.stopImmediatePropagation();
   }, true);
   window.addEventListener("resize", () => closeCombobox());
   document.addEventListener("scroll", (e) => {
