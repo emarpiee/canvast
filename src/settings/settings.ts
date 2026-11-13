@@ -205,6 +205,8 @@ export const SETTINGS = {
   "ui.motion": { scope: "device", default: "system", validate: oneOf("system", "reduce", "subtle", "full"), effect: "immediate" } as Def<"system" | "reduce" | "subtle" | "full">,
   "ui.animSpeed": { scope: "device", default: "normal", validate: oneOf("slow", "normal", "fast"), effect: "immediate" } as Def<"slow" | "normal" | "fast">,
   "ui.hints": { scope: "device", default: "all", validate: oneOf("all", "bar", "off"), effect: "immediate" } as Def<"all" | "bar" | "off">,
+  /** Where the names of the Actions bar's groups show (ADR 0197): under or over the buttons, always or while the pointer is on the bar, or not at all. */
+  "ui.groupNames": { scope: "device", default: "bottom", validate: oneOf("top", "bottom", "top-hover", "bottom-hover", "off"), effect: "immediate" } as Def<"top" | "bottom" | "top-hover" | "bottom-hover" | "off">,
   "ui.actions": { scope: "device", default: "bottom", validate: oneOf("bottom", "follow"), effect: "immediate" } as Def<"bottom" | "follow">,
   "ui.names": { scope: "device", default: "all", validate: oneOf("all", "picked", "off"), effect: "immediate" } as Def<"all" | "picked" | "off">,
   "ui.zen": { scope: "device", default: false, validate: (v: unknown) => (typeof v === "boolean" ? v : undefined), effect: "immediate" } as Def<boolean>,

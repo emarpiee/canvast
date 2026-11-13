@@ -122,6 +122,9 @@ const TAB_GROUPS: ReadonlyArray<readonly [title: string, ids: readonly string[]]
 
 const SCOPE_LABEL = { device: "This device", workspace: "This workspace", board: "This board" } as const;
 
+/** A pointer that can hover (a mouse, a pen over a tablet): choices that show things on hover are not offered on a touch screen alone. */
+const CAN_HOVER = typeof matchMedia === "function" && matchMedia("(any-hover: hover)").matches;
+
 export const SETTINGS_TABS: readonly Tab[] = [
   {
     id: "drawing",
@@ -299,6 +302,7 @@ export const SETTINGS_TABS: readonly Tab[] = [
       { key: "grid.major", label: "Stronger line every", help: "A stronger line every so many squares.", control: { kind: "select", options: [["none", "None"], ["2", "2 squares"], ["4", "4 squares"], ["8", "8 squares"]] } },
       { key: "grid.opacity", label: "Grid strength", help: "How strongly the pattern shows.", control: { kind: "range", min: 10, max: 100, step: 5, unit: "%" } },
       { key: "ui.actions", label: "Actions bar", help: "Where the bar of actions for the selected things sits.", more: "Where the bar of actions for the selected things sits. At the bottom: always in the same place. Follows the selection: just under the selected things (above them when there is no room below).", control: { kind: "select", options: [["bottom", "At the bottom"], ["follow", "Follows the selection"]] } },
+      { key: "ui.groupNames", label: "Actions bar group names", help: "Where the names of the Actions bar's groups show.", more: "Where the names of the Actions bar's groups (Items, Files, Edit shapes, Arrange, Attach, Selection) show: under or over their buttons, always or only while the pointer is on the bar, or not at all.", control: { kind: "select", options: [["bottom", "Under the buttons"], ["top", "Over the buttons"], ...(CAN_HOVER ? [["bottom-hover", "Under, on hover"], ["top-hover", "Over, on hover"]] as Array<[string, string]> : []), ["off", "Hidden"]] } },
       { key: "ui.names", label: "Item names", help: "The name above a sheet, picture or file card.", more: "The name above a sheet, picture or file card (and above any item that is selected). Always: every one. When selected: only the selected ones. Hidden: none. The button at the bottom right cycles through these.", control: { kind: "select", options: [["all", "Always"], ["picked", "When selected"], ["off", "Hidden"]] } },
       { key: "ui.density", label: "Density", help: "How much room controls take: more canvas, or larger controls.", more: "Compact (the default): smaller controls and tighter spacing, so more of the canvas shows. Dense: the smallest controls, fields, menus and spacing, for the most canvas. Comfortable: larger, roomier controls.", control: { kind: "select", options: [["dense", "Dense"], ["compact", "Compact"], ["comfortable", "Comfortable"]] } },
       { key: "ui.corners", label: "Corners", help: "The shape of every corner of the interface: round or sharp.", more: "The shape of every corner of the interface: buttons, fields, panels, menus, chips and dots, in every view. Round (the default) or sharp.", control: { kind: "select", options: [["round", "Round"], ["sharp", "Sharp"]] } },

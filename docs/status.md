@@ -47,6 +47,15 @@ Unverified / Committed / Next bounded task**.
 - **Committed:** v0.57.19 on `main`.
 - **Next bounded task:** retake the README screenshots in Stone when the owner says.
 
+## v0.58.2: where the Actions bar's group names show (2026-11-13)
+
+- **Implemented:** setting `ui.groupNames` (top, bottom, top-hover, bottom-hover, off) as `data-group-names` on the root, read by the stylesheet; the hover choices left out of Settings where nothing can hover (`any-hover`), and shown always there.
+- **Tested:** typecheck and build here; each choice checked by eye in a scratch run (Chromium). Tests on GitHub.
+- **Known failures:** none known.
+- **Unverified:** a real touch screen.
+- **Committed:** v0.58.2 on `main`.
+- **Next bounded task:** the owner's plan for the Properties bar.
+
 ## v0.58.1: the Actions bar names its groups (2026-11-13)
 
 - **Implemented:** ADR 0197: `captionedGroup` in `ui/bar.ts` (a group's name under its controls, read by `syncGroups`), used by every group of the Actions bar; Find at its end (`findCommand`, icon `text-search`).

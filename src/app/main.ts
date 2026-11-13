@@ -442,6 +442,10 @@ async function start(): Promise<void> {
     root.style.setProperty("--vivid", String(settings.get("ui.vivid") / 100));
     if (settings.get("ui.corners") === "sharp") root.dataset["corners"] = "sharp";
     else delete root.dataset["corners"]; // round is the default
+    // Where the names of the Actions bar's groups show (under the buttons is the default)
+    const names = settings.get("ui.groupNames");
+    if (names !== "bottom") root.dataset["groupNames"] = names;
+    else delete root.dataset["groupNames"];
     const density = settings.get("ui.density");
     if (density !== "compact") root.dataset["density"] = density;
     else delete root.dataset["density"]; // compact is the default
@@ -2823,6 +2827,7 @@ async function start(): Promise<void> {
       case "quality.level": applyHeldQuality(); break;
       case "cache.decodedMb": assets?.setBudget(Number(settings.get("cache.decodedMb")) * 2 ** 20); break;
       case "ui.density":
+      case "ui.groupNames":
       case "ui.motion":
       case "ui.animSpeed":
       case "nav.travel":

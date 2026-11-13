@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.58.2 — Where the Actions bar's group names show (2026-11-13)
+
+- **Added:** Settings > Appearance > **Actions bar group names**: under the buttons, over them, either only on hover (not offered on a touch screen), or hidden.
+
 ## 0.58.1 — The Actions bar names its groups (2026-11-13)
 
 - **Changed:** the Actions bar's groups show their names under their buttons (Items, Files, Edit shapes, Arrange, Attach, Selection), always in the same order.
