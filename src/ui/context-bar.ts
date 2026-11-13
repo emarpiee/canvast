@@ -224,7 +224,7 @@ export function mountContextBar(host: HTMLElement, editor: EditorState, doc: Doc
   const names = document.createElement("div");
   names.className = "ctx-names";
   names.setAttribute("aria-hidden", "true");
-  wrap.append(names);
+  wrap.prepend(names); // (first: the Actions bar and the selection options bar beside it stay next to each other)
   const placeNames = (): void => {
     if (!(document.documentElement.dataset["groupNames"] ?? "").endsWith("hover") || document.documentElement.dataset["actionsView"] === "chips" || bar.hidden) return;
     const k = uiScale();

@@ -47,6 +47,13 @@ Unverified / Committed / Next bounded task**.
 - **Committed:** v0.57.19 on `main`.
 - **Next bounded task:** retake the README screenshots in Stone when the owner says.
 
+## v0.58.6: the hover names' layer first in the Actions bar's row (2026-11-13)
+
+- **Implemented:** `.ctx-names` is prepended to `.ctx-wrap`, so the selection options bar is next to the Actions bar again (`vectors.spec.ts:3220` failed on 0.58.4 in chromium and firefox).
+- **Tested:** build here; the spec on GitHub.
+- **Known failures:** `vectors.spec.ts:3515` (the paste of an adjusted shape) failed once on 0.58.4 in chromium: the known paste flake, not this change.
+- **Committed:** v0.58.6 on `main`.
+
 ## v0.58.5: value chips, the Properties panel and chips by the selection (2026-11-13)
 
 - **Implemented:** ADR 0198. `ui/bar-sections.ts` (sections, summaries), `ui/value-chips.ts` (chip, popover, `syncChips`), `ui/properties-layout.ts` (bar, chips, panel, near), `ui/near-selection.ts` (`placeBy`, shared with the following Actions bar); `toolbar.ts` finds its controls wherever the bar is (`q`, `qa`, `listen`); Actions bar chips in `context-bar.ts`; palette reveal in `from-bars.ts`; settings `ui.properties`, `ui.propsFolded`, `ui.propsPin`, `ui.propsMini`, `ui.actionsView`.

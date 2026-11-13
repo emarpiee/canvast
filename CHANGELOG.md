@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.58.6 — The selection options stay beside the Actions bar (2026-11-13)
+
+- **Fixed:** the layer of the Actions bar's hover names stood between the Actions bar and the selection options bar beside it; it is now first in their row.
+
 ## 0.58.5 — Value chips, the Properties panel and chips by the selection (2026-11-13)
 
 - **Added:** Settings > Appearance > **Properties**: the options of what is selected in the bar at the top (as before), as **value chips** (one per group, saying what it is set to, opening its options), in the **Properties panel** (opens by itself with a selection, folds its groups to one line of values, an anchor keeps it open, a short form of only the groups), or as value chips **near the selection** (above it, with a following Actions bar under it).
