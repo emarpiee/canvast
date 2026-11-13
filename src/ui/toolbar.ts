@@ -417,29 +417,20 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
       </div>
     </div>
   `;
-  // The colours of a selection are a second bar of their own, just under this one (the same bar component, ADR 0128).
-  const colourBar = createBar("Colours of the selection", "Colours");
-  colourBar.row.append(root.querySelector("[data-sel-colours]")!);
+  // The colours of a selection are in the Look section, before its fill and outline (ADR 0197; they were a second bar under this one). Their
+  // chips are made again as the selection changes, so the group keeps its section itself.
+  root.querySelector<HTMLElement>("[data-sel-colours]")!.dataset["section"] = "look";
   // The Outline options button sits beside the Outline colour: in this bar, after the chips, when several shapes are picked.
   const outlineBtn = root.querySelector<HTMLElement>("[data-outline-options]")!;
   // (the outline's width beside it, between the Outline colour and its options: the quick way to the width every outline has)
   const outlineW = root.querySelector<HTMLElement>("[data-outline-w-wrap]")!;
   const outlineWInput = outlineW.querySelector<HTMLInputElement>("input")!;
   const outlineHome = outlineBtn.parentElement!;
-  root.querySelector(".toolbar")!.after(colourBar.el);
-  // On a phone the colours of the selection share the row of the Properties bar (one row less at the top); wider, they are a bar of their own under it.
-  const phoneWidth = window.matchMedia("(max-width: 640px)");
-  const placeColours = (): void => {
-    const group = root.querySelector<HTMLElement>("[data-sel-colours]")!;
-    const home = phoneWidth.matches ? root.querySelector<HTMLElement>(".tb-options-row")! : colourBar.row;
-    if (group.parentElement !== home) home.append(group);
-  };
-  placeColours();
   // Sections (ADR 0197): every control of a selection belongs to one (Look first, then what is the kind's own, then the sheet's), and the bar
   // shows one at a time, chosen by tabs at its start, so it never needs to scroll and a thing is always in the same tab. A group's section is
   // its controls' (a control may name its own).
   for (const el of root.querySelectorAll<HTMLElement>(".tb-options-row [data-section]")) {
-    if (!el.querySelector("[data-section]") && !el.classList.contains("tb-group")) continue;
+    if (el.hasAttribute("data-sel-colours") || (!el.querySelector("[data-section]") && !el.classList.contains("tb-group"))) continue;
     for (const c of el.children) if (!(c as HTMLElement).dataset["section"]) (c as HTMLElement).dataset["section"] = el.dataset["section"]!;
     el.removeAttribute("data-section");
   }
@@ -998,6 +989,12 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
     editor.changed();
   });
 
+  root.addEventListener("change", (e) => {
+    const t = e.target as HTMLElement;
+    if (!t.matches("[data-subject-select]")) return;
+    editor.subject = (t as HTMLSelectElement).value;
+    editor.changed();
+  });
   const onClick = (e: Event): void => {
     const b = (e.target as HTMLElement).closest("button");
     if (!b) return;
@@ -1370,7 +1367,8 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
     // (`all`, chosen by its chip, shows only what is for any kind in this row; the Actions bar below follows the same choice)
     const chosen = editor.subject === "all" && kinds.length > 1 ? "all" : kinds.includes(editor.subject ?? "") ? editor.subject! : (kinds[0] ?? null);
     const chips = root.querySelector<HTMLElement>(".tb-subject")!;
-    const chipHtml = kinds.length > 1 ? ["all", ...kinds].map((k) => `<button type="button" role="radio" class="tb-chip" data-subject="${k}" aria-checked="${k === chosen}" title="${k === "all" ? "Everything selected: the tools for all of it" : `Edit the ${KIND_LABEL[k]!.toLowerCase()} properties of the selection`}">${KIND_LABEL[k]}</button>`).join("") : "";
+    // (a dropdown, not chips: the chips looked like the section tabs beside them; ADR 0197)
+    const chipHtml = kinds.length > 1 ? `<label class="tb-count" title="The selection holds several kinds of things: the options of which one to show (All: what they share)">Editing <select data-subject-select aria-label="Which kind of the selected things to edit">${["all", ...kinds].map((k) => `<option value="${k}"${k === chosen ? " selected" : ""}>${k === "all" ? "All" : KIND_LABEL[k]}</option>`).join("")}</select></label>` : "";
     if (chips.dataset["html"] !== chipHtml) {
       chips.dataset["html"] = chipHtml;
       chips.innerHTML = chipHtml;
@@ -1391,9 +1389,6 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
     organize(row, picking && editor.selection.size > 0, chosen ?? "");
     root.querySelector<HTMLElement>(".toolbar")!.hidden = ![...row.querySelectorAll<HTMLElement>(":scope > .tb-group:not(.tb-find)")].some((g) => !g.hidden);
     syncScroll(row);
-    syncGroups(colourBar.row, (g) => g.dataset["for"]!.split(" ").includes(rowTool));
-    colourBar.el.hidden = ![...colourBar.row.querySelectorAll<HTMLElement>(":scope > .tb-group")].some((g) => !g.hidden);
-    syncScroll(colourBar.row);
     const wrap = document.querySelector(".ctx-wrap");
     if (wrap && pickBar.el.parentElement !== wrap) wrap.append(pickBar.el);
     pickGroup.hidden = ![...pickGroup.children].some((c) => !isOff(c as HTMLElement));
@@ -1401,9 +1396,5 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
   };
   editor.subscribe(update);
   doc.subscribe(update);
-  phoneWidth.addEventListener("change", () => {
-    placeColours();
-    update();
-  });
   update();
 }

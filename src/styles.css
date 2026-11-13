@@ -1018,6 +1018,7 @@ dialog.confirm .secret-field .prompt-input { padding-right: calc(var(--icon-xl) 
 .ctx-bar .tb-group { flex: none; }
 /* A group with its name over its controls (ADR 0197): the Actions bar's groups say what they hold. */
 .tb-captioned { flex-direction: column; align-items: stretch; gap: 0; }
+.tb-captioned > .tb-cap { order: 1; } /* (the name under its buttons) */
 .tb-captioned > .tb-row { display: flex; gap: var(--s-1); align-items: center; justify-content: center; }
 .tb-cap { padding-inline: var(--s-2); font: var(--font-meta); color: var(--hud-muted); line-height: 1; text-align: center; white-space: nowrap; }
 .ctx-bar button { display: inline-flex; flex: none; align-items: center; justify-content: center; color: inherit; background: transparent; border: 0; cursor: pointer; }
