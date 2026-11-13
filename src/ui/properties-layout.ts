@@ -129,7 +129,8 @@ export function mountPropertiesLayout(root: HTMLElement, canvasHost: HTMLElement
     if (popped !== COLOURS && colours.parentElement !== park) move(colours, () => park.append(colours));
     if (popped !== null && !ids.includes(popped)) closePop();
     // (while something is dragged the chips step aside, as the Actions bar does: they do not follow it about, nor jump to the top)
-    if (editor.gesturing) {
+    // (an open popover is being worked in: a value changed there previews too, and must not close it)
+    if (editor.gesturing && popped === null) {
       closePop();
       near.hidden = top.el.hidden = true;
       return;

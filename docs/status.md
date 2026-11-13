@@ -47,6 +47,12 @@ Unverified / Committed / Next bounded task**.
 - **Committed:** v0.57.19 on `main`.
 - **Next bounded task:** retake the README screenshots in Stone when the owner says.
 
+## v0.58.16: a chip's options stay open while a colour is set (2026-11-13)
+
+- **Implemented:** the chips hide for a drag only when no chip's popover is open (a value changed there previews too).
+- **Tested:** build here; scratch: the colour typed in a chip's Fill keeps its options open, two Escapes close the picker then them, the Shape tool stays. On GitHub (0.58.15): `bar-layouts.spec.ts:28` failed from this; also `tiles.spec.ts:99` (built 40, not 20: seen once before, at 0.58.0, passed on a re-run), Pan and zoom (zoom-whole-fast-mouse 160 tiles over 150; it passed on the commit before, whose only change was the colour picker's place), `text.spec.ts:93` in Firefox and the desktop sharing test: not touched by these changes; to be read again on this push's runs.
+- **Committed:** v0.58.16 on `main`.
+
 ## v0.58.15: the colour picker keeps its panel clear (2026-11-13)
 
 - **Implemented:** the panel or dialog of the picker's button is kept clear as its bar is. Tests: `styles.spec.ts:155` waits for the picker before its Escape (a race: an Escape before it opened closed nothing) and checks it closed; `bar-layouts.spec.ts:28` draws right of the dev panel (x 378).

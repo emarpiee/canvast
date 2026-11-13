@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.58.16 — A chip's options stay open while a colour is set (2026-11-13)
+
+- **Fixed:** setting a colour from a chip's options closed them (the colour's live preview was taken for a drag on the canvas).
+
 ## 0.58.15 — The colour picker keeps its panel clear (2026-11-13)
 
 - **Fixed:** a colour picker opened from a panel (a palette's colour in the Styles panel) could cover the panel's own rows when it had to move off the selection.
