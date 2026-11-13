@@ -1,6 +1,6 @@
 import { existsSync, readFileSync } from "node:fs";
 import type { BrowserContext, Page } from "@playwright/test";
-import { APP_URL, exportWith, expect, pathWith, recordMetric, test } from "./harness";
+import { APP_URL, boolWith, exportWith, expect, pathWith, recordMetric, test } from "./harness";
 import type { App } from "./harness";
 import { blockyFixture } from "./png";
 
@@ -964,6 +964,18 @@ test("a text is set along a picked path (a copy of its curve), runs along it and
   await expect.poll(async () => ((await textObjects(p))[0]!["onPath"] as { flip?: boolean }).flip).toBe(true);
   await p.keyboard.press("Escape");
 
+  // Its handles on the canvas (ADR 0202): off the path, dragged the way the letters stand; along, slid back from the end (a start below 0)
+  const dots = () => p.evaluate(() => window.__canvastDebug.pathTextDots());
+  const handle = async (part: "along" | "lift") => (await dots()).find((d) => d.part === part)!;
+  const [al, li] = [await handle("along"), await handle("lift")];
+  const up = Math.hypot(li.x - al.x, li.y - al.y);
+  await app.drag({ x: li.x, y: li.y }, { x: li.x + ((li.x - al.x) / up) * 24, y: li.y + ((li.y - al.y) / up) * 24 }, 4);
+  await expect.poll(async () => ((await textObjects(p))[0]!["onPath"] as { lift?: number }).lift ?? 0).toBeGreaterThan(0.5);
+  const al2 = await handle("along");
+  await app.drag({ x: al2.x, y: al2.y }, { x: 430, y: 400 }, 5); // (the middle of the line: half of it back from the end)
+  await expect.poll(async () => ((await textObjects(p))[0]!["onPath"] as { start?: number }).start ?? 0).toBeLessThan(-0.3);
+  expect((await textObjects(p))[0]!["onPath"]).toMatchObject({ align: "end", flip: true });
+
   // Taking it off sets it straight again, and undo puts it back on.
   await pathWith(p, "offpath");
   await expect.poll(async () => (await textObjects(p))[0]!["onPath"]).toBeUndefined();
@@ -972,6 +984,35 @@ test("a text is set along a picked path (a copy of its curve), runs along it and
   await p.keyboard.press(`${mod}+z`);
   await expect.poll(async () => (await textObjects(p))[0]!["onPath"]).toBeDefined();
   expect(line.kind).toBe("path");
+  expect(app.consoleErrors).toEqual([]);
+});
+
+test("a text along a shape follows the boolean group the shape goes into: the result, as seen (ADR 0202)", async ({ app }) => {
+  const p = app.page;
+  await newText(p, 380, 300);
+  await p.keyboard.type("Round the edge");
+  await finish(p);
+  await p.keyboard.press("u");
+  await p.click('[data-shape-kind="ellipse"]');
+  await app.drag({ x: 420, y: 340 }, { x: 680, y: 600 }, 5);
+  const text = (await textObjects(p))[0]!;
+  const circle = (await objects(p)).find((o) => o.kind === "path")!;
+  await p.keyboard.press("v");
+  await p.evaluate((ids) => window.__canvastDebug.select(ids), [text.id, circle.id]);
+  await pathWith(p, "onpath");
+  await expect.poll(async () => ((await textObjects(p))[0]!["onPath"] as { path?: string } | undefined)?.path).toBe(circle.id);
+  // (how wide the curve it follows is)
+  const width = async () => { const n = ((await textObjects(p))[0]!["onPath"] as { n: number[] }).n.filter((_, i) => i % 2 === 0); return Math.max(...n) - Math.min(...n); };
+  const was = await width();
+  await p.keyboard.press("u");
+  await app.drag({ x: 560, y: 340 }, { x: 820, y: 600 }, 5);
+  await p.keyboard.press("v");
+  const other = (await objects(p)).find((o) => o.kind === "path" && o.id !== circle.id)!;
+  await p.evaluate((ids) => window.__canvastDebug.select(ids), [circle.id, other.id]);
+  await boolWith(p, "op:intersect");
+  // (the lens of the two, about half as wide as the circle: the words follow it)
+  await expect.poll(width).toBeLessThan(was * 0.6);
+  expect(((await textObjects(p))[0]!["onPath"] as { path?: string }).path, "it stays tied to its own shape").toBe(circle.id);
   expect(app.consoleErrors).toEqual([]);
 });
 

@@ -757,7 +757,7 @@ export function openTextBoxPopover(anchor: HTMLElement, o: TextBoxOptions): void
   const choices = (key: string, label: string, items: ReadonlyArray<[string, string, string]>, value: string): string => opChoices(`tb-${key}`, key, label, items, value);
   const round = (v: number): string => String(Math.round(v * 100) / 100);
   const along = o.pathOpts
-    ? num("pathStart", "Start at", round(o.pathOpts.start * 100), "%", 0, "1") +
+    ? num("pathStart", "Start at", round(o.pathOpts.start * 100), "%", -100, "1") +
       choices("path-align", "Along the path", [["start", "Start", "From the start point"], ["center", "Middle", "In the middle of the path"], ["end", "End", "Up to the end of the path"]], o.pathOpts.align) +
       choices("path-side", "Side", [["a", "This", "On this side of the path"], ["b", "Other", "On the other side, read the other way"]], o.pathOpts.flip ? "b" : "a") +
       num("pathLift", "Off the path", round(o.pathOpts.lift), "em", 0, "0.05")
@@ -779,7 +779,7 @@ export function openTextBoxPopover(anchor: HTMLElement, o: TextBoxOptions): void
     const key = input.dataset["field"]!;
     liveNumber(input, (v, final) => {
       if (!(v >= 0)) return;
-      if (key === "pathStart") return o.onChange({ pathOpts: { start: Math.min(1, v / 100) } }, final);
+      if (key === "pathStart") return o.onChange({ pathOpts: { start: Math.max(-1, Math.min(1, v / 100)) } }, final);
       if (key === "pathLift") return o.onChange({ pathOpts: { lift: v } }, final);
       if (key === "cardPad" || key === "cardRadius") {
         if (!card) return;

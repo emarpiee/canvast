@@ -22,7 +22,7 @@ import { DEFAULT_INNER } from "../doc/path";
 import { linkAt } from "../text/layout";
 import { pictureBox } from "../render/gradient";
 import { newInk } from "../render/ink";
-import { NODE_REACH_PX, handleGuide, shapeHandles, hitCornerHandle, gradientHandles, gradientHandleLabel, hitGradient, hitNodes, isSmoothNode, localOf, moveGradientHandle, nodesOnScreen } from "./path-edit";
+import { NODE_REACH_PX, handleGuide, shapeHandles, hitCornerHandle, gradientHandles, gradientHandleLabel, hitGradient, hitNodes, isSmoothNode, localOf, moveGradientHandle, nodesOnScreen , pathTextLabel } from "./path-edit";
 import type { GradHandle } from "./path-edit";
 import type { Gradient } from "../doc/paint";
 import type { Frame } from "../core/frames";
@@ -35,6 +35,7 @@ import { TILT_FULL_DEG, expandStroke } from "./pens";
 import { normalizeUnit, restack, worldBounds } from "../doc/edit-ops";
 import { MAX_SNAP_TARGETS, SNAP_PX, bestSnap } from "./snap";
 import { visibleObjects } from "../render/scene-view";
+import { nearestAlong, pathTextGrips, startFor } from "../text/glyph-space";
 import { draggedLength, handleLength, layoutHandleAt, layoutHandles, withHandleLength, type LayoutHandle } from "./layout-handles";
 import type { FrameIndex } from "../scene/frame-index";
 import { cameraIn } from "../scene/frame-index";
@@ -57,7 +58,7 @@ import type { SelectionFrame } from "../render/selection-frame";
 import { TURN, angleFromRadians, cosSin, normAngle, radiansFromAngle } from "../core/angle";
 import { formatRatio } from "../app/export-size";
 import { PanGesture } from "./navigation";
-import { autoLayoutOf, patchAutoLayout, drawSheetOver, finishShapeBuilder, fillGapAt, finishGapFill, attachSelection, sheetSelection, arrangeSelection, commitCornerAt, commitCornerSet, commitCorners, commitShape as commitShapeNumbers, balloonText, setShapeText, setBalloonLink, commitPaint, deleteSelection, flattenSelection, duplicateSelection, groupSelection, previewPaint, redo, ungroupSelection, undo } from "../app/actions";
+import { autoLayoutOf, patchAutoLayout, drawSheetOver, finishShapeBuilder, fillGapAt, finishGapFill, attachSelection, sheetSelection, arrangeSelection, commitCornerAt, commitCornerSet, commitCorners, commitShape as commitShapeNumbers, balloonText, setShapeText, setTextStyle, setBalloonLink, commitPaint, deleteSelection, flattenSelection, duplicateSelection, groupSelection, previewPaint, redo, ungroupSelection, undo } from "../app/actions";
 import { expandToUnits, groupObjects, isInside, unitsWithin } from "../doc/groups";
 import { boolGroupsOf, isResult } from "../doc/boolean-group";
 
@@ -262,7 +263,7 @@ type Gesture =
   /** Dragging a handle of a path's gradient (ADR 0100). */
   | { kind: "grad"; pointerId: number; id: ObjectId; which: "fill" | "stroke"; handle: GradHandle; g: Gradient }
   /** Dragging the corner radius dot or a star's ratio handle (ADR 0105): `r0` the radius in px and `proj0` where along the corner's bisector the press was. */
-  | { kind: "round"; pointerId: number; id: ObjectId; what: "main" | "corner" | "ratio" | "count" | "balloon"; balloon?: { part: BalloonPart; tail: number }; snap?: SnapContext | null; index: number; ax: number; ay: number; r0: number; proj0: number; x0: number; start: ScreenPoint; moved: boolean; opened: boolean; timer: number; /** Every picked corner taken along (its radius and the most it can have), by node. */ multi?: ReadonlyMap<number, { r0: number; max: number }> }
+  | { kind: "round"; pointerId: number; id: ObjectId; what: "main" | "corner" | "ratio" | "count" | "balloon" | "pathtext"; balloon?: { part: BalloonPart; tail: number }; /** A text along a path's handle, and its lift and the point pressed (local units) when it was taken. */ pathText?: { part: "along" | "lift"; lift0: number; l0: { x: number; y: number } }; snap?: SnapContext | null; index: number; ax: number; ay: number; r0: number; proj0: number; x0: number; start: ScreenPoint; moved: boolean; opened: boolean; timer: number; /** Every picked corner taken along (its radius and the most it can have), by node. */ multi?: ReadonlyMap<number, { r0: number; max: number }> }
   /** Dragging a shape out (Shape tool). */
   | { kind: "shape"; pointerId: number; start: ScreenPoint; /** What a corner being drawn snaps to (null: snapping off). */ snap: SnapContext | null }
   /** A side handle of words in a shape: the shape sets their box, so what it changes is the padding. */
@@ -977,6 +978,13 @@ export function attachTools(
     g = { kind: "grad", pointerId: e.pointerId, id: tgt.o.id, which: h.which, handle, g: h.g };
     return true;
   };
+  /** What a shape's own handles are on: what a gradient is edited on, or the one picked text along a path (ADR 0202). */
+  const handleTarget = (): { po: ProjectedObject; o: PathObject | TextObject } | null => {
+    const tgt = gradientTarget();
+    if (tgt || editor.selection.size !== 1) return tgt;
+    const po = visible().find((p) => editor.selection.has(p.obj.id));
+    return po && po.obj.kind === "text" && po.obj.onPath && !po.cover && !po.obj.locked ? { po, o: po.obj } : null;
+  };
   /** A press on the main radius dot, one of the corners' own dots (when opened out) or the star's ratio handle takes it; held still, the main dot opens the corners out (or closes them). */
   const toggleCorners = (id: ObjectId): void => {
     editor.cornersOpen = editor.cornersOpen === id ? null : id;
@@ -984,7 +992,7 @@ export function attachTools(
     editor.changed();
   };
   const startCornerPress = (e: PointerEvent, s: ScreenPoint): boolean => {
-    const tgt = gradientTarget();
+    const tgt = handleTarget();
     if (!tgt || editor.blockEdit() || (editor.tool !== "select" && !editor.editsMade)) return false; // (and on what a tool has just made: ADR 0198)
     const open = editor.cornersOpen === tgt.o.id;
     const h = shapeHandles(tgt.po, open, editor);
@@ -1006,7 +1014,7 @@ export function attachTools(
         toggleCorners(id);
       }
     }, LONG_PRESS_MS) : 0;
-    g = { kind: "round", pointerId: e.pointerId, id, what: pick.what, ...(pick.what === "balloon" ? { balloon: { part: pick.handle.part, tail: pick.handle.tail }, snap: editor.snap ? snapContext([id], view.frame) : null } : {}), index: pick.what === "corner" ? pick.dot.index : 0, ax: pick.what === "ratio" && h.ratio ? (h.ratio.x - h.ratio.cx) / Math.max(1e-6, Math.hypot(h.ratio.x - h.ratio.cx, h.ratio.y - h.ratio.cy)) : 0, ay: pick.what === "ratio" && h.ratio ? (h.ratio.y - h.ratio.cy) / Math.max(1e-6, Math.hypot(h.ratio.x - h.ratio.cx, h.ratio.y - h.ratio.cy)) : 0, r0: dot?.px ?? 0, proj0: along, x0: s.x, start: s, moved: false, opened: false, timer };
+    g = { kind: "round", pointerId: e.pointerId, id, what: pick.what, ...(pick.what === "balloon" ? { balloon: { part: pick.handle.part, tail: pick.handle.tail }, snap: editor.snap ? snapContext([id], view.frame) : null } : {}), ...(pick.what === "pathtext" && tgt.o.kind === "text" ? { pathText: { part: pick.handle.part, lift0: tgt.o.onPath?.lift ?? 0, l0: localOf(tgt.po, s.x, s.y) } } : {}), index: pick.what === "corner" ? pick.dot.index : 0, ax: pick.what === "ratio" && h.ratio ? (h.ratio.x - h.ratio.cx) / Math.max(1e-6, Math.hypot(h.ratio.x - h.ratio.cx, h.ratio.y - h.ratio.cy)) : 0, ay: pick.what === "ratio" && h.ratio ? (h.ratio.y - h.ratio.cy) / Math.max(1e-6, Math.hypot(h.ratio.x - h.ratio.cx, h.ratio.y - h.ratio.cy)) : 0, r0: dot?.px ?? 0, proj0: along, x0: s.x, start: s, moved: false, opened: false, timer };
     const sel = editor.cornerSel;
     if (g.kind === "round" && pick.what === "corner" && sel && sel.id === id && sel.idx.size > 1 && sel.idx.has(pick.dot.index)) {
       g.multi = new Map(h.corners.filter((d) => sel.idx.has(d.index)).map((d) => [d.index, { r0: d.px, max: d.max }]));
@@ -1042,11 +1050,25 @@ export function attachTools(
       window.clearTimeout(g.timer);
     }
     if (!g.moved) return;
-    const tgt = gradientTarget();
+    const tgt = handleTarget();
     const open = !!tgt && editor.cornersOpen === tgt.o.id;
     const h = tgt && shapeHandles(tgt.po, open, editor);
     if (!tgt || !h) return;
     const ppu = tgt.po.proj.ppu;
+    if (g.what === "pathtext" && g.pathText) {
+      // Along: the text's held point goes to the point of the curve nearest the pointer. Off the path: as far as the pointer went along the way the letters stand.
+      const t = doc.get(g.id);
+      const grips = t?.kind === "text" ? pathTextGrips(t) : null;
+      if (!t || t.kind !== "text" || !grips) return;
+      const l = localOf(tgt.po, s.x, s.y);
+      const { part, lift0, l0 } = g.pathText;
+      const pathOpts = part === "along"
+        ? { start: Math.round(startFor(t, grips.curve, nearestAlong(grips.curve, l.x, l.y)) * 1000) / 1000 }
+        : { lift: Math.max(0, Math.round((lift0 + ((l.x - l0.x) * grips.up[0] + (l.y - l0.y) * grips.up[1]) / t.size) * 100) / 100) };
+      setTextStyle(doc, editor, { pathOpts }, () => 1, final);
+      editor.handleLabel = final ? null : { x: s.x, y: s.y, text: pathTextLabel(part, { ...t.onPath!, ...pathOpts }) };
+      return;
+    }
     if (g.what === "balloon" && g.balloon) {
       const { part, tail } = g.balloon;
       // (the tip, the base and the body line up with the grid and with what is in view, when Snap is on)
@@ -1058,7 +1080,7 @@ export function attachTools(
       editor.guides = !final && (sx !== null || sy !== null) ? { ...(sx !== null ? { x: sx } : {}), ...(sy !== null ? { y: sy } : {}) } : null;
       const l = localOf(tgt.po, sx ?? s.x, sy ?? s.y);
       if (part === "linkW" || part === "linkBend" || part === "linkA" || part === "linkB") {
-        const q = tgt.o.params!;
+        const q = (tgt.o as PathObject).params!;
         setBalloonLink(doc, editor, linkDragged(q.box, q.link!, part, [l.x, l.y]), final);
       } else if (part === "move") commitShapeNumbers(doc, editor, { balloonBox: (b) => [l.x - b[2] / 2, l.y - b[3] / 2, b[2], b[3]] }, final);
       else if (part === "size") commitShapeNumbers(doc, editor, { balloonBox: (b) => {
@@ -1139,7 +1161,7 @@ export function attachTools(
 
   /** Every handle on a shape names its value while the pointer is over it, not only while it is dragged (Radius, Ratio, Count, the gradient's ends). */
   const hoverHandleLabel = (s: ScreenPoint, boxLabel: string | null = null): void => {
-    const tgt = gradientTarget();
+    const tgt = handleTarget();
     let text: string | null = boxLabel;
     let guide: ReturnType<typeof handleGuide> = null;
     if (tgt) {
@@ -1147,11 +1169,11 @@ export function attachTools(
       const h = shapeHandles(tgt.po, open, editor);
       const pick = h && hitCornerHandle(h, s.x, s.y, open);
       if (pick && h) {
-        const prm = paramsOf(tgt.o);
+        const prm = tgt.o.kind === "path" ? paramsOf(tgt.o) : null;
         guide = handleGuide(h, pick, open);
-        text = pick.what === "balloon" ? BALLOON_LABELS[pick.handle.part] : pick.what === "ratio" ? `Ratio ${Math.round((prm?.inner ?? DEFAULT_INNER) * 100)}%` : pick.what === "count" ? `Count ${prm?.sides ?? prm?.tips ?? 0}` : `Radius ${Math.round((pick.what === "corner" ? pick.dot.px : h.main?.px ?? 0) * 10) / 10}`;
+        text = pick.what === "pathtext" && tgt.o.kind === "text" ? pathTextLabel(pick.handle.part, tgt.o.onPath!) : pick.what === "balloon" ? BALLOON_LABELS[pick.handle.part] : pick.what === "ratio" ? `Ratio ${Math.round((prm?.inner ?? DEFAULT_INNER) * 100)}%` : pick.what === "count" ? `Count ${prm?.sides ?? prm?.tips ?? 0}` : `Radius ${Math.round((pick.what === "corner" ? pick.dot.px : h.main?.px ?? 0) * 10) / 10}`;
       } else {
-        const gh = editor.tool === "node" || editor.cornersOpen === tgt.o.id ? null : gradientHandles(tgt.po, editor.gradientFocus);
+        const gh = editor.tool === "node" || editor.cornersOpen === tgt.o.id || tgt.o.kind !== "path" ? null : gradientHandles(tgt.po, editor.gradientFocus);
         const hit = gh && hitGradient(gh, s.x, s.y);
         if (hit) text = gradientHandleLabel(gh!.which, gh!.g, hit);
       }

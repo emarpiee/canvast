@@ -785,7 +785,9 @@ export function validateObject(o: CanvasObject): CanvasObject {
     if (o.onPath !== undefined && !(Array.isArray(o.onPath.n) && o.onPath.n.length >= 12 && o.onPath.n.length % 6 === 0 && o.onPath.n.length <= 6 * 20000 && o.onPath.n.every((v) => Number.isFinite(v)) && typeof o.onPath.closed === "boolean")) throw new InvalidObjectError("bad text path");
     if (o.inShape !== undefined && !(Array.isArray(o.inShape.n) && o.inShape.n.length >= 12 && o.inShape.n.length % 6 === 0 && o.inShape.n.length <= 6 * 20000 && o.inShape.n.every((v) => Number.isFinite(v)) && o.inShape.closed === true)) throw new InvalidObjectError("bad text shape");
     if (o.inShape?.holes !== undefined && !(Array.isArray(o.inShape.holes) && o.inShape.holes.length <= 256 && o.inShape.holes.every((h) => Array.isArray(h) && h.length >= 12 && h.length % 6 === 0 && h.length <= 6 * 20000 && h.every((v) => Number.isFinite(v))))) throw new InvalidObjectError("bad text shape");
-    for (const v of [o.onPath?.start, o.onPath?.lift, o.inShape?.padX, o.inShape?.padY, o.inShape?.padR, o.inShape?.padB]) if (v !== undefined && !(Number.isFinite(v) && v >= 0)) throw new InvalidObjectError("bad text option");
+    // (a start from -1: a text held at its middle or end slides back along an open path; lift and padding from 0)
+    if (o.onPath?.start !== undefined && !(Number.isFinite(o.onPath.start) && o.onPath.start >= -1 && o.onPath.start <= 1)) throw new InvalidObjectError("bad text option");
+    for (const v of [o.onPath?.lift, o.inShape?.padX, o.inShape?.padY, o.inShape?.padR, o.inShape?.padB]) if (v !== undefined && !(Number.isFinite(v) && v >= 0)) throw new InvalidObjectError("bad text option");
   } else {
     throw new InvalidObjectError(`unknown kind ${(o as { kind: unknown }).kind}`);
   }

@@ -1,6 +1,7 @@
 import { balloonHandlePoints, type BalloonPart } from "../doc/balloon-geometry";
 import { linkHandlePoints } from "../doc/balloon-link";
-import type { PathObject } from "../doc/model";
+import type { PathObject, TextObject } from "../doc/model";
+import { pathTextGrips } from "../text/glyph-space";
 import { editSubs } from "../doc/model";
 import type { ImageObject } from "../doc/model";
 import { rectSubs } from "../doc/path";
@@ -295,7 +296,11 @@ export interface CornerHandles {
   count: { x: number; y: number; cx: number; cy: number; a0: number; n: number } | null;
   /** A speech balloon's own handles. */
   balloon?: BalloonHandle[];
+  /** A text along a path's own handles: where along it the text is held, and how far off it (ADR 0202). */
+  pathText?: PathTextHandle[];
 }
+
+export interface PathTextHandle { part: "along" | "lift"; x: number; y: number; /** The way it is dragged on screen, in radians: along the curve, or off it. */ a: number }
 
 export interface BalloonHandle { part: BalloonPart; tail: number; x: number; y: number; /** The way it points on screen, in radians. */ a: number }
 
@@ -441,7 +446,25 @@ export function shapeHandles(po: ProjectedObject, expanded: boolean, editor: { g
     });
     return { main: null, corners: [], centre: null, ratio: null, count: null, balloon };
   }
+  if (po.obj.kind === "text") return po.cover ? null : pathTextHandles(po);
   return cornerHandles(po, expanded, [...(gradientHandles(po, editor.gradientFocus)?.pts ?? []), ...editor.drawnHandles.map(([x, y]) => ({ x, y }))]);
+}
+
+/** A text along a path's handles on screen: `along` on the curve where it is held, `lift` above its letters there (kept clear of `along`). */
+function pathTextHandles(po: ProjectedObject): CornerHandles | null {
+  const grips = pathTextGrips(po.obj as TextObject);
+  if (!grips) return null;
+  const p = po.proj;
+  const screen = (x: number, y: number): [number, number] => outerAt(po, exactX(p, x), exactY(p, y));
+  const [ax, ay] = screen(...grips.along);
+  const [lx0, ly0] = screen(...grips.lift);
+  const [ux, uy] = screen(grips.along[0] + grips.up[0], grips.along[1] + grips.up[1]);
+  const len = Math.max(1e-9, Math.hypot(ux - ax, uy - ay));
+  const dir: [number, number] = [(ux - ax) / len, (uy - ay) / len];
+  const [lx, ly] = clearSpot(lx0, ly0, [dir], [{ x: ax, y: ay }]);
+  const across = Math.atan2(dir[1], dir[0]);
+  if (![ax, ay, lx, ly].every((v) => Math.abs(v) < FAR)) return null;
+  return { main: null, corners: [], centre: null, ratio: null, count: null, pathText: [{ part: "along", x: ax, y: ay, a: across + Math.PI / 2 }, { part: "lift", x: lx, y: ly, a: across }] };
 }
 
 /**
@@ -470,7 +493,7 @@ export function handleGuide(h: CornerHandles, pick: CornerPick, open: boolean): 
   return { x0: dot.cx + dot.ux * MIN_DOT_PX, y0: dot.cy + dot.uy * MIN_DOT_PX, x1: dot.cx + (dot.ux * max) / dot.sinHalf, y1: dot.cy + (dot.uy * max) / dot.sinHalf };
 }
 
-export type CornerPick = { what: "balloon"; handle: BalloonHandle } | { what: "main" } | { what: "corner"; dot: CornerDot } | { what: "ratio" } | { what: "count" };
+export type CornerPick = { what: "pathtext"; handle: PathTextHandle } | { what: "balloon"; handle: BalloonHandle } | { what: "main" } | { what: "corner"; dot: CornerDot } | { what: "ratio" } | { what: "count" };
 
 /** Which handle a press takes: a corner's own dot (when opened out), the ratio handle, or the main dot. */
 export function hitCornerHandle(h: CornerHandles, x: number, y: number, expanded: boolean): CornerPick | null {
@@ -484,9 +507,14 @@ export function hitCornerHandle(h: CornerHandles, x: number, y: number, expanded
     }
   };
   for (const handle of h.balloon ?? []) consider({ what: "balloon", handle }, near(handle) - (handle.part === "tip" ? 1 : 0));
+  for (const handle of h.pathText ?? []) consider({ what: "pathtext", handle }, near(handle));
   if (h.main) consider({ what: "main" }, near(h.main) - 2); // the main one wins a tie: it is the bigger
   if (expanded) for (const dot of h.corners) consider({ what: "corner", dot }, near(dot));
   if (h.ratio) consider({ what: "ratio" }, near(h.ratio));
   if (h.count) consider({ what: "count" }, near(h.count));
   return best;
 }
+
+/** What a text along a path's handle sets, as it reads over the handle (the names of Paragraph and box options). */
+export const pathTextLabel = (part: PathTextHandle["part"], on: { start?: number; lift?: number }): string =>
+  part === "along" ? `Start at ${Math.round((on.start ?? 0) * 100)}%` : `Off the path ${Math.round((on.lift ?? 0) * 100) / 100} em`;

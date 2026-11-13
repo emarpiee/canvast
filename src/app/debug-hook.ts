@@ -225,6 +225,8 @@ export interface DebugHook {
   /** The words beside a handle being dragged, or null. */
   /** The handles of the selected speech balloon, on screen. */
   balloonDots(): Array<{ part: string; tail: number; x: number; y: number }>;
+  /** The handles of the one selected text along a path, on screen (ADR 0202). */
+  pathTextDots(): Array<{ part: "along" | "lift"; x: number; y: number }>;
   /** How many frames have been drawn: it must not rise while nothing changes. */
   draws(): number;
   placeFromLibrary(hash: string): Promise<unknown>;
@@ -616,6 +618,10 @@ export function installDebugHook(
     balloonDots: () => {
       const po = visibleObjects(doc, deps.index, null, view.frameCamera, view.viewport).find((p) => editor.selection.has(p.obj.id));
       return (po && shapeHandles(po, false, editor)?.balloon) ?? [];
+    },
+    pathTextDots: () => {
+      const po = visibleObjects(doc, deps.index, null, view.frameCamera, view.viewport).find((p) => editor.selection.has(p.obj.id));
+      return ((po && shapeHandles(po, false, editor)?.pathText) ?? []).map(({ part, x, y }) => ({ part, x, y }));
     },
     draws: () => deps.draws(),
     placeFromLibrary: (hash) => session.placeAsset(hash),

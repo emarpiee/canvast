@@ -103,7 +103,7 @@ function placing(o: TextObject): { base: number; curve: Curve; start: number } {
     const lay = layoutOf(o);
     const curve = on.flip ? reversedOf(on.n, on.closed) : curveOf(on.n, on.closed);
     const free = curve.len - lay.width * o.size;
-    placings.set(o, (p = { base: lay.lines[0]!.baseline, curve, start: (on.start ?? 0) * curve.len + (on.align === "center" ? free / 2 : on.align === "end" ? free : 0) }));
+    placings.set(o, (p = { base: lay.lines[0]!.baseline, curve, start: (on.start ?? 0) * curve.len + ALIGN_AT[on.align ?? "start"] * free }));
   }
   return p;
 }
@@ -158,4 +158,45 @@ export function pathTextBounds(o: TextObject): { minX: number; minY: number; max
     }
   }
   return Number.isFinite(minX) ? { minX, minY, maxX, maxY } : { minX: 0, minY: 0, maxX: 0, maxY: 0 };
+}
+
+/** How far along its curve a text is held for each way it is aligned: its first letter, its middle, its last letter (a part of the curve). */
+export const ALIGN_AT = { start: 0, center: 0.5, end: 1 } as const;
+
+/**
+ * The two grips of a text on a path (its handles on the canvas), in its local units: `along`, on the curve where the text is aligned (its
+ * start, middle or end), and `lift`, above the letters there, as far off the curve as they are. `up` is the way the letters stand there.
+ */
+export function pathTextGrips(o: TextObject): { curve: Curve; at: number; along: [number, number]; lift: [number, number]; up: [number, number] } | null {
+  if (!o.onPath) return null;
+  const place = placing(o);
+  const on = o.onPath;
+  const at = (on.start ?? 0) * place.curve.len + ALIGN_AT[on.align ?? "start"] * place.curve.len;
+  const p = { x: 0, y: 0, tx: 1, ty: 0 };
+  curveAt(place.curve, at, p);
+  const up: [number, number] = [p.ty, -p.tx];
+  const off = ((on.lift ?? 0) + place.base) * o.size;
+  if (!Number.isFinite(p.x + p.y + off)) return null;
+  return { curve: place.curve, at, along: [p.x, p.y], lift: [p.x + up[0] * off, p.y + up[1] * off], up };
+}
+
+/** The distance along a curve of its point nearest to (x, y). */
+export function nearestAlong(c: Curve, x: number, y: number): number {
+  const { pts, cum } = c;
+  let best = 0, bestD = Infinity;
+  for (let i = 1; i < cum.length; i++) {
+    const x0 = pts[2 * i - 2]!, y0 = pts[2 * i - 1]!, dx = pts[2 * i]! - x0, dy = pts[2 * i + 1]! - y0;
+    const l2 = dx * dx + dy * dy;
+    const t = l2 > 0 ? Math.max(0, Math.min(1, ((x - x0) * dx + (y - y0) * dy) / l2)) : 0;
+    const d = Math.hypot(x0 + dx * t - x, y0 + dy * t - y);
+    if (d < bestD) (bestD = d, best = cum[i - 1]! + t * Math.sqrt(l2));
+  }
+  return best;
+}
+
+/** Where the text starts (a part of the curve) for its aligned point at distance `s` along it: a closed curve goes round, an open one keeps it on the curve. */
+export function startFor(o: TextObject, c: Curve, s: number): number {
+  const a = ALIGN_AT[o.onPath?.align ?? "start"];
+  const v = c.len > 0 ? s / c.len - a : 0;
+  return c.closed ? ((v % 1) + 1) % 1 : Math.max(-a, Math.min(1 - a, v));
 }

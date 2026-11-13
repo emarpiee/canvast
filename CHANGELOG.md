@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.58.30 — Text along a path: follows its boolean group, and handles (2026-11-14)
+
+- **Fixed:** a text along a shape kept following the shape's own outline after the shape was put into a boolean group; it had to be set along the path again. It follows the group's result now (what is seen), and the shape again when the group is let go. Text inside a shape does the same.
+- **Added:** two handles on a selected text along a path: a diamond on the path slides the text along it (*Start at*), two arrows above the letters set how far off the path it sits (*Off the path*). On an open path *Start at* can be below 0, so a text held at its middle or end slides back too.
+
 ## 0.58.29 — One look for every field; sub-menus as forms (2026-11-14)
 
 - **Changed:** every field of the app (numbers, text, lists) has one look: one height, edge, corner and font. Numbers are right-aligned, without spin arrows.

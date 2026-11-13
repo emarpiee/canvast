@@ -1,7 +1,7 @@
 import { isIn, placedIn, sharedPlace } from "./belongs";
 import * as D from "../core/dyadic";
 import { outlineBox } from "../text/shape-flow";
-import type { DerivationSource } from "./boolean-group";
+import { boolGroupsOf, isResult, type DerivationSource } from "./boolean-group";
 import type { CanvasObject, ObjectId, PathObject, TextObject } from "./model";
 import { pathStyle, pathSubs } from "./model";
 import { paintBounds, rotateSubs, type SubPath } from "./path";
@@ -42,6 +42,21 @@ export function fittedOnPath(text: TextObject, path: PathObject): TextObject | n
 }
 
 const refit = (t: TextObject, p: PathObject): TextObject | null => (t.onPath ? fittedOnPath(t, p) : fittedInShape(t, p));
+
+/**
+ * The outline a text takes its place from: its shape's own, or, when that shape is in a boolean group, the group's result (the outermost
+ * one: what is seen). A text set along a circle that is then combined follows the combined outline, and the circle's again when the group
+ * is let go. `results` finds a group's result (the transaction's own first, then the document's).
+ */
+export function shownShape(p: PathObject, results: (gid: string) => CanvasObject | undefined): PathObject {
+  const g = boolGroupsOf(p).find((x) => !x.own);
+  const r = g && results(g.gid);
+  return r?.kind === "path" ? r : p;
+}
+const resultsIn = (...sources: Array<Iterable<CanvasObject>>) => (gid: string): CanvasObject | undefined => {
+  for (const src of sources) for (const o of src) if (isResult(o) && o.result === gid) return o;
+  return undefined;
+};
 
 /** The text placed by this shape or path, for drawing a change that is still going on. */
 export const followed = refit;
@@ -92,7 +107,8 @@ export function withShapeTexts(src: DerivationSource, next: readonly CanvasObjec
   const follow = (t: TextObject): void => {
     const shape = parentOf(t);
     if (shape === undefined) return;
-    const path = gone.has(shape) ? undefined : (mine.get(shape) ?? src.get(shape));
+    const own = gone.has(shape) ? undefined : (mine.get(shape) ?? src.get(shape));
+    const path = own?.kind === "path" ? shownShape(own, (gid) => resultsIn(mine.values(), src.all())(gid)) : own;
     if (path?.kind !== "path") {
       // Its shape or path is gone: plain words again, as wide as they were.
       const { inShape: _s, onPath: _p, ...plain } = t;
@@ -110,7 +126,15 @@ export function withShapeTexts(src: DerivationSource, next: readonly CanvasObjec
     const was = t.onPath ?? t.inShape!, now = made.onPath ?? made.inShape!;
     if (made.w !== t.w || !D.equals(made.anchor.x, t.anchor.x) || !D.equals(made.anchor.y, t.anchor.y) || now.n.join() !== was.n.join() || now.closed !== was.closed || String((now as { holes?: unknown }).holes) !== String((was as { holes?: unknown }).holes)) out.set(t.id, made);
   };
-  if (paths || removed.length) for (const o of src.all()) if (o.kind === "text" && !gone.has(o.id) && !mine.has(o.id) && parentOf(o) !== undefined && (mine.has(parentOf(o)!) || gone.has(parentOf(o)!))) follow(o);
+  // (a boolean result the change makes again: the texts on its members follow it too)
+  const remade = new Set<string>();
+  for (const o of next) if (isResult(o)) remade.add(o.result!);
+  const onRemade = (o: TextObject): boolean => {
+    if (!remade.size) return false;
+    const p = mine.get(parentOf(o)!) ?? src.get(parentOf(o)!);
+    return !!p && boolGroupsOf(p).some((g) => !g.own && remade.has(g.gid));
+  };
+  if (paths || removed.length) for (const o of src.all()) if (o.kind === "text" && !gone.has(o.id) && !mine.has(o.id) && parentOf(o) !== undefined && (mine.has(parentOf(o)!) || gone.has(parentOf(o)!) || onRemade(o))) follow(o);
   for (const o of next) if (o.kind === "text") follow(o);
   return [...out.values()];
 }

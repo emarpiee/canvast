@@ -47,6 +47,13 @@ Unverified / Committed / Next bounded task**.
 - **Committed:** v0.57.19 on `main`.
 - **Next bounded task:** retake the README screenshots in Stone when the owner says.
 
+## v0.58.30: text along a path follows its boolean group, and has handles (2026-11-14)
+
+- **Implemented:** `shownShape` in `doc/text-in-shape.ts` (ADR 0202): `withShapeTexts` and the drag preview (`render/scene-view.ts`) place a text by its shape's outermost boolean result; a remade result brings the texts on its members. `pathTextGrips`, `nearestAlong`, `startFor` and `ALIGN_AT` in `text/glyph-space.ts`; `pathText` handles in `shapeHandles` and `hitCornerHandle` (`interaction/path-edit.ts`), `handleTarget` and the `pathtext` drag in `interaction/tools.ts` (through `setTextStyle`), drawn with the balloon's glyphs (`render/scene-renderer.ts`); `pathTextDots()` in the debug hook. A text's start may be -1 to 1 (model check, the *Start at* field from -100). README: Text on a path.
+- **Tested:** build and typecheck here. Scratch (Chromium and Firefox): a text along a circle, the circle intersected with another: the text moves onto the lens, still tied to the circle; the along handle sets Start at 16%, the lift handle 1.9 em; undo; no errors. Scratch of `text.spec`'s new steps: lift 1.5, start -0.51 on an open line (End, Other side).
+- **Tests:** `text.spec.ts`: the text along a path test drags both handles; a new test checks a text along a circle follows the intersect's lens.
+- **Committed:** v0.58.30 on `main`.
+
 ## v0.58.29: one look for every field; sub-menus as forms (2026-11-14)
 
 - **Implemented:** one field rule in `src/styles.css` (ADR 0201): `--field-h`, `--hud-edge`, `--r-sm`, the value font; numbers right-aligned, tabular, no spin buttons; about 30 place rules cut to their width (the Settings search keeps room for its icon). `formRows` in `ui/bar-sections.ts`, used by Outline options, Paragraph and box options, Font options (switches) and Columns and rows (`keepOrder`) in `ui/colour-popover.ts`; form rules shared by `.pop-form`; names `--font-meta`, muted. Tests: `formChecks` in `floatingRules` for every shown sub-menu form; `fieldLooks`, checked in `scrub-audit.spec.ts`; `text.spec.ts` presses the Kerning switch; `setPenColour` opens the look chip first.

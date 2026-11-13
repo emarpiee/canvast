@@ -513,7 +513,7 @@ function drawLayoutHandles(ctx: CanvasRenderingContext2D, handles: readonly Layo
 /** The main corner radius dot (large, filled), one small dot per corner when the corners are opened out, and a star's ratio handle (ADR 0105). */
 function drawCornerHandles(ctx: CanvasRenderingContext2D, picked: readonly ProjectedObject[], editor: EditorState, theme: SceneTheme, owner?: ProjectedObject): void {
   const selected = owner ? [owner] : picked; // (a balloon's words selected: its handles still show)
-  if (selected.length !== 1 || (selected[0]!.obj.kind !== "path" && selected[0]!.obj.kind !== "image")) return;
+  if (selected.length !== 1 || (selected[0]!.obj.kind !== "path" && selected[0]!.obj.kind !== "image" && !(selected[0]!.obj.kind === "text" && selected[0]!.obj.onPath && !selected[0]!.obj.locked))) return;
   const po = selected[0]!;
   if (po.obj.kind === "image" && (editor.selection.size !== 1 || po.obj.locked)) return;
   if (editor.selection.size !== 1 && (po.obj as PathObject).result === undefined) return; // (a group picked whole is its result alone on screen)
@@ -567,7 +567,8 @@ function drawCornerHandles(ctx: CanvasRenderingContext2D, picked: readonly Proje
     ctx.strokeStyle = theme.selection;
   }
   const r = HANDLE_SIZE_PX / 2 + 1;
-  for (const b of h.balloon ?? []) {
+  // (a text along a path's handles look as a balloon's of the same kind: a diamond slides along an outline, two triangles set a distance)
+  for (const b of [...(h.balloon ?? []), ...(h.pathText ?? []).map((t) => ({ ...t, part: t.part === "along" ? ("base" as const) : ("width" as const) }))]) {
     ctx.fillStyle = theme.handleFill;
     ctx.strokeStyle = theme.selection;
     ctx.lineWidth = 1.5;
@@ -693,7 +694,7 @@ function drawGaps(ctx: CanvasRenderingContext2D, f: NonNullable<EditorState["gap
 
 /** The axis or the rings of the gradient of the one selected path, with handles to drag (ADR 0100). */
 function drawGradientHandles(ctx: CanvasRenderingContext2D, selected: readonly ProjectedObject[], theme: SceneTheme, focus: "fill" | "stroke" | null): void {
-  if (selected.length !== 1 || (selected[0]!.obj.kind !== "path" && selected[0]!.obj.kind !== "image")) return;
+  if (selected.length !== 1 || (selected[0]!.obj.kind !== "path" && selected[0]!.obj.kind !== "image" && !(selected[0]!.obj.kind === "text" && selected[0]!.obj.onPath && !selected[0]!.obj.locked))) return;
   const h = gradientHandles(selected[0]!, focus);
   if (!h) return;
   ctx.save();
