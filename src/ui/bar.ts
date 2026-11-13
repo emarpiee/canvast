@@ -68,18 +68,32 @@ export function createBar(label: string, commandGroup: string): { el: HTMLElemen
   return { el, row };
 }
 
+const toMeasure = new Set<HTMLElement>();
+let measuring = 0;
+function measureScroll(row: HTMLElement): void {
+  const over = !row.closest(".is-form") && row.scrollWidth > row.clientWidth + 1; // (a bar laid out as a form, in a popover, does not scroll sideways)
+  row.toggleAttribute("data-scroll", over);
+  row.toggleAttribute("data-scroll-start", over && row.scrollLeft > 1);
+  row.toggleAttribute("data-scroll-end", over && row.scrollLeft + row.clientWidth < row.scrollWidth - 1);
+}
+
 /**
  * Mark a row that is wider than its room, and which ends have more to show (CSS `[data-scroll-start]`, `[data-scroll-end]`: a fade and a small arrow
  * at that end only). One cue for every row that scrolls; it follows the row's own scrolling.
  */
 export function syncScroll(row: HTMLElement): void {
-  const over = !row.closest(".is-form") && row.scrollWidth > row.clientWidth + 1; // (a bar laid out as a form, in a popover, does not scroll sideways)
-  row.toggleAttribute("data-scroll", over);
-  row.toggleAttribute("data-scroll-start", over && row.scrollLeft > 1);
-  row.toggleAttribute("data-scroll-end", over && row.scrollLeft + row.clientWidth < row.scrollWidth - 1);
+  // (measured once a frame, before it is drawn: a bar refreshed on every move of a drag measured itself each time, a layout in the middle
+  // of the move. A row's own scrolling is measured at once.)
+  toMeasure.add(row);
+  if (!measuring) measuring = requestAnimationFrame(() => {
+    measuring = 0;
+    const rows = [...toMeasure];
+    toMeasure.clear();
+    for (const r of rows) if (r.isConnected) measureScroll(r);
+  });
   if (!row.dataset["scrollBound"]) {
     row.dataset["scrollBound"] = "1";
-    row.addEventListener("scroll", () => syncScroll(row), { passive: true });
+    row.addEventListener("scroll", () => measureScroll(row), { passive: true });
     // A plain wheel scrolls the row sideways too (Shift+wheel already does, natively), on every bar that uses this.
     row.addEventListener("wheel", (e) => {
       if (e.shiftKey || e.ctrlKey || Math.abs(e.deltaY) <= Math.abs(e.deltaX) || row.scrollWidth <= row.clientWidth + 1) return;

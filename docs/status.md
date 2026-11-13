@@ -47,6 +47,13 @@ Unverified / Committed / Next bounded task**.
 - **Committed:** v0.57.19 on `main`.
 - **Next bounded task:** retake the README screenshots in Stone when the owner says.
 
+## v0.58.20: no lag while dragging on a large canvas (2026-11-14)
+
+- **Implemented:** a marquee's moves and a move's steps after its first call `editor.redraw()` (the canvas only), not `editor.changed()` (every bar and panel); the texture of moved things still follows (`followPreview` also on redraw). The Layers panel redraws on an editor change only when the selection or its being open changed, and finds the parts of every row through one index (`rowMembersIndex`, `doc/layer-move.ts`: the same members as `rowMembers` for all 7,022 rows of the showcase). `syncScroll` measures once a frame.
+- **Tested:** build and typecheck here. Scratch in the *Powers of two* showcase (Earth bookmark, zoomed in by the rocket, 1397 × 921, headless Chromium without a GPU), a move of the pointer, before → after: a marquee with Layers and Styles open 222 → 33 ms (closed 26 → 19; a blank canvas 19); 23 selected things dragged with the panels open 395 → 93 ms (a blank canvas 18: the rest is painting the canvas in software, about 84 ms of it). The new check in `frames.spec.ts` (the Layers panel unchanged during a marquee) in Chromium and Firefox.
+- **Unverified:** the time left for a drag on a machine with a GPU; the whole E2E suite (on GitHub).
+- **Committed:** v0.58.20 on `main`.
+
 ## v0.58.19: a marquee takes what is inside it; the panels keep their place (2026-11-14)
 
 - **Implemented:** ADR 0199. `unitsWithin` (`doc/groups.ts`) for the marquee and the lasso, `SHAPE_PICK_MIN_PX` (`render/hit-test.ts`), the selected list kept per change (`app/actions.ts`), `textPpu` projects one text (`app/main.ts`).

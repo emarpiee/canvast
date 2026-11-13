@@ -1,7 +1,7 @@
 import { showMoreButton } from "./show-more";
 import { redraw } from "./redraw";
 import { treeGuides, treeSlot } from "./tree";
-import { rowHolds, rowMembers, type LayerPlace } from "../doc/layer-move";
+import { rowHolds, rowMembers, rowMembersIndex, type LayerPlace } from "../doc/layer-move";
 import { ownerOf } from "../doc/belongs";
 import type { EditorState } from "../app/editor-state";
 import { revealRow } from "../interaction/reveal";
@@ -226,6 +226,7 @@ export function mountLayersPanel(host: HTMLElement, editor: EditorState, doc: Do
     const all = doc.ordered().filter((o) => !isResult(o));
     for (const o of all) if (o.kind === "image") actions.names.get(o.assetId);
     const tree = layerTree(all);
+    const partsOf = rowMembersIndex(all); // (once for all the rows)
     for (const g of new Set(all.flatMap((o) => o.groups ?? []))) {
       if (!seenGroups.has(g)) {
         seenGroups.add(g);
@@ -245,7 +246,7 @@ export function mountLayersPanel(host: HTMLElement, editor: EditorState, doc: Do
       const locked = n.members.every((m) => m.locked);
       // (a row whose parts are hidden or locked on their own, a balloon's words say, shows it too, and its button shows or unlocks them all)
       // (its parts as the shared rule has them: words and connectors are no members of the tree's row, doc/belongs.ts)
-      const parts = rowMembers(all, n.id);
+      const parts = partsOf(n.id);
       const partHidden = !hidden && parts.some((m) => m.hidden);
       const partLocked = !locked && parts.some((m) => m.locked);
       const expanded = n.group && open.has(n.id);
@@ -312,8 +313,14 @@ export function mountLayersPanel(host: HTMLElement, editor: EditorState, doc: Do
     }
   };
   doc.subscribe(schedule);
+  // (only what the list shows: the selection, and whether it is open. A marquee or a drag changes the editor at every move, and with
+  // thousands of layers a redraw at each frame made them lag.)
+  let drawnOpen = editor.layersOpen;
   editor.subscribe(() => {
+    const before = lastSelection;
     noteSelection();
+    if (lastSelection === before && editor.layersOpen === drawnOpen) return;
+    drawnOpen = editor.layersOpen;
     schedule();
   });
   render();

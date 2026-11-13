@@ -1607,7 +1607,23 @@ test("a marquee takes a group whole only when all of it is inside, else what it 
   await p.keyboard.press("Control+g");
   await p.keyboard.press("v");
   await p.keyboard.press("Escape");
-  await app.drag({ x: 385, y: 280 }, { x: 500, y: 380 }, 6);
+  // (with the Layers panel open: a marquee's moves only redraw the canvas, the panel is not drawn again at each one)
+  await p.getByRole("button", { name: "Layers panel", exact: true }).click();
+  await p.evaluate(() => {
+    const w = window as unknown as { panelChanges: number };
+    w.panelChanges = 0;
+    new MutationObserver((m) => void (w.panelChanges += m.length)).observe(document.querySelector('[data-testid="layers-panel"]')!, { subtree: true, childList: true, attributes: true });
+  });
+  await p.mouse.move(385, 280);
+  await p.mouse.down();
+  await p.mouse.move(420, 320, { steps: 2 }); // (it starts: the bars may change once)
+  await app.frame();
+  const before = await p.evaluate(() => (window as unknown as { panelChanges: number }).panelChanges);
+  await p.mouse.move(500, 380, { steps: 8 });
+  await app.frame();
+  expect(await p.evaluate(() => (window as unknown as { panelChanges: number }).panelChanges), "the Layers panel is not drawn again while the marquee moves").toBe(before);
+  await p.mouse.up();
+  await p.getByRole("button", { name: "Layers panel", exact: true }).click();
   expect(await sel(), "only the shape inside it, not its group").toEqual([a]);
   await p.keyboard.press("Escape");
   await app.drag({ x: 385, y: 280 }, { x: 620, y: 380 }, 6);

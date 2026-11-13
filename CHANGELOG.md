@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.58.20 — No lag while dragging on a large canvas (2026-11-14)
+
+- **Fixed:** drawing a marquee or dragging selected things lagged on a canvas with thousands of layers while the Layers panel was open (each move redrew the whole list, and each row looked through every object). The panels and bars are no longer refreshed at each step of a marquee or a move, only when it starts and ends; the Layers panel redraws only when what it lists or what is selected changes, and finds each row's parts at once.
+
 ## 0.58.19 — A marquee takes what is inside it; the panels keep their place (2026-11-14)
 
 - **Changed:** a marquee or a lasso takes a group whole only when all of it is inside; otherwise only what it touches. A pencil or ink line, a boolean group and a pattern still come whole, and a click still selects a whole group.

@@ -1,7 +1,7 @@
 import type { CanvasObject, ObjectId } from "./model";
 import { MAX_GROUP_DEPTH } from "./groups";
 import { MAX_SHEET_DEPTH, ancestorsOf, descendantsOf, isContainer } from "./containers";
-import { belongingTo } from "./belongs";
+import { belongingTo, ownerOf } from "./belongs";
 
 /**
  * Moving rows of the Layers panel (a row is an object, a sheet with what is on it, or a group by its id) before, after or inside another row.
@@ -22,6 +22,42 @@ export function rowMembers(all: readonly CanvasObject[], key: string): CanvasObj
   // (and what belongs to them: a shape's words, a balloon's connectors: doc/belongs.ts)
   const ids = new Set(found.map((x) => x.id));
   return [...found, ...belongingTo(all, ids).filter((x) => !ids.has(x.id))];
+}
+
+/**
+ * `rowMembers` for many rows of one list at once (the Layers panel draws hundreds): the same members, found through maps made in one pass,
+ * not a walk of every object for each row. In no set order.
+ */
+export function rowMembersIndex(all: readonly CanvasObject[]): (key: string) => CanvasObject[] {
+  const byId = new Map<ObjectId, CanvasObject>();
+  const kids = new Map<ObjectId, CanvasObject[]>();
+  const inGroup = new Map<string, CanvasObject[]>();
+  const owned = new Map<ObjectId, CanvasObject[]>();
+  const covers = new Map<ObjectId, CanvasObject[]>();
+  const add = <K>(m: Map<K, CanvasObject[]>, k: K, o: CanvasObject): void => void (m.get(k) ?? m.set(k, []).get(k)!).push(o);
+  for (const o of all) {
+    byId.set(o.id, o);
+    if (o.parent !== undefined) add(kids, o.parent, o);
+    if (o.attachmentTargetId !== null) add(kids, o.attachmentTargetId, o);
+    for (const g of o.groups ?? []) add(inGroup, g, o);
+    const owner = ownerOf(o);
+    if (owner !== undefined) add(owned, owner, o);
+    const cover = o.kind === "path" ? o.params?.link?.cover : undefined;
+    if (cover !== undefined) add(covers, cover, o);
+  }
+  return (key) => {
+    const o = byId.get(key);
+    const found = new Map<ObjectId, CanvasObject>();
+    if (o) {
+      found.set(o.id, o);
+      if (isContainer(o)) for (let i: CanvasObject[] = [o]; i.length; ) i = i.flatMap((x) => (kids.get(x.id) ?? []).filter((k) => !found.has(k.id) && found.set(k.id, k)));
+    } else for (const m of inGroup.get(key) ?? []) found.set(m.id, m);
+    // (and what belongs to them, as belongingTo: a shape's words, a balloon's connectors and their cover pieces)
+    const extra = new Map<ObjectId, CanvasObject>();
+    for (const id of found.keys()) for (const x of owned.get(id) ?? []) if (!found.has(x.id)) extra.set(x.id, x);
+    for (const x of [...extra.values()]) if (x.kind === "path" && x.params?.link && x.params.link.cover === undefined) for (const c of covers.get(x.id) ?? []) if (!found.has(c.id)) extra.set(c.id, c);
+    return [...found.values(), ...extra.values()];
+  };
 }
 
 /** Whether a row can hold others: a group (a boolean one too) or a sheet. */

@@ -1807,6 +1807,16 @@ export function attachTools(
     return best;
   };
 
+  /**
+   * Show a move as it goes. Its start is a change for everything (the bars step aside, a video's overlay waits); after that only the canvas
+   * draws it again: the bars and panels show nothing that changes while it goes on, and with a large canvas their refresh at every move lagged.
+   */
+  const showMove = (p: Extract<EditorState["preview"], { kind: "move" }>): void => {
+    const starts = editor.preview.kind !== "move";
+    editor.preview = p;
+    if (starts) editor.changed();
+    else editor.redraw();
+  };
   const updateMove = (at: ScreenPoint): void => {
     if (g.kind !== "move") return;
     const s = draggedAt(g, at).point;
@@ -1849,8 +1859,7 @@ export function attachTools(
           if (!heldX) dy = D.sub(w2.y, g.startWorld.y);
         }
         if (!heldX && !heldY) {
-          editor.preview = { kind: "move", ids: g.ids, frame: g.frame, dx, dy };
-          editor.changed();
+          showMove({ kind: "move", ids: g.ids, frame: g.frame, dx, dy });
           return;
         }
       }
@@ -1878,8 +1887,7 @@ export function attachTools(
         editor.guides = { ...editor.guides, y: sn.ty[hy.target]![hy.line]! };
       }
     }
-    editor.preview = { kind: "move", ids: g.ids, frame: g.frame, dx, dy };
-    editor.changed();
+    showMove({ kind: "move", ids: g.ids, frame: g.frame, dx, dy });
   };
 
   /**
@@ -2340,7 +2348,7 @@ export function attachTools(
         break;
       case "marquee":
         editor.marquee = { x0: g.start.x, y0: g.start.y, x1: s.x, y1: s.y };
-        editor.changed();
+        editor.redraw(); // (only the canvas draws the marquee: the bars and panels are not refreshed at every move)
         break;
       case "rotate": {
         let delta = angleFromRadians(Math.atan2(s.y - g.centre.y, s.x - g.centre.x) - g.start);

@@ -685,7 +685,8 @@ async function start(): Promise<void> {
   // A gesture on a source of an objects fill (moving, turning, resizing, recolouring it): the fill follows at each step, not on release.
   let livePreview: EditorState["preview"] | null = null;
   let liveUsers: string[] = [];
-  editor.subscribe(() => {
+  // (also at each step of a move, which only redraws: a texture made of the moved things follows it)
+  const followPreview = (): void => {
     const p = editor.preview;
     if (p === livePreview) return;
     livePreview = p;
@@ -694,7 +695,9 @@ async function start(): Promise<void> {
     else if (liveUsers.length) textureHost.live(false);
     if (users.length || liveUsers.length) tiles.invalidate(new Set([...users, ...liveUsers]));
     liveUsers = users;
-  });
+  };
+  editor.subscribe(followPreview);
+  editor.subscribeRedraw(followPreview);
   applyHeldQuality();
   // The fonts texts are set in (ADR 0127): read from the library when a text names one; when one arrives, text made without it is drawn and measured again.
   const fontLoader = new FontLoader(async (hash) => (await assets.record(hash))?.blob);
