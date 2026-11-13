@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.58.14 — The colour picker by its button again (2026-11-13)
+
+- **Fixed:** the colour picker moved beside the selection whenever its usual place touched the Actions bar, and could cover what a texture is picked from or the next button of a palette; it stays where it always opens (under or over its button) unless that would cover the selection or its own bar.
+
 ## 0.58.13 — One dropdown list for the whole app (2026-11-13)
 
 - **Changed:** every dropdown of the app (the bars, the chips' options, Settings, Export, the Library...) opens one list made as the app's menus: the arrow keys move through it and a choice they rest on is taken after a moment with the list still open (a font tried at once), Enter or a click takes it and closes, letters jump to a choice; it is never over the selected things and is at most twelve rows tall.

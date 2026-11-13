@@ -92,6 +92,9 @@ function place(pop: HTMLElement, anchor: HTMLElement): void {
   const over = (b: Box, l: number, t: number): number => Math.max(0, Math.min(l + m.width, b.right) - Math.max(l, b.left)) * Math.max(0, Math.min(t + m.height, b.bottom) - Math.max(t, b.top));
   const covers = (l: number, t: number): number => hud.reduce((sum, b) => sum + over(b, l, t), 0);
   const onSelection = (l: number, t: number): boolean => !!sel && over(sel, l, t) > 0;
+  // (where every menu goes, under or over its button, is kept when it is clear of the selection and of the button's own bar: the picker
+  // then stands where it always does, by what opened it)
+  if (!onSelection(m.left, m.top) && (parent || over(a, m.left, m.top) === 0)) return;
   const fitY = (t: number): number => Math.max(edge, Math.min(window.innerHeight - edge - m.height, t));
   const inX = (l: number): boolean => l >= edge && l + m.width <= window.innerWidth - edge;
   const tries: Array<[number, number]> = [[m.left, m.top]];

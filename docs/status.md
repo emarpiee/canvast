@@ -47,6 +47,12 @@ Unverified / Committed / Next bounded task**.
 - **Committed:** v0.57.19 on `main`.
 - **Next bounded task:** retake the README screenshots in Stone when the owner says.
 
+## v0.58.14: the colour picker by its button again (2026-11-13)
+
+- **Implemented:** `place` in `ui/colour-popover.ts` keeps the menu place when it is clear of the selection and of its button's bar; the search for another place only then. Tests: `bar-layouts.spec.ts` (a drag clear of the Actions bar; a text has no Look chip).
+- **Tested:** build and typecheck here; the scratch audit of every tool and kind, Chromium and Firefox, no problems. On GitHub (0.58.12): `pictures.spec.ts:834` and `styles.spec.ts:155` failed from the picker's place, `bar-layouts.spec.ts:28` and `:121` from the tests themselves: fixed here; the unit test of the sharing server's certificate failed once on 0.58.11 (`illegal padding`) and passed on the next run.
+- **Committed:** v0.58.14 on `main`.
+
 ## v0.58.13: one dropdown list (2026-11-13)
 
 - **Implemented:** `ui/combobox.ts`, installed in `main.ts`: document pointerdown, mousedown and keydown on a `<select>` open a `pop-menu combo-pop` list (options, groups, tick, keys, 0.9 s dwell, type-ahead), placed by `placeMenu`; CSS rows. No dropdown changed.

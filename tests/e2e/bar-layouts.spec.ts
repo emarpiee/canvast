@@ -53,7 +53,7 @@ test("a shape drawn with the Shape tool: its chips stand above it and edit it, t
   await p.keyboard.press("Escape");
   const first = (await objects(app))[0]!;
   expect(JSON.stringify(first.fill)).toContain("ff8800");
-  await app.drag({ x: 300, y: 600 }, { x: 420, y: 700 }, 6);
+  await app.drag({ x: 260, y: 180 }, { x: 380, y: 260 }, 6); // (clear of the chips and of the Actions bar the drawn shape now has)
   const second = (await objects(app)).at(-1)!;
   expect(second.id).not.toBe(first.id);
   expect(JSON.stringify(second.fill), "the tool kept the colour").toContain("ff8800");
@@ -128,7 +128,7 @@ test("a text's chips are Text, Text outline and Paragraph, every field named in 
   await p.keyboard.press("v");
   await select(app, [(await objects(app)).at(-1)!.id]);
   const near = p.locator(".props-near");
-  await expect(near.locator(".tb-cap")).toHaveText(["Look", "Text", "Text outline", "Paragraph"]);
+  await expect(near.locator(".tb-cap")).toHaveText(["Text", "Text outline", "Paragraph"]);
   expect(await auditChips(app, ".props-near")).toEqual([]);
   await near.locator('[data-vchip="paragraph"]').click();
   await expect(p.locator(".vchip-pop").getByText("Line height", { exact: true }), "the full name, not the bar's \"Line\"").toBeVisible();
