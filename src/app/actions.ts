@@ -108,7 +108,18 @@ export function deleteSelection(doc: DocumentStore, editor: EditorState): void {
 }
 
 /** The selected objects that exist (in paint order). */
-const selected = (doc: DocumentStore, editor: EditorState): CanvasObject[] => doc.ordered().filter((o) => editor.selection.has(o.id));
+/** The selected objects, back to front. Asked many times for one change (every bar and check), so kept until the document or the selection
+ * changes: a large selection in a large canvas was a filter of every object each time. (A copy each time: a caller may sort it.) */
+let selectedMemo: { ordered: readonly CanvasObject[]; ids: Set<ObjectId>; out: CanvasObject[] } | null = null;
+const selected = (doc: DocumentStore, editor: EditorState): CanvasObject[] => {
+  const ordered = doc.ordered();
+  const sel = editor.selection;
+  const m = selectedMemo;
+  if (m && m.ordered === ordered && m.ids.size === sel.size && [...sel].every((id) => m.ids.has(id))) return [...m.out];
+  const out = ordered.filter((o) => sel.has(o.id));
+  selectedMemo = { ordered, ids: new Set(sel), out };
+  return [...out];
+};
 
 /** Group the selection (at least two units) into one group at the level the user is working at. */
 export function groupSelection(doc: DocumentStore, editor: EditorState): void {

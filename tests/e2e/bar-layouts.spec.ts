@@ -157,8 +157,11 @@ test("with something selected, another tool's options stand at the top, never by
   await p.keyboard.press("u");
   await app.drag({ x: 500, y: 380 }, { x: 700, y: 520 }, 6);
   await p.keyboard.press("v");
+  const barBottom = () => p.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue("--bar-bottom"));
+  const bottom = await barBottom();
   for (const [key, first] of [["e", "Eraser"], ["t", "Text"], ["p", "Look"], ["l", "Lasso"], ["u", "Look"]] as const) {
     await p.keyboard.press(key);
+    expect(await barBottom(), `${key}: the panels under the bars do not move as the chips come and go`).toBe(bottom);
     await expect(p.locator(".props-near"), `${key}: not by the selection`).toBeHidden();
     await expect(p.locator(".props-chips .tb-cap").first(), `${key}: the tool's own, at the top`).toHaveText(first);
   }

@@ -149,7 +149,7 @@ export function mountPropertiesLayout(root: HTMLElement, canvasHost: HTMLElement
     syncScroll(top.row);
     if (beside) syncScroll(nearRow); // (a small window: the chips by the selection scroll sideways, as the Actions bar)
     if (beside) {
-      const at = placeBy(box!, near.offsetWidth, near.offsetHeight, "above", clearOfHandles(6)) /* (the rotate handle stays free) */;
+      const at = placeBy(box!, near.offsetWidth, near.offsetHeight, "above", clearOfHandles(6), 6) /* (the rotate handle stays free) */;
       const [l, t] = [`${Math.round(at.left)}px`, `${Math.round(at.top)}px`];
       if (near.style.left !== l) near.style.left = l;
       if (near.style.top !== t) near.style.top = t;

@@ -29,12 +29,12 @@ export const inRoom = (b: ScreenBox): boolean => b.right > 0 && b.bottom > 0 && 
  * centre over the selection's, kept inside the room. One rule for the Actions bar that follows the selection (under it) and the value chips
  * beside it (over it), so the two make one group round what is selected.
  */
-export function placeBy(b: ScreenBox, w: number, h: number, prefer: "below" | "above", gap: number): { left: number; top: number } {
+export function placeBy(b: ScreenBox, w: number, h: number, prefer: "below" | "above", gap: number, /** From the room's sides (the gap from the selection may be wider). */ side = gap): { left: number; top: number } {
   const above = b.top - gap - h;
   const below = b.bottom + gap;
-  const fitsBelow = below + h <= b.roomH - gap;
-  const fitsAbove = above >= gap;
-  const top = prefer === "below" ? (fitsBelow ? below : fitsAbove ? above : Math.max(gap, b.roomH - h - gap)) : fitsAbove ? above : fitsBelow ? below : gap;
-  const left = Math.max(gap, Math.min(b.roomW - w - gap, (b.left + b.right) / 2 - w / 2));
+  const fitsBelow = below + h <= b.roomH - side;
+  const fitsAbove = above >= side;
+  const top = prefer === "below" ? (fitsBelow ? below : fitsAbove ? above : Math.max(side, b.roomH - h - side)) : fitsAbove ? above : fitsBelow ? below : side;
+  const left = Math.max(side, Math.min(b.roomW - w - side, (b.left + b.right) / 2 - w / 2));
   return { left, top };
 }

@@ -1594,6 +1594,50 @@ test("selection boxes follow the rotation, rotation works from outside a corner,
   expect((await rots())[0]!, "turned from outside the corner").not.toBe(before);
 });
 
+test("a marquee takes a group whole only when all of it is inside, else what it touches; a pencil mark is never split; nothing too small to see is taken", async ({ app }) => {
+  const p = app.page;
+  const sel = () => p.evaluate(() => window.__canvastDebug.selection().slice().sort());
+  const all = () => p.evaluate(() => window.__canvastDebug.objects() as Array<{ id: string; kind: string; groups?: string[] }>);
+  for (const x of [400, 520]) {
+    await p.keyboard.press("u");
+    await app.drag({ x, y: 300 }, { x: x + 80, y: 360 }, 4);
+  }
+  const [a, b] = (await all()).map((o) => o.id);
+  await p.evaluate((ids) => window.__canvastDebug.select(ids), [a!, b!]);
+  await p.keyboard.press("Control+g");
+  await p.keyboard.press("v");
+  await p.keyboard.press("Escape");
+  await app.drag({ x: 385, y: 280 }, { x: 500, y: 380 }, 6);
+  expect(await sel(), "only the shape inside it, not its group").toEqual([a]);
+  await p.keyboard.press("Escape");
+  await app.drag({ x: 385, y: 280 }, { x: 620, y: 380 }, 6);
+  expect(await sel(), "all of the group inside: the group").toEqual([a, b].sort());
+  await p.mouse.click(440, 330); // (a click: the whole group, as always)
+  expect(await sel()).toEqual([a, b].sort());
+  // a pencil line is a group of strokes: a marquee over part of it takes all of it
+  await p.keyboard.press("p");
+  await p.getByRole("radio", { name: "Pencil" }).click();
+  await p.mouse.move(420, 500);
+  await p.mouse.down();
+  for (let i = 1; i <= 30; i++) await p.mouse.move(420 + i * 10, 500 + 20 * Math.sin(i / 4));
+  await p.mouse.up();
+  const line = (await all()).filter((o) => o.kind === "stroke").map((o) => o.id).sort();
+  expect(line.length, "a pencil line is several strokes").toBeGreaterThan(1);
+  await p.keyboard.press("v");
+  await p.keyboard.press("Escape");
+  await app.drag({ x: 400, y: 470 }, { x: 480, y: 540 }, 6);
+  expect(await sel(), "the whole line").toEqual(line);
+  // far out, the shapes are under 2 px: a marquee round them takes nothing
+  await p.keyboard.press("Escape");
+  await p.evaluate(() => window.__canvastDebug.jump(-8));
+  await app.frame();
+  const box = (await boxOf(app, a!))!;
+  expect(box.maxX - box.minX, "too small to see").toBeLessThan(2);
+  await app.drag({ x: Math.round(box.minX) - 30, y: Math.round(box.minY) - 30 }, { x: Math.round(box.maxX) + 30, y: Math.round(box.maxY) + 30 }, 6);
+  expect(await sel()).toEqual([]);
+  expect(app.consoleErrors).toEqual([]);
+});
+
 test("keyboard shortcuts still work after using a slider (focus stays on it)", async ({ app }) => {
   const p = app.page;
   await p.keyboard.press("p");
@@ -1899,6 +1943,11 @@ test("phone layout (360 px wide): the bars stack in rows, the tools sit below th
     expect(overlap(a, b), `${name} overlap`).toBe(false);
   }
   for (const b of [dock, options, rail, panel]) expect(b.x + b.width, "inside the screen").toBeLessThanOrEqual(360);
+  // a tool with no options (the Hand): the panel and the tools stay where they are, the options' row is kept
+  await p.keyboard.press("h");
+  await app.frame();
+  expect((await rect("#side-panels > .dock-item:not([hidden])"))!.y, "the panel does not move up").toBe(panel.y);
+  expect((await rect("#toolbar > .rail"))!.y, "nor the tools").toBe(rail.y);
   expect(app.consoleErrors).toEqual([]);
 });
 

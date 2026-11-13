@@ -47,6 +47,14 @@ Unverified / Committed / Next bounded task**.
 - **Committed:** v0.57.19 on `main`.
 - **Next bounded task:** retake the README screenshots in Stone when the owner says.
 
+## v0.58.19: a marquee takes what is inside it; the panels keep their place (2026-11-14)
+
+- **Implemented:** ADR 0199. `unitsWithin` (`doc/groups.ts`) for the marquee and the lasso, `SHAPE_PICK_MIN_PX` (`render/hit-test.ts`), the selected list kept per change (`app/actions.ts`), `textPpu` projects one text (`app/main.ts`).
+- **Tested:** build and typecheck here. Scratch in the *Powers of two* showcase (Earth as a dot, marquee of 72 px, five depths, both bar places): 837 selected before, 46 to 113 now; release to the second frame 236 to 295 ms before, 128 to 177 ms now (an empty marquee: 57 to 62 ms). Scratch of the new `frames.spec.ts` test in Chromium and Firefox: part of a group, all of it, a click, a pencil line, a shape under 2 px: all as expected.
+- **Also:** `--bar-bottom` (what the side panels, the small window's tools, the format bar and the search start under) keeps the lowest the bars have reached for the view, window width and settings, so it no longer follows the options as they come and go; the shown option rows are listed by themselves (the chips were found only because the parked bar came later). `placeBy` takes a margin from the room's sides of its own (0.58.18 used the rotate handle's gap there: `bar-layouts.spec.ts:64` failed at 449 > 427 in four projects; the paste failures of 0.58.16 did not come back). Scratch: the Styles panel's top for nine tools and selections, 1256 and 427 px, bar and chips: one value each (54, 65, 146, 157).
+- **Unverified:** the whole E2E suite (on GitHub).
+- **Committed:** v0.58.19 on `main`.
+
 ## v0.58.18: the chips by the selection keep its rotate handle free (2026-11-14)
 
 - **Implemented:** the chips are placed `clearOfHandles(6)` from the selection's box (`ui/near-selection.ts`: the rotate handle's offset and size, in interface px), on either side.

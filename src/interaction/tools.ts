@@ -58,7 +58,7 @@ import { TURN, angleFromRadians, cosSin, normAngle, radiansFromAngle } from "../
 import { formatRatio } from "../app/export-size";
 import { PanGesture } from "./navigation";
 import { autoLayoutOf, patchAutoLayout, drawSheetOver, finishShapeBuilder, fillGapAt, finishGapFill, attachSelection, sheetSelection, arrangeSelection, commitCornerAt, commitCornerSet, commitCorners, commitShape as commitShapeNumbers, balloonText, setShapeText, setBalloonLink, commitPaint, deleteSelection, flattenSelection, duplicateSelection, groupSelection, previewPaint, redo, ungroupSelection, undo } from "../app/actions";
-import { expandToUnits, groupObjects, isInside } from "../doc/groups";
+import { expandToUnits, groupObjects, isInside, unitsWithin } from "../doc/groups";
 import { boolGroupsOf, isResult } from "../doc/boolean-group";
 
 /**
@@ -548,12 +548,19 @@ export function attachTools(
     for (let p: CanvasObject | undefined = o; p; p = p.parent !== undefined ? doc.get(p.parent) : undefined) if (p.id === sheetId) return true;
     return false;
   };
-  const pick = (ids: readonly ObjectId[], additive = false): void => {
+  /** Select these, widened to whole groups (a click); with `poly` (a marquee or lasso on screen), a group only when all of it is inside it. */
+  const pick = (ids: readonly ObjectId[], additive = false, poly?: ArrayLike<number>): void => {
     let picked = ids.map((id) => doc.get(id)).filter((o): o is CanvasObject => !!o);
     if (editor.openMask && !picked.every((o) => inside(o, editor.openMask!))) editor.openMask = null; // (picking away from the mask leaves it)
     picked = [...new Map(picked.map((o) => { const m = maskAbove(o) ?? o; return [m.id, m] as const; })).values()];
     if (editor.entered.length && !picked.every((o) => isInside(o, editor.entered))) editor.entered = [];
-    editor.select(expandToUnits(doc.ordered(), picked, editor.entered), additive);
+    editor.select(poly ? unitsWithin(doc.ordered(), picked, editor.entered, (o) => withinShape(o, poly)) : expandToUnits(doc.ordered(), picked, editor.entered), additive);
+  };
+  /** Whether all of an object (seen or too small to draw) lies inside a shape on screen; one out of the view does not. */
+  const withinShape = (o: CanvasObject, poly: ArrayLike<number>): boolean => {
+    const cam = cameraIn(view.frameCamera, o.frame ?? doc.space.world);
+    const b = cam && projectObject(o, cam, view.viewport, { keepTiny: true })?.box;
+    return !!b && [[b.minX, b.minY], [b.maxX, b.minY], [b.maxX, b.maxY], [b.minX, b.maxY]].every(([x, y]) => pointInPolygon(x!, y!, poly));
   };
 
   // ---- object eraser (ADR 0022) ------------------------------------------
@@ -2491,7 +2498,7 @@ export function attachTools(
       case "lasso": {
         const poly = editor.lasso!;
         editor.lasso = null;
-        if (!cancelled) pick(lassoSelect(unlocked(visible()), poly, editor.lassoFilter), e.shiftKey);
+        if (!cancelled) pick(lassoSelect(unlocked(visible()), poly, editor.lassoFilter), e.shiftKey, poly);
         break;
       }
       case "press": {
@@ -2525,7 +2532,7 @@ export function attachTools(
         editor.marquee = null;
         if (!cancelled) {
           const box = { minX: Math.min(m.x0, m.x1), minY: Math.min(m.y0, m.y1), maxX: Math.max(m.x0, m.x1), maxY: Math.max(m.y0, m.y1) };
-          pick(boxSelect(unlocked(visible()), box), g.additive);
+          pick(boxSelect(unlocked(visible()), box), g.additive, [box.minX, box.minY, box.maxX, box.minY, box.maxX, box.maxY, box.minX, box.maxY]);
         }
         break;
       }

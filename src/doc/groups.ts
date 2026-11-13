@@ -27,6 +27,45 @@ export function expandToUnits(all: readonly CanvasObject[], picked: readonly Can
   return withDescendants(all, expandGroups(all, picked, entered));
 }
 
+/**
+ * What a marquee or a lasso takes (ADR 0031, revised): a touched object's group comes whole only when all of it lies inside the shape
+ * (`within`), the outermost such group from the level reached; otherwise the touched object alone (or the group it is one thing with: a
+ * boolean group, a pen's mark, a pattern). A click takes whole groups (`expandToUnits`).
+ * Hidden members do not count. A sheet takes what is on it either way.
+ */
+export function unitsWithin(all: readonly CanvasObject[], picked: readonly CanvasObject[], entered: readonly string[], within: (o: CanvasObject) => boolean): ObjectId[] {
+  if (picked.every((o) => !o.groups?.length)) return withDescendants(all, picked.map((o) => o.id)); // nothing grouped: no scan
+  let members: Map<string, CanvasObject[]> | null = null;
+  const membersOf = (gid: string): CanvasObject[] => {
+    if (!members) {
+      members = new Map();
+      for (const o of all) for (const g of o.groups ?? []) {
+        let list = members.get(g);
+        if (!list) members.set(g, (list = []));
+        list.push(o);
+      }
+    }
+    return members.get(gid) ?? [];
+  };
+  const whole = new Map<string, boolean>();
+  const isWhole = (gid: string): boolean => {
+    let w = whole.get(gid);
+    if (w === undefined) whole.set(gid, (w = membersOf(gid).every((m) => m.hidden || within(m))));
+    return w;
+  };
+  // A group that is one thing is never split, as a single object is not: a boolean group (its result is made from its shapes), a pen's
+  // mark (a pencil or ink line is a group of strokes), a pattern (made as one).
+  const oneThing = (gid: string): boolean => membersOf(gid).some((m) => m.boolOps?.[gid] !== undefined || m.gen?.gid === gid) || membersOf(gid).every((m) => m.kind === "stroke");
+  const ids = new Set<ObjectId>();
+  for (const o of picked) {
+    const path = o.groups ?? [];
+    const gid = path.slice(isInside(o, entered) ? entered.length : 0).find((g) => isWhole(g) || oneThing(g));
+    if (gid) for (const m of membersOf(gid)) ids.add(m.id);
+    else ids.add(o.id);
+  }
+  return withDescendants(all, [...ids]);
+}
+
 function expandGroups(all: readonly CanvasObject[], picked: readonly CanvasObject[], entered: readonly string[]): ObjectId[] {
   const level = (o: CanvasObject): number => (isInside(o, entered) ? entered.length : 0);
   const keys = new Set(picked.map((o) => `${level(o)}|${unitKey(o, level(o))}`));

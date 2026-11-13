@@ -185,13 +185,17 @@ export function pickAll(ordered: readonly ProjectedObject[], x: number, y: numbe
 export type LassoFilter = "strokes" | "all";
 
 /**
- * Lasso and box selection take what the shape touches (ADR 0031), like a design tool's marquee, not only what it
+ * Lasso and box selection take what the shape touches (ADR 0031; a group whole only when all of it is inside: `unitsWithin`), like a design tool's marquee, not only what it
  * encloses: a stroke when any part of it is inside or crosses the edge, a turned or plain image or text when its
  * rectangle overlaps the shape. One exception keeps a drawing over a picture safe: a shape drawn entirely inside an
  * image or text does not select it (that is how you lasso strokes lying on media; click the media to take it).
  */
+/** A marquee or a lasso takes nothing smaller than this on screen (px): what cannot be seen, deep inside a dot, is not taken. */
+export const SHAPE_PICK_MIN_PX = 2;
+
 function touches(po: ProjectedObject, poly: ArrayLike<number>, filter: LassoFilter): boolean {
   if (po.cover) return false;
+  if (Math.max(po.box.maxX - po.box.minX, po.box.maxY - po.box.minY) < SHAPE_PICK_MIN_PX) return false;
   if (po.obj.kind === "stroke") return polylineTouchesPolygon(po.q, poly);
   // A path is drawing, like a stroke: the lasso takes it when it touches its outline (the closing line of a closed one included).
   if (po.obj.kind === "path") return po.path!.some((f) => polylineTouchesPolygon(f.closed && f.pts.length >= 4 ? closedLine(f.pts) : f.pts, poly));

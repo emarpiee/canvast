@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.58.19 — A marquee takes what is inside it; the panels keep their place (2026-11-14)
+
+- **Changed:** a marquee or a lasso takes a group whole only when all of it is inside; otherwise only what it touches. A pencil or ink line, a boolean group and a pattern still come whole, and a click still selects a whole group.
+- **Fixed:** a marquee took things too small to see (deep inside a dot when zoomed far out) and whole groups reaching outside the window, and selecting hundreds of things lagged; it now takes nothing under 2 px on screen, and the bars no longer slow down with a large selection.
+- **Fixed:** the side panels (and on a small window the tools) moved up and down as the options at the top came and went (chips, or a tool with none, such as the Hand); they now keep their place.
+- **Fixed:** on a small window the chips by the selection could run past the right edge (since 0.58.18: their room from the window's sides was the wide room kept for the rotate handle).
+
 ## 0.58.18 — The chips by the selection keep its rotate handle free (2026-11-14)
 
 - **Fixed:** the Properties chips by the selection sat so near it that they covered its rotate handle; they now stand clear of it.
