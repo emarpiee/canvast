@@ -29,6 +29,13 @@ import type { ProjectedObject } from "./projection";
  * renders the frame directly.
  */
 export const TILE_CSS = 256;
+/** The view a set was made for, scaled to this camera (device px, whole pixels outward, so the scaled tiles and the exact border meet without a gap). */
+const viewOf = (ox: number, oy: number, g: { vp: { width: number; height: number } }, dpr: number, s: number): { l: number; t: number; r: number; b: number } => ({
+  l: Math.floor(ox),
+  t: Math.floor(oy),
+  r: Math.ceil(ox + g.vp.width * dpr * s),
+  b: Math.ceil(oy + g.vp.height * dpr * s),
+});
 /**
  * Each tile is rendered with this many CSS px of extra border, which is then
  * discarded: rasterizers compute antialiased coverage slightly differently
@@ -605,7 +612,9 @@ export class TileCache {
     const { i0, i1, j0, j1 } = g.range;
     for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) if (!g.tiles.has(`${i},${j}`)) return null;
     const td = TILE_CSS * dpr * s;
-    return { l: ox + i0 * td, t: oy + j0 * td, r: ox + (i1 + 1) * td, b: oy + (j1 + 1) * td };
+    // (no further than the set's own view, where its tiles are drawn scaled: a whole tile row reaches past it, and is not shown scaled)
+    const v = viewOf(ox, oy, g, dpr, s);
+    return { l: Math.max(ox + i0 * td, v.l), t: Math.max(oy + j0 * td, v.t), r: Math.min(ox + (i1 + 1) * td, v.r), b: Math.min(oy + (j1 + 1) * td, v.b) };
   }
 
   /**
@@ -694,6 +703,12 @@ export class TileCache {
     ctx.globalAlpha = 1;
     ctx.imageSmoothingEnabled = true;
     ctx.imageSmoothingQuality = "low";
+    // Only the set's own view is shown scaled: a whole tile row reaches past its edge (800 px of view is not a whole number of tiles), and that
+    // part, scaled down while zooming out, would stand where the border is drawn exactly (`extent` stops at the same place).
+    const v = viewOf(ox, oy, g, dpr, s);
+    ctx.beginPath();
+    ctx.rect(v.l, v.t, v.r - v.l, v.b - v.t);
+    ctx.clip();
     let n = 0;
     for (const [k, t] of g.tiles) {
       if (!t.canvas) continue;

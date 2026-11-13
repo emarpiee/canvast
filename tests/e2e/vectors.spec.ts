@@ -3601,8 +3601,9 @@ test("an adjustment shape (ADR 0188): a shape with no fill adjusts what is under
   await p.locator('.adjust-pop [data-adj-num="exposure"]').fill("100");
   await p.locator('.adjust-pop [data-adj-num="exposure"]').blur();
   await p.evaluate(() => window.__canvastDebug.select([]));
-  await app.frame();
-  expect(await px(630, 375), "under it: brighter").not.toEqual(plain);
+  // (the exposure is stored when the field is left, then drawn: waited for, as a browser may take another frame)
+  await expect.poll(async () => ((await last(app)) as Obj & { adjust?: { exposure?: number } }).adjust?.exposure).toBe(100);
+  await expect.poll(async () => { await app.frame(); return JSON.stringify(await px(630, 375)); }, { message: "under it: brighter" }).not.toBe(JSON.stringify(plain));
   expect(await px(520, 310), "beside it: the plain fill").toEqual(plain);
   // no seam at its edge: down across the top of the ellipse, no pixel darker than both the plain and the brightened fill
   const lum = (c: number[] | null): number => (c ? c[0]! + c[1]! + c[2]! : 0);

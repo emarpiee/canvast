@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.57.19 — The border of a zoom-out drawn exactly (2026-11-13)
+
+- **Fixed:** zooming out on a busy canvas, a strip along the bottom of the view showed a blurred, scaled-down picture for a moment where the exact one should be drawn (the last row of tiles reached past the view it was made for).
+
 ## 0.57.19 — The README animation in the new brand, with the new features (2026-11-13)
 
 - **Changed:** the one-minute animation at the top of the README is made again: its intro, end and promise cards in the warm grey brand (Stone) instead of Viridian, the lock screen in the default theme, the theme swatches as the Theme colour presets, and every clip recorded from the current app.
