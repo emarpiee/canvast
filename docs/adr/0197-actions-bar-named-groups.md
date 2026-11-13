@@ -10,7 +10,7 @@ People said the floating bars were cluttered and hard to navigate. The Actions b
 ## Decision
 
 - Each group of the Actions bar shows its name under its buttons: Items, Files, Edit shapes, Arrange, Attach, Selection (`captionedGroup` in `ui/bar.ts`; `syncGroups` reads the controls in its `.tb-row`). The buttons stay one click away, in the same order for every selection.
-- Where the names show is a setting (`ui.groupNames`, Settings > Appearance): under the buttons (the default), over them, either only while the pointer is on the bar (their room kept, so the buttons do not move), or hidden. The hover choices are not offered where nothing can hover (a touch screen), and there the names always show.
+- Where the names show is a setting (`ui.groupNames`, Settings > Appearance): under the buttons (the default), over them, either only while the pointer is on the bar, or hidden. A hover choice takes no room until the pointer is on the bar: the bar then grows (upward, from its bottom edge, when it sits at the bottom). Keeping the room empty was tried first and dropped: an empty strip on the bar looked like a mistake. The hover choices are not offered where nothing can hover (a touch screen), and there the names always show.
 - **Find** at the end of the bar opens the command palette, to find any option or action by its name.
 
 ## Consequences

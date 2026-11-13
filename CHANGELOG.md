@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.58.3 — Hover group names take no room (2026-11-13)
+
+- **Changed:** the Actions bar's group names set to show on hover take no room until the pointer is on the bar (an empty strip showed before); the README's Actions bar row reads in order again.
+
 ## 0.58.2 — Where the Actions bar's group names show (2026-11-13)
 
 - **Added:** Settings > Appearance > **Actions bar group names**: under the buttons, over them, either only on hover (not offered on a touch screen), or hidden.

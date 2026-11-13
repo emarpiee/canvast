@@ -47,6 +47,15 @@ Unverified / Committed / Next bounded task**.
 - **Committed:** v0.57.19 on `main`.
 - **Next bounded task:** retake the README screenshots in Stone when the owner says.
 
+## v0.58.3: hover group names take no room (2026-11-13)
+
+- **Implemented:** with a hover choice the names have no height and are unseen (their width kept, so nothing slides sideways) until the pointer is on the bar (or a control in it has the focus); the bar grows on hover. Touch screens still always show them.
+- **Tested:** typecheck and build here; checked by eye in a scratch run (Chromium). Tests on GitHub.
+- **Known failures:** none known.
+- **Unverified:** a real touch screen.
+- **Committed:** v0.58.3 on `main`.
+- **Next bounded task:** the owner's plan for the Properties bar.
+
 ## v0.58.2: where the Actions bar's group names show (2026-11-13)
 
 - **Implemented:** setting `ui.groupNames` (top, bottom, top-hover, bottom-hover, off) as `data-group-names` on the root, read by the stylesheet; the hover choices left out of Settings where nothing can hover (`any-hover`), and shown always there.
