@@ -21,6 +21,10 @@ const SHAPE_HINT: Record<ShapeKind, string> = {
   balloon: "Drag to draw a speech balloon · then drag its handles: tail tip, base and width · Shift: even · Alt: from the centre",
 };
 
+/** Where Fill and Outline are, in the words of the hints (ADR 0198): it depends on how the Properties bar is shown. */
+let propsWhere = "in the bar above";
+export const setPropsWhere = (words: string): void => void (propsWhere = words);
+
 export function toolHint(editor: EditorState, doc: DocumentStore): string | null {
   const sel = [...editor.selection].map((id) => doc.get(id)).filter((o) => !!o);
   const paths = sel.filter((o) => o!.kind === "path");
@@ -49,14 +53,14 @@ export function toolHint(editor: EditorState, doc: DocumentStore): string | null
       // one shape: say whose gradient the handles on it are (the fill's or the outline's) and how to get the other one's; several: the general words
       const sides = paths.length === 1 && sel.length === 1 ? gradientSides(paths[0] as PathObject, editor.gradientFocus) : null;
       const handles = sides
-        ? ` · Drag the round handles on the shape to move its ${paintName(sides.active).toLowerCase()}'s ${gradientName(sides.g)} gradient${sides.other ? ` · Press ${paintName(sides.other.which)} in the bar above to edit its ${gradientName(sides.other.g)} gradient instead` : ""}`
+        ? ` · Drag the round handles on the shape to move its ${paintName(sides.active).toLowerCase()}'s ${gradientName(sides.g)} gradient${sides.other ? ` · Press ${paintName(sides.other.which)} ${propsWhere} to edit its ${gradientName(sides.other.g)} gradient instead` : ""}`
         : gradient ? " · Drag the round handles on the shape to move its gradient (Fill or Outline selects which one)" : "";
       if (sel.length && sel.every((o) => boolGroupsOf(o!).length > 0 && boolGroupsOf(o!).some((g) => !editor.entered.includes(g.gid)))) return "Boolean group · double-click to edit the shapes inside · Combine in the bar above changes the operation, flattens or releases · The pin saves its initial state" + handles;
       if (paths.length === 1 && sel.length === 1) {
         const shape = (paths[0] as PathObject).shape;
         const radius = " · Big dot: the radius of every corner (double-click: one dot for each)";
         const dots = !hasCorners(paths[0] as PathObject) ? (shape === "polygon" || shape === "star" ? " · Triangle: how many" : "") : radius + (shape === "star" ? " · Diamond: the ratio · Triangle: how many" : shape === "polygon" ? " · Triangle: how many" : "");
-        return "Enter or double-click edits its nodes · Fill and Outline are in the bar above · The pin saves its initial state" + dots + handles;
+        return `Enter or double-click edits its nodes · Fill and Outline are ${propsWhere} · The pin saves its initial state` + dots + handles;
       }
       return null;
     }

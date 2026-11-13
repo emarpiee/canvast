@@ -208,6 +208,16 @@ export const SETTINGS = {
   /** Where the names of the Actions bar's groups show (ADR 0197): under or over the buttons, always or while the pointer is on the bar, or not at all. */
   "ui.groupNames": { scope: "device", default: "bottom", validate: oneOf("top", "bottom", "top-hover", "bottom-hover", "off"), effect: "immediate" } as Def<"top" | "bottom" | "top-hover" | "bottom-hover" | "off">,
   "ui.actions": { scope: "device", default: "bottom", validate: oneOf("bottom", "follow"), effect: "immediate" } as Def<"bottom" | "follow">,
+  /** How the options of the tool or of what is selected show (ADR 0198): the bar at the top, value chips there, the Properties panel, or value chips just above the selection. */
+  "ui.properties": { scope: "device", default: "bar", validate: oneOf("bar", "chips", "panel", "near"), effect: "immediate" } as Def<"bar" | "chips" | "panel" | "near">,
+  /** The sections of the Properties panel folded, by id, comma-separated. */
+  "ui.propsFolded": { scope: "device", default: "", validate: text(400), effect: "immediate" } as Def<string>,
+  /** The Properties panel: shown when there is something in it (auto), kept open, or kept closed. */
+  "ui.propsPin": { scope: "device", default: "auto", validate: oneOf("auto", "open", "closed"), effect: "immediate" } as Def<"auto" | "open" | "closed">,
+  /** The Properties panel shows only its sections (each opens its options beside it). */
+  "ui.propsMini": { scope: "device", default: false, validate: bool, effect: "immediate" } as Def<boolean>,
+  /** How the Actions bar shows its groups (ADR 0198): their buttons, or one value chip each that opens them. */
+  "ui.actionsView": { scope: "device", default: "buttons", validate: oneOf("buttons", "chips"), effect: "immediate" } as Def<"buttons" | "chips">,
   "ui.names": { scope: "device", default: "all", validate: oneOf("all", "picked", "off"), effect: "immediate" } as Def<"all" | "picked" | "off">,
   "ui.zen": { scope: "device", default: false, validate: (v: unknown) => (typeof v === "boolean" ? v : undefined), effect: "immediate" } as Def<boolean>,
   /** Every shortcut the person changed, as JSON: command id → keys (settings/keymap.ts). Empty: all as they were. */

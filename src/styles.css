@@ -454,7 +454,7 @@ input[type="range"], .media-scrub, .tb-count[data-scrub] input, input[data-scrub
 /* what scrolls into view (the picked chip) stops clear of the fade and its arrow */
 :is(.tb-options-row, .ctx-bar, .hud-controls, #toolbar > .dock, .set-tabs) { scroll-padding-inline: var(--sp-10); }
 /* Switched off: for another kind of item than the one being edited (ui/toolbar.ts). */
-[data-off] { display: none !important; }
+[data-off], [data-sec-off] { display: none !important; }
 .toolbar .tb-chip { width: auto; padding: 0 var(--s-6); font: var(--font-meta); }
 .tb-group { display: flex; gap: var(--s-1); align-items: center; }
 .tb-group[hidden] { display: none; }
@@ -1123,7 +1123,7 @@ input[type="radio"]:checked::before { content: ""; width: var(--sp-3); height: v
 :root { --edge: 12px; --ctl: 36px; --pad: 4px; --gap: 2px; --near: 8px; --field-h: var(--sp-11); --menu-h: 34px; --list-h: var(--sp-12); } /* (--field-h: the height of an input or select in a bar; --menu-h: a row of a menu) */
 /* The thickness every floating bar has (the Properties bar, the Actions bar, the dock, the rail, the view controls, the view tabs): a control, the padding on both sides and the border. */
 :root { --bar-h: calc(var(--ctl) + 2 * var(--pad) + 2px); }
-.rail, .dock, .toolbar, .view-switch, .hud-controls, .ctx-bar { padding: var(--pad); gap: var(--gap); border-radius: var(--r-lg); border: 1px solid var(--hud-border); background: var(--hud-bg); box-shadow: var(--hud-lift); backdrop-filter: blur(8px); }
+.rail, .dock, .toolbar, .view-switch, .hud-controls, .ctx-bar, .props-near { padding: var(--pad); gap: var(--gap); border-radius: var(--r-lg); border: 1px solid var(--hud-border); background: var(--hud-bg); box-shadow: var(--hud-lift); backdrop-filter: blur(8px); }
 .rail button, .dock button, .toolbar button, .view-switch button, .hud-controls button, .ctx-bar button, .tb-options-row button { min-width: var(--ctl); height: var(--ctl); border-radius: var(--ctl-r, var(--r-md)); }
 .rail button, .ctx-bar button { width: var(--ctl); padding: 0; }
 .rail button svg, .dock button svg, .toolbar button svg, .ctx-bar button svg, .hud-controls button svg { width: 18px; height: 18px; }
@@ -2754,7 +2754,7 @@ button, select, input, textarea, summary, [role="tab"] { transition: background-
   --cp-radius: var(--r-md); --cp-radius-sm: var(--r-sm); --cp-gap: calc(var(--near) + var(--sp-2)); --cp-gap-sm: var(--near);
   --cp-thumb: var(--sp-8); --cp-bar: var(--sp-6); --cp-swatch: var(--sp-9); --cp-field-h: var(--field-h); --cp-dot: var(--r-dot);
 }
-.colour-pop { position: fixed; z-index: var(--z-pop); max-width: calc(100vw - var(--sp-8)); max-height: calc(100dvh - var(--sp-8)); overflow: auto; padding: var(--s-6); background: var(--hud-bg); border: 1px solid var(--hud-border); border-radius: var(--r-lg); box-shadow: var(--hud-lift); backdrop-filter: blur(12px); }
+.colour-pop, .vchip-pop { position: fixed; z-index: var(--z-pop); max-width: calc(100vw - var(--sp-8)); max-height: calc(100dvh - var(--sp-8)); overflow: auto; padding: var(--s-6); background: var(--hud-bg); border: 1px solid var(--hud-border); border-radius: var(--r-lg); box-shadow: var(--hud-lift); backdrop-filter: blur(12px); }
 .colour-pop, .pop-menu { animation: pop-in var(--dur-base) var(--ease-out) both; }
 /* Settings: the colour row is a button showing the colour and its hex; it opens the picker. */
 .set-colour { display: inline-flex; align-items: center; gap: var(--s-4); height: var(--ctl); padding: 0 var(--s-6); font: var(--font-control); color: inherit; background: var(--hud-bg); border: 1px solid var(--hud-border); border-radius: var(--r-md); cursor: pointer; }
@@ -3300,3 +3300,47 @@ dialog.choice-dialog { width: min(var(--choice-w), calc(100vw - var(--sp-10))); 
 .np-date { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s-4); }
 .np-date[hidden], .np-date input[hidden] { display: none; }
 .np-label { color: var(--hud-muted); font: var(--font-meta); }
+
+/* ---- Value chips and the ways the Properties bar shows (ADR 0198: ui/value-chips.ts, ui/properties-layout.ts, ui/bar-sections.ts) ---- */
+/* A chip: the name of a group of controls and what it is set to; it opens them. */
+.vchip { display: inline-flex; flex: none; align-items: center; gap: var(--s-4); height: var(--ctl); padding: 0 var(--s-6); color: inherit; font: var(--font-control); white-space: nowrap; background: transparent; border: 1px solid transparent; border-radius: var(--ctl-r, var(--r-md)); cursor: pointer; }
+.vchip:hover { background: var(--hud-hover); }
+.vchip[aria-expanded="true"], .vchip[aria-pressed="true"] { border-color: var(--hud-accent); background: var(--hud-hover); }
+.vchip-k { font-weight: var(--weight-medium); }
+.vchip-v { display: inline-flex; align-items: center; gap: var(--s-2); color: var(--hud-muted); font: var(--font-meta); }
+.vchip-sw { width: var(--icon-sm); height: var(--icon-sm); border: 1px solid var(--hud-border); border-radius: var(--r-dot); }
+.vchip-sw.is-none { background: linear-gradient(135deg, transparent 45%, var(--hud-danger) 45% 55%, transparent 55%); }
+.vchip-arrow, .vchip-ic { display: inline-flex; color: var(--hud-muted); }
+.vchip-arrow svg, .vchip-ic svg { width: var(--icon-sm); height: var(--icon-sm); }
+.vchip svg { flex: none; }
+.vchip-pop { min-width: calc(8 * var(--ctl)); max-width: min(calc(100vw - var(--sp-8)), calc(12 * var(--ctl))); }
+/* The bar laid out in a popover or the panel: its controls wrap, a label and its field on one line each. */
+.toolbar.is-stacked { display: block; min-height: 0; padding: 0; background: none; border: 0; border-radius: 0; box-shadow: none; backdrop-filter: none; }
+.toolbar.is-stacked[hidden] { display: none; }
+.toolbar.is-stacked .tb-options-row { flex-wrap: wrap; justify-content: flex-start; align-items: center; overflow: visible; gap: var(--s-4); }
+.toolbar.is-stacked .tb-options-row::before, .toolbar.is-stacked .tb-options-row::after { display: none; }
+.toolbar.is-stacked .tb-options-row > .tb-group:not([hidden], [data-sec-off]) { display: contents; }
+.toolbar.is-stacked .tb-options-row :is(label, .tb-count):not([hidden], [data-sec-off]) { display: flex; flex: 1 1 100%; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--s-4); }
+.toolbar.is-stacked .tb-options-row .tb-count :is(.tb-count, label) { flex-basis: auto; }
+.toolbar.is-stacked .tb-options-row input[type="number"] { width: calc(2 * var(--ctl)); }
+.toolbar.is-stacked .tb-options-row input[type="text"] { width: calc(3 * var(--ctl)); }
+.toolbar:not(.is-panel) .ps-head { display: none; }
+.toolbar.is-panel .ps-head { display: flex; flex: 1 1 100%; align-items: center; gap: var(--s-4); height: var(--list-h); margin-top: var(--s-4); padding: 0 var(--s-2); color: inherit; font: var(--weight-semibold) var(--text-sm)/1.3 var(--font-ui); background: none; border: 0; border-top: 1px solid var(--hud-border); border-radius: 0; cursor: pointer; }
+.toolbar.is-panel .ps-head[hidden] { display: none; }
+.toolbar.is-panel .ps-head .ps-sum { display: inline-flex; flex: 1; justify-content: flex-end; align-items: center; gap: var(--s-2); min-width: 0; overflow: hidden; color: var(--hud-muted); font: var(--font-meta); }
+.toolbar.is-panel .ps-head svg { width: var(--icon-sm); height: var(--icon-sm); transition: transform var(--dur-fast); }
+.toolbar.is-panel .ps-head[aria-expanded="false"] svg { transform: rotate(-90deg); }
+.props-panel .panel-body { padding: var(--s-6); }
+.props-mini { display: flex; flex-direction: column; align-items: stretch; gap: var(--s-2); }
+.props-mini[hidden] { display: none; }
+.props-mini .vchip { justify-content: space-between; }
+.props-quick { display: contents; }
+/* Value chips just above the selection: placed by ui/near-selection.ts, as the Actions bar that follows it. */
+.props-near { position: absolute; z-index: var(--z-edge); display: flex; align-items: center; }
+.props-near[hidden] { display: none; }
+/* The Actions bar as value chips: one chip a group, its buttons listed in a menu. */
+.ctx-chip-host { display: none; }
+.ctx-bar button.vchip { width: auto; padding: 0 var(--s-6); }
+:root[data-actions-view="chips"] .ctx-bar .tb-captioned > .ctx-chip-host { display: contents; }
+:root[data-actions-view="chips"] .ctx-bar .tb-captioned > :is(.tb-row, .tb-cap), :root[data-actions-view="chips"] .ctx-names { display: none; }
+

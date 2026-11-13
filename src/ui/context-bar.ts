@@ -7,7 +7,10 @@ import { ICONS } from "./icons";
 import { GAP_LABEL, GAP_ORDER } from "../doc/arrange";
 import type { GapKey } from "../doc/arrange";
 import { LAYOUT_MENU } from "./toolbar";
-import { captionedGroup, syncGroups, syncScroll } from "./bar";
+import { captionedGroup, isOff, syncGroups, syncScroll } from "./bar";
+import { placeBy, selectionBoxIn, uiScale } from "./near-selection";
+import { syncChips } from "./value-chips";
+import { shortTitle } from "../commands/from-bars";
 import { isContainer } from "../doc/containers";
 import { closeMoreMenu, MENU_GAP, openMoreMenu } from "./more-menu";
 import { mediaBarTop } from "./media-player";
@@ -223,8 +226,8 @@ export function mountContextBar(host: HTMLElement, editor: EditorState, doc: Doc
   names.setAttribute("aria-hidden", "true");
   wrap.append(names);
   const placeNames = (): void => {
-    if (!(document.documentElement.dataset["groupNames"] ?? "").endsWith("hover") || bar.hidden) return;
-    const k = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--ui-scale")) || 1;
+    if (!(document.documentElement.dataset["groupNames"] ?? "").endsWith("hover") || document.documentElement.dataset["actionsView"] === "chips" || bar.hidden) return;
+    const k = uiScale();
     const [home, mine] = [wrap.getBoundingClientRect(), bar.getBoundingClientRect()];
     names.style.top = `${Math.round((mine.top - home.top) / k)}px`;
     names.style.height = `${Math.round(mine.height / k)}px`;
@@ -248,6 +251,42 @@ export function mountContextBar(host: HTMLElement, editor: EditorState, doc: Doc
   const q = (act: string, extra = ""): HTMLButtonElement => bar.querySelector<HTMLButtonElement>(`[data-ctx="${act}"]${extra}`)!;
   const each = (act: string, f: (b: HTMLButtonElement) => void): void => bar.querySelectorAll<HTMLButtonElement>(`[data-ctx="${act}"]`).forEach(f);
 
+  // Value chips (ADR 0198, Settings > Appearance > Actions bar groups): each group is one chip, its name and the icons of what it holds; a click
+  // lists its actions in the shared menu, each run as its button would be (a button that opens a menu opens it under the chip).
+  const chipsOn = (): boolean => document.documentElement.dataset["actionsView"] === "chips";
+  const chipOf = (g: Element): HTMLElement | null => g.querySelector<HTMLElement>(":scope > .ctx-chip-host > .vchip");
+  const anchorOf = (b: HTMLElement): HTMLElement => (chipsOn() && b.closest(".tb-captioned") ? chipOf(b.closest(".tb-captioned")!) : null) ?? b;
+  const shown = (g: Element): HTMLButtonElement[] => [...g.querySelectorAll<HTMLButtonElement>(":scope > .tb-row > button")].filter((b) => !isOff(b));
+  const syncActionChips = (): void => {
+    for (const g of bar.querySelectorAll<HTMLElement>(":scope > .tb-captioned")) {
+      let host = g.querySelector<HTMLElement>(":scope > .ctx-chip-host");
+      if (!host) {
+        host = document.createElement("span");
+        host.className = "ctx-chip-host";
+        g.prepend(host);
+      }
+      if (!chipsOn() || g.hidden) continue;
+      const name = g.getAttribute("aria-label")!;
+      const icons = shown(g).slice(0, 3).map((b) => `<span class="vchip-ic">${b.querySelector("svg")?.outerHTML ?? ""}</span>`).join("");
+      syncChips(host, [{ id: name, label: name, value: icons, title: `${name}: ${shown(g).map((b) => shortTitle(b.getAttribute("aria-label") ?? "")).join(", ")}` }]);
+    }
+  };
+  bar.addEventListener("click", (e) => {
+    const chip = (e.target as HTMLElement).closest<HTMLElement>(".ctx-chip-host > .vchip");
+    if (!chip) return;
+    const g = chip.closest(".tb-captioned")!;
+    const only = shown(g);
+    if (only.length === 1 && !only[0]!.hasAttribute("aria-haspopup")) return only[0]!.click(); // (a group of one action: the chip is its button)
+    const items = only.map((b): MenuItem => {
+      const [name, ...rest] = (b.getAttribute("aria-label") ?? "").split(/:\s/);
+      return {
+        label: shortTitle(name ?? ""), hint: rest.join(": ") || (b.title !== b.getAttribute("aria-label") ? b.title : "") || g.getAttribute("aria-label")!, icon: b.querySelector("svg")?.outerHTML ?? "",
+        disabled: b.disabled, ...(b.getAttribute("aria-pressed") === "true" ? { checked: true } : {}),
+        id: b.dataset["ctx"] ?? "", run: () => b.click(),
+      };
+    });
+    openMoreMenu(chip, items, g.getAttribute("aria-label")!);
+  });
   bar.addEventListener("click", (e) => {
     const b = (e.target as HTMLElement).closest<HTMLElement>("[data-ctx]");
     if (!b || (b as HTMLButtonElement).disabled) return;
@@ -260,7 +299,7 @@ export function mountContextBar(host: HTMLElement, editor: EditorState, doc: Doc
           ...(actions.laidOutOrder() !== null ? { disabled: true, hint: "Their sheet places them: see its alignment" } : { disabled: i.id.startsWith("distribute") && editor.selection.size < 3 }),
           run: () => { const [kind, arg] = i.id.split(":") as [string, string]; actions.layout(kind === "align" ? { align: arg as AlignKey } : { distribute: arg as "x" | "y" }); },
         }));
-        openMoreMenu(b, [...rows("Align", "Align "), ...rows("Distribute", "Distribute ")], "Align and distribute", { keepOpen: true });
+        openMoreMenu(anchorOf(b), [...rows("Align", "Align "), ...rows("Distribute", "Distribute ")], "Align and distribute", { keepOpen: true });
         break;
       }
       case "sizemenu": {
@@ -276,7 +315,7 @@ export function mountContextBar(host: HTMLElement, editor: EditorState, doc: Doc
             ...same("h", "Height", ICONS.sameHeight),
           ];
         };
-        openMoreMenu(b, items(), "Size", { keepOpen: true, refresh: items });
+        openMoreMenu(anchorOf(b), items(), "Size", { keepOpen: true, refresh: items });
         break;
       }
       case "arrangemenu": {
@@ -293,7 +332,7 @@ export function mountContextBar(host: HTMLElement, editor: EditorState, doc: Doc
             { id: "keeptidy", label: "Keep it tidy", hint: "As auto layout: it stays a grid", icon: ICONS.autoLayout, sep: true, checked: actions.keepTidy(), run: () => { actions.setKeepTidy(!actions.keepTidy()); update(); } },
           ];
         };
-        openMoreMenu(b, items(), "Arrange in a grid", { keepOpen: true, refresh: items });
+        openMoreMenu(anchorOf(b), items(), "Arrange in a grid", { keepOpen: true, refresh: items });
         break;
       }
       case "sheetmenu": {
@@ -307,7 +346,7 @@ export function mountContextBar(host: HTMLElement, editor: EditorState, doc: Doc
             ? { id: "autolayout", label: "Auto layout", hint: "A row, a column, a wrap or a grid (Shift+A)", icon: ICONS.autoLayout, checked: actions.autoLayout() === true, run: () => actions.setAutoLayout(actions.autoLayout() !== true) }
             : { id: "autolayout", label: "Auto layout on a new sheet", hint: "Round them, laid out as a row (Shift+A)", icon: ICONS.autoLayout, run: () => { closeMoreMenu(); actions.layoutOnSheet(); } },
         ];
-        openMoreMenu(b, items(), "Sheets", { keepOpen: true, refresh: items });
+        openMoreMenu(anchorOf(b), items(), "Sheets", { keepOpen: true, refresh: items });
         break;
       }
       case "exportmenu": {
@@ -319,7 +358,7 @@ export function mountContextBar(host: HTMLElement, editor: EditorState, doc: Doc
           ...(actions.canExportSvg() ? [{ id: "svglibrary", label: "Save to library", hint: "An SVG in the library, to place again", icon: ICONS.save, run: () => actions.saveSvgToLibrary() }] : []),
           ...([...editor.selection].some((id) => doc.get(id)?.kind === "text") ? [{ id: "copymd", label: "Copy Markdown", hint: "The Markdown of the selected text", icon: ICONS.markdown, run: () => actions.copyMarkdown() }] : []),
         ];
-        openMoreMenu(b, items(), "Export", { keepOpen: true, refresh: items });
+        openMoreMenu(anchorOf(b), items(), "Export", { keepOpen: true, refresh: items });
         break;
       }
       case "statemenu": {
@@ -332,7 +371,7 @@ export function mountContextBar(host: HTMLElement, editor: EditorState, doc: Doc
             ...(st.saved > 0 ? [{ id: "stateupdate", label: "Update initial state", hint: "Save the shape as it is now", icon: ICONS.refresh, run: () => actions.setInitialState(false) }, { id: "statereset", label: "Reset to initial state", hint: "Back to how it was saved", icon: ICONS.stateReset, run: () => actions.resetInitialState() }] : []),
           ];
         };
-        openMoreMenu(b, items(), "Initial state", { keepOpen: true, refresh: items });
+        openMoreMenu(anchorOf(b), items(), "Initial state", { keepOpen: true, refresh: items });
         break;
       }
       case "boolmenu": {
@@ -348,7 +387,7 @@ export function mountContextBar(host: HTMLElement, editor: EditorState, doc: Doc
             ...(cur !== null ? [row("flatten", "Flatten", "Make the group one path (Ctrl+E)", ICONS.merge, () => actions.flattenBoolean()), row("release", "Release", "Take the group apart; the shapes stay as they are", ICONS.releaseBoolean, () => actions.releaseBoolean())] : []),
           ];
         };
-        openMoreMenu(b, items(), "Shapes", { keepOpen: true, refresh: items });
+        openMoreMenu(anchorOf(b), items(), "Shapes", { keepOpen: true, refresh: items });
         break;
       }
       case "maskmenu": {
@@ -369,7 +408,7 @@ export function mountContextBar(host: HTMLElement, editor: EditorState, doc: Doc
             ] : []),
           ];
         };
-        openMoreMenu(b, items(), "Masks", { keepOpen: true, refresh: items });
+        openMoreMenu(anchorOf(b), items(), "Masks", { keepOpen: true, refresh: items });
         break;
       }
       case "pathmenu": {
@@ -401,7 +440,7 @@ export function mountContextBar(host: HTMLElement, editor: EditorState, doc: Doc
             ...(actions.canTakeOffPath() ? [row("offpath", "Text off its path or shape", "The text is set straight again", ICONS.routeOff, () => actions.takeOffPath())] : []),
           ];
         };
-        openMoreMenu(b, items(), "Path tools", { keepOpen: true, refresh: items });
+        openMoreMenu(anchorOf(b), items(), "Path tools", { keepOpen: true, refresh: items });
         break;
       }
       case "builderdone": actions.finishBuilder(true); break;
@@ -446,7 +485,7 @@ export function mountContextBar(host: HTMLElement, editor: EditorState, doc: Doc
       // At the bottom a media player may come down onto this bar (its picture is low): the bar then stands just above the player.
       const playerEl = document.querySelector<HTMLElement>("[data-testid=media-bar]:not([hidden])");
       if (box && playerEl && !bar.hidden) {
-        const k = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--ui-scale")) || 1;
+        const k = uiScale();
         const home = host.getBoundingClientRect();
         const room = home.height / k;
         const playerTop = mediaBarTop(Math.max(...box.frame.corners.map((c) => c[1] / k)), playerEl.offsetHeight, room);
@@ -457,25 +496,22 @@ export function mountContextBar(host: HTMLElement, editor: EditorState, doc: Doc
       return;
     }
     wrap.style.bottom = "";
-    const k = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--ui-scale")) || 1; // (the bars are drawn zoomed by the interface size)
-    const xs = box.frame.corners.map((c) => c[0] / k);
-    const ys = box.frame.corners.map((c) => c[1] / k);
-    const home = host.getBoundingClientRect();
-    const [w, h, room] = [wrap.offsetWidth, bar.offsetHeight, home.height / k];
+    const b = selectionBoxIn(host, editor)!;
+    const [w, h, room] = [wrap.offsetWidth, bar.offsetHeight, b.roomH];
     const edge = MENU_GAP;
     // A media player stands right under its picture and never moves from there (ui/media-player.ts): this bar goes above the picture; with no room
     // above, under the player; with no room there either (a picture that fills the view), just above the player, over the picture.
     const playerEl = document.querySelector<HTMLElement>("[data-testid=media-bar]:not([hidden])");
-    const above = Math.min(...ys) - MENU_GAP - h;
-    const below = Math.max(...ys) + MENU_GAP;
-    let top: number;
+    const at = placeBy(b, w, h, "below", edge); // (the one rule with the value chips over the selection, ui/near-selection.ts)
+    let top = at.top;
     if (playerEl) {
-      const playerTop = mediaBarTop(Math.max(...ys), playerEl.offsetHeight, room); // (worked out here, not read from the page: it is never a frame behind)
+      const above = b.top - MENU_GAP - h;
+      const playerTop = mediaBarTop(b.bottom, playerEl.offsetHeight, room); // (worked out here, not read from the page: it is never a frame behind)
       const handle = 3 * MENU_GAP; // (clear of the picture's name and turn handle)
       const under = playerTop + playerEl.offsetHeight + MENU_GAP;
       top = above - handle >= edge ? above - handle : under + h <= room - edge ? under : Math.max(edge, playerTop - MENU_GAP - h);
-    } else top = below + h <= room - edge ? below : above >= edge ? above : Math.max(edge, room - h - edge); // (no room either side: the bottom edge)
-    const left = Math.max(edge, Math.min(home.width / k - w - edge, (Math.min(...xs) + Math.max(...xs)) / 2 - w / 2));
+    }
+    const left = at.left;
     wrap.style.left = `${Math.round(left)}px`;
     wrap.style.top = `${Math.round(top)}px`;
   };
@@ -528,6 +564,7 @@ export function mountContextBar(host: HTMLElement, editor: EditorState, doc: Doc
     for (const el of bar.querySelectorAll<HTMLElement>("[data-for]")) el.toggleAttribute("data-off", only !== null && !el.dataset["for"]!.split(",").some((k) => only.includes(k)));
     bar.hidden = false;
     syncGroups(bar, () => true);
+    syncActionChips();
     syncScroll(bar);
     if (bar.matches(":hover, :focus-within")) placeNames();
     follow();

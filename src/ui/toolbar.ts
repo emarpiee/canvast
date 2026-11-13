@@ -4,6 +4,7 @@ import { esc } from "./format";
 import { openMoreMenu } from "./more-menu";
 import type { MenuItem } from "./more-menu";
 import { createBar, isOff, syncGroups, syncScroll } from "./bar";
+import { assignSections } from "./bar-sections";
 import { liveNumber } from "./live";
 import { isContainer } from "../doc/containers";
 import type { CanvasObject, LayoutPatch, SheetLayout } from "../doc/model";
@@ -230,7 +231,15 @@ const kindOf = (o: CanvasObject): string => (isContainer(o) ? "sheet" : o.kind =
 /** The features of a font worth offering, with the words that name them (a font only shows the ones it has). */
 const FONT_FEATURES: Record<string, string> = { liga: "Ligatures", dlig: "Discretionary ligatures", smcp: "Small capitals", c2sc: "Capitals to small capitals", tnum: "Tabular numbers", pnum: "Proportional numbers", onum: "Old-style numbers", lnum: "Lining numbers", frac: "Fractions", zero: "Slashed zero", case: "Case-sensitive forms", sups: "Superscript", subs: "Subscript", titl: "Titling forms", swsh: "Swashes", salt: "Stylistic alternates", ordn: "Ordinals" };
 
-export function mountToolbar(root: HTMLElement, editor: EditorState, doc: DocumentStore, actions: ToolbarActions): void {
+/** The Properties bar, for the ways it can be shown (ui/properties-layout.ts): the bar and its row, a call after every update, and an update. */
+export interface PropertiesBar {
+  bar: HTMLElement;
+  row: HTMLElement;
+  onUpdate(fn: () => void): void;
+  refresh(): void;
+}
+
+export function mountToolbar(root: HTMLElement, editor: EditorState, doc: DocumentStore, actions: ToolbarActions): PropertiesBar {
   root.innerHTML = `
     <div class="rail" data-cmd-group="Tools">
       <!-- What a tool with kinds offers while it is the tool: beside its button, not in the Properties bar -->
@@ -397,39 +406,76 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
       </div>
     </div>
   `;
+  // The Properties bar may be placed outside this root (in a chip's popover, the Properties panel or beside the selection: ui/properties-layout.ts):
+  // its controls are found, and its events heard, wherever it is.
+  const barEl = root.querySelector<HTMLElement>(".toolbar")!;
+  const barRow = barEl.querySelector<HTMLElement>(".tb-options-row")!;
+  const inRoot = (): boolean => root.contains(barEl);
+  function q<E extends Element = Element>(sel: string): E | null {
+    return root.querySelector<E>(sel) ?? (inRoot() ? null : barEl.querySelector<E>(sel));
+  }
+  function qa<E extends Element = Element>(sel: string): E[] {
+    const found = [...root.querySelectorAll<E>(sel)];
+    return inRoot() ? found : [...found, ...barEl.querySelectorAll<E>(sel)];
+  }
+  function listen<K extends keyof HTMLElementEventMap>(type: K, fn: (e: HTMLElementEventMap[K]) => void, capture = false): void {
+    root.addEventListener(type, fn, capture);
+    barEl.addEventListener(type, (e) => { if (!inRoot()) fn(e); }, capture);
+  }
+  // Each control's section (ADR 0198), for the ways the bar can be shown (value chips, the Properties panel, beside the selection): a control's
+  // own, else its group's.
+  assignSections(barRow, [
+    ["[data-adjust], [data-adjust-reset]", "look"],
+    ["[data-sel-radius-wrap], [data-sel-smooth-wrap], [data-sel-sides-wrap], [data-sel-tips-wrap], [data-sel-inner-wrap]", "shape"],
+    ["[data-pin-wrap], [data-on-sheet]", "position"],
+    ["[data-crop], [data-uncrop], [data-flip], [data-unflip]", "picture"],
+    ["[data-sheet-size]", "size"],
+    ["[data-auto-layout]", "layout"],
+    ["[data-in-layout]", "inlayout"],
+    [".tb-subject", "kind"],
+    ["[data-mask-paint]", "mask"],
+    ['.tb-group[data-for="pen"][aria-label="Colour"]', "look"],
+    ['.tb-group[data-for="shape"]', "shape"],
+    ['.tb-group[data-kind="text"]', "text"],
+    ['.tb-group[data-for="shape balloon path select node"]', "look"],
+    ['.tb-group[data-for="shape balloon path"]', "look"],
+    ['.tb-group[aria-label="Size"][data-for="pen select"], .tb-group[aria-label="Smooth"], .tb-group[aria-label="Keep size"]', "brush"],
+    ['.tb-group[data-for="eraser"]', "eraser"],
+    ['.tb-group[data-for="lasso"]', "lasso"],
+  ]);
   // The colours of a selection are a second bar of their own, just under this one (the same bar component, ADR 0128).
   const colourBar = createBar("Colours of the selection", "Colours");
-  colourBar.row.append(root.querySelector("[data-sel-colours]")!);
+  colourBar.row.append(q("[data-sel-colours]")!);
   // The Outline options button sits beside the Outline colour: in this bar, after the chips, when several shapes are picked.
-  const outlineBtn = root.querySelector<HTMLElement>("[data-outline-options]")!;
+  const outlineBtn = q<HTMLElement>("[data-outline-options]")!;
   // (the outline's width beside it, between the Outline colour and its options: the quick way to the width every outline has)
-  const outlineW = root.querySelector<HTMLElement>("[data-outline-w-wrap]")!;
+  const outlineW = q<HTMLElement>("[data-outline-w-wrap]")!;
   const outlineWInput = outlineW.querySelector<HTMLInputElement>("input")!;
   const outlineHome = outlineBtn.parentElement!;
-  root.querySelector(".toolbar")!.after(colourBar.el);
+  barEl.after(colourBar.el);
   // On a phone the colours of the selection share the row of the Properties bar (one row less at the top); wider, they are a bar of their own under it.
   const phoneWidth = window.matchMedia("(max-width: 640px)");
   const placeColours = (): void => {
-    const group = root.querySelector<HTMLElement>("[data-sel-colours]")!;
-    const home = phoneWidth.matches ? root.querySelector<HTMLElement>(".tb-options-row")! : colourBar.row;
+    const group = q<HTMLElement>("[data-sel-colours]")!;
+    const home = phoneWidth.matches ? barRow : colourBar.row;
     if (group.parentElement !== home) home.append(group);
   };
   placeColours();
   // The corner-radius lock, snap and the axis-aligned box are a bar of their own beside the Actions bar. It joins that bar's wrapper (the same parent, so the
   // two line up) in `update`, once the Actions bar exists (it is mounted after this one); its clicks are handled here.
   const pickBar = createBar("Selection options", "Selection");
-  const pickGroup = root.querySelector<HTMLElement>('.tb-group[aria-label="Selection options"]')!;
-  pickGroup.prepend(root.querySelector("[data-lock-radius]")!); // (the lock of the corner radius is one of them: it is about how a shape resizes)
+  const pickGroup = q<HTMLElement>('.tb-group[aria-label="Selection options"]')!;
+  pickGroup.prepend(q("[data-lock-radius]")!); // (the lock of the corner radius is one of them: it is about how a shape resizes)
   pickBar.row.append(pickGroup);
   const pq = (sel: string): HTMLElement => pickGroup.querySelector<HTMLElement>(sel)!;
-  const input = root.querySelector<HTMLInputElement>("input[type=file]")!;
+  const input = q<HTMLInputElement>("input[type=file]")!;
   input.addEventListener("change", () => {
     if (input.files?.length) actions.importFiles([...input.files]);
     input.value = "";
   });
 
   // Continuous pen size: a new size is the new lock reference, like a preset.
-  root.querySelector<HTMLInputElement>("[data-size]")!.addEventListener("input", (e) => {
+  q<HTMLInputElement>("[data-size]")!.addEventListener("input", (e) => {
     editor.penWidthPx = penFromSlider(Number((e.target as HTMLInputElement).value));
     if (editor.lock) editor.lock = { ...actions.depth(), px: editor.penWidthPx };
     if (editor.tool === "select") actions.setSelectedWidth(editor.penWidthPx, false); // live: the selected strokes follow the slider
@@ -437,13 +483,13 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
   });
 
   // On Select the slider also sets the selected strokes' thickness, once on release (one undo step).
-  root.querySelector<HTMLInputElement>("[data-size]")!.addEventListener("change", () => {
+  q<HTMLInputElement>("[data-size]")!.addEventListener("change", () => {
     if (editor.tool === "select") actions.setSelectedWidth(editor.penWidthPx, true);
   });
 
-  scrubNumbers(root);
+  scrubNumbers(barEl); // (the bar's own: it works wherever the bar is placed)
   // As the Width field of the outline options: the far left is no outline (the width is kept), any other place a width that turns one on.
-  root.querySelector<HTMLInputElement>("[data-shape-width]")!.addEventListener("input", (e) => {
+  q<HTMLInputElement>("[data-shape-width]")!.addEventListener("input", (e) => {
     const v = Number((e.target as HTMLInputElement).value);
     if (v === 0) editor.shapeStroke = null;
     else {
@@ -452,14 +498,14 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
     }
     editor.changed();
   });
-  root.querySelector<HTMLInputElement>("[data-sides]")!.addEventListener("input", (e) => {
+  q<HTMLInputElement>("[data-sides]")!.addEventListener("input", (e) => {
     const v = Math.round(Number((e.target as HTMLInputElement).value));
     if (v >= 3 && v <= 24) {
       editor.shapeSides = v;
       editor.changed();
     }
   });
-  root.querySelector<HTMLInputElement>("[data-tips]")!.addEventListener("input", (e) => {
+  q<HTMLInputElement>("[data-tips]")!.addEventListener("input", (e) => {
     const v = Math.round(Number((e.target as HTMLInputElement).value));
     if (v >= 3 && v <= 24) {
       editor.shapeTips = v;
@@ -497,13 +543,13 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
 
   // The numbers of the picked shape (a polygon's sides, a star's points and ratio, a corner radius): changed after the shape is drawn.
   const shapeInput = (sel: string, apply: (v: number) => { sides?: number; tips?: number; inner?: number; radiusPx?: number } | null): void => {
-    liveNumber(root.querySelector<HTMLInputElement>(sel)!, (v, final) => {
+    liveNumber(q<HTMLInputElement>(sel)!, (v, final) => {
       const change = apply(v);
       if (change) actions.shapeSelected(change, final);
     });
   };
   // (one value, or one for every corner)
-  const radiusInput = root.querySelector<HTMLInputElement>("[data-sel-radius]")!;
+  const radiusInput = q<HTMLInputElement>("[data-sel-radius]")!;
   const radiusApply = (final: boolean): void => {
     const parts = radiusInput.value.trim().split(/[\s,]+/).map(Number);
     if (parts.every((v) => Number.isFinite(v) && v >= 0) && (parts.length === 1 || parts.length === actions.selectedCorners()?.nodes)) actions.cornersSelected(parts, final);
@@ -511,8 +557,8 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
   radiusInput.addEventListener("input", () => radiusApply(false));
   radiusInput.addEventListener("change", () => radiusApply(true));
   // The font list is read from the library when the menu is opened (and after an import); the selected font is always shown.
-  const fontSelect = root.querySelector<HTMLSelectElement>("[data-text-font]")!;
-  const fontInput = root.querySelector<HTMLInputElement>("[data-testid=font-input]")!;
+  const fontSelect = q<HTMLSelectElement>("[data-text-font]")!;
+  const fontInput = q<HTMLInputElement>("[data-testid=font-input]")!;
   let fontList: Array<{ hash: string; name: string; unusable: string }> = [];
   let fontHtml = "";
   const paintFonts = (): void => {
@@ -556,12 +602,12 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
       askFonts();
     });
   });
-  liveNumber(root.querySelector<HTMLInputElement>("[data-text-size]")!, (v, final) => v > 0 && actions.setTextStyle({ sizePx: v }, final));
+  liveNumber(q<HTMLInputElement>("[data-text-size]")!, (v, final) => v > 0 && actions.setTextStyle({ sizePx: v }, final));
   // (these buttons keep the focus where it is, so a text being edited stays open and takes the change)
-  for (const b of root.querySelectorAll<HTMLElement>("[data-text-align], [data-text-fit]")) b.addEventListener("mousedown", (e) => e.preventDefault());
-  for (const b of root.querySelectorAll<HTMLElement>("[data-text-align]")) b.addEventListener("click", () => actions.setTextStyle({ align: b.dataset["textAlign"] as "left" }));
-  for (const b of root.querySelectorAll<HTMLElement>("[data-text-fit]")) b.addEventListener("click", () => actions.setTextStyle({ autoWidth: b.dataset["textFit"] === "width" }));
-  root.querySelector<HTMLElement>("[data-text-colour]")!.addEventListener("click", (e) => {
+  for (const b of qa<HTMLElement>("[data-text-align], [data-text-fit]")) b.addEventListener("mousedown", (e) => e.preventDefault());
+  for (const b of qa<HTMLElement>("[data-text-align]")) b.addEventListener("click", () => actions.setTextStyle({ align: b.dataset["textAlign"] as "left" }));
+  for (const b of qa<HTMLElement>("[data-text-fit]")) b.addEventListener("click", () => actions.setTextStyle({ autoWidth: b.dataset["textFit"] === "width" }));
+  q<HTMLElement>("[data-text-colour]")!.addEventListener("click", (e) => {
     const anchor = e.currentTarget as HTMLElement;
     openPaintPopover(anchor, {
       name: "Text colour",
@@ -577,7 +623,7 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
     const size = actions.selectedTextStyle()?.sizePx;
     return size ? px / size : 0.05;
   };
-  root.querySelector<HTMLElement>("[data-text-outline]")!.addEventListener("click", (e) => {
+  q<HTMLElement>("[data-text-outline]")!.addEventListener("click", (e) => {
     const t = actions.selectedTextStyle();
     openPaintPopover(e.currentTarget as HTMLElement, {
       name: "Text outline",
@@ -588,11 +634,11 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
       onChange: (p) => actions.setTextStyle({ outline: typeof p === "string" ? { c: p, w: actions.selectedTextStyle()?.outline?.w ?? 0.05 } : null }),
     });
   });
-  liveNumber(root.querySelector<HTMLInputElement>("[data-text-outline-w]")!, (v, final) => {
+  liveNumber(q<HTMLInputElement>("[data-text-outline-w]")!, (v, final) => {
     const t = actions.selectedTextStyle();
     actions.setTextStyle({ outline: v > 0 ? { c: t?.outline?.c ?? t?.color ?? "#000000", w: outlineWidthEm(v) } : null }, final);
   });
-  root.querySelector<HTMLElement>("[data-text-font-options]")!.addEventListener("click", (e) => {
+  q<HTMLElement>("[data-text-font-options]")!.addEventListener("click", (e) => {
     const t = actions.selectedTextStyle();
     if (!t) return;
     const font = fontFor(t.assetId ?? undefined);
@@ -607,8 +653,8 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
       onChange: (patch, final) => actions.setTextStyle({ ...patch, ...(patch.axes && Object.keys(patch.axes).length === 0 ? { axes: null } : {}) }, final),
     });
   });
-  for (const b of root.querySelectorAll<HTMLElement>("[data-balloon-panel]")) b.addEventListener("click", () => actions.toggleBalloonPanel());
-  root.querySelector<HTMLElement>("[data-text-box]")!.addEventListener("click", (e) => {
+  for (const b of qa<HTMLElement>("[data-balloon-panel]")) b.addEventListener("click", () => actions.toggleBalloonPanel());
+  q<HTMLElement>("[data-text-box]")!.addEventListener("click", (e) => {
     const t = actions.selectedTextStyle();
     if (!t) return;
     openTextBoxPopover(e.currentTarget as HTMLElement, {
@@ -616,12 +662,12 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
       onChange: (patch, final) => actions.setTextStyle(patch, final),
     });
   });
-  liveNumber(root.querySelector<HTMLInputElement>("[data-text-line]")!, (v, final) => actions.setTextStyle({ lineHeight: v }, final));
-  liveNumber(root.querySelector<HTMLInputElement>("[data-text-track]")!, (v, final) => actions.setTextStyle({ tracking: v / 100 }, final));
-  root.querySelector<HTMLSelectElement>("[data-pin-h]")!.addEventListener("change", (e) => actions.setPin({ h: (e.target as HTMLSelectElement).value }));
-  root.querySelector<HTMLSelectElement>("[data-pin-v]")!.addEventListener("change", (e) => actions.setPin({ v: (e.target as HTMLSelectElement).value }));
-  const sheetField = (sel: string): HTMLInputElement => root.querySelector<HTMLInputElement>(sel)!;
-  const onSheet = (sel: string): HTMLInputElement => root.querySelector<HTMLInputElement>(sel)!;
+  liveNumber(q<HTMLInputElement>("[data-text-line]")!, (v, final) => actions.setTextStyle({ lineHeight: v }, final));
+  liveNumber(q<HTMLInputElement>("[data-text-track]")!, (v, final) => actions.setTextStyle({ tracking: v / 100 }, final));
+  q<HTMLSelectElement>("[data-pin-h]")!.addEventListener("change", (e) => actions.setPin({ h: (e.target as HTMLSelectElement).value }));
+  q<HTMLSelectElement>("[data-pin-v]")!.addEventListener("change", (e) => actions.setPin({ v: (e.target as HTMLSelectElement).value }));
+  const sheetField = (sel: string): HTMLInputElement => q<HTMLInputElement>(sel)!;
+  const onSheet = (sel: string): HTMLInputElement => q<HTMLInputElement>(sel)!;
   for (const f of ["[data-on-x]", "[data-on-y]"]) liveNumber(onSheet(f), (_v, final) => actions.moveOnSheet(Number(onSheet("[data-on-x]").value), Number(onSheet("[data-on-y]").value), final));
   for (const f of ["[data-on-w]", "[data-on-h]"]) liveNumber(onSheet(f), (_v, final) => actions.resizeOnSheet(Number(onSheet("[data-on-w]").value), Number(onSheet("[data-on-h]").value), final));
   // The shape of a sheet: typed (16:9, A4 portrait …), picked from the shapes, or turned on its side. Anything else keeps what it was.
@@ -653,7 +699,7 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
     }
   });
   // The custom ratios lead the list, with saving one and managing them; the built-in ones follow as they are.
-  const customGroup = root.querySelector<HTMLOptGroupElement>("[data-custom-ratios]")!;
+  const customGroup = q<HTMLOptGroupElement>("[data-custom-ratios]")!;
   const showCustom = (): void => {
     const list = actions.customRatios();
     const html = `${list.map((c) => `<option value="c:${c.ratio}">${esc(c.name)} ${esc(formatRatio(c.ratio))}</option>`).join("")}<option value="save">Save this ratio…</option>${list.length ? `<option value="manage">Manage custom ratios…</option>` : ""}`;
@@ -674,17 +720,17 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
     const now = actions.sheetRatio();
     if (r > 0 && now !== null) actions.setSheetRatio(now < 1 ? 1 / r : r, true); // (a sheet on its side stays on its side)
   });
-  root.querySelector<HTMLElement>("[data-sheet-turn]")!.addEventListener("click", () => {
+  q<HTMLElement>("[data-sheet-turn]")!.addEventListener("click", () => {
     const now = actions.sheetRatio();
     if (now !== null) actions.setSheetRatio(1 / now, true);
   });
-  root.querySelector<HTMLElement>("[data-sheet-scale]")!.addEventListener("click", () => {
+  q<HTMLElement>("[data-sheet-scale]")!.addEventListener("click", () => {
     actions.setSheetScale(!actions.sheetScale());
   });
   // Auto layout (ADR 0186): the flow, the gap and padding (typed in px as seen now, kept in the sheet's units), the alignment, hugging, columns.
-  const layoutEl = <T extends HTMLElement>(sel: string): T => root.querySelector<T>(`[data-auto-layout] ${sel}`)!;
+  const layoutEl = <T extends HTMLElement>(sel: string): T => q<T>(`[data-auto-layout] ${sel}`)!;
   const toUnits = (px: number): number => { const al = actions.autoLayout(); return al && al.ppu > 0 && al.ppu < Infinity ? Math.max(0, px) / al.ppu : NaN; };
-  for (const b of root.querySelectorAll<HTMLElement>("[data-layout-flow]")) b.addEventListener("click", () => actions.setAutoLayout({ flow: b.dataset["layoutFlow"] as SheetLayout["flow"] }));
+  for (const b of qa<HTMLElement>("[data-layout-flow]")) b.addEventListener("click", () => actions.setAutoLayout({ flow: b.dataset["layoutFlow"] as SheetLayout["flow"] }));
   for (const i of [0, 1] as const) liveNumber(layoutEl(`[data-layout-gap="${i}"]`), (v, final) => { const al = actions.autoLayout(), u = toUnits(v); if (al && Number.isFinite(u)) actions.setAutoLayout({ gap: i === 0 ? [u, al.layout.gap[1]] : [al.layout.gap[0], u] }, final); });
   const PAD: Record<string, number[]> = { t: [0], r: [1], b: [2], l: [3], h: [1, 3], v: [0, 2] };
   for (const [k, at] of Object.entries(PAD)) liveNumber(layoutEl(`[data-layout-pad="${k}"]`), (v, final) => {
@@ -735,37 +781,37 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
       { label: "Save this layout as a style", hint: "Kept in Styles, for any sheet", icon: ICONS.save, sep: true, run: () => actions.saveLayoutStyle(layoutTimes(al.layout, al.ppu, al.ppu)) },
     ], "Layout styles");
   });
-  for (const i of [0, 1] as const) liveNumber(root.querySelector<HTMLInputElement>(`[data-in-span="${i}"]`)!, (v, final) => {
+  for (const i of [0, 1] as const) liveNumber(q<HTMLInputElement>(`[data-in-span="${i}"]`)!, (v, final) => {
     const il = actions.inLayout();
     if (!final || !il || !(v >= 1)) return;
     actions.setInLayout({ span: i === 0 ? [Math.round(v), il.span[1]] : [il.span[0], Math.round(v)] });
   });
-  for (const k of ["min", "max"] as const) for (const i of [0, 1] as const) liveNumber(root.querySelector<HTMLInputElement>(`[data-in-${k}="${i}"]`)!, (v, final) => {
+  for (const k of ["min", "max"] as const) for (const i of [0, 1] as const) liveNumber(q<HTMLInputElement>(`[data-in-${k}="${i}"]`)!, (v, final) => {
     const il = actions.inLayout();
     if (!final || !il || !(v >= 0)) return;
     const pair = [...il[k]] as [number, number];
     pair[i] = Math.min(100, v) / 100;
     actions.setInLayout({ [k]: pair });
   });
-  root.querySelector<HTMLSelectElement>("[data-in-fill]")!.addEventListener("change", (e) => actions.setInLayout({ fill: (e.target as HTMLSelectElement).value as "none" | "x" | "y" | "both" }));
-  root.querySelector<HTMLElement>("[data-in-free]")!.addEventListener("click", () => { const il = actions.inLayout(); if (il) actions.setInLayout({ free: !il.free }); });
-  root.querySelector<HTMLElement>("[data-crop]")!.addEventListener("click", () => {
+  q<HTMLSelectElement>("[data-in-fill]")!.addEventListener("change", (e) => actions.setInLayout({ fill: (e.target as HTMLSelectElement).value as "none" | "x" | "y" | "both" }));
+  q<HTMLElement>("[data-in-free]")!.addEventListener("click", () => { const il = actions.inLayout(); if (il) actions.setInLayout({ free: !il.free }); });
+  q<HTMLElement>("[data-crop]")!.addEventListener("click", () => {
     const id = [...editor.selection][0];
     editor.cropId = editor.cropId ? null : (id ?? null);
     editor.changed();
   });
-  root.querySelector<HTMLElement>("[data-uncrop]")!.addEventListener("click", () => actions.uncrop());
-  for (const b of root.querySelectorAll<HTMLElement>("[data-flip]")) b.addEventListener("click", () => actions.flip(b.dataset["flip"] as "x" | "y"));
-  root.querySelector<HTMLElement>("[data-unflip]")!.addEventListener("click", () => actions.unflip());
-  root.querySelector<HTMLElement>("[data-adjust-reset]")!.addEventListener("click", () => actions.commitAdjust({}, "Reset adjustments"));
-  root.querySelector<HTMLElement>("[data-adjust]")!.addEventListener("click", () => {
+  q<HTMLElement>("[data-uncrop]")!.addEventListener("click", () => actions.uncrop());
+  for (const b of qa<HTMLElement>("[data-flip]")) b.addEventListener("click", () => actions.flip(b.dataset["flip"] as "x" | "y"));
+  q<HTMLElement>("[data-unflip]")!.addEventListener("click", () => actions.unflip());
+  q<HTMLElement>("[data-adjust-reset]")!.addEventListener("click", () => actions.commitAdjust({}, "Reset adjustments"));
+  q<HTMLElement>("[data-adjust]")!.addEventListener("click", () => {
     if (!actions.selectedAdjust() && !editor.adjustOpen) return;
     editor.adjustOpen = !editor.adjustOpen; // the Adjust panel (ui/adjust-panel.ts, ADR 0123)
     editor.changed();
   });
   shapeInput("[data-sel-sides]", (v) => (v >= 3 && v <= 24 ? { sides: Math.round(v) } : null));
   shapeInput("[data-sel-tips]", (v) => (v >= 3 && v <= 24 ? { tips: Math.round(v) } : null));
-  liveNumber(root.querySelector<HTMLInputElement>("[data-sel-smooth]")!, (v, final) => v >= 0 && v <= 100 && actions.setSmoothing(v, final));
+  liveNumber(q<HTMLInputElement>("[data-sel-smooth]")!, (v, final) => v >= 0 && v <= 100 && actions.setSmoothing(v, final));
   liveNumber(outlineWInput, (v, final) => v >= 0 && actions.setSelectedWidth(v, final));
   shapeInput("[data-sel-inner]", (v) => (v >= 5 && v <= 95 ? { inner: v / 100 } : null));
 
@@ -779,7 +825,7 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
     "outline-w": { to: (v, dx) => Math.max(0, Math.round((v + dx / 4) * 2) / 2), apply: (v, f) => actions.setSelectedWidth(v, f) },
   };
   let scrub: { label: HTMLElement; input: HTMLInputElement; key: string; start: number; x: number; moved: boolean; last: number } | null = null;
-  root.addEventListener("pointerdown", (e) => {
+  listen("pointerdown", (e) => {
     const label = (e.target as HTMLElement).closest<HTMLElement>("[data-scrub]");
     if (!label || e.button !== 0 || (e.target as HTMLElement).tagName !== "INPUT") return; // (the field scrubs, under a finger too; its name is only a label, so a bar that scrolls sideways scrolls from it)
     const input = label.querySelector<HTMLInputElement>("input")!;
@@ -788,7 +834,7 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
     label.setPointerCapture(e.pointerId);
     e.preventDefault();
   });
-  root.addEventListener("pointermove", (e) => {
+  listen("pointermove", (e) => {
     if (!scrub) return;
     const dx = e.clientX - scrub.x;
     if (!scrub.moved && Math.abs(dx) < 3) return;
@@ -816,15 +862,15 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
   };
   // (the click that ends a drag on a name would focus its field: not after a drag)
   let dragged = false;
-  root.addEventListener("click", (e) => {
+  listen("click", (e) => {
     if (dragged && (e.target as HTMLElement).closest("[data-scrub]") && (e.target as HTMLElement).tagName !== "INPUT") e.preventDefault();
     dragged = false;
   }, true);
-  root.addEventListener("pointerup", (e) => {
+  listen("pointerup", (e) => {
     dragged = scrub?.moved ?? false;
     endScrub(e, false);
   });
-  root.addEventListener("pointercancel", (e) => endScrub(e, true));
+  listen("pointercancel", (e) => endScrub(e, true));
 
   /** The tool whose kinds were closed by pressing its own button (until the tool changes). */
   let flyShut: "shape" | "pen" | null = null;
@@ -865,10 +911,10 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
     editor.highlight = b ? new Set(actions.selectionPaints().items[Number(b.dataset["selColour"])]?.ids ?? []) : null;
     editor.changed();
   };
-  root.addEventListener("pointerover", (e) => { if ((e.target as HTMLElement).closest("[data-sel-colour]")) light(e); });
-  root.addEventListener("pointerout", (e) => { if ((e.target as HTMLElement).closest("[data-sel-colour]") && editor.highlight) { editor.highlight = null; editor.changed(); } });
-  root.addEventListener("focusin", (e) => { if ((e.target as HTMLElement).closest("[data-sel-colour]")) light(e); });
-  root.addEventListener("focusout", () => { if (editor.highlight) { editor.highlight = null; editor.changed(); } });
+  listen("pointerover", (e) => { if ((e.target as HTMLElement).closest("[data-sel-colour]")) light(e); });
+  listen("pointerout", (e) => { if ((e.target as HTMLElement).closest("[data-sel-colour]") && editor.highlight) { editor.highlight = null; editor.changed(); } });
+  listen("focusin", (e) => { if ((e.target as HTMLElement).closest("[data-sel-colour]")) light(e); });
+  listen("focusout", () => { if (editor.highlight) { editor.highlight = null; editor.changed(); } });
   const openOutline = (anchor: HTMLElement): void => {
     const sel = editsSelection() ? actions.selectedOutline() : null;
     if (editsSelection() && !sel) return;
@@ -913,12 +959,12 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
     });
   };
 
-  root.querySelector<HTMLInputElement>("[data-eraser-size]")!.addEventListener("input", (e) => {
+  q<HTMLInputElement>("[data-eraser-size]")!.addEventListener("input", (e) => {
     editor.eraserPx = Number((e.target as HTMLInputElement).value);
     editor.changed();
   });
 
-  root.querySelector<HTMLInputElement>("[data-strength]")!.addEventListener("input", (e) => {
+  q<HTMLInputElement>("[data-strength]")!.addEventListener("input", (e) => {
     editor.stabilizer = { ...editor.stabilizer, strength: Number((e.target as HTMLInputElement).value) };
     editor.changed();
   });
@@ -1028,19 +1074,19 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
     else if (d["action"] === "undo") actions.undo();
     else if (d["action"] === "redo") actions.redo();
   };
-  root.addEventListener("click", onClick);
+  listen("click", onClick);
   pickGroup.addEventListener("click", onClick);
 
   const update = (): void => {
-    for (const b of root.querySelectorAll<HTMLElement>("[data-tool]")) {
+    for (const b of qa<HTMLElement>("[data-tool]")) {
       // (Shape and Path are one place on the rail: the Shape button stays lit on the Path tool, which is chosen in the options beside the shapes)
       const on = b.dataset["tool"] === editor.tool || (b.dataset["tool"] === "shape" && editor.tool === "path" && !b.closest(".tb-options"));
       b.setAttribute("aria-checked", String(on));
     }
     // The tools with kinds: their kinds open beside the button while the tool is active, and the button wears the icon of the kind in use.
     const flyAt = (name: "shape" | "pen", tool: string, on: boolean, icon: string): void => {
-      const fly = root.querySelector<HTMLElement>(`[data-fly="${name}"]`)!;
-      const btn = root.querySelector<HTMLElement>(`.rail [data-tool="${tool}"]`)!;
+      const fly = q<HTMLElement>(`[data-fly="${name}"]`)!;
+      const btn = q<HTMLElement>(`.rail [data-tool="${tool}"]`)!;
       if (!on && flyShut === name) flyShut = null; // (another tool: the kinds open again next time)
       fly.hidden = !on || flyShut === name;
       if (!fly.hidden) fly.style.top = `${btn.offsetTop + (btn.offsetHeight - fly.offsetHeight) / 2}px`; // (centred on its button, whatever the bar's own padding)
@@ -1052,18 +1098,18 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
     };
     flyAt("shape", "shape", editor.tool === "shape" || editor.tool === "path", editor.tool === "path" ? ICONS.pathTool : (SHAPE_MENU.find((k) => k.id === editor.shapeKind)?.icon ?? ICONS.shapeTool));
     flyAt("pen", "pen", editor.tool === "pen", PEN_MENU.find((k) => k.id === editor.penKind)?.icon ?? ICONS.pencil);
-    for (const b of root.querySelectorAll<HTMLElement>("[data-pen-kind]")) b.setAttribute("aria-checked", String(b.dataset["penKind"] === editor.penKind));
-    root.querySelector<HTMLElement>("[data-colour-chip]")!.style.background = newInk(editor.penColor);
-    for (const b of root.querySelectorAll<HTMLElement>("[data-shape-kind]")) b.setAttribute("aria-checked", String(editor.tool === "shape" && b.dataset["shapeKind"] === editor.shapeKind));
-    const sides = root.querySelector<HTMLInputElement>("[data-sides]")!;
-    const tips = root.querySelector<HTMLInputElement>("[data-tips]")!;
-    root.querySelector<HTMLElement>("[data-sides-wrap]")!.hidden = editor.shapeKind !== "polygon";
-    root.querySelector<HTMLElement>("[data-tips-wrap]")!.hidden = editor.shapeKind !== "star";
+    for (const b of qa<HTMLElement>("[data-pen-kind]")) b.setAttribute("aria-checked", String(b.dataset["penKind"] === editor.penKind));
+    q<HTMLElement>("[data-colour-chip]")!.style.background = newInk(editor.penColor);
+    for (const b of qa<HTMLElement>("[data-shape-kind]")) b.setAttribute("aria-checked", String(editor.tool === "shape" && b.dataset["shapeKind"] === editor.shapeKind));
+    const sides = q<HTMLInputElement>("[data-sides]")!;
+    const tips = q<HTMLInputElement>("[data-tips]")!;
+    q<HTMLElement>("[data-sides-wrap]")!.hidden = editor.shapeKind !== "polygon";
+    q<HTMLElement>("[data-tips-wrap]")!.hidden = editor.shapeKind !== "star";
     if (document.activeElement !== sides) sides.value = String(editor.shapeSides);
     if (document.activeElement !== tips) tips.value = String(editor.shapeTips);
     const pick = editor.tool === "select" || editor.tool === "node";
     const still = !editor.gesturing;
-    for (const b of root.querySelectorAll<HTMLElement>("[data-balloon-panel]")) b.hidden = !(pick && still && actions.hasBalloon());
+    for (const b of qa<HTMLElement>("[data-balloon-panel]")) b.hidden = !(pick && still && actions.hasBalloon());
     // (a field is left as it is while it is typed in, and while a value from one is being shown: the document has the old number until it is settled)
     const free = (el: Element): boolean => document.activeElement !== el && editor.preview.kind !== "replace"; // (not while something is being dragged: the numbers wait for it to end)
     const shp = pick && still ? actions.selectedShape() : null;
@@ -1078,55 +1124,55 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
       ["inner", shp?.shape === "star", String(shp ? Math.round(shp.inner * 100) : 0)],
     ];
     const txt = (pick && still) || editor.editingText || editor.tool === "text" ? actions.selectedTextStyle() : null;
-    for (const w of root.querySelectorAll<HTMLElement>("[data-text-wrap]")) w.hidden = !txt;
+    for (const w of qa<HTMLElement>("[data-text-wrap]")) w.hidden = !txt;
     if (txt) {
       wantFonts(txt.assetId ?? "");
       if (free(fontSelect)) paintFonts();
-      const size = root.querySelector<HTMLInputElement>("[data-text-size]")!;
+      const size = q<HTMLInputElement>("[data-text-size]")!;
       if (free(size)) size.value = txt.sizePx === null ? "" : String(Math.round(txt.sizePx * 100) / 100);
-      for (const b of root.querySelectorAll<HTMLElement>("[data-text-align]")) b.setAttribute("aria-checked", String(b.dataset["textAlign"] === txt.align));
-      for (const b of root.querySelectorAll<HTMLElement>("[data-text-fit]")) b.setAttribute("aria-checked", String((b.dataset["textFit"] === "width") === txt.autoWidth));
-      root.querySelector<HTMLElement>("[data-text-colour] [data-paint-chip]")!.style.background = txt.gradient ? paintCss(txt.gradient) : swatchBackground(txt.color);
-      root.querySelector<HTMLElement>("[data-text-outline] [data-paint-chip]")!.style.background = txt.outline ? swatchBackground(txt.outline.c) : "transparent";
-      const ow = root.querySelector<HTMLInputElement>("[data-text-outline-w]")!;
+      for (const b of qa<HTMLElement>("[data-text-align]")) b.setAttribute("aria-checked", String(b.dataset["textAlign"] === txt.align));
+      for (const b of qa<HTMLElement>("[data-text-fit]")) b.setAttribute("aria-checked", String((b.dataset["textFit"] === "width") === txt.autoWidth));
+      q<HTMLElement>("[data-text-colour] [data-paint-chip]")!.style.background = txt.gradient ? paintCss(txt.gradient) : swatchBackground(txt.color);
+      q<HTMLElement>("[data-text-outline] [data-paint-chip]")!.style.background = txt.outline ? swatchBackground(txt.outline.c) : "transparent";
+      const ow = q<HTMLInputElement>("[data-text-outline-w]")!;
       if (free(ow)) ow.value = txt.outline && txt.sizePx !== null ? String(Math.round(txt.outline.w * txt.sizePx * 100) / 100) : "0";
-      const line = root.querySelector<HTMLInputElement>("[data-text-line]")!, track = root.querySelector<HTMLInputElement>("[data-text-track]")!;
+      const line = q<HTMLInputElement>("[data-text-line]")!, track = q<HTMLInputElement>("[data-text-track]")!;
       if (free(line)) line.value = String(Math.round(txt.lineHeight * 100) / 100);
       if (free(track)) track.value = String(Math.round(txt.tracking * 100));
     }
     const pin = pick && still ? actions.selectedPin() : null;
-    root.querySelector<HTMLElement>("[data-pin-wrap]")!.hidden = !pin;
+    q<HTMLElement>("[data-pin-wrap]")!.hidden = !pin;
     if (pin) {
-      const h = root.querySelector<HTMLSelectElement>("[data-pin-h]")!, v = root.querySelector<HTMLSelectElement>("[data-pin-v]")!;
+      const h = q<HTMLSelectElement>("[data-pin-h]")!, v = q<HTMLSelectElement>("[data-pin-v]")!;
       if (free(h)) h.value = pin.h;
       if (free(v)) v.value = pin.v;
     }
-    const crop = root.querySelector<HTMLElement>("[data-crop]")!;
+    const crop = q<HTMLElement>("[data-crop]")!;
     crop.hidden = !(pick && still && actions.croppable());
     crop.setAttribute("aria-pressed", String(editor.cropId !== null));
     // A dot on the button says the picture already has it (and the label says so for a screen reader).
     const cropped = pick && still && actions.cropped();
     crop.classList.toggle("is-applied", cropped);
     crop.setAttribute("aria-label", cropped ? "Crop the picture (cropped)" : "Crop the picture");
-    root.querySelector<HTMLElement>("[data-uncrop]")!.hidden = !(pick && still && actions.cropped());
+    q<HTMLElement>("[data-uncrop]")!.hidden = !(pick && still && actions.cropped());
     const flip = pick && still ? actions.selectedFlip() : null;
-    for (const b of root.querySelectorAll<HTMLElement>("[data-flip]")) {
+    for (const b of qa<HTMLElement>("[data-flip]")) {
       b.hidden = !flip;
       b.setAttribute("aria-pressed", String(!!flip?.[b.dataset["flip"] as "x" | "y"]));
     }
-    root.querySelector<HTMLElement>("[data-unflip]")!.hidden = !(flip && (flip.x || flip.y));
+    q<HTMLElement>("[data-unflip]")!.hidden = !(flip && (flip.x || flip.y));
     const adj = pick && still ? actions.selectedAdjust() : null;
-    const adjustBtn = root.querySelector<HTMLElement>("[data-adjust]")!;
+    const adjustBtn = q<HTMLElement>("[data-adjust]")!;
     adjustBtn.hidden = !adj;
     adjustBtn.setAttribute("aria-pressed", String(editor.adjustOpen));
     const adjusted = !!adj && Object.keys(adj.adjust).length > 0;
     adjustBtn.classList.toggle("is-applied", adjusted);
     adjustBtn.setAttribute("aria-label", adjusted ? "Adjust the picture (adjusted)" : "Adjust the picture");
-    root.querySelector<HTMLElement>("[data-adjust-reset]")!.hidden = !adj || Object.keys(adj.adjust).length === 0;
+    q<HTMLElement>("[data-adjust-reset]")!.hidden = !adj || Object.keys(adj.adjust).length === 0;
     const on = pick && still ? actions.boxOnSheet() : null;
-    root.querySelector<HTMLElement>("[data-on-sheet]")!.hidden = !on;
+    q<HTMLElement>("[data-on-sheet]")!.hidden = !on;
     if (on) {
-      root.querySelector<HTMLElement>("[data-on-size]")!.hidden = !on.resizable;
+      q<HTMLElement>("[data-on-size]")!.hidden = !on.resizable;
       for (const f of ["[data-on-x]", "[data-on-y]", "[data-on-w]", "[data-on-h]"]) onSheet(f).dataset["scrubStep"] = "0.1"; // (a dragged pixel is a tenth of a per cent)
       for (const [f, v] of [["[data-on-x]", on.x], ["[data-on-y]", on.y], ["[data-on-w]", on.w], ["[data-on-h]", on.h]] as const) {
         const el = onSheet(f);
@@ -1135,10 +1181,10 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
     }
     // Auto layout (ADR 0186): the picked sheet's, in px as seen now
     const al = pick && still ? actions.autoLayout() : null;
-    root.querySelector<HTMLElement>("[data-auto-layout]")!.hidden = !al;
+    q<HTMLElement>("[data-auto-layout]")!.hidden = !al;
     if (al) {
       const l = al.layout, px = (u: number): string => String(Math.round(u * al.ppu * 10) / 10);
-      for (const b of root.querySelectorAll<HTMLElement>("[data-layout-flow]")) b.setAttribute("aria-checked", String(b.dataset["layoutFlow"] === l.flow));
+      for (const b of qa<HTMLElement>("[data-layout-flow]")) b.setAttribute("aria-checked", String(b.dataset["layoutFlow"] === l.flow));
       for (const i of [0, 1] as const) { const f = layoutEl<HTMLInputElement>(`[data-layout-gap="${i}"]`); if (free(f)) f.value = px(l.gap[i]); }
       // (each side when they differ, or when asked)
       const eachBtn = layoutEl<HTMLElement>("[data-layout-pad-each]");
@@ -1173,42 +1219,42 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
       void LAYOUT_FLOWS;
     }
     const il = pick && still ? actions.inLayout() : null;
-    root.querySelector<HTMLElement>("[data-in-layout]")!.hidden = !il;
+    q<HTMLElement>("[data-in-layout]")!.hidden = !il;
     if (il) {
-      const fill = root.querySelector<HTMLSelectElement>("[data-in-fill]")!;
+      const fill = q<HTMLSelectElement>("[data-in-fill]")!;
       fill.value = il.fill;
       fill.disabled = !il.stretch;
       // (a picture keeps its shape: it fills the room as far as its shape allows, so only Own size and Fill the room are offered)
       for (const o of fill.options) if (o.value === "x" || o.value === "y") o.hidden = il.keepShape && o.value !== il.fill;
       fill.querySelector<HTMLOptionElement>('option[value="both"]')!.textContent = il.keepShape ? "Fill the room" : "Fill both";
-      root.querySelector<HTMLElement>("[data-in-free]")!.setAttribute("aria-pressed", String(il.free));
-      root.querySelector<HTMLElement>("[data-in-span-wrap]")!.hidden = !il.grid || il.free;
-      for (const i of [0, 1] as const) { const f = root.querySelector<HTMLInputElement>(`[data-in-span="${i}"]`)!; if (free(f)) f.value = String(il.span[i]); }
+      q<HTMLElement>("[data-in-free]")!.setAttribute("aria-pressed", String(il.free));
+      q<HTMLElement>("[data-in-span-wrap]")!.hidden = !il.grid || il.free;
+      for (const i of [0, 1] as const) { const f = q<HTMLInputElement>(`[data-in-span="${i}"]`)!; if (free(f)) f.value = String(il.span[i]); }
       const fills = [il.fill === "x" || il.fill === "both", il.fill === "y" || il.fill === "both"];
-      root.querySelector<HTMLElement>("[data-in-limits]")!.hidden = il.free || !fills.some(Boolean);
+      q<HTMLElement>("[data-in-limits]")!.hidden = il.free || !fills.some(Boolean);
       for (const i of [0, 1] as const) {
-        root.querySelector<HTMLElement>(`[data-in-limit-axis="${i}"]`)!.hidden = !fills[i];
-        for (const k of ["min", "max"] as const) { const f = root.querySelector<HTMLInputElement>(`[data-in-${k}="${i}"]`)!; if (free(f)) f.value = String(Math.round(il[k][i] * 100)); }
+        q<HTMLElement>(`[data-in-limit-axis="${i}"]`)!.hidden = !fills[i];
+        for (const k of ["min", "max"] as const) { const f = q<HTMLInputElement>(`[data-in-${k}="${i}"]`)!; if (free(f)) f.value = String(Math.round(il[k][i] * 100)); }
       }
     }
     const ratio = pick && still ? actions.sheetRatio() : null;
-    root.querySelector<HTMLElement>("[data-sheet-size]")!.hidden = ratio === null;
+    q<HTMLElement>("[data-sheet-size]")!.hidden = ratio === null;
     if (ratio !== null) {
       showRatio();
       showCustom();
-      const scale = root.querySelector<HTMLElement>("[data-sheet-scale]")!;
+      const scale = q<HTMLElement>("[data-sheet-scale]")!;
       scale.hidden = !actions.ratioOfSheet(); // (what is on a sheet: a shape holds nothing)
       scale.setAttribute("aria-pressed", String(actions.sheetScale()));
     }
     for (const [key, shown, value] of fields) {
       if (!still && pick) continue;
-      root.querySelector<HTMLElement>(`[data-sel-${key}-wrap]`)!.hidden = !shown;
-      const input = root.querySelector<HTMLInputElement>(`[data-sel-${key}]`)!;
+      q<HTMLElement>(`[data-sel-${key}-wrap]`)!.hidden = !shown;
+      const input = q<HTMLInputElement>(`[data-sel-${key}]`)!;
       if (shown && free(input)) input.value = value;
       if (key === "radius") input.placeholder = crn?.mixed ? "Mixed" : "";
     }
     // The colours the picked shapes use, as chips (several shapes picked): one change reaches every shape that uses that colour or gradient.
-    const colours = root.querySelector<HTMLElement>("[data-sel-colours]")!;
+    const colours = q<HTMLElement>("[data-sel-colours]")!;
     if (pick && still && !colourEditing) {
       const used = actions.selectionPaints();
       // (a pen stroke alone has no Fill or Outline button, so its colour is a chip too)
@@ -1226,16 +1272,16 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
             .join("") + (all.length > items.length ? `<button type="button" class="tb-chip" data-sel-more aria-haspopup="menu" aria-expanded="false" aria-label="${all.length - items.length} more colours of the selection" title="${all.length - items.length} more colours of the selection: choose one to change it">+${all.length - items.length}</button>` : "");
       }
     }
-    const sw = root.querySelector<HTMLInputElement>("[data-shape-width]")!;
+    const sw = q<HTMLInputElement>("[data-shape-width]")!;
     const noOutline = editor.shapeStroke === null && editor.shapeKind !== "line"; // (a line gets the ink when it has no outline)
     if (free(sw)) sw.value = noOutline ? "0" : String(Math.max(1, sliderFromPen(editor.shapeWidthPx)));
-    root.querySelector<HTMLElement>("[data-shape-out]")!.textContent = noOutline ? "None" : `${editor.shapeWidthPx} px`;
+    q<HTMLElement>("[data-shape-out]")!.textContent = noOutline ? "None" : `${editor.shapeWidthPx} px`;
     // The paint chips show the next shape's colours, or the selected paths' (and are there only when something has them).
     const sel = editor.tool === "select" || editor.tool === "node" ? actions.selectedPaint() : null;
     const several = (editor.tool === "select" || editor.tool === "node") && !editor.gesturing ? actions.selectionPaints().count >= 2 : false;
     if (!editor.gesturing) {
     }
-    const outlineAt = several ? root.querySelector<HTMLElement>("[data-sel-colours]")! : outlineHome;
+    const outlineAt = several ? q<HTMLElement>("[data-sel-colours]")! : outlineHome;
     if (outlineBtn.parentElement !== outlineAt) outlineAt.append(outlineW, outlineBtn);
     outlineBtn.hidden = (editor.tool === "select" || editor.tool === "node") && !sel;
     const ol = (editor.tool === "select" || editor.tool === "node") && sel && !editor.gesturing ? actions.selectedOutline() : null;
@@ -1244,49 +1290,49 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
       outlineWInput.value = ol.widthPx === null ? "" : String(Math.round(ol.widthPx * 100) / 100);
       outlineWInput.placeholder = ol.widthPx === null ? "Mixed" : "";
     }
-    for (const b of root.querySelectorAll<HTMLButtonElement>("[data-paint]")) {
+    for (const b of qa<HTMLButtonElement>("[data-paint]")) {
       const which = b.dataset["paint"] as "fill" | "stroke";
       const value = sel ? sel[which] : which === "fill" ? editor.shapeFill : editor.shapeStroke;
       b.hidden = (editor.tool === "select" || editor.tool === "node") && (!sel || several);
       b.classList.toggle("is-none", value === null);
       (b.querySelector("[data-paint-chip]") as HTMLElement).style.setProperty("--paint", value === null ? "linear-gradient(transparent, transparent)" : typeof value === "string" ? `linear-gradient(${sel ? value : newInk(value)}, ${sel ? value : newInk(value)})` : paintCss(value)); // (what the next shape gets is the colour it will have)
     }
-    for (const b of root.querySelectorAll<HTMLElement>("[data-width]")) b.classList.toggle("is-on", Number(b.dataset["width"]) === editor.penWidthPx);
-    for (const b of root.querySelectorAll<HTMLElement>("[data-pen-only]")) b.hidden = editor.tool !== "pen"; // (the pen's own presets and zoom behaviour: not for strokes already drawn)
-    const size = root.querySelector<HTMLInputElement>("[data-size]")!;
+    for (const b of qa<HTMLElement>("[data-width]")) b.classList.toggle("is-on", Number(b.dataset["width"]) === editor.penWidthPx);
+    for (const b of qa<HTMLElement>("[data-pen-only]")) b.hidden = editor.tool !== "pen"; // (the pen's own presets and zoom behaviour: not for strokes already drawn)
+    const size = q<HTMLInputElement>("[data-size]")!;
     if (free(size)) size.value = String(sliderFromPen(editor.penWidthPx));
-    root.querySelector<HTMLElement>("[data-size-out]")!.textContent = `${editor.penWidthPx} px`;
-    root.querySelector<HTMLElement>("[data-stab]")!.setAttribute("aria-pressed", String(editor.stabilizer.on));
-    const strength = root.querySelector<HTMLInputElement>("[data-strength]")!;
+    q<HTMLElement>("[data-size-out]")!.textContent = `${editor.penWidthPx} px`;
+    q<HTMLElement>("[data-stab]")!.setAttribute("aria-pressed", String(editor.stabilizer.on));
+    const strength = q<HTMLInputElement>("[data-strength]")!;
     strength.hidden = !editor.stabilizer.on;
     if (free(strength)) strength.value = String(editor.stabilizer.strength);
-    const es = root.querySelector<HTMLInputElement>("[data-eraser-size]")!;
+    const es = q<HTMLInputElement>("[data-eraser-size]")!;
     if (free(es)) es.value = String(editor.eraserPx);
-    root.querySelector<HTMLElement>("[data-eraser-out]")!.textContent = `${editor.eraserPx} px`;
-    root.querySelector<HTMLElement>("[data-erase-groups]")!.setAttribute("aria-pressed", String(editor.eraseWholeGroups));
-    root.querySelector<HTMLElement>("[data-erase-parts]")!.setAttribute("aria-pressed", String(editor.eraseParts));
-    root.querySelector<HTMLElement>("[data-bookmarks]")!.setAttribute("aria-pressed", String(editor.bookmarksOpen));
-    root.querySelector<HTMLElement>("[data-layers]")!.setAttribute("aria-pressed", String(editor.layersOpen));
-    root.querySelector<HTMLElement>("[data-adjust-panel]")!.setAttribute("aria-pressed", String(editor.adjustOpen));
-    root.querySelector<HTMLElement>("[data-pattern-panel]")!.setAttribute("aria-pressed", String(editor.patternOpen));
-    root.querySelector<HTMLElement>("[data-tags]")!.setAttribute("aria-pressed", String(editor.tagsOpen));
-    root.querySelector<HTMLElement>("[data-styles]")!.setAttribute("aria-pressed", String(editor.stylesOpen));
+    q<HTMLElement>("[data-eraser-out]")!.textContent = `${editor.eraserPx} px`;
+    q<HTMLElement>("[data-erase-groups]")!.setAttribute("aria-pressed", String(editor.eraseWholeGroups));
+    q<HTMLElement>("[data-erase-parts]")!.setAttribute("aria-pressed", String(editor.eraseParts));
+    q<HTMLElement>("[data-bookmarks]")!.setAttribute("aria-pressed", String(editor.bookmarksOpen));
+    q<HTMLElement>("[data-layers]")!.setAttribute("aria-pressed", String(editor.layersOpen));
+    q<HTMLElement>("[data-adjust-panel]")!.setAttribute("aria-pressed", String(editor.adjustOpen));
+    q<HTMLElement>("[data-pattern-panel]")!.setAttribute("aria-pressed", String(editor.patternOpen));
+    q<HTMLElement>("[data-tags]")!.setAttribute("aria-pressed", String(editor.tagsOpen));
+    q<HTMLElement>("[data-styles]")!.setAttribute("aria-pressed", String(editor.stylesOpen));
     pq("[data-snap]").setAttribute("aria-pressed", String(editor.snap));
     pq("[data-box-axis]").setAttribute("aria-pressed", String(editor.alignBox));
-    root.querySelector<HTMLElement>("[data-ignore-fill]")!.setAttribute("aria-pressed", String(editor.ignoreFilling));
-    root.querySelector<HTMLElement>("[data-follow]")!.setAttribute("aria-pressed", String(editor.followZoom));
-    root.querySelector<HTMLElement>("[data-lock]")!.setAttribute("aria-pressed", String(editor.lock !== null));
+    q<HTMLElement>("[data-ignore-fill]")!.setAttribute("aria-pressed", String(editor.ignoreFilling));
+    q<HTMLElement>("[data-follow]")!.setAttribute("aria-pressed", String(editor.followZoom));
+    q<HTMLElement>("[data-lock]")!.setAttribute("aria-pressed", String(editor.lock !== null));
     const lockR = pq("[data-lock-radius]");
     lockR.setAttribute("aria-pressed", String(editor.lockRadius));
     if (!editor.gesturing) lockR.hidden = !(editor.tool === "select" && actions.selectedCorners() !== null); // (there when a picked shape has corners)
-    for (const b of root.querySelectorAll<HTMLElement>("[data-filter]")) {
+    for (const b of qa<HTMLElement>("[data-filter]")) {
       b.setAttribute("aria-checked", String(b.dataset["filter"] === editor.lassoFilter));
     }
-    root.querySelector<HTMLButtonElement>('[data-action="undo"]')!.disabled = !doc.canUndo;
-    root.querySelector<HTMLButtonElement>('[data-action="redo"]')!.disabled = !doc.canRedo;
+    q<HTMLButtonElement>('[data-action="undo"]')!.disabled = !doc.canUndo;
+    q<HTMLButtonElement>('[data-action="redo"]')!.disabled = !doc.canRedo;
     // On Select the pen-size slider sets the thickness of selected strokes: with only shapes (or pictures, text) picked it is not theirs to set
     // (a shape's width is in Outline options), so it is not offered.
-    const penSize = root.querySelector<HTMLElement>("[data-size]")!.closest<HTMLElement>(".tb-options")!;
+    const penSize = q<HTMLElement>("[data-size]")!.closest<HTMLElement>(".tb-options")!;
     penSize.dataset["for"] = editor.tool === "select" && editor.selection.size > 0 && ![...editor.selection].some((id) => doc.get(id)?.kind === "stroke") ? "pen" : "pen select";
     // One row, one kind at a time (ADR 0128): when the picked items are of different kinds, chips at the start choose which kind's
     // properties the row shows; what is for another kind is switched off, never moved into a menu.
@@ -1294,7 +1340,7 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
     const kinds = picking ? [...new Set([...editor.selection].flatMap((id) => { const o = doc.get(id); return o ? [kindOf(o)] : []; }))] : [];
     // (`all`, chosen by its chip, shows only what is for any kind in this row; the Actions bar below follows the same choice)
     const chosen = editor.subject === "all" && kinds.length > 1 ? "all" : kinds.includes(editor.subject ?? "") ? editor.subject! : (kinds[0] ?? null);
-    const chips = root.querySelector<HTMLElement>(".tb-subject")!;
+    const chips = q<HTMLElement>(".tb-subject")!;
     const chipHtml = kinds.length > 1 ? ["all", ...kinds].map((k) => `<button type="button" role="radio" class="tb-chip" data-subject="${k}" aria-checked="${k === chosen}" title="${k === "all" ? "Everything selected: the tools for all of it" : `Edit the ${KIND_LABEL[k]!.toLowerCase()} properties of the selection`}">${KIND_LABEL[k]}</button>`).join("") : "";
     if (chips.dataset["html"] !== chipHtml) {
       chips.dataset["html"] = chipHtml;
@@ -1302,18 +1348,18 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
     }
     chips.hidden = !chipHtml;
     if (picking) {
-      for (const el of [...root.querySelectorAll<HTMLElement>(".toolbar [data-kind]"), ...pickGroup.querySelectorAll<HTMLElement>("[data-kind]")]) {
+      for (const el of [...qa<HTMLElement>(".toolbar [data-kind]"), ...pickGroup.querySelectorAll<HTMLElement>("[data-kind]")]) {
         const ks = el.dataset["kind"]!.split(" ");
         el.toggleAttribute("data-off", !(ks.includes("any") || (chosen ? ks.includes(chosen) : ks.includes("tool"))));
       }
-    } else for (const el of [...root.querySelectorAll<HTMLElement>(".toolbar [data-off]"), ...pickGroup.querySelectorAll<HTMLElement>("[data-off]")]) el.removeAttribute("data-off");
+    } else for (const el of [...qa<HTMLElement>(".toolbar [data-off]"), ...pickGroup.querySelectorAll<HTMLElement>("[data-off]")]) el.removeAttribute("data-off");
     // The bar shows what the current tool offers and is gone when there is nothing to show.
-    const row = root.querySelector<HTMLElement>(".tb-options-row")!;
-    root.querySelector<HTMLElement>("[data-mask-paint]")!.dataset["for"] = editor.maskEdit ? "pen" : ""; // (only while a brush mask is painted)
-    for (const b of root.querySelectorAll<HTMLElement>("[data-mask-ink]")) b.setAttribute("aria-pressed", String(b.dataset["maskInk"] !== "done" && editor.maskEdit?.ink === (b.dataset["maskInk"] === "show" ? "#ffffff" : "#000000")));
+    const row = barRow;
+    q<HTMLElement>("[data-mask-paint]")!.dataset["for"] = editor.maskEdit ? "pen" : ""; // (only while a brush mask is painted)
+    for (const b of qa<HTMLElement>("[data-mask-ink]")) b.setAttribute("aria-pressed", String(b.dataset["maskInk"] !== "done" && editor.maskEdit?.ink === (b.dataset["maskInk"] === "show" ? "#ffffff" : "#000000")));
     const rowTool = editor.editingText ? "text" : editor.tool; // (while a text is typed in, the bar offers the text's options, whatever tool is active)
     syncGroups(row, (g) => g.dataset["for"]!.split(" ").includes(rowTool));
-    root.querySelector<HTMLElement>(".toolbar")!.hidden = ![...row.querySelectorAll<HTMLElement>(":scope > .tb-group")].some((g) => !g.hidden);
+    barEl.hidden = ![...row.querySelectorAll<HTMLElement>(":scope > .tb-group")].some((g) => !g.hidden);
     syncScroll(row);
     syncGroups(colourBar.row, (g) => g.dataset["for"]!.split(" ").includes(rowTool));
     colourBar.el.hidden = ![...colourBar.row.querySelectorAll<HTMLElement>(":scope > .tb-group")].some((g) => !g.hidden);
@@ -1322,7 +1368,9 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
     if (wrap && pickBar.el.parentElement !== wrap) wrap.append(pickBar.el);
     pickGroup.hidden = ![...pickGroup.children].some((c) => !isOff(c as HTMLElement));
     pickBar.el.hidden = !(rowTool === "select" || rowTool === "node") || editor.selection.size === 0 || pickGroup.hidden;
+    for (const fn of afterUpdate) fn();
   };
+  const afterUpdate: Array<() => void> = [];
   editor.subscribe(update);
   doc.subscribe(update);
   phoneWidth.addEventListener("change", () => {
@@ -1330,4 +1378,5 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
     update();
   });
   update();
+  return { bar: barEl, row: barRow, onUpdate: (fn) => void afterUpdate.push(fn), refresh: update };
 }

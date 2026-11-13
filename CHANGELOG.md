@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.58.5 — Value chips, the Properties panel and chips by the selection (2026-11-13)
+
+- **Added:** Settings > Appearance > **Properties**: the options of what is selected in the bar at the top (as before), as **value chips** (one per group, saying what it is set to, opening its options), in the **Properties panel** (opens by itself with a selection, folds its groups to one line of values, an anchor keeps it open, a short form of only the groups), or as value chips **near the selection** (above it, with a following Actions bar under it).
+- **Added:** Settings > Appearance > **Actions bar groups**: buttons, or one value chip per group listing its actions.
+- **Changed:** the command palette also finds an option inside a closed chip or a folded group, and opens it first; the hints say where Fill and Outline are for the way chosen.
+
 ## 0.58.4 — Hover group names float beside the bar (2026-11-13)
 
 - **Changed:** Actions bar group names set to show on hover float over or under the bar on small labels; neither the bar nor the options bar beside it grows or moves any more.

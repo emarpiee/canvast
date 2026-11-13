@@ -8,7 +8,20 @@ import type { Command } from "./types";
  */
 const CONTROLS = "button, input:not([type=hidden]):not([type=file]), select";
 
-const usable = (el: HTMLElement): boolean => !el.closest("[hidden], [data-off], [data-no-command]") && el.getClientRects().length > 0 && !(el as HTMLButtonElement).disabled;
+/**
+ * A bar shown another way (ADR 0198: as value chips, in the Properties panel) keeps some controls out of sight, in a closed chip or a folded
+ * section; it is marked `data-parked`, and its controls count as there when nothing inside it hides them. Before one runs, the layout shows it.
+ */
+let reveal: ((el: HTMLElement) => void) | null = null;
+export const setControlRevealer = (fn: (el: HTMLElement) => void): void => void (reveal = fn);
+
+function usable(el: HTMLElement): boolean {
+  if ((el as HTMLButtonElement).disabled) return false;
+  const parked = el.closest<HTMLElement>("[data-parked]");
+  if (!parked) return !el.closest("[hidden], [data-off], [data-no-command]") && el.getClientRects().length > 0;
+  for (let e: HTMLElement | null = el; e; e = e === parked ? null : e.parentElement) if (e.hidden || e.hasAttribute("data-off") || e.hasAttribute("data-no-command")) return false;
+  return true;
+}
 
 /** The words a control is called by: its accessible name, else its tooltip, else its text. */
 const labelOf = (el: HTMLElement): string => (el.getAttribute("aria-label") ?? el.title ?? el.textContent ?? "").replace(/\s+/g, " ").trim();
@@ -41,6 +54,7 @@ export function barCommands(root: ParentNode = document): Command[] {
         words: `${label} ${field ? "field" : "button"}`,
         enabled: () => usable(el),
         run: () => {
+          if (el.closest("[data-parked]")) reveal?.(el);
           if (field) {
             el.focus();
             if (el instanceof HTMLInputElement) el.select();
