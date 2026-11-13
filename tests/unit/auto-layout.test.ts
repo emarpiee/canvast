@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import * as D from "../../src/core/dyadic";
 import { FrameSpace } from "../../src/core/frames";
 import type { CanvasObject, PathObject, SheetLayout } from "../../src/doc/model";
-import { newObjectId } from "../../src/doc/model";
+import { deserializeObject, newObjectId, serializeObject } from "../../src/doc/model";
 import type { DerivationSource } from "../../src/doc/boolean-group";
 import { DEFAULT_LAYOUT, guessLayout, layOutSheet, placeItems, previewLayout, withAutoLayout, type ItemSize } from "../../src/doc/auto-layout";
 import { worldBounds } from "../../src/doc/edit-ops";
@@ -175,6 +175,17 @@ describe("a sort rule and live reflow (ADR 0193)", () => {
     const off = previewLayout(src(s, a, b), new Map([[a.id, { ...a, anchor: at(500, 500) } as CanvasObject]]));
     near(box(of(off, b)), [0, 0, 20, 10]);
     near(box(of(off, s)), [0, 0, 20, 10]);
+  });
+});
+
+describe("kept when stored or copied", () => {
+  it("how a thing takes part in a layout (fill, free, span, limits) and a picture's library date survive the round trip", () => {
+    const s = sheet(0, 0, 100, 100, 0, { flow: "grid", columnsBy: "shape" });
+    const r = rect(0, 0, 10, 10, 1, { parent: s.id, inLayout: { fill: "x", span: [2, 1], min: [0.1, 0], max: [0.5, 0] } });
+    expect(deserializeObject(serializeObject(r)).inLayout).toEqual({ fill: "x", span: [2, 1], min: [0.1, 0], max: [0.5, 0] });
+    expect((deserializeObject(serializeObject(s)) as PathObject).container!.layout!.columnsBy).toBe("shape");
+    const pic = { id: newObjectId(), kind: "image", assetId: "a".repeat(64), anchor: at(0, 0), unit: 0, z: 2, opacity: 1, attachmentTargetId: null, w: 10, h: 10, pixelW: 10, pixelH: 10, added: 1234 } as CanvasObject;
+    expect((deserializeObject(serializeObject(pic)) as CanvasObject & { added?: number }).added).toBe(1234);
   });
 });
 
