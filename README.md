@@ -19,7 +19,7 @@
   <a href="#installation"><img src="https://img.shields.io/badge/runs_on-Linux_%C2%B7_any_browser-71685E" alt="Runs on Linux and in any modern browser"></a>
 </p>
 
-![A minute of canvast in use: references landing on a board, a grey value study, crop and auto layout, gesture lines over dancers, shapes, boolean cuts, patterns, guides, a mask, a gradient and the colour picker, a lettered comic page, the Library, its viewer, a PDF and a 3D model, a linked note, export, a dive 24 levels into the canvas, hidden items, the lock screen, theme colours, and the logo](docs/screenshots/canvast-60s.gif)
+![A minute of canvast in use: references landing on a board, a grey value study, crop, auto layout (grid, masonry, justified rows), an adjustment shape pixelating a print, gesture lines over dancers, shapes, boolean cuts, patterns, guides, a mask, a gradient and the colour picker, a lettered comic page, the Library, its viewer, a PDF and a 3D model turned into line art, a linked note, export, a dive 24 levels into the canvas, hidden items, the lock screen, theme colours, and the logo](docs/screenshots/canvast-60s.gif)
 
 **Your references, drawings and notes, in one place.** canvast is a creative workspace for the whole of a project: collect references and lay them out on boards, draw and edit vectors, make comic pages and storyboards, write notes that link to your files, and keep every file in a library you can search, tag and browse. All of it on one endless canvas you can zoom into without limit, and all of it on your own machine.
 
@@ -2762,7 +2762,7 @@ Every picture in this README is made by code: each one is a Playwright test in `
 | Its words | `tests/shots/manifest.ts` gives each picture its section, the use it shows and its alt text; `npm run check:shots` fails when the README and the manifest disagree |
 | On GitHub | The `Screenshots` workflow (*Run workflow*; *grep* picks pictures by name) takes them all in parallel and gives them as WebP (`cwebp -q 78`, at most 1280 px wide); a picture that fails leaves its trace and its last screen in a second artifact |
 | The desktop app | `tests/shots/desktop.shot.ts` starts the desktop build (`npm run build:desktop`) in Electron on a new workspace folder: the folder with Switch workspace, its Trash and Sharing |
-| The animation at the top | `canvast-60s.gif` is a one-minute video of the app in use: each clip recorded frame by frame with Playwright on the shot harness, laid out with HTML, CSS and GSAP, with a soundtrack synthesized in code. The GIF is 720 px wide at 12 frames a second with its own 128-colour palette (`ffmpeg … palettegen/paletteuse`), then `gifsicle -O3 --lossy=120`, about 19 MB |
+| The animation at the top | `canvast-60s.gif` is a one-minute video of the app in use: each clip recorded frame by frame with Playwright on the shot harness, laid out with HTML, CSS and GSAP, with a soundtrack synthesized in code. The GIF is 720 px wide at 12 frames a second with its own 128-colour palette made from what changes between frames (`ffmpeg … palettegen=stats_mode=diff`, `paletteuse=dither=bayer:diff_mode=rectangle`), then `gifsicle -O3 --lossy=120`, about 20 MB |
 
 | Area | Its pictures (`tests/shots/`) |
 | --- | --- |

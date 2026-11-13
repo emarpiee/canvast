@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.57.19 — The README animation in the new brand, with the new features (2026-11-13)
+
+- **Changed:** the one-minute animation at the top of the README is made again: its intro, end and promise cards in the warm grey brand (Stone) instead of Viridian, the lock screen in the default theme, the theme swatches as the Theme colour presets, and every clip recorded from the current app.
+- **Changed:** it shows auto layout going from a grid to masonry and justified rows, an adjustment shape pixelating a print, and a 3D model turned into line art.
+
 ## 0.57.18 — Auto layout settings kept on reload and paste (2026-11-13)
 
 - **Fixed:** how a thing takes part in an auto layout (Fill, Keep out of the layout, its span and limits) was lost when the canvas was opened again or the thing was pasted.

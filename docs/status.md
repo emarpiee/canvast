@@ -38,6 +38,15 @@ Unverified / Committed / Next bounded task**.
 | 5 | Creative editing, including **arrange selected items in a grid (A–Z, Z–A, by date, size, type), align and distribute** | **done** ([ADR 0036](adr/0036-arrange-align-distribute.md)) |
 | WF | Workspace folder and the desktop app ([ADR 0177](adr/0177-workspace-folder-desktop-app.md)): Electron shell, the workspace as a folder of files, encrypted hidden items, outside changes; Linux packages (AppImage with updates, `.deb`, `.rpm`, `.tar.gz`, x86_64 and aarch64) | **done** (v0.49.0; packages v0.50.33 to 0.50.35) |
 
+## v0.57.19: the README animation in the new brand (2026-11-13)
+
+- **Implemented:** `docs/screenshots/canvast-60s.gif` made again from all 25 footage clips (one new: an adjustment shape) recorded from the current app, the composition recoloured to Stone; the GIF palette from frame differences (about 20 MB).
+- **Tested:** footage 25/25 recorded; stills and GIF frames checked by eye.
+- **Known failures:** the adjustment clip ends brightened (exposure step) more than it needs.
+- **Unverified:** the motion sources (`scripts/showcase/motion/`) are local only (gitignored).
+- **Committed:** v0.57.19 on `main`.
+- **Next bounded task:** retake the README screenshots in Stone when the owner says.
+
 ## v0.57.18: auto layout settings kept on reload and paste (2026-11-13)
 
 - **Implemented:** `deserializeObject` reads `inLayout` (never read since ADR 0186) and `ImageObject.added` (code in 2beab99d; this entry and the version follow the recolour's 0.57.17).
