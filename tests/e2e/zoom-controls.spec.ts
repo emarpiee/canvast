@@ -43,7 +43,7 @@ test("invalid text and oversized jumps are rejected without moving the camera", 
 
 test("a placed stroke is still coloured after typing a 3000-level jump into it", async ({ app }) => {
   await app.page.keyboard.press("p");
-  await app.page.getByRole("button", { name: "Pen width 8 px" }).click();
+  await app.page.getByRole("button", { name: "Pen size 8 px" }).click();
   await app.page.mouse.move(500, 400);
   await app.page.mouse.down();
   await app.page.mouse.move(780, 400, { steps: 8 });

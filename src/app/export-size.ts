@@ -146,7 +146,7 @@ const PAPERS: ReadonlyArray<{ label: string; w: number; h: number; unit: "mm" | 
 const SCREENS: ReadonlyArray<{ label: string; w: number; h: number; upright?: true }> = [
   { label: "Instagram square", w: 1080, h: 1080 },
   { label: "Instagram portrait", w: 1080, h: 1350, upright: true },
-  { label: "Story", w: 1080, h: 1920, upright: true },
+  { label: "Instagram story", w: 1080, h: 1920, upright: true },
   { label: "HD 720p", w: 720, h: 1280 },
   { label: "Full HD", w: 1080, h: 1920 },
   { label: "4K", w: 2160, h: 3840 },

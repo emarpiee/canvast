@@ -33,7 +33,7 @@ test("a shape drawn with the Shape tool: its chips stand above it and edit it, t
   await expect(p.getByRole("radio", { name: "Shape and path" })).toHaveAttribute("aria-checked", "true");
   const near = p.locator(".props-near");
   // (named groups as the Actions bar's: the section's name, and on its chip the section's icon and value)
-  await expect(near.locator(".tb-cap")).toHaveText(["Look", "Shape", "Flip", "Size"]);
+  await expect(near.locator(".tb-cap")).toHaveText(["Appearance", "Shape", "Flip", "Size"]);
   expect((await near.boundingBox())!.y + (await near.boundingBox())!.height, "the chips above the shape, clear of its rotate handle (26 px over it)").toBeLessThanOrEqual(380 - 26 - 6);
   // the Shape chip: its corner radius is the drawn shape's
   const chip = near.locator('[data-vchip="shape"]');
@@ -43,7 +43,7 @@ test("a shape drawn with the Shape tool: its chips stand above it and edit it, t
   await radius.press("Enter");
   await expect(chip, "the chip reads it, its popover still open").toContainText("20 px");
   await p.keyboard.press("Escape");
-  // the Look chip: a fill for this shape is the next one's too
+  // the Appearance chip: a fill for this shape is the next one's too
   await near.locator('[data-vchip="look"]').click();
   await p.locator(".vchip-pop [data-paint=fill]").click();
   // a colour tried by dragging in the picker is no drag on the canvas: the chips stay the selection's (not the tool's own, Brush and Options)
@@ -51,7 +51,7 @@ test("a shape drawn with the Shape tool: its chips stand above it and edit it, t
   await p.mouse.move(slider.x + slider.width * 0.3, slider.y + slider.height / 2);
   await p.mouse.down();
   await p.mouse.move(slider.x + slider.width * 0.7, slider.y + slider.height / 2, { steps: 4 });
-  await expect(near.locator(".tb-cap"), "while the colour is dragged").toHaveText(["Look", "Shape", "Flip", "Size"]);
+  await expect(near.locator(".tb-cap"), "while the colour is dragged").toHaveText(["Appearance", "Shape", "Flip", "Size"]);
   await p.mouse.up();
   const hex = p.locator(".colour-pop [data-hex]");
   await hex.fill("ff8800");
@@ -136,7 +136,7 @@ test("a speech balloon's options are chips (Body, Tail) with the forms of every 
   await p.keyboard.press("v");
   await p.mouse.click(680, 480);
   const near = p.locator(".props-near");
-  await expect(near.locator(".tb-cap")).toHaveText(["Look", "Body", "Tail", "Flip", "Size"]);
+  await expect(near.locator(".tb-cap")).toHaveText(["Appearance", "Balloon", "Tail", "Flip", "Size"]);
   await expect(p.getByTestId("balloon-panel"), "no panel of its own any more").toHaveCount(0);
   expect(await auditChips(app, ".props-near")).toEqual([]);
   const tails = () => p.evaluate(() => (window.__canvastDebug.objects().find((o) => o["params"]) as unknown as { params: { balloon: { tails: Array<{ width: number }> } } }).params.balloon.tails);
@@ -157,7 +157,7 @@ test("with nothing selected a tool's chips are at the top; the palette opens a c
   await set(app, "ui.properties", "near");
   await p.keyboard.press("p");
   const top = p.locator(".props-chips");
-  await expect(top.locator(".tb-cap")).toHaveText(["Look", "Brush"]);
+  await expect(top.locator(".tb-cap")).toHaveText(["Appearance", "Pen"]);
   expect(await auditChips(app, ".props-chips")).toEqual([]);
   await p.keyboard.press("Control+k");
   await p.keyboard.type("Stabilizer");
@@ -204,7 +204,7 @@ test("with something selected, another tool's options stand at the top, never by
   await p.keyboard.press("v");
   const barBottom = () => p.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue("--bar-bottom"));
   const bottom = await barBottom();
-  for (const [key, first] of [["e", "Eraser"], ["t", "Text"], ["p", "Look"], ["l", "Lasso"], ["u", "Look"]] as const) {
+  for (const [key, first] of [["e", "Eraser"], ["t", "Text"], ["p", "Appearance"], ["l", "Lasso"], ["u", "Appearance"]] as const) {
     await p.keyboard.press(key);
     expect(await barBottom(), `${key}: the panels under the bars do not move as the chips come and go`).toBe(bottom);
     await expect(p.locator(".props-near"), `${key}: not by the selection`).toBeHidden();

@@ -2642,7 +2642,7 @@ test("Vector network: two rectangles that share a side become one network with a
   expect(back.sub).toHaveLength(7);
 });
 
-test("Brush mask: started from the palette over a picked shape, the Pen paints black to hide (white to show), the strokes are the mask, Done ends it; copies follow", async ({ app }) => {
+test("Painted mask: started from the palette over a picked shape, the Pen paints black to hide (white to show), the strokes are the mask, Done ends it; copies follow", async ({ app }) => {
   const p = app.page;
   const px = (x: number, y: number) => p.evaluate(([a, b]) => window.__canvastDebug.pixelAt(a!, b!), [x, y]);
   await key(app, "u");
@@ -2652,7 +2652,7 @@ test("Brush mask: started from the palette over a picked shape, the Pen paints b
   await click(app, 450, 350);
   const blue = await px(430, 330);
   await p.keyboard.press("Control+k");
-  await p.keyboard.type("Brush mask: show everything");
+  await p.keyboard.type("Painted mask: show everything");
   await p.keyboard.press("Enter");
   expect(await tool(app)).toBe("pen");
   await expect(p.locator('[data-mask-ink="done"]')).toBeVisible();

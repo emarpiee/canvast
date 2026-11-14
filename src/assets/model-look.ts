@@ -69,7 +69,7 @@ const LINE_SECTIONS: readonly Section[] = [
     items: [
       { ...R("sketch", "Wobble", 0, 3, 0.05, 0), tip: "How far a line strays from the edge, as by hand." },
       { ...R("depthFade", "Fade far lines", 0, 100, 1, 0) },
-      { t: "toggle", k: "depthWeight", label: "Thicker near", def: false, tip: "Near lines drawn thicker, far ones thinner." },
+      { t: "toggle", k: "depthWeight", label: "Thicker near lines", def: false, tip: "Near lines drawn thicker, far ones thinner." },
     ],
   },
 ];

@@ -307,7 +307,7 @@ test("theme colour: the hue and colourfulness dials recolour the interface but n
       const bg = rgb(getComputedStyle(document.body).backgroundColor);
       return { contrast: (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05), bgLum: lum(bg), bg };
     });
-  await panel.getByLabel("Colourfulness", { exact: true }).fill("150");
+  await panel.getByLabel("Saturation", { exact: true }).fill("150");
   const seen: Array<{ hue: number; contrast: number; bgLum: number; bg: number[] }> = [];
   for (const hue of [20, 90, 190, 265, 330]) {
     await panel.getByLabel("Theme colour", { exact: true }).fill(String(hue));

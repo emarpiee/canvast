@@ -19,7 +19,7 @@ async function balloon(s: Scene, b: Balloon): Promise<string> {
   await s.tool("select");
   await s.select([id]);
   if (b.kind) {
-    await (await s.control("[data-bln='preset']")).selectOption(b.kind); // (the balloon's Body chip)
+    await (await s.control("[data-bln='preset']")).selectOption(b.kind); // (the balloon's Balloon chip)
     await p.keyboard.press("Escape"); // (its options closed: the words are typed next)
   }
   // its words first (a double-click in the body, where it was drawn), then its tail to the speaker
@@ -104,7 +104,7 @@ test("balloon-kinds", async ({ scene: s }) => {
   made.push(await balloon(s, { box: [300, 600, 700, 670], words: "LATER THAT NIGHT.", kind: "caption", fill: "#f3e3a6" }));
   await s.select([made[2]!]);
   await s.settle();
-  await s.control("[data-bln='preset']"); // (the Body chip's options open: its Preset)
+  await s.control("[data-bln='preset']"); // (the Balloon chip's options open: its Preset)
   await s.shot("balloon-kinds", await s.around({ objects: made, els: ["[data-bln='preset']", ...(await s.chipEls())], pad: 30 }));
 });
 

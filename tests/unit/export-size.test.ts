@@ -65,7 +65,7 @@ describe("suggested sizes", () => {
     const wide = sizeSuggestions(16 / 9);
     expect(wide.some((x) => x.label === "Full HD" && x.w === 1920 && x.h === 1080)).toBe(true);
     expect(wide.some((x) => x.label === "4K" && x.w === 3840)).toBe(true);
-    expect(sizeSuggestions(9 / 16).some((x) => x.label === "Story" && x.w === 1080 && x.h === 1920)).toBe(true);
+    expect(sizeSuggestions(9 / 16).some((x) => x.label === "Instagram story" && x.w === 1080 && x.h === 1920)).toBe(true);
   });
   it("a shape with no standard still gets widths, never more than asked for, none over the limits", () => {
     const s = sizeSuggestions(1.234, 5);

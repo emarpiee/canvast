@@ -65,10 +65,10 @@ const FIELDS: readonly Field[] = [
 ];
 /** Vary each copy (ADR 0173): shown under the grid, when the texture is repeated. */
 const VARY_FIELDS: readonly Field[] = [
-  { key: "vrot", label: "Turn ± °", min: 0, max: MAX_VARY_ROTATION, step: 1, tiled: true, get: (t) => varyOf(t).rotation, set: (t, v) => withVary(t, { rotation: clamp(v, 0, MAX_VARY_ROTATION) }) },
-  { key: "vstep", label: "Turn steps °", min: 0, max: 180, step: 1, tiled: true, get: (t) => varyOf(t).rotStep, set: (t, v) => withVary(t, { rotStep: clamp(v, 0, 180) }) },
+  { key: "vrot", label: "Rotation ± °", min: 0, max: MAX_VARY_ROTATION, step: 1, tiled: true, get: (t) => varyOf(t).rotation, set: (t, v) => withVary(t, { rotation: clamp(v, 0, MAX_VARY_ROTATION) }) },
+  { key: "vstep", label: "Rotation steps °", min: 0, max: 180, step: 1, tiled: true, get: (t) => varyOf(t).rotStep, set: (t, v) => withVary(t, { rotStep: clamp(v, 0, 180) }) },
   { key: "vsize", label: "Size ± %", min: 0, max: MAX_VARY_SIZE * 100, step: 1, tiled: true, get: (t) => varyOf(t).size * 100, set: (t, v) => withVary(t, { size: clamp(v / 100, 0, MAX_VARY_SIZE) }) },
-  { key: "vjit", label: "Place ± %", min: 0, max: MAX_VARY_JITTER * 100, step: 1, tiled: true, get: (t) => varyOf(t).jitter * 100, set: (t, v) => withVary(t, { jitter: clamp(v / 100, 0, MAX_VARY_JITTER) }) },
+  { key: "vjit", label: "Position ± %", min: 0, max: MAX_VARY_JITTER * 100, step: 1, tiled: true, get: (t) => varyOf(t).jitter * 100, set: (t, v) => withVary(t, { jitter: clamp(v / 100, 0, MAX_VARY_JITTER) }) },
   { key: "vskip", label: "Leave out %", min: 0, max: MAX_VARY_SKIP * 100, step: 1, tiled: true, get: (t) => varyOf(t).skip * 100, set: (t, v) => withVary(t, { skip: clamp(v / 100, 0, MAX_VARY_SKIP) }) },
   { key: "vseed", label: "Seed", min: 1, max: SEED_MAX, step: 1, tiled: true, get: (t) => varyOf(t).seed, set: (t, v) => withVary(t, { seed: clamp(Math.round(v), 1, SEED_MAX) }) },
 ];
@@ -93,7 +93,7 @@ const CHOICES: readonly Choice[] = [
 const VARY_CHOICES: readonly Choice[] = [
   { key: "veach", label: "Copies of", tiled: true, objects: true, items: [["each", "Each object"], ["all", "The arrangement"]], get: (t) => (t.vary && !t.vary.each ? "all" : "each"), set: (t, v) => withVary(t, { each: v === "each" }) },
   { key: "vorder", label: "Order", tiled: true, objects: true, items: [["sequence", "In turn"], ["shuffle", "Shuffled"]], get: (t) => varyOf(t).order, set: (t, v) => withVary(t, { order: v === "shuffle" ? "shuffle" : "sequence" }) },
-  { key: "vflip", label: "Mirror some", tiled: true, items: [["no", "No"], ["yes", "Yes"]], get: (t) => (varyOf(t).flip ? "yes" : "no"), set: (t, v) => withVary(t, { flip: v === "yes" }) },
+  { key: "vflip", label: "Random flip", tiled: true, items: [["no", "No"], ["yes", "Yes"]], get: (t) => (varyOf(t).flip ? "yes" : "no"), set: (t, v) => withVary(t, { flip: v === "yes" }) },
 ];
 const SELECTS = [...CHOICES, ...VARY_CHOICES];
 

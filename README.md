@@ -553,17 +553,17 @@ The **Pen** (`P`) draws strokes with pressure, tilt and a stabilizer, made at th
 
 Find the gesture: draw a line of action over each figure, from the head through the weight to the foot that carries it.
 
-![Three Degas dancers with a red line of action drawn over each with the Pen, the Pen's kinds in the Brush chip's options](docs/screenshots/pen.webp)
+![Three Degas dancers with a red line of action drawn over each with the Pen, the Pen's kinds in the Pen chip's options](docs/screenshots/pen.webp)
 
 Draw a long, calm contour: the stabilizer smooths the wobble of the hand.
 
-![Delacroix's Study of a Horse beside a long ink line of a horse's back drawn with the Pen, the Stabilizer on in the Brush chip's options](docs/screenshots/pen-stabilizer.webp)
+![Delacroix's Study of a Horse beside a long ink line of a horse's back drawn with the Pen, the Stabilizer on in the Pen chip's options](docs/screenshots/pen-stabilizer.webp)
 
 | Setting | What it does |
 | --- | --- |
 | **Pen** | Four pens: fine, pencil, ink, marker |
-| **Size** | 0.5 to 128 px |
-| **Thickness lock** | Keeps strokes the same width on screen at any zoom |
+| **Pen size** | 0.5 to 128 px |
+| **Lock pen size** | New strokes keep this size on the canvas at any zoom |
 | **Colour** | From the colour picker; a selected stroke's colours show as chips in the Properties bar |
 | **Stabilizer** | Smooths the line as you draw (Settings > Drawing) |
 
@@ -629,7 +629,7 @@ Frame a reference in an oval, as on a botanical print, without cutting the file.
 | **Clipping mask** | The top shape cuts what else is selected to its outline. It becomes a sheet of its own shape (no fill, its outline stays, named "Mask n") holding the others |
 | **Mask by opacity** | The top object shows the others only where it is solid |
 | **Mask by brightness** | The top object shows the others where it is light |
-| **Brush mask** | Painted in black and white with the Pen |
+| **Painted mask** | Painted in black and white with the Pen |
 
 Masks can be inverted, selected on their own and released. A click on a mask selects it as one unit; a double click goes inside.
 
@@ -792,7 +792,7 @@ Press `K`, drag to draw a balloon, and double-click it to type its words.
 
 Pick the balloon that fits the line: speech, thought, a shout or a caption box.
 
-![Four lettered balloons: a speech balloon, a thought cloud with bubbles, a burst shouting Look out! and a yellow caption box, the Preset in the selected balloon's Body chip](docs/screenshots/balloon-kinds.webp)
+![Four lettered balloons: a speech balloon, a thought cloud with bubbles, a burst shouting Look out! and a yellow caption box, the Preset in the selected balloon's Balloon chip](docs/screenshots/balloon-kinds.webp)
 
 Point a balloon's tail at the speaker.
 
@@ -802,7 +802,7 @@ Point a balloon's tail at the speaker.
 | --- | --- |
 | **Handles** | Set the tail tip, base, width, middle width and bend, the rounding or bump depth, the body's size, and its place while the tail tip stays; they snap when Snap is on |
 | **Tails** | Double-click the outline to add one; let a tip go inside the body to remove it |
-| **Options** | Chips of the Properties bar by the selection: **Body** (twelve bodies, presets, hand-drawn, a double line, *Save as style*, *Convert to path*), **Tail** (its kind, widths, rounded tip, base, *Add tail* and *Remove tail*; *Which tail* when there are several), **Text in shape** (alignment across and down, padding for each side, what happens to text that does not fit, **Fit text to shape**) and **Connector** (its kind, width and bend, when one is selected) |
+| **Options** | Chips of the Properties bar by the selection: **Balloon** (twelve bodies, presets, hand-drawn, a double line, *Save as style*, *Convert to path*), **Tail** (its kind, widths, rounded tip, base, *Add tail* and *Remove tail*; *Which tail* when there are several), **Text in shape** (alignment across and down, padding for each side, what happens to text that does not fit, **Fit text to shape**) and **Connector** (its kind, width and bend, when one is selected) |
 | **Styles** | *Save as style* keeps size, ratio, tails, paint and the look of the text; its text goes only into a balloon that has none |
 | **Connectors** | Select two or more balloons and *Connect balloons* joins them, left to right. A connector is a neck, pinch, line or dots, and follows its balloons; its handles set the width, the bend and where each end stands on its balloon |
 | **Paint** | The normal fill and outline, including dashes |
@@ -832,7 +832,7 @@ Set a cover's type: a title and a subtitle in fonts of your own.
 | Feature | What it does |
 | --- | --- |
 | **Formatting** | Bold, italic, underline, strikethrough, links, colour and size of any range, headings, bulleted, numbered and nested lists (`Tab` nests a list item). The format bar stands just above the text being typed, as the Properties chips stand by the selection, and keeps its tools in groups with a line between them: style, the selected text (link, colour, the size menu and the font), paragraph (the paragraph and list menus) and finish. Its menus stay open after a choice, ticking the one made, until `Esc` or a click outside, and never cover the text. **Copy Markdown** is one click away |
-| **Look** | Colour or gradient, outline, size, line height, letter spacing, alignment, auto or fixed width, paragraph spacing, indent, case, line limit, a set height, kerning, OpenType features and the axes of variable fonts |
+| **Appearance** | Colour or gradient, outline, size, line height, letter spacing, alignment, auto or fixed width, paragraph spacing, indent, case, line limit, a set height, kerning, OpenType features and the axes of variable fonts |
 | **Fonts** | Import `.ttf`, `.otf`, `.woff` or `.woff2` into the library, including variable fonts. One text may use several fonts. Right-to-left and mixed-direction text are supported |
 | **Paragraph and box** | At the start of the text's bar: the paragraph and card settings (a text can sit on a coloured card; **Make note files** turns such texts into notes) |
 | **Text on a path** | *Path tools > Text along a path*: the text follows the path when it moves or changes, in the same undo step, and is plain text again when the path is deleted. A path put into a boolean group is followed as the group looks: its result. Two handles on the selected text: a diamond on the path slides it along (*Start at*), two arrows above the letters set how far off the path it sits. *Paragraph and box* sets the same, with the alignment along it and the side |
@@ -1230,14 +1230,14 @@ Take a reference out of the app: download it or export it.
 
 Bring back a file deleted by mistake: the workspace folder keeps deleted files in its Trash.
 
-![The Trash in the Library of the desktop app: deleted drawings as cards, one selected with Restore and Delete for good](docs/screenshots/trash.webp)
+![The Trash in the Library of the desktop app: deleted drawings as cards, one selected with Restore and Delete permanently](docs/screenshots/trash.webp)
 
 | Action | What happens |
 | --- | --- |
 | **Delete…** on an unused item | It leaves the library |
 | **Delete…** on an item in use | Deleted everywhere, after a confirmation that says where it is used (the first three canvases and how many others). Its instances are removed from every canvas first; a text using it as its font keeps its text in the default font. Undo brings them back on the open canvas, not on the others |
 | **Delete everywhere** | A selected item's right-click menu on a canvas, the command palette, and the library's details: the file and every instance of it, after saying where it is used; on a canvas, text and shapes selected with it stay. Outside hidden mode, a hidden item is a padlock: Delete everywhere, Copy file and copying a note card do not reach it, whatever the password state |
-| **Trash** (desktop app) | The library's sidebar: puts `is:trash` in the search box and shows the files in this workspace's `.trash` folder as cards in place of the grid, each with the picture the library gives its kind (a note's page, a PDF's, a video's frame, an art file's picture…), not your system's trash; anything else typed filters by name, and anything else in the sidebar goes back to the library. Pick files as in the library (Ctrl, Shift, Ctrl+A): **Restore** and **Delete for good** are in the details panel and the right-click menu. A file comes back where it was, never over another; its tags and folder come back only if the library still remembers it. Delete for good asks first. Hidden files there are listed only in hidden mode with the Hidden items open; outside it they neither show nor count. Boards and canvases in `.trash` are not listed |
+| **Trash** (desktop app) | The library's sidebar: puts `is:trash` in the search box and shows the files in this workspace's `.trash` folder as cards in place of the grid, each with the picture the library gives its kind (a note's page, a PDF's, a video's frame, an art file's picture…), not your system's trash; anything else typed filters by name, and anything else in the sidebar goes back to the library. Pick files as in the library (Ctrl, Shift, Ctrl+A): **Restore** and **Delete permanently** are in the details panel and the right-click menu. A file comes back where it was, never over another; its tags and folder come back only if the library still remembers it. Delete permanently asks first. Hidden files there are listed only in hidden mode with the Hidden items open; outside it they neither show nor count. Boards and canvases in `.trash` are not listed |
 | **Missing files** | For example after clearing site data, or a file taken out of the library folder: flagged with their usage; importing the same file again restores every instance |
 
 ### The library folder
@@ -1293,8 +1293,8 @@ Keep study notes on a reference: its facts as properties, the print embedded, a 
 | **Remove format** | The eraser in the toolbar over selected text, and in the Text menu: takes sizes, fonts and colours off the text chosen, so a heading made bigger or smaller by accident goes back to its own size |
 | **Colours in code blocks** | A block with a language is coloured, in any of the 21 languages it offers. The colours are painted over the words, so the note itself does not change. **Colour code in notes** in Settings > Notes turns it off |
 | **The word under the cursor** | `Ctrl+B`, `Ctrl+I`, `Ctrl+U` and **Code** with the cursor inside a word format the whole word, or remove the format from text already in it, with nothing selected |
-| **Signs round selected text** | Typing `"`, `'`, `(`, `[`, `{`, `<`, `=` or `%` over selected text wraps it, and it stays selected. In a note with formats, `` ` `` makes code, `*` or `_` italic (twice: bold) and `~` strikethrough. **Signs wrap selected text** in Settings > Notes turns it off |
-| **Marks typed at a line's start** | `1.` then a space starts a numbered list, and `---` a line, always. With **Markdown marks make formats** on (Settings > Notes; off at first), `-`, `*`, `+`, any number with `.` or `)`, `>` and `#` to `######` then a space do too: the mark goes, the line takes the format, one undo step |
+| **Auto-surround selected text** | Typing `"`, `'`, `(`, `[`, `{`, `<`, `=` or `%` over selected text wraps it, and it stays selected. In a note with formats, `` ` `` makes code, `*` or `_` italic (twice: bold) and `~` strikethrough. **Signs wrap selected text** in Settings > Notes turns it off |
+| **Marks typed at a line's start** | `1.` then a space starts a numbered list, and `---` a line, always. With **Markdown shortcuts** on (Settings > Notes; off at first), `-`, `*`, `+`, any number with `.` or `)`, `>` and `#` to `######` then a space do too: the mark goes, the line takes the format, one undo step |
 | **Lines with marks into lists** | In the `/` menu. Lines that start with `1.`, `-`, `#` or `>` but are words (pasted as words or typed before marks were read; saved, their marks show as `1\.` or `\-` in the file) become the list, heading or quote they say, in the whole note; one undo step. Nothing changes a note by itself |
 | **Markdown and Code views** | Show the note as text; coming back without a change there, the note is as it was (picture sizes, spacing). A change made there is read back from that text, which markdown keeps without sizes or styles |
 | **Numbers drag** | The font size and a picture's or video's width and height change by dragging the field left or right, as every number of the app (a picture keeps its proportion when that is on; a dragged font size applies on release) |
@@ -2272,7 +2272,7 @@ Make the app yours: theme, theme colour, density and the canvas.
 | Drawing and selection | Pen, colour picker model and layout, pen width and stabilizer, lasso filter, snapping, align to the selection box, grid spacing for Arrange, initial shape and paint, the distance Fill gaps closes openings by, eraser |
 | Navigation | How `W` `A` `S` `D` choose the next object (nearest in view or anywhere, by layer or by name A to Z, in view or anywhere); focus on the object or keep the zoom; camera travel (style, time, longest trip, easing) and the wait at each tour stop; whether dragging near an edge pans the view, and how fast (Pan at the edge while dragging, Edge panning speed) |
 | Shortcuts | Rebind any shortcut to a key or a chord; the full list is also on `?` |
-| Notes | The notes editor's style in the library and on a canvas (each its own, Document at first); on a canvas, Panel or Window; a new note's name (a pattern, as screenshots have) and the width of the Note tool's card; the Notes folder new notes are filed in; light or dark previews (Preview look); whether note cards show the whole note or a part (Note cards show), and which properties they show (Note cards show properties); Write tags and properties into note files; whether typed markdown marks make formats (Markdown marks make formats); Save notes on close; what to do when a note's formatting does not fit its file |
+| Notes | The notes editor's style in the library and on a canvas (each its own, Document at first); on a canvas, Panel or Window; a new note's name (a pattern, as screenshots have) and the width of the Note tool's card; the Notes folder new notes are filed in; light or dark previews (Preview look); whether note cards show the whole note or a part (Note cards show), and which properties they show (Note cards show properties); Write tags and properties into note files; whether typed Markdown marks make formats (Markdown shortcuts); Save notes on close; what to do when a note's formatting does not fit its file |
 | Media and playback | Players: starting volume and step sizes. The library viewer: its edges (a click on the left or right goes to the previous or next item), how long the player stays while a video plays, slideshow time |
 | Saving to the library | Extracted frames and PDF pages (format, quality, a page's resolution, folder, name, tags) and edited pictures (format, quality, folder, name, tags), and the folder and tags of what is saved to the library from the canvas, one pair for each kind: pictures from Export… (*Exports*, `export`), patterns (*Patterns*, `pattern`) and shapes saved as SVG (*Shapes*, `shape`); screenshots have theirs in the Screenshot group. In the desktop app, Keep file names and Sort files by kind |
 | Screenshot | Format, quality, pattern, transparency, interface, clipboard, folder, name and tags |

@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.59.13 — Standard words in the interface (2026-11-15)
+
+- **Changed:** the Pen's chip in the Properties bar is **Pen** (it said Brush); the size of the pen is **Pen size** everywhere (the size buttons, Settings, *Pen size follows zoom*), and its lock is **Lock pen size** (it said Lock thickness).
+- **Changed:** the chips **Look** and **Body** are **Appearance** and **Balloon**.
+- **Changed:** **Delete for good** is **Delete permanently** (Trash, Styles, Settings > Storage, Sharing).
+- **Changed:** Settings: *Lasso takes* → **Lasso selects**, *Eraser takes whole groups* → **Erase whole groups**, *Colourfulness* → **Saturation**, *Signs wrap selected text* → **Auto-surround selected text**, *Markdown marks make formats* → **Markdown shortcuts**.
+- **Changed:** a pattern's variations say **Rotation ± °**, **Rotation steps °**, **Position ± %** and **Random flip**; the 3D line option is **Thicker near lines**; the sheet size *Story* is **Instagram story**; *Brush mask* in Find is **Painted mask**.
+- **Fixed:** the README said the thickness lock keeps strokes the same width on screen; it keeps them the same size on the canvas.
+
 ## 0.59.12 — PhotoCraft saves into the file it opened (2026-11-15)
 
 - **Changed:** in PhotoCraft, **Save** on a document opened from a file of the library or the canvas saves into that file, in its own kind, as Save does on a desktop: a PNG stays a PNG (its layers merged), a JPEG a JPEG, a PSD a PSD. The file keeps its name, folder and tags, every canvas that shows it shows the new version, and the older one goes to the trash. Nothing is asked. (PhotoCraft's web build writes every document as PSD, having no file to write back to: canvast puts it into the file.) **Save a Copy**, or Save As under another name, makes a new item beside the picture. The type is asked only for a new document's first save.

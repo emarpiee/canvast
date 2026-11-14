@@ -2205,7 +2205,7 @@ test("a file renamed outside the app keeps its place in notes: the links follow,
   await app.close();
 });
 
-test("the Trash is a state of the library: this workspace's .trash for the mode, in the library's cards, with Restore and Delete for good in the details", async () => {
+test("the Trash is a state of the library: this workspace's .trash for the mode, in the library's cards, with Restore and Delete permanently in the details", async () => {
   const ws = tempDir("cv-trash-");
   let { app, page } = await launch(ws, "userdata", true);
   try {
@@ -2262,9 +2262,9 @@ test("the Trash is a state of the library: this workspace's .trash for the mode,
     await expect(cards).toHaveCount(1);
     await expect.poll(() => files(ws).filter((f) => f.startsWith("library/") && f.endsWith("gone.png")).length, { timeout: 15_000 }).toBe(1);
     await expect.poll(() => page.evaluate((h) => window.__canvastDebug.assetListing().then((l) => l.entries.some((e) => e.hash === h && e.present)), gone), { timeout: 15_000 }).toBe(true);
-    // Delete for good, from its right-click menu: asked first.
+    // Delete permanently, from its right-click menu: asked first.
     await cards.first().click({ button: "right" });
-    await page.getByRole("menuitem", { name: "Delete for good" }).click();
+    await page.getByRole("menuitem", { name: "Delete permanently" }).click();
     await page.getByTestId("confirm-ok").click();
     await expect(cards).toHaveCount(0);
     await expect(page.getByTestId("trash-empty")).toBeVisible();

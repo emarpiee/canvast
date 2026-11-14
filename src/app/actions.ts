@@ -2728,7 +2728,7 @@ export function startBrushMask(doc: DocumentStore, editor: EditorState, revealed
     return { ...o, groups: path, groupNames: { ...(o.groupNames ?? {}), ...names } };
   };
   const out = [place(homeObject(normalizeUnit(backdrop), doc.space)), ...members.map((o) => place({ ...o, mask: { by: MG, mode: "luminance" } }))];
-  doc.commit(doc.transaction("Brush mask", out));
+  doc.commit(doc.transaction("Painted mask", out));
   editor.entered = [];
   editor.select(out.map((o) => o.id));
   editor.maskEdit = { groups: [G, MG], ink: revealed ? "#000000" : "#ffffff" };

@@ -98,7 +98,7 @@ export function mountSharing(host: HTMLElement, share: ShareCalls, row: SettingR
               right("add", "Add", "New files and folders in Library.") +
               right("edit", "Edit", "Replace a file's contents, or a file moved or copied over it.") +
               right("move", "Move and rename", "Files and folders, within Library.") +
-              right("delete", "Delete", "Into the workspace's trash (.trash), never for good.") +
+              right("delete", "Delete", "Into the workspace's trash (.trash), never permanently.") +
               right("hidden", "See hidden items", "While the Hidden items are open here: each file is decrypted on this computer and sent to this device over the encrypted connection. Its file manager may keep copies or thumbnails.")
             : `<p class="set-help">This login was removed.</p>`,
         onChange: (t) => t.dataset["davRight"] && act("davLogin", { id, right: t.dataset["davRight"], on: t.checked }),

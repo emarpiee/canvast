@@ -31,8 +31,8 @@ export const SHOTS: Record<string, ShotSpec> = {
   "canvas-tags": { section: "#tags-on-the-canvas", use: "Tag the studies on a canvas by what they teach, and find them again.", alt: "Studies tagged gesture and anatomy, the Tags panel listing the tags with their counts" },
 
   // Drawing and vector editing
-  "pen": { section: "#pen", use: "Find the gesture: draw a line of action over each figure, from the head through the weight to the foot that carries it.", alt: "Three Degas dancers with a red line of action drawn over each with the Pen, the Pen's kinds in the Brush chip's options" },
-  "pen-stabilizer": { section: "#pen", use: "Draw a long, calm contour: the stabilizer smooths the wobble of the hand.", alt: "Delacroix's Study of a Horse beside a long ink line of a horse's back drawn with the Pen, the Stabilizer on in the Brush chip's options" },
+  "pen": { section: "#pen", use: "Find the gesture: draw a line of action over each figure, from the head through the weight to the foot that carries it.", alt: "Three Degas dancers with a red line of action drawn over each with the Pen, the Pen's kinds in the Pen chip's options" },
+  "pen-stabilizer": { section: "#pen", use: "Draw a long, calm contour: the stabilizer smooths the wobble of the hand.", alt: "Delacroix's Study of a Horse beside a long ink line of a horse's back drawn with the Pen, the Stabilizer on in the Pen chip's options" },
   "shape-kinds": { section: "#shapes", use: "Block in a composition as flat value shapes before painting.", alt: "A landscape thumbnail made of shapes in four greys: sky, sun, two hills and a near ground, the Shape tool's kinds in the Shape chip's options" },
   "shapes": { section: "#combining-shapes", use: "Build an icon from simple shapes: a wave crest is a circle and a block joined, with circles cut out for the curl and the claws.", alt: "On the left the loose parts, a blue circle and block with cream circles over them; on the right the crest they make once subtracted, the Shapes menu open" },
   "nodes": { section: "#paths-and-nodes", use: "Refine a combined shape by its nodes: here the claws of the wave crest.", alt: "The wave crest in node editing, the nodes of its claws selected" },
@@ -47,7 +47,7 @@ export const SHOTS: Record<string, ShotSpec> = {
 
   // Comics and storyboards
   "comic": { section: "#a-page-of-panels", use: "Lay out a comic page from four pictures and letter it.", alt: "A comic page of four panels: Hokusai's Seaside Village in Winter with the caption Winter. The village waits for the boats.; Le Prince's Landscape with Peasants Fording a Stream with a balloon saying The ford is high this year.; Verhaecht's Mountainous Landscape with the caption Three days over the pass.; and Hokusai's Great Wave with a burst shouting Hold on! over the boats" },
-  "balloon-kinds": { section: "#speech-balloons", use: "Pick the balloon that fits the line: speech, thought, a shout or a caption box.", alt: "Four lettered balloons: a speech balloon, a thought cloud with bubbles, a burst shouting Look out! and a yellow caption box, the Preset in the selected balloon's Body chip" },
+  "balloon-kinds": { section: "#speech-balloons", use: "Pick the balloon that fits the line: speech, thought, a shout or a caption box.", alt: "Four lettered balloons: a speech balloon, a thought cloud with bubbles, a burst shouting Look out! and a yellow caption box, the Preset in the selected balloon's Balloon chip" },
   "balloons": { section: "#speech-balloons", use: "Point a balloon's tail at the speaker.", alt: "A speech balloon over Le Prince's peasants fording a stream, its tail pointing at them, selected with its handles, its Tail chip's options open" },
   "text": { section: "#text", use: "Set a cover's type: a title and a subtitle in fonts of your own.", alt: "Hokusai's Great Wave with the title THE CROSSING being set in Bangers above it and a subtitle in Cormorant Garamond italic under it, the title's format bar between them" },
 
@@ -121,6 +121,6 @@ export const SHOTS: Record<string, ShotSpec> = {
 
   // The desktop app
   "desktop": { section: "#the-workspace-folder-desktop-app", use: "Keep a project as a plain folder that any sync or backup tool can carry, and switch between projects.", alt: "The desktop app on a workspace folder named Picture book: its References canvas of four prints, and the board and canvas menu with Switch workspace open" },
-  "trash": { section: "#deleting-and-trash", use: "Bring back a file deleted by mistake: the workspace folder keeps deleted files in its Trash.", alt: "The Trash in the Library of the desktop app: deleted drawings as cards, one selected with Restore and Delete for good" },
+  "trash": { section: "#deleting-and-trash", use: "Bring back a file deleted by mistake: the workspace folder keeps deleted files in its Trash.", alt: "The Trash in the Library of the desktop app: deleted drawings as cards, one selected with Restore and Delete permanently" },
   "sharing": { section: "#sharing-on-the-local-network", use: "Show a project on a tablet on the same network, read-only, without copying it there.", alt: "Settings, Sharing in the desktop app: sharing the workspace on the local network, its address, code and the devices allowed" },
 };

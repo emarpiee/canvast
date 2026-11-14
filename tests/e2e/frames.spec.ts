@@ -344,8 +344,8 @@ test("thickness lock: new strokes keep the same width on the canvas at any zoom;
     return (await ids()).find((i) => !before.has(i))!;
   };
   await p.keyboard.press("p");
-  await p.getByRole("button", { name: "Pen width 8 px" }).click();
-  const lock = p.getByRole("button", { name: "Lock thickness" });
+  await p.getByRole("button", { name: "Pen size 8 px" }).click();
+  const lock = p.getByRole("button", { name: "Lock pen size" });
   await expect(lock).toHaveAttribute("aria-pressed", "false");
 
   // Reference stroke at home, lock off: 8 px wide.
@@ -379,7 +379,7 @@ test("thickness lock: new strokes keep the same width on the canvas at any zoom;
 
   // A new pen size while locked is the new reference, at the zoom where it was chosen.
   await lock.click();
-  await p.getByRole("button", { name: "Pen width 3 px" }).click();
+  await p.getByRole("button", { name: "Pen size 3 px" }).click();
   const thin = await drawn({ x: 450, y: 380 }, { x: 980, y: 380 });
   expect(await radius(thin)).toBe(1.5);
   await p.evaluate(() => window.__canvastDebug.jump(-3));
@@ -465,9 +465,9 @@ test("stabilizer: hand wobble does not reach the stroke (at home and a trillion 
 test("pen size follows zoom: drawing while zooming keeps the pen's screen size (pieces of different widths), in one undo step; off or locked, one stroke", async ({ app }) => {
   const p = app.page;
   await p.keyboard.press("p");
-  await p.getByRole("button", { name: "Pen width 8 px" }).click();
+  await p.getByRole("button", { name: "Pen size 8 px" }).click();
   const follow = p.getByRole("button", { name: "Pen size follows zoom" });
-  const lock = p.getByRole("button", { name: "Lock thickness" });
+  const lock = p.getByRole("button", { name: "Lock pen size" });
   await expect(follow).toHaveAttribute("aria-pressed", "false");
   const ids = () => p.evaluate(() => window.__canvastDebug.objectFrames().map((o) => o.id));
   const radii = async (): Promise<Array<number | undefined>> =>
@@ -531,11 +531,11 @@ test("thickness lock on resize: dragging a handle scales a stroke's shape but ke
   const p = app.page;
   const info = async (id: string) => (await p.evaluate((i) => window.__canvastDebug.objectScreen(i), id))!;
   await p.keyboard.press("p");
-  await p.getByRole("button", { name: "Pen width 8 px" }).click();
+  await p.getByRole("button", { name: "Pen size 8 px" }).click();
   await app.drag({ x: 400, y: 380 }, { x: 560, y: 460 }, 6);
   const [id] = await p.evaluate(() => window.__canvastDebug.objectFrames().map((o) => o.id));
   await p.keyboard.press("v");
-  const lock = p.getByRole("button", { name: "Lock thickness" });
+  const lock = p.getByRole("button", { name: "Lock pen size" });
   await expect(lock, "the lock is on the select tool's bar too").toBeVisible();
 
   const resize = async (): Promise<{ before: Awaited<ReturnType<typeof info>>; after: Awaited<ReturnType<typeof info>> }> => {
@@ -645,7 +645,7 @@ test("colour at depth: zoomed 10^6, 10^9 and 10^12 levels into an image or a let
 test("option: ignore the object that fills the view, so zooming far into something cannot select it by accident", async ({ app }) => {
   const p = app.page;
   await p.keyboard.press("p");
-  await p.getByRole("button", { name: "Pen width 8 px" }).click();
+  await p.getByRole("button", { name: "Pen size 8 px" }).click();
   await app.drag({ x: 300, y: 400 }, { x: 980, y: 400 }, 6);
   const [id] = await p.evaluate(() => window.__canvastDebug.objectFrames().map((o) => o.id));
   await p.keyboard.press("v");
@@ -690,7 +690,7 @@ test("option: ignore the object that fills the view, so zooming far into somethi
 test("an edge in view past 100,000 levels is drawn as a dimmed approximate fill, not nothing (ADR 0016)", async ({ app }) => {
   const p = app.page;
   await p.keyboard.press("p");
-  await p.getByRole("button", { name: "Pen width 8 px" }).click();
+  await p.getByRole("button", { name: "Pen size 8 px" }).click();
   await app.drag({ x: 300, y: 400 }, { x: 980, y: 400 }, 6);
   const [id] = (await p.evaluate(() => window.__canvastDebug.objectFrames())).map((o) => o.id);
   const bg = (await p.evaluate(() => window.__canvastDebug.pixelAt(20, 20))).join(",");
@@ -747,13 +747,13 @@ test("pen and select options come back after a reload (device settings, ADR 0017
   const p = app.page;
   await p.keyboard.press("p");
   await setPenColour(p, "#2563eb");
-  await p.getByRole("button", { name: "Pen width 8 px" }).click();
+  await p.getByRole("button", { name: "Pen size 8 px" }).click();
   await p.getByRole("button", { name: "Stabilizer", exact: true }).click();
   await p.reload();
   await p.waitForFunction(() => typeof window.__canvastDebug !== "undefined");
   await p.keyboard.press("p");
   expect(await p.evaluate(() => JSON.parse(localStorage.getItem("canvast.settings")!)["pen.color"])).toBe("#2563eb");
-  await expect(p.getByRole("button", { name: "Pen width 8 px" })).toHaveClass(/is-on/);
+  await expect(p.getByRole("button", { name: "Pen size 8 px" })).toHaveClass(/is-on/);
   await expect(p.getByRole("button", { name: "Stabilizer", exact: true })).toHaveAttribute("aria-pressed", "true");
 });
 

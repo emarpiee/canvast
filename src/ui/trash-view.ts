@@ -1,6 +1,6 @@
 /**
  * The Trash in the library: this workspace's `.trash/` for the mode, never the system's. It is a state of the library view, as the viewer is: the library's own cards in place
- * of its grid, and its details panel for what is picked, with Restore and Delete for good.
+ * of its grid, and its details panel for what is picked, with Restore and Delete permanently.
  */
 import { showMoreButton } from "./show-more";
 import { plural } from "../doc/plural";
@@ -102,7 +102,7 @@ export function mountTrashView(deps: TrashDeps): TrashView {
     const dis = deps.readOnly() ? " disabled" : "";
     return `<div class="trash-actions">
       <button type="button" class="assets-btn" data-trash="restore" data-testid="trash-restore"${dis}>${ICONS.archiveRestore}<span>Restore</span></button>
-      <button type="button" class="assets-btn is-danger" data-trash="erase" data-testid="trash-erase"${dis}>${ICONS.trash2}<span>Delete for good</span></button>
+      <button type="button" class="assets-btn is-danger" data-trash="erase" data-testid="trash-erase"${dis}>${ICONS.trash2}<span>Delete permanently</span></button>
     </div>`;
   };
   function drawDetails(): void {
@@ -110,7 +110,7 @@ export function mountTrashView(deps: TrashDeps): TrashView {
     delete details.dataset["hash"];
     const on = files.filter((f) => picked.has(f.path));
     if (!on.length) {
-      details.innerHTML = `<p class="asset-note asset-insp-empty" data-testid="inspector-empty">Select a file to restore it or delete it for good. A file comes back where it was; its tags and folder come back only if the library still remembers it.</p>`;
+      details.innerHTML = `<p class="asset-note asset-insp-empty" data-testid="inspector-empty">Select a file to restore it or delete it permanently. A file comes back where it was; its tags and folder come back only if the library still remembers it.</p>`;
       return;
     }
     if (on.length > 1) {
@@ -164,7 +164,7 @@ export function mountTrashView(deps: TrashDeps): TrashView {
   };
   const erase = async (): Promise<void> => {
     const on = files.filter((f) => picked.has(f.path));
-    const ok = await confirmDialog({ title: on.length === 1 ? `Delete “${on[0]?.name}” for good?` : `Delete ${plural(on.length, "file")} for good?`, lines: ["Erased from the workspace's .trash folder. This cannot be undone."], confirmLabel: "Delete for good" });
+    const ok = await confirmDialog({ title: on.length === 1 ? `Delete “${on[0]?.name}” permanently?` : `Delete ${plural(on.length, "file")} permanently?`, lines: ["Erased from the workspace's .trash folder. This cannot be undone."], confirmLabel: "Delete for good" });
     if (!ok) return;
     for (const f of on) await deps.erase(f.path).catch(() => undefined);
     await refresh();
@@ -212,7 +212,7 @@ export function mountTrashView(deps: TrashDeps): TrashView {
       }
       return [
         { label: "Restore", hint: "Put it back where it was", icon: ICONS.archiveRestore, run: () => void restore() },
-        { label: "Delete for good", hint: "Cannot be undone", icon: ICONS.trash2, danger: true, run: () => void erase() },
+        { label: "Delete permanently", hint: "Cannot be undone", icon: ICONS.trash2, danger: true, run: () => void erase() },
       ];
     },
   });

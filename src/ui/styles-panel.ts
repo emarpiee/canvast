@@ -328,7 +328,7 @@ export function mountStylesPanel(host: HTMLElement, editor: EditorState, styles:
   ];
   const menuFor = (item: StyleItem): MenuItem[] => {
     const can = canApply(item.kind);
-    const del: MenuItem = { label: "Delete", hint: "Remove it for good", icon: ICONS.trash2, danger: true, aria: `Delete style ${item.name}`, run: () => remove(item) };
+    const del: MenuItem = { label: "Delete", hint: "Remove it permanently", icon: ICONS.trash2, danger: true, aria: `Delete style ${item.name}`, run: () => remove(item) };
     if (item.kind === "gradient")
       return [
         { label: "Apply to the fill", hint: "On what is selected", icon: ICONS.pointer, disabled: deps.paint.count() === 0, aria: `Apply ${item.name} to the fill`, run: () => deps.paint.apply(item.data as Paint, item.name, "fill", false, item.id) },
