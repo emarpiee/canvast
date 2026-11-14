@@ -1,17 +1,19 @@
 import { panelHtml } from "../../ui/panel";
 
 /**
- * The view PhotoCraft runs in (artcraft/photocraft/app.ts): over the whole app, under the window's own row, with the shared panel's header (its
- * name and the button that closes it) and a status line while it starts. Its frame fills the rest; its keys are its own while it has the
- * focus.
+ * PhotoCraft's view (artcraft/photocraft/app.ts), one of the app's views beside Canvas, Library and Settings: under the top bar, with the
+ * shared panel's header (its name, and the button that closes PhotoCraft) and a line under it while it starts or after it saved. Its
+ * frame fills the rest, and stays while another view is shown; its keys are its own while it has the focus.
  */
 export interface PhotoCraftView {
   /** Where its frame goes. */
   readonly body: HTMLElement;
   show(): void;
   hide(): void;
-  /** A line under the header ("" hides it). */
+  /** A line under the header that stays ("" hides it). */
   status(text: string): void;
+  /** A line under the header for a few seconds (what happened to a file it saved). */
+  note(text: string): void;
 }
 
 export function mountPhotoCraftView(onClose: () => void): PhotoCraftView {
@@ -20,12 +22,21 @@ export function mountPhotoCraftView(onClose: () => void): PhotoCraftView {
   root.setAttribute("aria-label", "PhotoCraft");
   root.dataset["testid"] = "photocraft-view";
   root.hidden = true;
-  root.innerHTML = panelHtml({ title: "PhotoCraft", sub: `<p class="photocraft-status" role="status" aria-live="polite" hidden></p>`, body: "" });
+  root.innerHTML = panelHtml({ title: "PhotoCraft", sub: `<p class="photocraft-status" role="status" aria-live="polite"></p>`, body: "" });
   document.body.append(root);
-  root.querySelector<HTMLButtonElement>("[data-close]")!.addEventListener("click", onClose);
-  const status = root.querySelector<HTMLElement>(".photocraft-status")!;
+  const close = root.querySelector<HTMLButtonElement>("[data-close]")!;
+  close.setAttribute("aria-label", "Close PhotoCraft (it asks first when something is not saved)");
+  close.title = "Close PhotoCraft";
+  close.addEventListener("click", onClose);
+  const line = root.querySelector<HTMLElement>(".photocraft-status")!;
   const sub = root.querySelector<HTMLElement>(".panel-sub")!;
-  sub.hidden = true;
+  let lasting = "";
+  let timer = 0;
+  const put = (text: string): void => {
+    line.textContent = text;
+    sub.hidden = !text;
+  };
+  put("");
   return {
     body: root.querySelector<HTMLElement>(".panel-body")!,
     show() {
@@ -35,8 +46,14 @@ export function mountPhotoCraftView(onClose: () => void): PhotoCraftView {
       root.hidden = true;
     },
     status(text) {
-      status.textContent = text;
-      status.hidden = sub.hidden = !text;
+      lasting = text;
+      window.clearTimeout(timer);
+      put(text);
+    },
+    note(text) {
+      window.clearTimeout(timer);
+      put(text);
+      timer = window.setTimeout(() => put(lasting), 8000);
     },
   };
 }

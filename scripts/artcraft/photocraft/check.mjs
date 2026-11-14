@@ -119,6 +119,16 @@ if (!sw.menus.length) fail("features.ts: no menu switches read (has its shape ch
 notes.push(`switches: ${sw.menus.length} menu ids and ${sw.tools.length} tools checked against ${now.menus.size} ids and ${now.tools.size} tools`);
 for (const [name] of sw.tools) if (!now.tools.has(name)) fail(`features.ts: tool ${name} is not on PhotoCraft ${version}'s toolbar`);
 
+// 4b. the kinds it opens (features.ts PHOTOCRAFT_OPENS), against its web build's OPEN_EXTS (less preset and swatch files, not documents)
+const NOT_DOCUMENTS = new Set(["gz", "abr", "grd", "asl", "aco", "act", "ase", "af"]);
+const theirs = [...(/const OPEN_EXTS: &\[&str\] = &\[([\s\S]*?)\];/.exec(web)?.[1] ?? "").matchAll(/"(\w+)"/g)].map((m) => m[1]).filter((x) => !NOT_DOCUMENTS.has(x));
+const ours = [...((await readFile(resolve(root, "src/artcraft/photocraft/features.ts"), "utf8")).match(/PHOTOCRAFT_OPENS[^=]*= \[([\s\S]*?)\];/)?.[1] ?? "").matchAll(/"(\w+)"/g)].map((m) => m[1]);
+if (!theirs.length) fail("its web shell no longer lists OPEN_EXTS");
+const lost = ours.filter((x) => !theirs.includes(x));
+const gained = theirs.filter((x) => !ours.includes(x));
+if (lost.length) fail(`features.ts PHOTOCRAFT_OPENS lists kinds it no longer opens: ${lost.join(", ")}`);
+if (gained.length) notes.push(`it opens kinds PHOTOCRAFT_OPENS lacks (add them to offer Edit in PhotoCraft): ${gained.join(", ")}`);
+
 // 5. what is new since the release canvast has
 if (version !== info.version) {
   const before = idsOf(await source(info.version));

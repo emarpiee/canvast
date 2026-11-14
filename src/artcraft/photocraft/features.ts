@@ -17,6 +17,12 @@ export const PHOTOCRAFT_FEATURES = {
     libraryItems: true,
     /** A blank PhotoCraft from the command list (Ctrl+K). */
     newDocument: true,
+    /** Its tab beside Library: PhotoCraft as a view of its own, running while you are in another. */
+    view: true,
+    /** A selected sheet opened as a layered project (each object a layer). */
+    sheets: true,
+    /** Several selected pictures as layers of one document (else each in its own). */
+    layers: true,
   },
   /** canvast in place of what PhotoCraft's page would do in a browser. */
   bridge: {
@@ -59,5 +65,15 @@ export const PHOTOCRAFT_FEATURES = {
   /** Its tools, by name (Brush, Sponge, CloneStamp…). None hidden. */
   tools: {} as Record<string, boolean>,
 } as const;
+
+/**
+ * The kinds of file PhotoCraft opens, by extension (its web build's `OPEN_EXTS`, `apps/photocraft-web/src/web.rs`): what Edit in
+ * PhotoCraft is offered for. `npm run photocraft:check` says when a release opens kinds this list lacks, or lost one.
+ */
+export const PHOTOCRAFT_OPENS: readonly string[] = [
+  "pcraft", "pdn", "ora", "xcf", "xcfgz", "kra", "krz", "psd", "psb", "psdt", "png", "jpg", "jpeg", "tif", "tiff", "webp", "gif", "bmp", "tga", "ico",
+  "qoi", "exr", "hdr", "pbm", "pgm", "ppm", "pam", "pfm", "dds", "fits", "fit", "fts", "dpx", "cin", "dcm", "dicom", "dc3", "iff", "lbm", "ilbm", "heic",
+  "heif", "hif", "dng", "cr2", "cr3", "nef", "nrw", "arw", "pef", "orf", "rw2", "raf", "svg", "svgz", "afdesign", "afphoto", "afpub",
+];
 
 export type PhotoCraftFeatures = typeof PHOTOCRAFT_FEATURES;

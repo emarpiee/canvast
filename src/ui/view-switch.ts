@@ -1,16 +1,16 @@
 import { ICONS } from "./icons";
 
-export type AppView = "canvas" | "assets" | "settings";
+export type AppView = "canvas" | "assets" | "settings" | "photocraft";
 
 /**
  * The top-level switch to the Assets view, and the way into the Settings view: the Assets tab here, and the Settings button at the far end of
  * the top right, beside the dock and in every view (`data-view="settings"`, pressed while Settings is open; any button with that attribute opens it). The Canvas view is the
  * navigator's infinity button, the first control (ADR 0079); here no tab is selected while the canvas is open.
  */
-export function mountViewSwitch(root: HTMLElement, onSelect: (v: AppView) => void): (v: AppView) => void {
+export function mountViewSwitch(root: HTMLElement, onSelect: (v: AppView) => void, /** The PhotoCraft tab beside Library (Settings > ArtCraft > PhotoCraft). */ photoCraft = false): (v: AppView) => void {
   root.innerHTML = `
     <div class="view-switch" data-cmd-group="Navigate" role="tablist" aria-label="View">
-      <button type="button" role="tab" data-view="assets" data-testid="view-assets" title="Library">${ICONS.images}<span>Library</span></button>
+      <button type="button" role="tab" data-view="assets" data-testid="view-assets" title="Library">${ICONS.images}<span>Library</span></button>${photoCraft ? `<button type="button" role="tab" data-view="photocraft" data-testid="view-photocraft" title="PhotoCraft, the photo editor (it keeps running while you are in another view)">${ICONS.photoCraft}<span>PhotoCraft</span></button>` : ""}
     </div>
     <div class="view-settings" data-cmd-group="Navigate"><button type="button" data-view="settings" data-testid="view-settings" aria-pressed="false" aria-label="Settings" title="Settings">${ICONS.settings}</button></div>`;
   const tabs = [...root.querySelectorAll<HTMLButtonElement>('[role="tab"]')];

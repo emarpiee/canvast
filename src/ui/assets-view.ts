@@ -3094,7 +3094,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
           : fileActionsOf(e.name, e.type).canOpen ? `<button type="button" class="assets-btn" data-action="open-tab" data-testid="asset-open-tab" title="Show it in a new browser tab">${ICONS.externalLink}<span>Open in tab</span></button>`
           : ""
         }
-        ${e?.present && editInPhotoCraft && !meta(e).hidden && editableInPhotoCraft(e.type, e.card) ? `<button type="button" class="assets-btn" data-action="photocraft" data-testid="asset-photocraft" title="Open it in PhotoCraft, the photo editor; what it saves becomes a new library item (this file is not written over)">${ICONS.photoCraft}<span>Edit in PhotoCraft</span></button>` : ""}
+        ${e?.present && editInPhotoCraft && !meta(e).hidden && editableInPhotoCraft(e.name, e.type) ? `<button type="button" class="assets-btn" data-action="photocraft" data-testid="asset-photocraft" title="Open it in PhotoCraft, the photo editor; what it saves becomes a new library item (this file is not written over)">${ICONS.photoCraft}<span>Edit in PhotoCraft</span></button>` : ""}
         ${e?.present ? `<button type="button" class="assets-btn" data-action="export" data-testid="asset-export" title="Save it as a .canvast archive, with its tags, notes and folder, to import into canvast">${ICONS.fileOutput}<span>Export</span></button>` : ""}
         ${e ? `<button type="button" class="assets-btn is-danger" data-action="${instances > 0 ? "delete-everywhere" : "delete"}" data-testid="asset-delete" title="${instances > 0 ? "Delete it from the library and from every canvas it is on" : "Delete it from the library"}"${ro}>${ICONS.trash2}<span>Delete…</span></button>` : ""}
       </div>`;

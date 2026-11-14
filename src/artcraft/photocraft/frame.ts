@@ -45,6 +45,14 @@ export interface PhotoCraftFrame {
 /** What canvast adds to its page: the file picker's card is never seen while the library stands in for it. */
 const BRIDGE_STYLE = "#rfd-overlay{display:none!important}";
 
+/** A key the browser or the app window would act on as well. */
+export function browserKey(e: Pick<KeyboardEvent, "key" | "ctrlKey" | "metaKey" | "altKey">): boolean {
+  const k = e.key.toLowerCase();
+  if (e.ctrlKey || e.metaKey) return !["c", "v", "x", "control", "meta", "shift", "alt"].includes(k);
+  if (/^f\d{1,2}$/.test(k)) return true;
+  return e.altKey && (k === "arrowleft" || k === "arrowright" || k === "home");
+}
+
 type FrameWindow = Window & typeof globalThis & { __photocraftWasm?: Uint8Array; __photocraftFailed?: (m: string) => void };
 
 /** Starts PhotoCraft in a new frame inside `container`. Throws when this build has no PhotoCraft. */
@@ -137,6 +145,13 @@ export function startPhotoCraft(container: HTMLElement, host: PhotoCraftHost, fe
     const blob = m ? await fontList[Number(m[1])]?.blob() : null;
     return blob ? respond(new win.Uint8Array(await blob.arrayBuffer())) : respond(null, 404);
   };
+
+  // ---- its keys are its own: a shortcut of it (Ctrl+= zooms its document) never also does what the browser or the app window does with it
+  // (zoom the page, save it, print, find, go back). Seen last, after PhotoCraft has read it; copy, cut and paste keep the browser's way,
+  // which its clipboard needs. (Keys a browser never lets a page have, Ctrl+W or Ctrl+T, stay the browser's.)
+  win.addEventListener("keydown", (e) => {
+    if (browserKey(e)) e.preventDefault();
+  });
 
   // ---- its own messages: running, stopped, could not start
   doc.addEventListener("click", (e) => {

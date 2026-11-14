@@ -22,6 +22,7 @@ const IMPLEMENTATION = [
 const OUTSIDE = [
   "src/app/debug-hook.ts", // the #debug test hook reads and seeds stores directly
   "src/app/diagnostics.ts", // reports whether the browser has IndexedDB at all
+  "src/artcraft/photocraft/presets.ts", // PhotoCraft's own preset database (not canvast's storage): moved to and from the workspace
 ];
 const allowed = new Set([...IMPLEMENTATION, ...OUTSIDE]);
 const pattern = /\bIDB[A-Z]\w*|\bindexedDB\b|["'](?:\.\.\/storage|\.)\/idb["']/;

@@ -70,7 +70,7 @@
   --z-item-bar: 6;
   --z-item-pop: 7;
   --z-edge: 10;
-  --z-view: 50; /* a view over the whole app (PhotoCraft): above the edge bars, under the menus and popovers it opens */
+  --z-view: 2; /* a view of the app under its top bar (Settings, PhotoCraft): above the canvas, under the bars and the menus */
   --z-pop: 60; /* menus and popovers opened from a button: above the edge bars, the panels and the Settings view */
   --z-window: 70; /* the frameless window's row and its top edge, over everything of the page (in a modal, they are in its top layer) */
   /* Animation (Settings > Performance): every duration and curve here, so one setting changes them all. --anim-speed and --anim-move are set by the settings (none: the durations below are made 0 by the rule at the end of this block). */
@@ -739,6 +739,8 @@ dialog.confirm .secret-field .prompt-input { padding-right: calc(var(--icon-xl) 
 .secret-reveal:hover, .secret-reveal[aria-pressed="true"] { color: var(--hud-fg); background: var(--hud-hover); }
 .secret-reveal svg { width: var(--icon-md); height: var(--icon-md); }
 .confirm-actions { display: flex; justify-content: flex-end; gap: var(--s-4); margin-top: var(--s-6); }
+.pc-size-row { display: flex; align-items: center; gap: var(--s-4); }
+.pc-size-row input { width: calc(var(--ctl) * 3); }
 .confirm-actions button {
   font: var(--weight-medium) var(--text-md) var(--font-ui);
   padding: var(--s-4) var(--s-6);
@@ -951,7 +953,7 @@ dialog.confirm .secret-field .prompt-input { padding-right: calc(var(--icon-xl) 
 #settings-view { position: fixed; inset: 0; z-index: 2; display: flex; flex-direction: column; padding: calc((var(--nav-bottom, var(--s-15)) + 2 * var(--near)) / var(--ui-scale, 1)) var(--s-8) 0; background: var(--theme-bg); font: var(--text-md)/1.4 var(--font-ui); }
 #settings-view[hidden] { display: none; }
 /* PhotoCraft's view (src/artcraft/photocraft/): the shared panel over the whole app, its frame filling the body */
-.photocraft-view.layers-panel { position: fixed; inset: 0; z-index: var(--z-view); border: 0; border-radius: 0; background: var(--theme-bg); backdrop-filter: none; }
+.photocraft-view.layers-panel { position: fixed; inset: calc((var(--nav-bottom, var(--s-15)) + 2 * var(--near)) / var(--ui-scale, 1)) 0 0; z-index: var(--z-view); border: 0; border-radius: 0; background: var(--theme-bg); backdrop-filter: none; }
 .photocraft-view .panel-body { display: flex; overflow: hidden; }
 .photocraft-frame { flex: 1 1 auto; width: 100%; height: 100%; border: 0; display: block; }
 .photocraft-status { margin: 0; padding: var(--s-2) var(--s-6); }
@@ -3100,7 +3102,9 @@ dialog.export-dlg.is-multi[open] { display: flex; flex-direction: column; height
 .lib-item:hover, .lib-item:focus-visible { background: var(--hud-hover); border-color: var(--hud-border); outline: 0; }
 .lib-thumb { display: block; aspect-ratio: 1; overflow: hidden; background: var(--hud-hover); border-radius: var(--r-xs); }
 .lib-thumb img { display: block; width: 100%; height: 100%; object-fit: cover; }
-.lib-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--hud-muted); }
+.lib-name { display: flex; min-width: 0; white-space: nowrap; color: var(--hud-muted); }
+.lib-name-head { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.lib-name-tail { flex: none; }
 .lib-pick.is-centred { inset: 0; color: var(--hud-fg); width: min(40rem, calc(100vw - var(--sp-8))); height: fit-content; margin: auto; }
 .lib-head { display: flex; gap: var(--s-4); }
 .lib-head input { flex: 1; min-width: 0; }

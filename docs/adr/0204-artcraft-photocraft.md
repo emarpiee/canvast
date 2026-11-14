@@ -34,11 +34,25 @@ the canvas, treated as a dependency: only its released package is used, never bu
   `--write` moves `release.json`. Code lives under `artcraft/` (`src/artcraft/photocraft/`, `scripts/artcraft/photocraft/`), where
   another ArtCraft tool would go beside it; Settings has an ArtCraft group with a tab per tool.
 
+## Amendment (0.59.4)
+
+- **A view of its own:** PhotoCraft is one of the app's views (`AppView` "photocraft"), with a tab beside Library; switching away keeps
+  its frame and documents; its Close stops it and returns to the view it came from.
+- **Layered projects:** several pictures (as layers) and a sheet are written as an OpenRaster file (`layers.ts`): each object drawn alone
+  by the Export renderer at the chosen size (Export's size rules, `size-dialog.ts`), the layer order canvast's, groups and sheets on the
+  sheet as layer groups; masks and adjustment shapes are in the merged picture only. A saved project is placed beside its box.
+- **Every kind it opens:** `PHOTOCRAFT_OPENS` (its `OPEN_EXTS` less preset files); the checker says when they differ.
+- **Its keys:** every Ctrl/Cmd, F-key and Alt+arrow key it sees has its default prevented after PhotoCraft read it (copy, cut, paste
+  excepted), so the page and the app window do not act on them too.
+- **Its state with the workspace:** its preferences JSON is the workspace setting `photocraft.prefs` (caught from the `storage` event its
+  frame's writes raise, and on stop); its preset database is packed (`photocraft-presets.zip`, fixed dates, so the same presets make the
+  same item) into the library's concealed PhotoCraft folder, `photocraft.presets` naming it; both are put back before each start. No new
+  storage format: the setting and the library item already go to the folder, sync and backups.
+
 ## Consequences
 
 - The single file grows by about 20 MB (28 MB in all); the block is read only when PhotoCraft first opens, after the app has started.
 - Things it does on its own disk in a desktop app (folders, batch, plug-ins, printing) are switched off: its page cannot have them.
-- Its own preferences and brush presets are kept in this browser's (or the desktop app's) storage, not in the workspace folder.
 - A few items it never lets be hidden (Save, Save As, Exit, Edit > Menus, Edit > Keyboard Shortcuts, its Preferences pages) stay; the
   person can show hidden items again in its Edit > Menus until the next start.
 - A release that changes one of the hooks fails the check (and the build, for the packager's part) before it can ship.

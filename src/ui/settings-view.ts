@@ -447,10 +447,10 @@ export function mountSettingsView(root: HTMLElement, settings: SettingsStore, ke
                 pwCard("hidden", "Password for the Hidden items", "A password asked before the Hidden items open and before an export that includes them. The same limits apply: it does not encrypt the files. It cannot be recovered either."))
           : t.id === "photocraft"
           ? `<div class="set-info set-card" data-photocraft><h3>About PhotoCraft</h3>
-             <p>PhotoCraft is the photo editor of ArtCraft, open source (MIT or Apache-2.0). canvast carries its released web build unchanged${photoCraftVersion() ? ` (version <span data-testid="photocraft-version">${esc(photoCraftVersion())}</span>)` : ""} and opens it from a selected picture (Edit in PhotoCraft on the Actions bar), a library item, or the command list. Its File > Open takes files from the library; what it saves comes back to the library. It makes no network requests: its help links and update check are hidden.</p>
+             <p>PhotoCraft is the photo editor of ArtCraft, open source (MIT or Apache-2.0). canvast carries its released web build unchanged${photoCraftVersion() ? ` (version <span data-testid="photocraft-version">${esc(photoCraftVersion())}</span>)` : ""} and opens it from its tab beside Library, from selected pictures or a sheet (Edit in PhotoCraft on the Actions bar: a sheet becomes a layered project), from a library item of any kind it reads (PSD, Krita, OpenRaster, camera raw…), or from the command list. Its File > Open takes files from the library; what it saves comes back to the library. It makes no network requests: its help links and update check are hidden.</p>
              ${photoCraftVersion() ? "" : `<p class="set-help">PhotoCraft is not in this build.</p>`}
              <div class="storage-actions"><button type="button" data-photocraft-reset data-testid="photocraft-reset">Reset PhotoCraft's own preferences</button></div>
-             <p class="set-help">Its own preferences (Edit > Preferences in it) are kept on this device, in this ${DESKTOP ? "app" : "browser"}; resetting them does not touch your files.</p></div>`
+             <p class="set-help">Its own preferences, keyboard shortcuts, menus and toolbar (Edit > Preferences in it) are kept with this workspace, so they are in its backups and go to your other devices with it; its brush and other presets too, as one file in the library's PhotoCraft folder (concealed). Resetting its preferences does not touch your files or its presets.</p></div>`
           : t.id === "develop"
           ? `<div class="set-info set-card" data-develop><dl><dt>Version</dt><dd>${esc(document.documentElement.dataset["version"] ?? "")}</dd><dt>Build</dt><dd>${DESKTOP ? "The desktop app runs the same single file as the browser build." : "One file: this page. There is no separate debug build."}</dd></dl>
              <p class="set-note" data-dev-note role="status" hidden>Reload to apply the change. <button type="button" class="set-done" data-reload>Reload now</button></p></div>`
@@ -886,6 +886,7 @@ export function mountSettingsView(root: HTMLElement, settings: SettingsStore, ke
     if (pcReset) {
       void confirmDialog({ title: "Reset PhotoCraft's own preferences?", lines: ["Its preferences go back to their defaults the next time it opens (its brush presets stay). Your files are not touched."], confirmLabel: "Reset them", danger: false }).then((yes) => {
         if (!yes) return;
+        settings.set("photocraft.prefs", "");
         try { localStorage.removeItem(PHOTOCRAFT_PREFS); } catch { /* (no storage: nothing kept) */ }
         pcReset.textContent = "Reset: they are the defaults from its next start";
       });

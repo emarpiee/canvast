@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { applySwitches, preparePrefs } from "../../src/artcraft/photocraft/prefs";
+import { browserKey } from "../../src/artcraft/photocraft/frame";
+import { editableInPhotoCraft } from "../../src/artcraft/photocraft/app";
+import { layerTree } from "../../src/artcraft/photocraft/layers";
+import type { LayerNode } from "../../src/artcraft/photocraft/layers";
+import type { CanvasObject } from "../../src/doc/model";
 // @ts-expect-error (plain JavaScript, no types)
 import { inlineGlue, pageParts } from "../../scripts/artcraft/photocraft/package.mjs";
 
@@ -35,5 +40,31 @@ describe("PhotoCraft's released code as one inline module", () => {
     expect(() => inlineGlue("import x from './snippets/a.js';\nexport { initSync, __wbg_init as default };", () => snippet)).toThrow(/does not place/);
     expect(() => inlineGlue("export default 1;", () => null)).toThrow(/exports changed/);
     expect(() => pageParts("<style>a{}</style><body><canvas id=\"photocraft_canvas\"></canvas></body>")).toThrow(/photocraft_loading/);
+  });
+});
+
+describe("PhotoCraft in canvast", () => {
+  it("its shortcuts stay in it; copy, cut and paste keep the browser's way", () => {
+    const k = (key: string, mods: Partial<Record<"ctrlKey" | "metaKey" | "altKey", boolean>> = {}) => browserKey({ key, ctrlKey: false, metaKey: false, altKey: false, ...mods });
+    expect([k("=", { ctrlKey: true }), k("-", { ctrlKey: true }), k("s", { metaKey: true }), k("F5"), k("ArrowLeft", { altKey: true })]).toEqual([true, true, true, true, true]);
+    expect([k("c", { ctrlKey: true }), k("V", { ctrlKey: true }), k("x", { metaKey: true }), k("b"), k("Control", { ctrlKey: true })]).toEqual([false, false, false, false, false]);
+  });
+
+  it("opens art files by their kind, never videos or sounds", () => {
+    expect(["a.psd", "b.KRA", "c.ora", "d.png", "e.cr2"].map((n) => editableInPhotoCraft(n))).toEqual([true, true, true, true, true]);
+    expect([editableInPhotoCraft("f.mp4", "video/mp4"), editableInPhotoCraft("g.md"), editableInPhotoCraft("h.gif", "video/gif")]).toEqual([false, false, false]);
+  });
+
+  it("a sheet's objects as layer groups: the sheets on it and its groups, in paint order, bottom first", () => {
+    const o = (id: string, z: number, more: Record<string, unknown> = {}): CanvasObject => ({ id, z, kind: "image", ...more }) as unknown as CanvasObject;
+    const objs = [
+      o("c", 4, { parent: "root", groups: ["g"], groupNames: { g: "Faces" } }),
+      o("a", 1, { parent: "root" }),
+      o("inner", 2, { kind: "path", container: { clip: true }, parent: "root" }),
+      o("b", 3, { parent: "inner" }),
+    ];
+    const tree = layerTree(objs, (id) => objs.find((x) => x.id === id), "root", (x) => `name of ${x.id}`);
+    const shape = (nodes: readonly LayerNode[]): unknown[] => nodes.map((n) => (n.kind === "layer" ? n.o.id : { [n.name]: shape(n.children) }));
+    expect(shape(tree)).toEqual(["a", { "name of inner": ["inner", "b"] }, { Faces: ["c"] }]);
   });
 });

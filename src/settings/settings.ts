@@ -242,6 +242,13 @@ export const SETTINGS = {
   "edit.tagsCustom": { scope: "workspace", default: "", validate: text(200), effect: "immediate" } as Def<string>,
   // PhotoCraft (Settings > ArtCraft > PhotoCraft): what a picture edited from a canvas does there when PhotoCraft saves it.
   "photocraft.saveCanvas": { scope: "device", default: "ask", validate: oneOf("ask", "replace", "beside"), effect: "immediate" } as Def<"ask" | "replace" | "beside">,
+  // PhotoCraft's own preferences (its JSON: Edit > Preferences, Keyboard Shortcuts, Menus, Toolbar) and its brush presets (the hash of the
+  // library item that packs them), kept with the workspace so they go into its folder, backups and exports (artcraft/photocraft/state.ts).
+  "photocraft.prefs": { scope: "workspace", default: "", validate: text(4_000_000), effect: "immediate" } as Def<string>,
+  "photocraft.presets": { scope: "workspace", default: "", validate: text(64), effect: "immediate" } as Def<string>,
+  // The size of a sheet or of several pictures opened as one layered project: a rule of the Export dialog and its value (last used).
+  "photocraft.sizeRule": { scope: "device", default: "scale", validate: oneOf("width", "height", "long", "scale"), effect: "immediate" } as Def<"width" | "height" | "long" | "scale">,
+  "photocraft.sizeValue": { scope: "device", default: 2, validate: range(0.01, 100_000), effect: "immediate" } as Def<number>,
   // Extracted frames (ADR 0081).
   "frame.format": { scope: "workspace", default: "png", validate: oneOf("webp", "png", "jpeg"), effect: "immediate" } as Def<"webp" | "png" | "jpeg">,
   "frame.quality": { scope: "workspace", default: 92, validate: range(10, 100), effect: "immediate" } as Def<number>,

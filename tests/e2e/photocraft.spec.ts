@@ -31,6 +31,11 @@ async function editInPhotoCraft(app: App, pic: Pic): Promise<void> {
   await p.evaluate((id) => window.__canvastDebug.select([id]), pic.id);
   await app.frame();
   await p.locator('[data-ctx="photocraft"]').click();
+  await running(p);
+}
+
+/** Its view is shown and it runs; where the browser cannot draw it, canvast says it could not start, and the test ends there. */
+async function running(p: Page): Promise<void> {
   await expect(p.getByTestId("photocraft-view")).toBeVisible();
   if (!(await canDraw(p))) {
     await expect(p.locator(".photocraft-status")).toContainText("could not start", { timeout: 120_000 });
@@ -67,6 +72,15 @@ test("PhotoCraft opens a selected picture; its File > Open asks the library, and
   await expect(p.locator(".lib-pick")).toContainText("harbour.png");
   await p.keyboard.press("Escape");
   await expect(p.locator(".lib-pick")).toBeHidden();
+  // a view of its own: the Library shown, then PhotoCraft again, still running (its frame kept)
+  await p.getByTestId("view-assets").click();
+  await expect(p.getByTestId("photocraft-view")).toBeHidden();
+  await p.getByTestId("view-photocraft").click();
+  await running(p);
+  await expect(p.locator(".photocraft-frame")).toHaveCount(1);
+  // its preferences, as it saves them, are kept with the workspace
+  await p.evaluate(() => document.querySelector<HTMLIFrameElement>(".photocraft-frame")!.contentWindow!.localStorage.setItem("photocraft.preferences", '{"version":2,"probe":7}'));
+  await expect.poll(() => p.evaluate(() => window.__canvastDebug.getSetting("photocraft.prefs"))).toContain('"probe":7');
   expect(await p.evaluate(() => document.querySelector<HTMLIFrameElement>(".photocraft-frame")!.contentDocument!.getElementById("photocraft_stopped")!.hidden)).toBe(true);
 });
 
@@ -95,4 +109,22 @@ test("what PhotoCraft saves comes back: asked, added beside, Don't ask again kep
   if (await p.getByTestId("confirm-dialog").isVisible().catch(() => false)) await p.getByTestId("confirm-ok").click();
   await expect(p.getByTestId("photocraft-view")).toBeHidden();
   await expect(p.locator(".photocraft-frame")).toHaveCount(0);
+});
+
+test("two pictures as layers of one document: the size asked as Export asks, what it saves placed beside them", async ({ app }) => {
+  const p = app.page;
+  const a = await place(app, "left.png");
+  const b = await place(app, "right.png");
+  await p.evaluate((ids) => window.__canvastDebug.select(ids), [a.id, b.id]);
+  await app.frame();
+  await p.locator('[data-ctx="photocraft"]').click();
+  await p.locator('[data-id="photocraft-layers"]').click();
+  await expect(p.getByTestId("photocraft-size")).toBeVisible();
+  await expect(p.getByTestId("photocraft-size")).toContainText("2 layers");
+  await p.getByTestId("photocraft-size-ok").click();
+  await running(p);
+  // (PhotoCraft names the document after the project file, pictures.ora: a save of it comes back beside the two pictures, not asked)
+  await saveFromPhotoCraft(p, "pictures.png", makePng(180, 60, () => [90, 90, 200, 255]));
+  await expect.poll(async () => (await objs(app)).length).toBe(3);
+  await expect(p.getByTestId("choose-dialog")).toBeHidden();
 });

@@ -19,6 +19,15 @@ export interface LibraryPickerOptions {
   importFiles?: { accept: string; run(files: File[]): Promise<string[]> };
 }
 
+/**
+ * A name cut in the middle when it is too long, its end kept (the extension, and the part where names of one series differ:
+ * `dark-s01e01-frame_0304.png` and `…_0310.png`). The whole name is the cell's tooltip.
+ */
+const nameParts = (name: string): string => {
+  const cut = Math.max(0, name.length - 12);
+  return `<span class="lib-name-head">${esc(name.slice(0, cut))}</span><span class="lib-name-tail">${esc(name.slice(cut))}</span>`;
+};
+
 /** Grid cells drawn at most: a bigger library is narrowed by the search. */
 const SHOWN_MAX = 300;
 
@@ -41,7 +50,7 @@ export function openLibraryPicker(anchor: HTMLElement | null, items: readonly Li
     const draw = (q: string): void => {
       const found = items.filter((i) => !q || i.name.toLowerCase().includes(q));
       const shown = found.slice(0, SHOWN_MAX);
-      grid.innerHTML = shown.map((i) => `<button type="button" class="lib-item" data-hash="${esc(i.hash)}" title="${esc(i.name)}" aria-label="${esc(i.name)}"><span class="lib-thumb">${i.chip ? `<span class="lib-chip">${esc(i.chip)}</span>` : ""}</span><span class="lib-name">${esc(i.name)}</span></button>`).join("");
+      grid.innerHTML = shown.map((i) => `<button type="button" class="lib-item" data-hash="${esc(i.hash)}" title="${esc(i.name)}" aria-label="${esc(i.name)}"><span class="lib-thumb">${i.chip ? `<span class="lib-chip">${esc(i.chip)}</span>` : ""}</span><span class="lib-name">${nameParts(i.name)}</span></button>`).join("");
       empty.hidden = shown.length > 0 && found.length <= SHOWN_MAX;
       empty.textContent = found.length > SHOWN_MAX ? `Showing ${SHOWN_MAX} of ${plural(found.length, one, many)}: search by name to find the others.` : items.length ? `No ${one} has that name.` : `The library has no ${many} yet.${opts.importFiles ? " Import one from this device." : ""}`;
       for (const [n, b] of [...grid.querySelectorAll<HTMLElement>(".lib-item")].entries()) {

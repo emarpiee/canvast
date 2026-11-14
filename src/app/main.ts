@@ -1177,7 +1177,8 @@ async function start(): Promise<void> {
     await Promise.all(fonts.map((e) => fontLoader.ensure(e.hash)));
     return fonts.map((e) => ({ hash: e.hash, name: e.name.replace(/\.[A-Za-z0-9]{1,5}$/, ""), unusable: fontLoader.state(e.hash) === "failed" ? fontLoader.reason(e.hash) : "" }));
   };
-  // PhotoCraft (src/artcraft/photocraft/): ArtCraft's photo editor, its released build, opened over the app.
+  // PhotoCraft (src/artcraft/photocraft/): ArtCraft's photo editor, its released build, a view of its own; closing it goes back where it came from.
+  let viewBeforePhotoCraft: AppView = "canvas";
   const photoCraft = createPhotoCraft({
     doc,
     editor,
@@ -1188,7 +1189,10 @@ async function start(): Promise<void> {
       const n = fontFor(f.hash).names;
       return { hash: f.hash, family: n.family, style: n.style, ext: (/\.(ttf|otf|ttc)$/i.exec(assetNames.get(f.hash) ?? "")?.[1] ?? "ttf").toLowerCase() };
     }),
-    showCanvas: () => setView("canvas"),
+    renderDeps: () => ({ doc, index, assets: filesAssets, theme }),
+    nameOf: (hash) => assetNames.get(hash),
+    enterView: () => setView("photocraft"),
+    leaveView: () => setView(viewBeforePhotoCraft),
   });
   const textEditor = mountTextEditor(host, view, doc, editor, libraryFonts, () => settings.get("ui.properties"));
   textFollow = textEditor.follow;
@@ -2304,7 +2308,7 @@ async function start(): Promise<void> {
       pasteAdjust: () => pasteAdjustments(doc, editor),
       copyRendered: () => void copyAsShown(),
       bake: () => void bakePicture(doc, editor, filesAssets, (shot) => storeFrame(assets, session, settings, shot)),
-      photoCraft: PHOTOCRAFT_FEATURES.entry.canvasPictures && photoCraft.available ? () => void photoCraft.editSelection() : null,
+      photoCraft: PHOTOCRAFT_FEATURES.entry.canvasPictures && photoCraft.available ? { run: (anchor) => void photoCraft.editSelection(anchor), offered: () => photoCraft.offered() } : null,
       svgPicture: () => {
         const ids = [...editor.selection];
         const o = ids.length === 1 ? doc.get(ids[0]!) : undefined;
@@ -2493,16 +2497,19 @@ async function start(): Promise<void> {
       assets.releaseIdle();
     }
     if (was === "settings") settingsView.hide();
+    if (was === "photocraft") photoCraft.hide();
+    else if (v === "photocraft") viewBeforePhotoCraft = was;
     if (v === "assets") assetsView.show();
     else if (v === "settings") settingsView.show();
+    else if (v === "photocraft") photoCraft.show();
     else {
       invalidate();
       canvas.focus();
     }
     // The Settings view is not remembered: a reload opens the canvas or the Assets view.
-    if (v !== "settings") settings.set("ui.view", v);
+    if (v === "canvas" || v === "assets") settings.set("ui.view", v);
   };
-  const markTab = mountViewSwitch(document.getElementById("view-switch")!, setView);
+  const markTab = mountViewSwitch(document.getElementById("view-switch")!, setView, PHOTOCRAFT_FEATURES.entry.view && photoCraft.available);
   void followFrameSetting(settings);
   followScrolling();
   markTab("canvas");

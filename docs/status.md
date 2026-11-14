@@ -38,6 +38,14 @@ Unverified / Committed / Next bounded task**.
 | 5 | Creative editing, including **arrange selected items in a grid (A–Z, Z–A, by date, size, type), align and distribute** | **done** ([ADR 0036](adr/0036-arrange-align-distribute.md)) |
 | WF | Workspace folder and the desktop app ([ADR 0177](adr/0177-workspace-folder-desktop-app.md)): Electron shell, the workspace as a folder of files, encrypted hidden items, outside changes; Linux packages (AppImage with updates, `.deb`, `.rpm`, `.tar.gz`, x86_64 and aarch64) | **done** (v0.49.0; packages v0.50.33 to 0.50.35) |
 
+## v0.59.4: PhotoCraft pass 2 (branch `photocraft`, 2026-11-15)
+
+- **Implemented:** the owner's 7 items: PhotoCraft view and tab (`AppView` "photocraft", kept running), several pictures each or as layers, sheets as layered OpenRaster projects (`layers.ts`, size by the Export rules in `size-dialog.ts`, saved file beside), every kind it opens (`PHOTOCRAFT_OPENS`, checked against its `OPEN_EXTS`), its keys kept from the browser (`browserKey`), its preferences in the workspace setting `photocraft.prefs` and its presets as a library pack (`state.ts`, `presets.ts`), middle-cut names in the library chooser.
+- **Tested:** typecheck (web, desktop), build, `check:offline`, `check:names`, `check:tokens`, `check:storage`, `check:groups`, `photocraft:check` here; unit and E2E on GitHub.
+- **Unverified:** a sheet project opened in PhotoCraft by hand (layers, groups, nested sheets); presets moving to another device; PhotoCraft inside the desktop app.
+- **Committed:** v0.59.4 on branch `photocraft`, not on `main`.
+- **Next bounded task:** read the GitHub runs; README section after the owner has tried it.
+
 ## v0.59.3: PhotoCraft inside canvast (branch `photocraft`, 2026-11-15)
 
 - **Implemented:** ADR 0204: PhotoCraft 0.23.1's released web build in the single file (`scripts/artcraft/photocraft/package.mjs`), started in a frame of its own (`src/artcraft/photocraft/`), its file picker, downloads and fonts met by canvast; Edit in PhotoCraft (Actions bar, library item), Open PhotoCraft (command list), Settings > ArtCraft > PhotoCraft, switches in `features.ts`, `npm run photocraft:check`, the PhotoCraft release workflow.

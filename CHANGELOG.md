@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.59.4 — PhotoCraft as a view, layered projects from sheets and pictures, every art file, its settings with the workspace (2026-11-15)
+
+- **Added:** a **PhotoCraft** tab beside Library: PhotoCraft is a view of its own, and keeps running with its documents while another view is shown; its Close goes back to the view it was opened from.
+- **Added:** several selected pictures open **each in its own document** or **as layers of one document**, placed as on the canvas; a selected **sheet** opens as a layered project: each object a layer drawn as the canvas draws it, in canvast's order, its groups and the sheets on it as layer groups (an OpenRaster file). Its size is asked with the Export dialog's rules (a scale, or a width, height or longest side; **Sharpest picture** keeps every pixel of its sharpest picture), the last one remembered. What PhotoCraft saves of it is placed beside the sheet or the pictures.
+- **Added:** **Edit in PhotoCraft** for every kind of file it opens (PSD, PSB, Krita, OpenRaster, GIMP, Paint.NET, camera raw, Affinity and more), in the library and on the canvas; an edited art file's card is replaced or placed beside as a picture is.
+- **Added:** PhotoCraft's own preferences, keyboard shortcuts, menus and toolbar are kept with the workspace (in its folder, backups and exports), and its brush and other presets as one file in the library's PhotoCraft folder (concealed).
+- **Changed:** the library chooser shortens a long name in the middle, so its end shows (`dark-s01e01-fr…ame_0304.png`): files of one series can be told apart.
+- **Fixed:** a PhotoCraft shortcut that is also the browser's or the window's (Ctrl+= and Ctrl+- zoomed PhotoCraft and the whole page, Ctrl+S, Ctrl+P, F5, Alt+←) now acts in PhotoCraft only.
+
 ## 0.59.3 — PhotoCraft, ArtCraft's photo editor, inside canvast (2026-11-15)
 
 - **Added:** **PhotoCraft**, the open-source photo editor of ArtCraft, in its own released web build, unchanged (ADR 0204): **Edit in PhotoCraft** on the Actions bar for selected pictures, on a library item (its details and its menu), and **Open PhotoCraft** in the command list. Its File > Open takes files from the library; what it saves becomes a new library item (filed as Edited pictures), and a picture from a canvas is replaced there or added beside it (asked, with Don't ask again). The library's fonts are in its font menus. It makes no network requests: its links and update check are hidden.
