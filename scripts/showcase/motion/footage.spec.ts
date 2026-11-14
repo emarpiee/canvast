@@ -86,6 +86,20 @@ class Rec {
     this.ptr = [b.x + b.width / 2, b.y + b.height / 2];
     return this.ptr;
   }
+  /** A control of the Properties bar: where it shows, else its chip pressed on camera first (the chips stand by the selection, ADR 0198). Its middle. */
+  async ctl(sel: string): Promise<Pt> {
+    const p = this.s.p;
+    if (!(await p.locator(sel).filter({ visible: true }).count())) {
+      const section = await p.locator(sel).first().evaluate((el) => (el.closest("[data-section]") as HTMLElement | null)?.dataset["section"] ?? null);
+      const chip = `.props-near:not([hidden]) [data-vchip="${section}"], .props-chips:not([hidden]) [data-vchip="${section}"]`;
+      await this.at(chip);
+      await this.hold(2);
+      await p.locator(chip).first().click();
+      this.down = true; await this.snap(); this.down = false;
+      await this.hold(2);
+    }
+    return this.at(sel);
+  }
   save(extra: Record<string, unknown> = {}): void {
     writeFileSync(`${this.dir}/meta.json`, JSON.stringify({ count: this.n, frames: this.frames, ...extra }));
   }
@@ -187,9 +201,9 @@ test("values", async ({ scene: s }) => {
   for (let i = 1; i <= 10; i++) await set("saturation", -100 * (i / 10) ** 0.8);
   for (let i = 1; i <= 6; i++) await set("contrast", 45 * i / 6);
   await s.blur();
-  await r.at('[data-flip="x"]');
+  await r.ctl('[data-flip="x"]');
   await r.hold(2);
-  await s.p.locator('[data-flip="x"]').click();
+  await s.p.locator('[data-flip="x"]').filter({ visible: true }).first().click();
   r.down = true; await r.snap(); r.down = false;
   await r.hold(4);
   r.save({ boxes: [a, b] });
@@ -302,9 +316,11 @@ async function balloon(s: Scene, b: Balloon, r?: Rec): Promise<string> {
   await s.tool("select");
   await s.select([id]);
   if (b.kind) {
-    if (!(await p.locator("[data-k='preset'] select").isVisible())) await p.locator("[data-balloon-panel]").filter({ visible: true }).first().click();
-    await p.locator("[data-k='preset'] select").selectOption(b.kind);
+    // (the balloon's Body chip: its options open, on camera when recording)
+    if (r) await r.ctl("[data-bln='preset']");
+    await (await s.control("[data-bln='preset']")).selectOption(b.kind);
     if (r) await r.snap();
+    await p.keyboard.press("Escape"); // (its options closed: the words are typed next)
   }
   await p.mouse.dblclick((x0 + x1) / 2, (y0 + y1) / 2);
   await p.waitForFunction(() => document.activeElement instanceof HTMLElement && document.activeElement.isContentEditable);
@@ -554,7 +570,7 @@ test("crop", async ({ scene: s }) => {
   const [id] = await s.place([h!]);
   await s.fit([id!], 0.62);
   await s.select([id!]);
-  await s.p.locator("[data-crop]").click();
+  await (await s.control("[data-crop]")).click();
   const b = (await s.box([id!]))!;
   const r = new Rec(s, "crop");
   await r.quiet();
@@ -583,14 +599,15 @@ test("autolayout", async ({ scene: s }) => {
   await s.select([sheet]);
   await r.snap({ key: 1 });
   const field = async (sel: string, v: string): Promise<void> => {
-    await r.at(sel);
-    await s.p.locator(sel).fill(v);
-    await s.p.locator(sel).press("Enter");
+    await r.ctl(sel);
+    const f = s.p.locator(sel).filter({ visible: true }).first();
+    await f.fill(v);
+    await f.press("Enter");
     await r.snap({ key: 1 });
   };
   const flow = async (f: string): Promise<void> => {
-    await r.at(`[data-layout-flow="${f}"]`);
-    await s.p.locator(`[data-layout-flow="${f}"]`).click();
+    await r.ctl(`[data-layout-flow="${f}"]`);
+    await s.p.locator(`[data-layout-flow="${f}"]`).filter({ visible: true }).first().click();
     r.down = true; await r.snap({ pop: 1 }); r.down = false;
     await r.hold(2);
   };
@@ -621,9 +638,10 @@ test("adjust", async ({ scene: s }) => {
   await r.hold(1);
   await s.p.keyboard.press("u");
   await s.p.click('[data-shape-kind="ellipse"]');
-  await s.p.locator('[data-paint="fill"]').click();
+  await (await s.control('[data-paint="fill"]')).click();
   await s.p.locator('.colour-pop [data-mode="none"]').click();
-  await s.p.locator('[data-paint="fill"]').click();
+  await s.p.keyboard.press("Escape");
+  await s.p.keyboard.press("Escape"); // (the picker and the chip's options closed before the shape is drawn)
   await r.drag([cx - 260, cy - 170], [cx + 120, cy + 150], 14, 1);
   await s.p.keyboard.press("v");
   const btn = s.p.getByRole("button", { name: /^Adjust the picture/ });
@@ -711,7 +729,7 @@ test("gradient", async ({ scene: s }) => {
   await s.select([id]);
   const r = new Rec(s, "gradient");
   await r.quiet();
-  await r.at('[data-paint="fill"]');
+  await r.ctl('[data-paint="fill"]');
   await r.snap();
   await s.p.locator('[data-paint="fill"]').filter({ visible: true }).first().click();
   r.down = true; await r.snap(); r.down = false;
@@ -737,7 +755,7 @@ test("picker", async ({ scene: s }) => {
   const sw = (await s.ids()).find((i) => !before.has(i))!;
   await s.paint(sw, "fill", "#e8e1cf");
   await s.select([sw]);
-  await s.p.locator('[data-paint="fill"]').filter({ visible: true }).first().click();
+  await (await s.control('[data-paint="fill"]')).click();
   const r = new Rec(s, "picker");
   await r.quiet();
   await r.hold(1);
@@ -894,9 +912,11 @@ test("export", async ({ scene: s }) => {
   await expect.poll(async () => (await s.objects()).some((o) => o.container)).toBe(true);
   const pg = (await s.objects()).find((o) => o.container)!.id;
   await s.select([pg]);
-  await s.p.locator('[data-layout-flow="grid"]').click();
-  await s.p.locator("[data-layout-columns]").fill("2");
-  await s.p.locator("[data-layout-columns]").press("Enter");
+  await (await s.control('[data-layout-flow="grid"]')).click();
+  const cols = await s.control("[data-layout-columns]");
+  await cols.fill("2");
+  await cols.press("Enter");
+  await s.p.keyboard.press("Escape");
   await s.fit([pg], 0.6);
   await s.select([pg]);
   const r = new Rec(s, "export");
