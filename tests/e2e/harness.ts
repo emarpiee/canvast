@@ -1,5 +1,5 @@
 import { expect, test as base } from "@playwright/test";
-import type { Page, TestInfo } from "@playwright/test";
+import type { Locator, Page, TestInfo } from "@playwright/test";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -90,10 +90,13 @@ export const test = base.extend<{ app: App }>({
     });
     page.on("pageerror", (e) => consoleErrors.push(String(e) + "\n" + (e.stack ?? "")));
     // (the specs were written for the Properties bar at the top and the Actions bar's names under it; bar-layouts.spec tries the chips by the
-    // selection, the app's own place since 0.58.27. Before the app, at every load and reload: only what is not set already, so a test's own
-    // value, or its own settings written before a reload, stays.)
+    // selection, the app's own place since 0.58.27. Before the app, on the page's first load only: storage is never read or written on a reload,
+    // where it could come before the last write of the page that is leaving and keep the old settings (Chromium), and a test's own settings,
+    // written before a reload or cleared by Start from scratch, stay as they are. Only what is not set already.)
     await page.addInitScript(() => {
       try {
+        if (sessionStorage.getItem("harness.barPlaces")) return;
+        sessionStorage.setItem("harness.barPlaces", "1");
         const saved = JSON.parse(localStorage.getItem("canvast.settings") ?? "{}") as Record<string, unknown>;
         const want: Record<string, unknown> = { "ui.barPlaces": 1, "ui.properties": "bar", "ui.groupNames": "bottom" };
         if (Object.keys(want).some((k) => !(k in saved))) localStorage.setItem("canvast.settings", JSON.stringify({ ...want, ...saved }));
@@ -187,16 +190,30 @@ type GroupMenu = "alignmenu" | "arrangemenu" | "boolmenu" | "maskmenu" | "pathme
 
 /** Give the pen a colour through the colour picker of the Properties bar (it has no row of colours any more): type the hex, close the picker. */
 /** New shapes have no outline: a test about outlines first gives the next shapes the one they used to get, 2 px of the ink (slider 25). */
+/**
+ * A control of the Properties bar wherever it stands (ADR 0198): shown (in the bar at the top, or in a chip's form already open), else in the
+ * form of its chip, opened (its section's chip, by the selection or at the top). The one way the specs, the shots and the motion clips reach one.
+ */
+export async function barControl(page: Page, sel: string): Promise<Locator> {
+  const shown = page.locator(sel).filter({ visible: true });
+  if (await shown.count()) return shown.first();
+  const section = await page.locator(sel).first().evaluate((el) => (el.closest("[data-section]") as HTMLElement | null)?.dataset["section"] ?? null);
+  expect(section, `${sel} belongs to a section of the Properties bar`).not.toBeNull();
+  const chip = page.locator(`.props-near:not([hidden]) [data-vchip="${section}"], .props-chips:not([hidden]) [data-vchip="${section}"]`).first();
+  if ((await chip.getAttribute("aria-expanded")) !== "true") await chip.click();
+  const inForm = page.locator(`.vchip-pop ${sel}`).filter({ visible: true }).first();
+  await expect(inForm, `${sel} in the ${section} chip's options`).toBeVisible();
+  return inForm;
+}
+
 export async function outlineShapes(page: Page): Promise<void> {
   await page.keyboard.press("u");
-  await page.locator("[data-shape-width]").fill("25");
+  await (await barControl(page, "[data-shape-width]")).fill("25");
+  if (await page.locator(".vchip-pop").count()) await page.keyboard.press("Escape"); // (the chip's options, closed)
 }
 
 export async function setPenColour(page: Page, hex: string): Promise<void> {
-  // (in the bar at the top, or with the chips of the Properties bar in the Look chip's options: ADR 0198)
-  const shown = page.locator("[data-colour-open]").filter({ visible: true });
-  if (!(await shown.count())) await page.locator('.props-chips:not([hidden]) [data-vchip="look"], .props-near:not([hidden]) [data-vchip="look"]').first().click();
-  await page.locator("[data-colour-open]").filter({ visible: true }).first().click();
+  await (await barControl(page, "[data-colour-open]")).click();
   const field = page.locator(".colour-pop [data-hex]");
   await field.fill(hex.replace("#", ""));
   await field.press("Enter");
@@ -449,7 +466,7 @@ function floatingRules(page: Page): Promise<string[]> {
 /**
  * The look of every field that shows (ADR 0201: one field style for the whole app): its fill, edge, rounding, font, padding and, for a number,
  * where its value reads. Its height is its place's (a settings row, a bar of --ctl). Left out: what is not typed in (checkboxes, ranges,
- * files), the developer panel, and a search box's own field inside its framed box (the box is the field).
+ * files), the developer panel, and a search box's own field (inside its framed box, the box is the field; Settings' search keeps room for its icon).
  */
 export function fieldLooks(page: Page): Promise<Array<{ label: string; look: string; reads: string | null }>> {
   return page.evaluate(() => {
@@ -457,7 +474,7 @@ export function fieldLooks(page: Page): Promise<Array<{ label: string; look: str
     const sel = 'select, input:not([type]), input[type="text"], input[type="number"], input[type="search"], input[type="url"], input[type="email"], .cp-hex';
     for (const el of document.querySelectorAll<HTMLElement>(sel)) {
       const r = el.getBoundingClientRect();
-      if (!r.width || !r.height || el.closest("[hidden], .hud-dev, .cs-box, .assets-searchbox") || el.matches(".cp-hex input")) continue;
+      if (!r.width || !r.height || el.closest("[hidden], .hud-dev, .cs-box, .assets-searchbox, .set-searchbox") || el.matches(".cp-hex input")) continue;
       const c = getComputedStyle(el);
       const look = [c.backgroundColor, `${c.borderTopWidth} ${c.borderTopColor}`, c.borderTopLeftRadius, `${c.fontSize} ${c.fontWeight}`, `pad ${c.paddingLeft}`].join(" | ");
       const label = el.getAttribute("aria-label") || (el as HTMLInputElement).labels?.[0]?.textContent?.trim() || el.className || el.tagName;

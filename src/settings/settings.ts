@@ -303,8 +303,10 @@ export class SettingsStore {
 
   constructor(private readonly storage: Pick<Storage, "getItem" | "setItem" | "removeItem"> | null = safeLocalStorage()) {
     let raw: Record<string, unknown> = {};
+    let fresh = true;
     try {
       const text = storage?.getItem(DEVICE_KEY);
+      fresh = !text;
       const parsed: unknown = text ? JSON.parse(text) : {};
       if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) raw = parsed as Record<string, unknown>;
       // Before settings existed, the last view was stored on its own.
@@ -319,6 +321,8 @@ export class SettingsStore {
       const v = (SETTINGS[key] as Def<unknown>).validate(raw[key]);
       if (v !== undefined) this.values.set(key, v);
     }
+    // (a fresh start has the bars in the app's own places already, ADR 0198: nothing to move once, and nothing written until a setting changes)
+    if (fresh) this.values.set("ui.barPlaces", 1);
     try {
       const at = Number(storage?.getItem(WS_AT_KEY));
       if (Number.isFinite(at) && at > 0) this.wsAt = at;

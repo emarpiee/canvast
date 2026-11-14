@@ -2386,6 +2386,8 @@ async function start(): Promise<void> {
     () => settings.get("ui.actions"),
   );
   contextUpdate = contextBar.update;
+  // (where the Actions bar stands is no longer a row of Settings: a change by a command or the debug hook takes effect at once, not at the next frame)
+  settings.subscribe((key) => key === "ui.actions" && contextUpdate());
 
   // The tools start where the view tabs and the workspace menu end (stylesheet: --nav-w).
   const navBox = document.getElementById("nav")!;

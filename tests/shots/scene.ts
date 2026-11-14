@@ -5,7 +5,7 @@
 import { readFileSync, mkdirSync, readdirSync } from "node:fs";
 import { resolve } from "node:path";
 import type { Locator, Page } from "@playwright/test";
-import { test as base, expect, chooseInMenu, type App } from "../e2e/harness";
+import { test as base, expect, barControl, chooseInMenu, type App } from "../e2e/harness";
 import { SHOTS } from "./manifest";
 
 export { expect };
@@ -97,15 +97,7 @@ export class Scene {
    * opened (its section's chip, by the selection or at the top: ADR 0198).
    */
   async control(sel: string): Promise<Locator> {
-    const shown = this.p.locator(sel).filter({ visible: true });
-    if (await shown.count()) return shown.first();
-    const section = await this.p.locator(sel).first().evaluate((el) => (el.closest("[data-section]") as HTMLElement | null)?.dataset["section"] ?? null);
-    expect(section, `${sel} belongs to a section of the Properties bar`).not.toBeNull();
-    const chip = this.p.locator(`.props-near:not([hidden]) [data-vchip="${section}"], .props-chips:not([hidden]) [data-vchip="${section}"]`).first();
-    if ((await chip.getAttribute("aria-expanded")) !== "true") await chip.click();
-    const inForm = this.p.locator(`.vchip-pop ${sel}`).filter({ visible: true }).first();
-    await expect(inForm, `${sel} in the ${section} chip's options`).toBeVisible();
-    return inForm;
+    return barControl(this.p, sel);
   }
   /** The chips of the Properties bar and the open chip's form, to frame with what they edit (those on the screen). */
   async chipEls(): Promise<string[]> {

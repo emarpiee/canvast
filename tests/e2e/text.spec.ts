@@ -1013,6 +1013,9 @@ test("a text along a shape follows the boolean group the shape goes into: the re
   // (the lens of the two, about half as wide as the circle: the words follow it)
   await expect.poll(width).toBeLessThan(was * 0.6);
   expect(((await textObjects(p))[0]!["onPath"] as { path?: string }).path, "it stays tied to its own shape").toBe(circle.id);
+  // the group let go: on the whole circle again
+  await boolWith(p, "release");
+  await expect.poll(width).toBeGreaterThan(was * 0.9);
   expect(app.consoleErrors).toEqual([]);
 });
 

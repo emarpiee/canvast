@@ -115,7 +115,9 @@ export function withShapeTexts(src: DerivationSource, next: readonly CanvasObjec
       out.set(t.id, plain);
       return;
     }
-    const made = refit(t, path);
+    // (placed by what is seen, still tied to its own shape: a boolean group let go puts it back on that shape)
+    const fitted = refit(t, path);
+    const made = !fitted || path.id === shape ? fitted : fitted.onPath ? { ...fitted, onPath: { ...fitted.onPath, path: shape } } : fitted.inShape ? { ...fitted, inShape: { ...fitted.inShape, shape } } : fitted;
     const base = made ?? t;
     // (they belong to their shape: its groups and sheet, just in front of it, wherever either of them is moved: doc/belongs.ts)
     const place = sharedPlace([path], (id) => mine.get(id) ?? src.get(id));

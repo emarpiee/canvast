@@ -47,6 +47,12 @@ Unverified / Committed / Next bounded task**.
 - **Committed:** v0.57.19 on `main`.
 - **Next bounded task:** retake the README screenshots in Stone when the owner says.
 
+## v0.58.32: a text on a combined shape stays tied to it; the test failures of 0.58.27-0.58.31 (2026-11-14)
+
+- **Implemented:** `withShapeTexts` keeps `onPath.path` / `inShape.shape` on the text's own shape when it is placed by the boolean result (`doc/text-in-shape.ts`); `main.ts` updates the Actions bar when `ui.actions` changes; `SettingsStore` starts a fresh install with `ui.barPlaces` 1 in memory (nothing written). Tests: the harness writes its bar settings on a page's first load only (a `sessionStorage` mark), never on a reload (in Chromium a read at the start of a reload could come before the leaving page's last write and keep the old settings: the WASD, theme, Zen, Information shown, bookmarks panel and following Actions bar specs lost their setting over a reload; Start from scratch found the settings written again); `barControl` in the harness (a Properties-bar control wherever it stands), used by `setPenColour`, `outlineShapes` (the release spec hung on a hidden field in a fresh profile) and the shots' `scene.control`; `fieldLooks` leaves out Settings' search (room for its icon); `bar-layouts.spec` lets the last shape go before drawing under the top bars; `text.spec` releases the group (the text back on the circle).
+- **Tested:** build and typecheck here. Scratch (Chromium and Firefox): intersect then release: the text's curve 264 → 120 → 264 wide, tied to the circle throughout; the release spec's first steps in a fresh profile (chips by the selection); the theme and A-Z steps over a reload. Tests on 0.58.31 (before): 25 failing tests in 14 jobs, sorted above.
+- **Committed:** v0.58.32 on `main`.
+
 ## v0.58.31: chips by the selection keep off the bars on the edges (2026-11-14)
 
 - **Implemented:** `edgeBarsIn` and an `avoid` list in `placeBy` (`ui/near-selection.ts`): on each side with room, the place where it would stand, else just past or beside an edge bar in the way, the nearest that is clear; `placeAbove` (the chips, the text format bar) and the Actions bar that follows the selection (`ui/context-bar.ts`) pass the edge bars. ADR 0198, CLAUDE.md's floating rules, README (Properties bar). Also since 0.58.30: every README picture taken again (91) and `text-on-path` added; `scripts/showcase/motion/` in the repository and the `Showcase GIF` workflow; `docs/testing/workflow-times.md`.

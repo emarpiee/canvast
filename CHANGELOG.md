@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.58.32 — A text on a combined shape stays tied to it; fixes the tests found (2026-11-14)
+
+- **Fixed:** a text along a shape that went into a boolean group followed the group's result but was then tied to the result (since 0.58.30): letting the group go turned it into plain text. It stays tied to its own shape now, and goes back onto it when the group is let go.
+- **Fixed:** where the Actions bar stands, changed by a command, took effect only at the next redraw; it takes effect at once.
+- **Fixed:** a fresh start (a new browser, or after *Start from scratch*) wrote the app's settings at once, though nothing was changed (since 0.58.27); nothing is written until a setting changes.
+
 ## 0.58.31 — Chips by the selection keep off the bars on the edges (2026-11-14)
 
 - **Fixed:** with the selection near the top of the window, its chips stood under the bar at the top left (Library and the canvas name) or the buttons at the top right, which are drawn over them: a chip there could not be pressed. The chips, the text format bar and the Actions bar that follows the selection now keep off every bar on the edges: just past it or beside it, whichever is nearest.
