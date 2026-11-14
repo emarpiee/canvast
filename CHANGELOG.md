@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.59.10 — The top bar in three sets (2026-11-15)
+
+- **Changed:** the buttons at the top left are three sets apart, each of one look: **Library**; the canvas (∞ and its name, one pill); and **PhotoCraft** (its icon, and its **×** while it runs).
+
 ## 0.59.9 — PhotoCraft saves a project file in its place (2026-11-15)
 
 - **Fixed:** the library still grew with every PhotoCraft save of a PSD (`sheet_2.psd`, `sheet_2-edited.psd`, `sheet_2-edited-edited.psd`…), and the type was asked at every save. A project file (PSD, PSB, OpenRaster, PhotoCraft) saved as the same kind, and any document saved again, is now a new version of that library item in its place: its name, folder, tags and the canvases that show it stay, the older version goes to the trash, and its type is not asked. A picture opened (a photo, a reference) is never written over: an edit of it is still an item of its own.

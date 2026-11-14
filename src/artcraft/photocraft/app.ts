@@ -398,7 +398,8 @@ export function createPhotoCraft(deps: PhotoCraftDeps): PhotoCraftApp {
     if (!photoCraftPayload()) return say("PhotoCraft is not in this build.");
     deps.enterView();
     const f = await ensureStarted();
-    if (files.length) await f.open(files).catch(() => undefined);
+    if (!files.length) return;
+    await f.open(files).catch(() => undefined);
   }
 
   /** The selected pictures of a kind it opens, with their files (hidden items left out: their names would stay in its storage). */
