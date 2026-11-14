@@ -49,6 +49,14 @@ the canvas, treated as a dependency: only its released package is used, never bu
   same item) into the library's concealed PhotoCraft folder, `photocraft.presets` naming it; both are put back before each start. No new
   storage format: the setting and the library item already go to the folder, sync and backups.
 
+## Amendment (0.59.12): Save writes the file it opened
+
+PhotoCraft's web build opens every file without a path (`open_bytes(name, bytes)`: File › Open and a drop alike), so its Save suggests
+PSD for every document and cannot write back. canvast keeps where each document came from and does what Save does on a desktop: a save
+of a document opened from a file goes into that file (`session.saveVersion`), in its own kind (the same kind as it is, or a PNG, JPEG or
+WebP from the PSD's merged picture); a later save is a new version of what it saved; another name (Save a Copy, Save As) is a new item
+beside it; the type is asked only for a new document. The question "Replace the picture / Add it beside" and its setting are gone.
+
 ## Consequences
 
 - The single file grows by about 20 MB (28 MB in all); the block is read only when PhotoCraft first opens, after the app has started.

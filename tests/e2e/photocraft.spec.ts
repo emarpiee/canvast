@@ -108,32 +108,25 @@ test("PhotoCraft opens a selected picture; its File > Open asks the library, and
   expect(await p.evaluate(() => document.querySelector<HTMLIFrameElement>(".photocraft-frame")!.contentDocument!.getElementById("photocraft_stopped")!.hidden)).toBe(true);
 });
 
-test("what PhotoCraft saves comes back: asked, added beside, Don't ask again kept; closed from its tab without asking once saved", async ({ app }) => {
+test("a picture saved in PhotoCraft is saved into its file, as Save does on a desktop; Save a Copy goes beside it; closed from its tab without asking once saved", async ({ app }) => {
   const p = app.page;
   const pic = await place(app, "harbour.png");
   await editInPhotoCraft(app, pic);
-  const edited = makePng(90, 60, () => [200, 40, 40, 255]);
-  await saveFromPhotoCraft(p, "harbour.png", edited);
-  await expect(p.getByTestId("choose-dialog")).toBeVisible();
-  await p.getByTestId("choose-dialog").locator('input[value="beside"]').check();
-  await p.getByTestId("choose-remember").check();
-  await p.getByTestId("choose-ok").click();
-  await expect.poll(async () => (await objs(app)).length).toBe(2);
-  expect(await p.evaluate(() => window.__canvastDebug.getSetting("photocraft.saveCanvas"))).toBe("beside");
-  // a new library item, named after the original (Settings > Saving to the library > Edited pictures), the original kept
-  expect(await itemNames(p)).toEqual(["harbour-edited.png", "harbour.png"]);
-  // saved again under its first name: it replaces its earlier save (the canvas shows it, the library does not grow)
-  const items = (): Promise<string[]> => itemNames(p);
-  const before = (await items()).length;
-  await saveFromPhotoCraft(p, "harbour.png", makePng(90, 60, () => [10, 10, 220, 255]));
-  await expect.poll(items).toEqual(["harbour-edited.png", "harbour.png"]);
-  expect((await items()).length).toBe(before);
-  expect((await objs(app)).length).toBe(2);
-  // not asked again
-  await saveFromPhotoCraft(p, "harbour-v2.png", makePng(90, 60, () => [40, 200, 40, 255]));
-  await expect.poll(async () => (await objs(app)).length).toBe(3);
+  // Save: into harbour.png itself (a new version in its place), not asked, no copy
+  await saveFromPhotoCraft(p, "harbour.png", makePng(90, 60, () => [200, 40, 40, 255]));
+  await expect.poll(() => itemNames(p)).toEqual(["harbour.png"]);
+  const hashes = async (): Promise<string[]> => (await p.evaluate(() => window.__canvastDebug.assetListing())).entries.filter((e) => e.name === "harbour.png").map((e) => e.hash);
+  const first = await hashes();
   await expect(p.getByTestId("choose-dialog")).toBeHidden();
-  // close: the view and its frame go
+  expect((await objs(app)).length).toBe(1);
+  // saved again: still that one file, its newer version
+  await saveFromPhotoCraft(p, "harbour.png", makePng(90, 60, () => [10, 10, 220, 255]));
+  await expect.poll(hashes).not.toEqual(first);
+  expect(await itemNames(p)).toEqual(["harbour.png"]);
+  // Save a Copy (another name): a new item, beside the picture
+  await saveFromPhotoCraft(p, "harbour copy.png", makePng(90, 60, () => [40, 200, 40, 255]));
+  await expect.poll(() => itemNames(p)).toEqual(["harbour copy.png", "harbour.png"]);
+  await expect.poll(async () => (await objs(app)).length).toBe(2);
   // (its tab's ×; nothing was done in it since its last save, so it is not asked about unsaved changes)
   await p.getByTestId("photocraft-close").click();
   await expect(p.getByTestId("confirm-dialog")).toBeHidden();

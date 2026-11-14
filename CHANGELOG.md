@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.59.12 — PhotoCraft saves into the file it opened (2026-11-15)
+
+- **Changed:** in PhotoCraft, **Save** on a document opened from a file of the library or the canvas saves into that file, in its own kind, as Save does on a desktop: a PNG stays a PNG (its layers merged), a JPEG a JPEG, a PSD a PSD. The file keeps its name, folder and tags, every canvas that shows it shows the new version, and the older one goes to the trash. Nothing is asked. (PhotoCraft's web build writes every document as PSD, having no file to write back to: canvast puts it into the file.) **Save a Copy**, or Save As under another name, makes a new item beside the picture. The type is asked only for a new document's first save.
+- **Removed:** the question "Replace the picture / Add it beside" and its setting: Save now writes the file, and Save a Copy puts a new one beside it.
+
 ## 0.59.11 — The panels' buttons on the right edge (2026-11-15)
 
 - **Changed:** the panels' buttons (Adjust, Layers, Tags, Styles, Pattern, Bookmarks) are a column on the right edge, under the Settings button, as the tools are on the left; only the view buttons are in the top corners, and the Properties bar has the top row to itself. The panels docked on the right open beside the column, never under it. On a phone it is on the right under the bars too, no longer a row across the screen; a short window scrolls it, clear of the bottom-right bar.

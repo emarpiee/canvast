@@ -10,7 +10,7 @@ import type { EditorState } from "../../app/editor-state";
 import type { Session } from "../../app/session";
 import type { ExportTarget, RenderDeps } from "../../app/export-render";
 import { exportTarget } from "../../app/actions";
-import { editedName, encodePicture } from "../../app/frames";
+import { encodePicture } from "../../app/frames";
 import { psdPixels } from "../../assets/art-preview";
 import { readZip } from "../../storage/zip";
 import { fileInLibrary } from "../../app/library-filing";
@@ -99,8 +99,6 @@ export const editableInPhotoCraft = (name: string, type = ""): boolean =>
 type SaveType = "keep" | "png" | "jpeg" | "webp";
 /** The layered kinds its page saves a new document as (PSD), or a Krita or OpenRaster one (ORA). */
 const LAYERED = ["psd", "psb", "ora"];
-/** Project files: saved as the same kind, they are written over (a new version in their place). */
-const PROJECTS = [...LAYERED, "pcraft"];
 
 /** The library folder of the files PhotoCraft saves that are not pictures (its shortcuts, presets, swatches). */
 const FILES_FOLDER = "PhotoCraft files";
@@ -119,6 +117,7 @@ export function createPhotoCraft(deps: PhotoCraftDeps): PhotoCraftApp {
   let making = false;
   const origins = new Map<string, Origin>();
   const stem = (name: string): string => splitName(name).stem.toLowerCase();
+  const extOf = (name: string): string => splitName(name).ext.toLowerCase();
   const state = createState({ settings, session, assets });
   /** What happened, in the app's notices (shown over PhotoCraft's view too). */
   const say = (text: string): void => {
@@ -135,29 +134,27 @@ export function createPhotoCraft(deps: PhotoCraftDeps): PhotoCraftApp {
   const savedAs = new Map<string, { hash: string; name: string; type: SaveType }>();
 
   /**
-   * A file it saved. Saved again (in this run), or saved as the kind of file it was opened from (a PSD of the library saved as PSD), it is
-   * a new version of that library item, in its place everywhere (its name, folder, tags, and the canvases that show it; the older version
-   * in the trash): the library does not grow with each save. Otherwise (a picture saved as PSD, a new document) it is a new item, and on
-   * the canvas in place of the picture it came from or beside it (asked), or beside the sheet or pictures a project was made of.
+   * A file it saved, as Save does on a desktop. A document opened from a file (of the library or the canvas) is saved into that file, in
+   * that file's own kind: the same kind as it is, a PNG, JPEG or WebP from its merged picture (its page saves every document as PSD,
+   * having no path to write back to), a new version in the file's place everywhere (its name, folder, tags, the canvases that show it;
+   * the older version in the trash, or written over in the desktop build). Saved again, it is a new version of what it saved. A new
+   * document, a copy (Save a Copy, or Save As under another name), or a file of a kind canvast cannot write is a new item: its type
+   * asked when it is a layered file, placed beside the picture, sheet or pictures it came from.
    */
   async function saved(name: string, blob: Blob): Promise<void> {
     savedCount++;
     const key = stem(name);
     const prev = savedAs.get(key);
-    // (by the name it opened with; renamed in its Save As, it is still the one file open, when only one is)
-    const origin = origins.get(key) ?? (origins.size === 1 ? [...origins.values()][0] : undefined);
-    const extOf = (n: string): string => splitName(n).ext.toLowerCase();
-    // the item this save is a new version of: its earlier save, or the item it was opened from when it is saved as the same kind
-    // (only a project file is written over so: a picture opened, a photo or a reference, never is; an edit of it is an item of its own)
-    const project = (n: string): boolean => PROJECTS.includes(extOf(n).replace(/^\./, ""));
-    const target = prev ?? (origin && origin.kind !== "beside" && extOf(origin.name) === extOf(name) && project(name) ? { hash: origin.hash, name: origin.name, type: "keep" as SaveType } : null);
-    if (target) {
-      const out = await asType(name, blob, target.type);
-      const hash = await session.saveVersion(target.hash, new File([out.blob], target.name, { type: out.blob.type }));
-      if (!hash) return; // (it said why)
-      savedAs.set(key, { ...target, hash });
-      if (origin && origin.kind !== "beside" && origin.hash === target.hash) origin.hash = hash;
-      return say(hash === target.hash ? `“${target.name}” saved again: nothing changed.` : `“${target.name}” saved from PhotoCraft: a new version in its place (the earlier one is in the trash).`);
+    if (prev) {
+      const out = await asType(name, blob, prev.type);
+      if (out && extOf(out.name) === extOf(prev.name)) return version(prev.hash, prev.name, out, key, prev.type);
+    }
+    const opened = origins.get(key);
+    if (!prev && opened && opened.kind !== "beside") {
+      const type = typeFor(opened.name, name);
+      const out = type ? await asType(name, blob, type) : null;
+      if (type && out) return version(opened.hash, opened.name, out, key, type, opened);
+      say(`PhotoCraft here saves “${opened.name}” as ${splitName(name).ext.replace(/^\./, "").toUpperCase()}: kept as a new item beside it (File › Export › Export As… in PhotoCraft writes other types).`);
     }
     // A file that is not a picture (a set of shortcuts, presets, a swatch file it exported): kept in the library as it is, in its own folder.
     if (!editableInPhotoCraft(name, blob.type)) {
@@ -166,48 +163,39 @@ export function createPhotoCraft(deps: PhotoCraftDeps): PhotoCraftApp {
       savedAs.set(key, { hash: record.hash, name: record.name, type: "keep" });
       return say(`“${record.name}” saved from PhotoCraft to ${where}.`);
     }
-    // its type: asked at the first save of a new document when it comes as a layered file (its page saves every new one as PSD)
+    // a new item: of a new document, a project, or a copy of the one document open (renamed in its Save a Copy or Save As)
+    const from = opened ?? (origins.size === 1 ? [...origins.values()][0] : undefined);
     const type = await chooseType(name);
     if (!type) return say(`“${name}” was not kept: no type was chosen.`);
-    const out = await asType(name, blob, type);
-    const sameName = origin && origin.kind !== "beside" && stem(out.name) === stem(origin.name);
-    const fileName = sameName ? `${editedName(session, settings, origin.name)}${splitName(out.name).ext}` : out.name;
-    const { record } = await assets.importFileDetailed(new File([out.blob], fileName, { type: out.blob.type }), true);
+    const out = (await asType(name, blob, type)) ?? { name, blob };
+    const { record } = await assets.importFileDetailed(new File([out.blob], out.name, { type: out.blob.type }), true);
     savedAs.set(key, { hash: record.hash, name: record.name, type });
     const tags: string[] = [];
     if (settings.get("edit.tagEdited")) tags.push("edited-picture");
-    if (origin && origin.kind !== "beside" && settings.get("edit.tagInherit")) tags.push(...((await session.catalog?.entry(origin.hash).catch(() => undefined))?.tags ?? []));
+    if (from && from.kind !== "beside" && settings.get("edit.tagInherit")) tags.push(...((await session.catalog?.entry(from.hash).catch(() => undefined))?.tags ?? []));
     tags.push(...parseTags(settings.get("edit.tagsCustom")));
     const where = await fileInLibrary(session, record.hash, settings.get("edit.folder"), tags);
     const placeable = !record.type.startsWith("video/") && !record.type.startsWith("audio/");
-    if (origin?.kind === "beside" && placeable) placeBeside(origin.target, record, where);
-    else if (origin?.kind !== "canvas" || !placeable) say(`“${record.name}” saved from PhotoCraft to ${where}.`);
-    else {
-      const o = doc.get(origin.objectId);
-      if (!o || o.kind !== "image") say(`“${record.name}” saved from PhotoCraft to ${where} (its picture is no longer on the canvas).`);
-      else {
-        let how = settings.get("photocraft.saveCanvas");
-        if (how === "ask") {
-          let remember = false;
-          const answer = await chooseDialog({
-            title: "Put the edited picture on the canvas",
-            lines: [`“${record.name}” is in the library (${where}).`],
-            choices: [
-              { value: "replace", label: "Replace the picture", help: "The picture on the canvas shows the edited file. Undo brings the old one back; its file stays in the library." },
-              { value: "beside", label: "Add it beside", help: "A new picture next to the old one, which stays as it was." },
-            ],
-            confirmLabel: "Put it on the canvas",
-            remember: { label: "Don't ask again (Settings > ArtCraft > PhotoCraft)", set: (on) => { remember = on; } },
-          });
-          if (answer) {
-            how = answer as "replace" | "beside";
-            if (remember) settings.set("photocraft.saveCanvas", how);
-          }
-        }
-        if (how === "ask") say(`“${record.name}” saved to ${where}; the canvas is as it was.`);
-        else putOnCanvas(o, record, how === "replace");
-      }
-    }
+    const o = from?.kind === "canvas" ? doc.get(from.objectId) : undefined;
+    if (from?.kind === "beside" && placeable) placeBeside(from.target, record, where);
+    else if (o?.kind === "image" && placeable) besidePicture(o, record);
+    else say(`“${record.name}” saved from PhotoCraft to ${where}.`);
+  }
+
+  /** The kind a save of a document opened from `opened` is written as into it: as it came, merged into a PNG, JPEG or WebP, or none. */
+  function typeFor(opened: string, saved: string): SaveType | null {
+    const o = extOf(opened);
+    if (o === extOf(saved)) return "keep";
+    return o === ".png" ? "png" : o === ".jpg" || o === ".jpeg" ? "jpeg" : o === ".webp" ? "webp" : null;
+  }
+
+  /** A new version of a library item, in its place everywhere (the older one in the trash; written over in the desktop build). */
+  async function version(hash: string, itemName: string, out: { blob: Blob }, key: string, type: SaveType, opened?: { hash: string }): Promise<void> {
+    const h = await session.saveVersion(hash, new File([out.blob], itemName, { type: out.blob.type }));
+    if (!h) return; // (it said why)
+    savedAs.set(key, { hash: h, name: itemName, type });
+    if (opened) opened.hash = h;
+    say(h === hash ? `“${itemName}” saved: nothing changed.` : `“${itemName}” saved from PhotoCraft.`);
   }
 
   /** The type of a document's first save, when PhotoCraft wrote a layered file (as its desktop Save As asks). Null: cancelled. */
@@ -234,7 +222,7 @@ export function createPhotoCraft(deps: PhotoCraftDeps): PhotoCraftApp {
   }
 
   /** The file in the type chosen: a layered one merged into a picture (its merged picture, as the library's previews read it). */
-  async function asType(name: string, blob: Blob, type: SaveType): Promise<{ name: string; blob: Blob }> {
+  async function asType(name: string, blob: Blob, type: SaveType): Promise<{ name: string; blob: Blob } | null> {
     if (type === "keep") return { name, blob };
     const ext = splitName(name).ext.replace(/^\./, "").toLowerCase();
     let png: Blob | null = null;
@@ -248,37 +236,20 @@ export function createPhotoCraft(deps: PhotoCraftDeps): PhotoCraftApp {
         png = await new Promise<Blob | null>((r) => c.toBlob(r, "image/png"));
       }
     } else if (ext === "ora") png = (await readZip(blob).catch(() => null))?.get("mergedimage.png")?.data ?? null;
-    if (!png) {
-      say(`“${name}” has no merged picture to make a ${type.toUpperCase()} of: it is kept as it is.`);
-      return { name, blob };
-    }
+    if (!png) return null; // (no merged picture in it: saved with Maximize compatibility off)
     const enc = await encodePicture(png, type, settings.get("edit.quality"));
     return { name: `${splitName(name).stem}.${enc.ext}`, blob: enc.blob };
   }
 
-  /** The edited file on the canvas: in place of `o` (one step of undo) or beside it. */
-  function putOnCanvas(o: ImageObject, record: AssetRecord, replace: boolean): string {
-    const h = (o.w * record.pixelH) / Math.max(1, record.pixelW);
-    if (replace) {
-      const sameSize = record.pixelW === o.pixelW && record.pixelH === o.pixelH;
-      // (a card's page or view belongs to the old file)
-      const { crop, preview: _pv, ...rest } = o;
-      const next: ImageObject = { ...rest, ...(sameSize && crop ? { crop } : {}), assetId: record.hash, pixelW: record.pixelW, pixelH: record.pixelH, h: sameSize ? o.h : h };
-      doc.commit(doc.transaction("Edit in PhotoCraft", [next]));
-      editor.select([o.id]);
-      say(`The picture on the canvas now shows “${record.name}”, saved from PhotoCraft.`);
-      editor.changed();
-      return o.id;
-    } else {
-      const { crop: _c, flipX: _fx, flipY: _fy, adjust: _a, groups: _g, hidden: _h, locked: _l, parent: _p, preview: _pv, ...rest } = o;
-      const copy: ImageObject = { ...rest, id: newObjectId(), assetId: record.hash, pixelW: record.pixelW, pixelH: record.pixelH, h, z: doc.topZ() + 1 };
-      const placed = translate(copy, D.shift(D.fromNumber(o.w * 1.05), o.unit), D.ZERO) as ImageObject;
-      doc.commit(doc.transaction("Edit in PhotoCraft", [placed]));
-      editor.select([placed.id]);
-      say(`“${record.name}”, saved from PhotoCraft, placed beside the picture on the canvas.`);
-      editor.changed();
-      return placed.id;
-    }
+  /** A copy of a picture beside it on the canvas (one step of undo). */
+  function besidePicture(o: ImageObject, record: AssetRecord): void {
+    const { crop: _c, flipX: _fx, flipY: _fy, adjust: _a, groups: _g, hidden: _h, locked: _l, parent: _p, preview: _pv, ...rest } = o;
+    const copy: ImageObject = { ...rest, id: newObjectId(), assetId: record.hash, pixelW: record.pixelW, pixelH: record.pixelH, h: (o.w * record.pixelH) / Math.max(1, record.pixelW), z: doc.topZ() + 1 };
+    const placed = translate(copy, D.shift(D.fromNumber(o.w * 1.05), o.unit), D.ZERO) as ImageObject;
+    doc.commit(doc.transaction("Edit in PhotoCraft", [placed]));
+    editor.select([placed.id]);
+    say(`“${record.name}”, saved from PhotoCraft, placed beside the picture on the canvas.`);
+    editor.changed();
   }
 
   /** A saved project beside the sheet or pictures it was made of: as wide as their box, a twentieth of it apart. */
