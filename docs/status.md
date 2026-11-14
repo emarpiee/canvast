@@ -47,6 +47,12 @@ Unverified / Committed / Next bounded task**.
 - **Committed:** v0.57.19 on `main`.
 - **Next bounded task:** retake the README screenshots in Stone when the owner says.
 
+## v0.58.34: a fresh start's settings, kept apart (2026-11-14)
+
+- **Implemented:** `SettingsStore.fresh` (nothing stored yet); its first save adds `ui.barPlaces` 1, and the one-time bar migration in `main.ts` skips a fresh start; no value is set in memory (`snapshot()` of a fresh store is empty again: the CI unit test of 0.58.33).
+- **Tested:** typecheck here. CI on 0.58.33 failed on that unit test (fixed here); Pan and zoom on 0.58.33 was over its budget once (wheel-zoom-slow p95 33 > 25 ms) on a commit with no app change, run again as the rule says.
+- **Committed:** v0.58.34 on `main`.
+
 ## v0.58.33: the README's animation made again; specs keep their bar settings over a reload (2026-11-14)
 
 - **Implemented:** `docs/screenshots/canvast-60s.gif` from the `Showcase GIF` run 43536039426 (0.58.31; 23.5 MB, README says about 23 MB). Tests: `saveSettings` in the harness adds a test's own settings to what is saved; the twelve places in six specs that replaced all the settings before a reload use it (with the harness writing only on a page's first load since 0.58.32, a spec that replaced them lost the bar at the top: `vectors.spec`'s initial shape timed out in Firefox).

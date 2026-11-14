@@ -300,13 +300,14 @@ export class SettingsStore {
   private readonly values = new Map<string, unknown>();
   private readonly listeners = new Set<(key: SettingKey) => void>();
   private wsAt = 0;
+  /** Nothing was stored yet (a new browser, or after Start from scratch): the bars are in the app's own places already (ADR 0198). */
+  readonly fresh: boolean = true;
 
   constructor(private readonly storage: Pick<Storage, "getItem" | "setItem" | "removeItem"> | null = safeLocalStorage()) {
     let raw: Record<string, unknown> = {};
-    let fresh = true;
     try {
       const text = storage?.getItem(DEVICE_KEY);
-      fresh = !text;
+      this.fresh = !text;
       const parsed: unknown = text ? JSON.parse(text) : {};
       if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) raw = parsed as Record<string, unknown>;
       // Before settings existed, the last view was stored on its own.
@@ -321,8 +322,6 @@ export class SettingsStore {
       const v = (SETTINGS[key] as Def<unknown>).validate(raw[key]);
       if (v !== undefined) this.values.set(key, v);
     }
-    // (a fresh start has the bars in the app's own places already, ADR 0198: nothing to move once, and nothing written until a setting changes)
-    if (fresh) this.values.set("ui.barPlaces", 1);
     try {
       const at = Number(storage?.getItem(WS_AT_KEY));
       if (Number.isFinite(at) && at > 0) this.wsAt = at;
@@ -461,7 +460,8 @@ export class SettingsStore {
 
   private save(): void {
     try {
-      this.storage?.setItem(DEVICE_KEY, JSON.stringify(Object.fromEntries(this.values)));
+      // (a fresh start's first save says its bars were never elsewhere: nothing to move at the next start)
+      this.storage?.setItem(DEVICE_KEY, JSON.stringify({ ...(this.fresh ? { "ui.barPlaces": 1 } : {}), ...Object.fromEntries(this.values) }));
       this.storage?.removeItem(LEGACY_VIEW_KEY);
     } catch {
       // storage full or blocked: the value stays for this session

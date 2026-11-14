@@ -340,7 +340,7 @@ async function start(): Promise<void> {
   // The places of the bars are the app's own now, not settings (ADR 0198): the Properties bar near the selection, the Actions bar at the bottom,
   // its group names over its buttons. Their rows are hidden, so a value saved before is put to these, once (the debug hook can still change
   // them: the tests do).
-  if (settings.get("ui.barPlaces") < 1) {
+  if (settings.get("ui.barPlaces") < 1 && !settings.fresh) { // (a fresh start has them there already, and writes nothing)
     settings.set("ui.properties", "near");
     settings.set("ui.actions", "bottom");
     settings.set("ui.groupNames", "top");

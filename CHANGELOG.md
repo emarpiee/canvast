@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.58.34 — A fresh start's settings, kept apart (2026-11-14)
+
+- **Fixed:** since 0.58.32 a fresh start counted the bars' places as one of its own settings, so a backup's settings and the list of this device's settings held it too; it is only written with the first setting saved now.
+
 ## 0.58.33 — The README's animation made again (2026-11-14)
 
 - **Changed:** the one-minute animation at the top of the README is made again from this version, by the *Showcase GIF* workflow: the chips by the selection, one field look, the balloon's chips.
