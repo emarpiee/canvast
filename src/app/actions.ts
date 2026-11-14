@@ -3162,13 +3162,13 @@ export function uncropPicture(doc: DocumentStore, editor: EditorState): void {
   editor.changed();
 }
 
-/** What Flip mirrors: the selected pictures (not sound), shapes, paths, pen strokes and texts (moved, not mirrored), unlocked; a boolean group's result through its members; not a sheet. */
-function flippables(doc: DocumentStore, editor: EditorState): CanvasObject[] {
-  const sel = selected(doc, editor).filter((o) => !o.locked && !(o.kind === "image" && o.media?.kind === "audio") && !isContainer(o));
+/** What Flip mirrors: the selected pictures (not sound), shapes and paths, unlocked; a boolean group's result through its members; not a sheet. */
+function flippables(doc: DocumentStore, editor: EditorState): (ImageObject | PathObject)[] {
+  const sel = selected(doc, editor).filter((o): o is ImageObject | PathObject => !o.locked && ((o.kind === "image" && o.media?.kind !== "audio") || (o.kind === "path" && !isContainer(o))));
   const ids = new Set(sel.map((o) => o.id));
-  const out = sel.filter((o) => !isResult(o));
-  for (const r of sel) if (isResult(r)) for (const m of doc.all()) if (m.groups?.includes((r as PathObject).result!) && !isResult(m) && !m.locked && !ids.has(m.id)) { ids.add(m.id); out.push(m); }
-  return out.some((o) => o.kind !== "text") ? out : [];
+  const out: (ImageObject | PathObject)[] = sel.filter((o) => !isResult(o));
+  for (const r of sel) if (isResult(r)) for (const m of doc.all()) if (m.kind === "path" && m.result === undefined && m.groups?.includes((r as PathObject).result!) && !m.locked && !ids.has(m.id)) { ids.add(m.id); out.push(m); }
+  return out;
 }
 
 /** Which way the selected pictures are flipped: `x` / `y` when the selection is pictures that all are (null: nothing to flip). */

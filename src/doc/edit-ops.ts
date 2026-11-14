@@ -1,8 +1,8 @@
 import * as D from "../core/dyadic";
 import type { WorldPoint } from "../core/camera";
 import { cosSin, normAngle } from "../core/angle";
-import type { CanvasObject, PathObject, SheetLayout } from "./model";
-import { localBounds, pivotOf, strokePivot } from "./model";
+import type { CanvasObject, ImageObject, PathObject, SheetLayout } from "./model";
+import { localBounds, pivotOf } from "./model";
 import { mirroredPaint } from "./paint";
 import { flipped } from "./crop";
 import { scaleParams, scaleRadius, scaleSubs } from "./path";
@@ -145,22 +145,18 @@ export function scaleAbout(o: CanvasObject, fixed: WorldPoint, kx: number, ky: n
 }
 
 /**
- * An object mirrored left to right (`x`) or top to bottom across the line through its own middle, as the canvas sees it (ADR 0203): a
- * picture is flipped in its box, a shape's or a pen stroke's points are mirrored (with its gradients and a network's region fills), and a
- * turn goes the other way. A text is not mirrored (its letters stay readable); only its turn does. Its middle stays where it was.
+ * A picture or a shape mirrored left to right (`x`) or top to bottom across the line through its own middle, as the canvas sees it
+ * (ADR 0203): a picture is flipped in its box, a shape's points are mirrored (with its gradients and a network's region fills), and a turn
+ * goes the other way. Its middle stays where it was.
  */
-export function mirrored(o: CanvasObject, axis: "x" | "y"): CanvasObject {
+export function mirrored<T extends ImageObject | PathObject>(o: T, axis: "x" | "y"): T;
+export function mirrored(o: ImageObject | PathObject, axis: "x" | "y"): ImageObject | PathObject {
   const turn = o.rot ? { rot: normAngle(-o.rot) } : {};
   if (o.kind === "image") {
     const { rot: _r, ...rest } = flipped(o, axis);
     return { ...rest, ...turn };
   }
-  if (o.kind === "text") return { ...o, ...turn };
   const i = axis === "x" ? 0 : 1;
-  if (o.kind === "stroke") {
-    const pv = strokePivot(o), c = 2 * (i ? pv.y : pv.x);
-    return { ...o, points: o.points.map((v, k) => (k % 2 === i ? c - v : v)), ...turn };
-  }
   // A path: its local points times -1 along the axis (about its local origin), and its anchor moved by twice its middle, so the middle stays.
   const pv = pivotOf(o);
   const [kx, ky] = i ? [1, -1] : [-1, 1];
