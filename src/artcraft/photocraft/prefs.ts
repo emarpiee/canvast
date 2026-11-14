@@ -56,3 +56,24 @@ export function themeKeys(saved: string | null): Array<{ command: string; key: s
   const commands = mode === "light" ? [light] : mode === "dark" ? [dark] : mode === "auto" ? [dark, light, "system"] : [typeof i["theme"] === "string" ? i["theme"] : null];
   return commands.filter((c): c is string => !!c && /^[a-zA-Z]+$/.test(c)).map((c, n) => ({ command: `window.theme.${c}`, key: `F${13 + n}` }));
 }
+
+/** The theme fields of the preferences kept (its mode and its dark and light themes), to see when it shows them again. */
+export function themeWanted(saved: string | null): { mode?: string; dark?: string; light?: string } {
+  try {
+    const i = obj(obj(saved ? JSON.parse(saved) : {})["interface"]);
+    const str = (k: string): string | undefined => (typeof i[k] === "string" ? (i[k] as string) : undefined);
+    const mode = str("appearanceMode"), dark = str("darkTheme"), light = str("lightTheme");
+    return { ...(mode ? { mode } : {}), ...(dark ? { dark } : {}), ...(light ? { light } : {}) };
+  } catch {
+    return {};
+  }
+}
+
+/** Whether the preferences it saved show the theme `wanted`: its mode, and the theme of that mode (both when it follows the system). */
+export function themeIs(saved: string | null, wanted: { mode?: string; dark?: string; light?: string }): boolean {
+  if (!wanted.mode) return true; // (an older file with only its single theme: nothing more to check)
+  const now = themeWanted(saved);
+  if (now.mode !== wanted.mode) return false;
+  const darkOk = !wanted.dark || now.dark === wanted.dark, lightOk = !wanted.light || now.light === wanted.light;
+  return wanted.mode === "dark" ? darkOk : wanted.mode === "light" ? lightOk : darkOk && lightOk;
+}

@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.59.14 — PhotoCraft's theme is given back until it shows (2026-11-15)
+
+- **Fixed:** PhotoCraft's theme could still start as Pro: its runtime takes keys only while its canvas has the focus, and the theme's command was pressed once, while the page around it still held it. The frame and its canvas are now given the focus, and the command is pressed again until PhotoCraft's own preferences show the theme chosen (its mode and that mode's theme), for 15 seconds at most.
+
 ## 0.59.13 — Standard words in the interface (2026-11-15)
 
 - **Changed:** the Pen's chip in the Properties bar is **Pen** (it said Brush); the size of the pen is **Pen size** everywhere (the size buttons, Settings, *Pen size follows zoom*), and its lock is **Lock pen size** (it said Lock thickness).

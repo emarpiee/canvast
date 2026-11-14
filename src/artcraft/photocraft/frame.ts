@@ -1,7 +1,7 @@
 import { PHOTOCRAFT_FEATURES } from "./features";
 import type { PhotoCraftFeatures } from "./features";
 import { photoCraftPayload, photoCraftWasm } from "./payload";
-import { PREFS_KEY, preparePrefs, themeKeys } from "./prefs";
+import { PREFS_KEY, preparePrefs, themeIs, themeKeys, themeWanted } from "./prefs";
 
 /**
  * PhotoCraft running in a frame of its own (same origin, no address: the page's security policy holds in it too, so it can reach no
@@ -64,8 +64,9 @@ export function startPhotoCraft(container: HTMLElement, host: PhotoCraftHost, fe
   const payload = photoCraftPayload();
   if (!payload) throw new Error("PhotoCraft is not in this build.");
   let keys: ReturnType<typeof themeKeys> = [];
+  let savedPrefs: string | null = null;
   try {
-    const saved = localStorage.getItem(PREFS_KEY);
+    const saved = (savedPrefs = localStorage.getItem(PREFS_KEY));
     keys = themeKeys(saved);
     localStorage.setItem(PREFS_KEY, preparePrefs(saved, features.menus, features.tools, keys));
   } catch {
@@ -181,13 +182,25 @@ export function startPhotoCraft(container: HTMLElement, host: PhotoCraftHost, fe
   let notStarted!: (e: Error) => void;
   const ready = new Promise<void>((ok, no) => { started = ok; notStarted = no; });
   ready.catch(() => undefined);
-  // (the theme chosen, by its own Window › Theme commands, once it runs: see prefs.ts `themeKeys`)
-  void ready.then(() => {
+  // The theme chosen, by its own Window › Theme commands, once it runs (prefs.ts `themeKeys`). Its runtime takes keys only while its canvas
+  // has the focus, which the page around it may still hold: the frame and its canvas are given it, the keys pressed, and pressed again
+  // until what it saves says the theme is the one chosen (every half second, for 15 seconds at most).
+  const wanted = themeWanted(savedPrefs);
+  const pressKeys = (): void => {
     const canvas = doc.getElementById("photocraft_canvas");
+    iframe.focus();
     canvas?.focus();
     pressing = true;
     for (const k of keys) for (const type of ["keydown", "keyup"]) (canvas ?? doc).dispatchEvent(new win.KeyboardEvent(type, { key: k.key, code: k.key, bubbles: true, cancelable: true }));
     pressing = false;
+  };
+  void ready.then(async () => {
+    if (!keys.length) return;
+    for (let i = 0; i < 30 && !destroyed; i++) {
+      pressKeys();
+      await new Promise((ok) => setTimeout(ok, 500));
+      if (themeIs(localStorage.getItem(PREFS_KEY), wanted)) return;
+    }
   }, () => undefined);
   const watch = new win.MutationObserver(() => {
     const loading = doc.getElementById("photocraft_loading");
