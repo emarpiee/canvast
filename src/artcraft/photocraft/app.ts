@@ -101,6 +101,8 @@ export function createPhotoCraft(deps: PhotoCraftDeps): PhotoCraftApp {
   let savedCount = 0;
   let failed = "";
   let keepTimer = 0;
+  /** A layered project is being made: its line stays until it is open in PhotoCraft. */
+  let making = false;
   const origins = new Map<string, Origin>();
   const stem = (name: string): string => splitName(name).stem.toLowerCase();
   const state = createState({ settings, session, assets });
@@ -243,7 +245,7 @@ export function createPhotoCraft(deps: PhotoCraftDeps): PhotoCraftApp {
       deps.runningChanged(true);
       started.ready.then(() => {
         ready = true;
-        view?.status("");
+        if (!making) view?.status("");
       }, (e: unknown) => {
         failed = String((e as Error)?.message ?? e);
         view?.status(`PhotoCraft could not start: ${failed}`);
@@ -326,14 +328,19 @@ export function createPhotoCraft(deps: PhotoCraftDeps): PhotoCraftApp {
     settings.set("photocraft.sizeRule", choice.rule);
     settings.set("photocraft.sizeValue", choice.value);
     deps.enterView();
+    making = true;
+    view?.busy(true);
     view?.status(`Making ${plural(layers, "layer")}…`);
     try {
       const file = await layeredProject(deps.renderDeps(), t, choice.w, choice.h, cleanName(name, "clean", "project"), (done, total) => view?.status(`Making the layers: ${done} of ${total}…`));
       origins.set(stem(file.name), { kind: "beside", target: t, name: file.name });
-      view?.status("");
       await open([file]);
+      view?.status("");
     } catch (e) {
       view?.status(`The project could not be made: ${(e as Error).message}`);
+    } finally {
+      making = false;
+      view?.busy(false);
     }
   }
 

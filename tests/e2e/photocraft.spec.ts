@@ -123,6 +123,8 @@ test("two pictures as layers of one document: the size asked as Export asks, wha
   await expect(p.getByTestId("photocraft-size")).toContainText("2 layers");
   await p.getByTestId("photocraft-size-ok").click();
   await running(p);
+  // (its layers are drawn while it starts: the project is in it once the view is no longer busy)
+  await expect(p.locator('[data-testid="photocraft-view"]:not([data-busy])')).toBeVisible({ timeout: 60_000 });
   // (PhotoCraft names the document after the project file, pictures.ora: a save of it comes back beside the two pictures, not asked)
   await saveFromPhotoCraft(p, "pictures.png", makePng(180, 60, () => [90, 90, 200, 255]));
   await expect.poll(async () => (await objs(app)).length).toBe(3);

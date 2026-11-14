@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.59.6 — A layered project is in PhotoCraft before you save it (2026-11-15)
+
+- **Fixed:** with several pictures or a sheet opened as layers, PhotoCraft's view opened while the layers were still being drawn, and its start cleared the "Making the layers" line: a file saved in that moment did not come back beside them. The line now stays until the project is open in PhotoCraft.
+
 ## 0.59.5 — PhotoCraft's view tidied, no false "not saved" (2026-11-15)
 
 - **Changed:** PhotoCraft's view is the whole window under the top bar, as Library and Settings are: the canvas, its bars and its panels no longer show behind or around it, its own title row is gone (its tab says PhotoCraft), it is closed with the **×** beside its tab, and what it saved is said once, in the notices.

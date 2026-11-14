@@ -12,6 +12,8 @@ export interface PhotoCraftView {
   hide(): void;
   /** A line above it while it starts or makes a project ("" hides it). */
   status(text: string): void;
+  /** A project is being made for it (`data-busy` on the view, for whoever waits for it to open). */
+  busy(on: boolean): void;
 }
 
 export function mountPhotoCraftView(): PhotoCraftView {
@@ -38,5 +40,8 @@ export function mountPhotoCraftView(): PhotoCraftView {
       root.hidden = true;
     },
     status: put,
+    busy(on) {
+      root.toggleAttribute("data-busy", on);
+    },
   };
 }
