@@ -163,6 +163,17 @@ export function asKind(g: Gradient, type: GradientKind): Gradient {
 }
 
 /** The angle of a linear gradient, in degrees (0: left to right, 90: top to bottom). */
+/** A paint mirrored with its shape, left to right (`x`) or top to bottom, in its box; a colour or a texture stays as it is. */
+export function mirroredPaint(p: Paint, axis: "x" | "y"): Paint {
+  if (!isGradient(p)) return p;
+  const fx = (v: number): number => (axis === "x" ? 1 - v : v), fy = (v: number): number => (axis === "y" ? 1 - v : v);
+  if (p.type === "linear") return { ...p, x0: fx(p.x0), y0: fy(p.y0), x1: fx(p.x1), y1: fy(p.y1) };
+  if (p.type === "radial") return { ...p, cx: fx(p.cx), cy: fy(p.cy) };
+  // (colours going round turn the other way: the stops are read backwards, from the mirrored start)
+  const angle = (((axis === "x" ? 180 - p.angle : -p.angle) % 360) + 360) % 360;
+  return { ...p, cx: fx(p.cx), cy: fy(p.cy), angle, stops: [...p.stops].reverse().map((s) => ({ ...s, o: 1 - s.o })) };
+}
+
 export const angleOf = (g: LinearGradient): number => (((Math.atan2(g.y1 - g.y0, g.x1 - g.x0) * 180) / Math.PI) % 360 + 360) % 360;
 
 /** A linear gradient at `deg`, through the middle of the box, long enough to reach its corners. */

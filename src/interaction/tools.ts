@@ -58,7 +58,7 @@ import type { SelectionFrame } from "../render/selection-frame";
 import { TURN, angleFromRadians, cosSin, normAngle, radiansFromAngle } from "../core/angle";
 import { formatRatio } from "../app/export-size";
 import { PanGesture } from "./navigation";
-import { autoLayoutOf, patchAutoLayout, drawSheetOver, finishShapeBuilder, fillGapAt, finishGapFill, attachSelection, sheetSelection, arrangeSelection, commitCornerAt, commitCornerSet, commitCorners, commitShape as commitShapeNumbers, balloonText, setShapeText, setTextStyle, setBalloonLink, commitPaint, deleteSelection, flattenSelection, duplicateSelection, groupSelection, previewPaint, redo, ungroupSelection, undo } from "../app/actions";
+import { autoLayoutOf, patchAutoLayout, drawSheetOver, finishShapeBuilder, fillGapAt, finishGapFill, attachSelection, sheetSelection, arrangeSelection, commitCornerAt, commitCornerSet, commitCorners, commitShape as commitShapeNumbers, balloonText, setShapeText, setTextStyle, setBalloonLink, commitPaint, deleteSelection, flattenSelection, duplicateSelection, flipSelection, groupSelection, previewPaint, redo, ungroupSelection, undo } from "../app/actions";
 import { expandToUnits, groupObjects, isInside, unitsWithin } from "../doc/groups";
 import { boolGroupsOf, isResult } from "../doc/boolean-group";
 
@@ -2840,6 +2840,9 @@ export function attachTools(
     } else if (!mod && e.shiftKey && !e.altKey && key === "a") {
       e.preventDefault();
       hooks.autoLayout();
+    } else if (!mod && e.shiftKey && !e.altKey && (key === "h" || key === "v") && editor.selection.size && g.kind === "none") {
+      e.preventDefault(); // (Shift+H, Shift+V: mirror the selection, ADR 0203)
+      flipSelection(doc, editor, key === "h" ? "x" : "y");
     } else if (mod && key === "g") {
       if (e.shiftKey) ungroupSelection(doc, editor);
       else groupSelection(doc, editor);

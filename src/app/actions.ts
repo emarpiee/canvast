@@ -33,7 +33,7 @@ import { planLayerMove, type LayerPlace } from "../doc/layer-move";
 import { DEFAULT_CONSTRAINT, constraintOf } from "../doc/constraints";
 import { cleanAdjust, cropOf, isNeutral, reachFraction } from "../doc/adjust";
 import type { Adjust } from "../doc/adjust";
-import { cropEdges, flipped, uncrop } from "../doc/crop";
+import { cropEdges, uncrop } from "../doc/crop";
 import { renderedPicture, setAdjustPreviewing } from "../render/adjust-image";
 import { DEFAULT_INK, newInk } from "../render/ink";
 import type { Constraint } from "../doc/constraints";
@@ -64,7 +64,7 @@ import { planSheetScale } from "../doc/constraints";
 import { DEFAULT_LAYOUT, guessLayout, isLaidOut, layOutSheet, layoutNow, type LaidOutSheet } from "../doc/auto-layout";
 import { ownerOf } from "../doc/belongs";
 import type { LayoutPatch, SheetLayout } from "../doc/model";
-import { localToWorld, normalizeUnit, placeAbove, unionBounds, restack, rotateAbout, translate } from "../doc/edit-ops";
+import { localToWorld, mirrored, normalizeUnit, placeAbove, unionBounds, restack, rotateAbout, translate } from "../doc/edit-ops";
 import { expandToUnits, groupObjects, ungroupObjects, unitKey } from "../doc/groups";
 import type { AlignKey, GapKey, SortKey, Unit } from "../doc/arrange";
 import { buildPayload, ClipboardError, instantiate, parsePayload } from "../doc/clipboard";
@@ -3162,19 +3162,43 @@ export function uncropPicture(doc: DocumentStore, editor: EditorState): void {
   editor.changed();
 }
 
-/** Which way the picked pictures are flipped: `x` / `y` when every one is (null: no picture is picked). */
-export function selectedFlip(doc: DocumentStore, editor: EditorState): { x: boolean; y: boolean } | null {
-  const ps = pictures(doc, editor);
-  return ps.length ? { x: ps.every((o) => o.flipX), y: ps.every((o) => o.flipY) } : null;
+/** What Flip mirrors: the selected pictures (not sound), shapes, paths, pen strokes and texts (moved, not mirrored), unlocked; a boolean group's result through its members; not a sheet. */
+function flippables(doc: DocumentStore, editor: EditorState): CanvasObject[] {
+  const sel = selected(doc, editor).filter((o) => !o.locked && !(o.kind === "image" && o.media?.kind === "audio") && !isContainer(o));
+  const ids = new Set(sel.map((o) => o.id));
+  const out = sel.filter((o) => !isResult(o));
+  for (const r of sel) if (isResult(r)) for (const m of doc.all()) if (m.groups?.includes((r as PathObject).result!) && !isResult(m) && !m.locked && !ids.has(m.id)) { ids.add(m.id); out.push(m); }
+  return out.some((o) => o.kind !== "text") ? out : [];
 }
 
-/** Mirror the picked pictures left to right (`x`) or top to bottom in their boxes, or back when every one already is: one undo step. */
-export function flipPictures(doc: DocumentStore, editor: EditorState, axis: "x" | "y"): void {
-  const ps = pictures(doc, editor);
-  if (!ps.length || editor.blockEdit()) return;
-  const key = axis === "x" ? "flipX" : "flipY";
-  const on = !ps.every((o) => o[key]);
-  doc.commit(doc.transaction(axis === "x" ? "Flip horizontally" : "Flip vertically", ps.filter((o) => !!o[key] !== on).map((o) => flipped(o, axis))));
+/** Which way the selected pictures are flipped: `x` / `y` when the selection is pictures that all are (null: nothing to flip). */
+export function selectedFlip(doc: DocumentStore, editor: EditorState): { x: boolean; y: boolean } | null {
+  const fs = flippables(doc, editor);
+  if (!fs.length) return null;
+  const ps = fs.every((o) => o.kind === "image") ? (fs as ImageObject[]) : [];
+  return { x: ps.length > 0 && ps.every((o) => o.flipX), y: ps.length > 0 && ps.every((o) => o.flipY) };
+}
+
+/**
+ * Mirror the selection left to right (`x`) or top to bottom, as one (ADR 0203): each object is mirrored across its own middle and moved
+ * to the mirrored place across the middle of the whole selection; one undo step.
+ */
+export function flipSelection(doc: DocumentStore, editor: EditorState, axis: "x" | "y"): void {
+  const fs = flippables(doc, editor);
+  if (!fs.length || editor.blockEdit()) return;
+  const f0 = fs[0]!.frame ?? doc.space.world;
+  const b = unionBounds(fs.map((o) => expressObjectIn(o, f0)))!;
+  const mid = axis === "x" ? D.shift(D.add(b.min.x, b.max.x), -1) : D.shift(D.add(b.min.y, b.max.y), -1);
+  const out = fs.map((o) => {
+    const m = mirrored(o, axis);
+    if (fs.length === 1) return m;
+    // (its middle, in the first one's frame, goes to the other side of the selection's middle)
+    const e = expressObjectIn(o, f0), pv = pivotOf(e), at = localToWorld(e, pv.x, pv.y);
+    const d = D.shift(D.sub(mid, axis === "x" ? at.x : at.y), 1);
+    const L = levelsBetween(o.frame ?? doc.space.world, f0);
+    return axis === "x" ? translate(m, D.shift(d, -L), D.ZERO) : translate(m, D.ZERO, D.shift(d, -L));
+  });
+  doc.commit(doc.transaction(axis === "x" ? "Flip horizontally" : "Flip vertically", out));
   editor.changed();
 }
 

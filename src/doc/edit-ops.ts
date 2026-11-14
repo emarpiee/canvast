@@ -2,7 +2,9 @@ import * as D from "../core/dyadic";
 import type { WorldPoint } from "../core/camera";
 import { cosSin, normAngle } from "../core/angle";
 import type { CanvasObject, PathObject, SheetLayout } from "./model";
-import { localBounds, pivotOf } from "./model";
+import { localBounds, pivotOf, strokePivot } from "./model";
+import { mirroredPaint } from "./paint";
+import { flipped } from "./crop";
 import { scaleParams, scaleRadius, scaleSubs } from "./path";
 import { roundCorners } from "./rounding";
 
@@ -140,6 +142,41 @@ export function scaleAbout(o: CanvasObject, fixed: WorldPoint, kx: number, ky: n
   }
   const k = Math.sqrt(kx * ky); // (a picture's corners and outline scale as the whole does)
   return normalizeUnit({ ...o, anchor, w: o.w * kx, h: o.h * ky, ...(o.kind === "image" && o.page ? pageScaled(o, kx, ky) : {}), ...(o.kind === "image" && o.radius !== undefined ? { radius: scaleRadius(o.radius, k) } : {}), ...(o.kind === "image" && o.width !== undefined ? { width: keepWidth ? o.width : o.width * k } : {}) });
+}
+
+/**
+ * An object mirrored left to right (`x`) or top to bottom across the line through its own middle, as the canvas sees it (ADR 0203): a
+ * picture is flipped in its box, a shape's or a pen stroke's points are mirrored (with its gradients and a network's region fills), and a
+ * turn goes the other way. A text is not mirrored (its letters stay readable); only its turn does. Its middle stays where it was.
+ */
+export function mirrored(o: CanvasObject, axis: "x" | "y"): CanvasObject {
+  const turn = o.rot ? { rot: normAngle(-o.rot) } : {};
+  if (o.kind === "image") {
+    const { rot: _r, ...rest } = flipped(o, axis);
+    return { ...rest, ...turn };
+  }
+  if (o.kind === "text") return { ...o, ...turn };
+  const i = axis === "x" ? 0 : 1;
+  if (o.kind === "stroke") {
+    const pv = strokePivot(o), c = 2 * (i ? pv.y : pv.x);
+    return { ...o, points: o.points.map((v, k) => (k % 2 === i ? c - v : v)), ...turn };
+  }
+  // A path: its local points times -1 along the axis (about its local origin), and its anchor moved by twice its middle, so the middle stays.
+  const pv = pivotOf(o);
+  const [kx, ky] = i ? [1, -1] : [-1, 1];
+  const shift = D.shift(D.fromNumber(2 * (i ? pv.y : pv.x)), o.unit);
+  const anchor = i ? { x: o.anchor.x, y: D.add(o.anchor.y, shift) } : { x: D.add(o.anchor.x, shift), y: o.anchor.y };
+  const { rot: _r, ...rest } = o;
+  return {
+    ...rest,
+    ...stretched(o, kx, ky, true),
+    anchor,
+    fill: o.fill === null ? null : mirroredPaint(o.fill, axis),
+    stroke: o.stroke === null ? null : mirroredPaint(o.stroke, axis),
+    // (a region of a network is named by a half-edge it lies beside: mirrored, it lies beside the other half of that edge)
+    ...(o.regions ? { regions: { ...o.regions, fills: o.regions.fills.map(([h, p]) => [h ^ 1, p === null ? null : mirroredPaint(p, axis)] as const) } } : {}),
+    ...turn,
+  };
 }
 
 /**

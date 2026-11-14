@@ -308,8 +308,8 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
           <select data-pin-v aria-label="Pin vertically: how it follows the sheet's height"><option value="top">Top</option><option value="bottom">Bottom</option><option value="both">Top and bottom</option><option value="center">Middle</option><option value="scale">Scale</option></select></label>
         <button type="button" data-kind="picture" data-crop hidden aria-pressed="false" aria-label="Crop the picture" title="Crop: drag a side or a corner of the picture; drag outward to bring back what was cut. Enter or Escape finishes.">${ICONS.crop}</button>
         <button type="button" data-kind="picture" data-uncrop hidden aria-label="Show the whole picture" title="Show the whole picture again (the crop is removed)">${ICONS.fullscreen}</button>
-        <button type="button" data-kind="picture" data-flip="x" hidden aria-pressed="false" aria-label="Flip horizontally" title="Flip horizontally: mirror the picture left to right in its box">${ICONS.flipHorizontal}</button>
-        <button type="button" data-kind="picture" data-flip="y" hidden aria-pressed="false" aria-label="Flip vertically" title="Flip vertically: mirror the picture top to bottom in its box">${ICONS.flipVertical}</button>
+        <button type="button" data-kind="picture shape stroke text" data-flip="x" hidden aria-pressed="false" aria-label="Flip horizontally" title="Flip horizontally: mirror the selection left to right (Shift+H)">${ICONS.flipHorizontal}</button>
+        <button type="button" data-kind="picture shape stroke text" data-flip="y" hidden aria-pressed="false" aria-label="Flip vertically" title="Flip vertically: mirror the selection top to bottom (Shift+V)">${ICONS.flipVertical}</button>
         <button type="button" data-kind="picture" data-unflip hidden aria-label="Reset flip" title="Reset flip: show the picture the right way round again">${ICONS.resetFlip}</button>
         <span class="tb-count" data-kind="any" data-on-sheet hidden title="Where it is on its sheet, in per cent of the sheet: X and Y from its top-left corner, W and H of its width and height">On sheet
           <label>X <input type="number" data-on-x data-name="Left, % of the sheet" step="any" inputmode="decimal" aria-label="Position from the left of the sheet (per cent of its width)"></label> <label>Y <input type="number" data-on-y data-name="Top, % of the sheet" step="any" inputmode="decimal" aria-label="Position from the top of the sheet (per cent of its height)"></label>
@@ -435,7 +435,8 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
     ['[data-bl-group="link"]', "connector"],
     ["[data-sel-radius-wrap], [data-sel-smooth-wrap], [data-sel-sides-wrap], [data-sel-tips-wrap], [data-sel-inner-wrap]", "shape"],
     ["[data-pin-wrap], [data-on-sheet]", "position"],
-    ["[data-crop], [data-uncrop], [data-flip], [data-unflip]", "picture"],
+    ["[data-crop], [data-uncrop]", "picture"],
+    ["[data-flip], [data-unflip]", "flip"],
     ["[data-sheet-size]", "size"],
     ["[data-auto-layout] > label:has([data-layout-gap]), [data-auto-layout] > label:has([data-layout-pad]), [data-layout-pad-sides], [data-layout-pad-each]", "spacing"],
     ["[data-layout-columns-wrap], [data-layout-colsby], [data-layout-tracks], [data-layout-rowh-wrap], [data-layout-sort]", "columns"],

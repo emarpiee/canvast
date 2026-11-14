@@ -184,6 +184,38 @@ test("select: a filled shape is picked inside, an outline only on its line; move
   r = (await objs(app)).find((q) => q.id === rect.id)!;
   expect(r.rot).toBeGreaterThan(0);
   expect(size(r).w).toBeGreaterThan(w0 + 98); // turning does not change the geometry
+
+  // flip (ADR 0203): both selected, Shift+H mirrors them as one (they change sides, the turn goes the other way); one undo step
+  await click(app, 920, 370); // (nothing: inside the ring)
+  const rb = await screenBox(app, rect.id);
+  await click(app, (rb.minX + rb.maxX) / 2, (rb.minY + rb.maxY) / 2);
+  await click(app, 1020, 370, ["Shift"]);
+  expect((await p.evaluate(() => window.__canvastDebug.selection())).length).toBe(2);
+  const sel = async () => ({ a: await screenBox(app, rect.id), b: await screenBox(app, ring.id) });
+  const s0 = await sel();
+  const mid = (Math.min(s0.a.minX, s0.b.minX) + Math.max(s0.a.maxX, s0.b.maxX)) / 2;
+  await expect(p.getByRole("button", { name: "Flip horizontally" })).toBeVisible();
+  await key(app, "Shift+H");
+  await app.frame();
+  const s1 = await sel();
+  expect(s1.b.minX, "the ring is now on the left").toBeCloseTo(2 * mid - s0.b.maxX, 0);
+  expect(s1.a.maxX, "the rectangle on the right").toBeCloseTo(2 * mid - s0.a.minX, 0);
+  expect(s1.a.minY).toBeCloseTo(s0.a.minY, 0);
+  const f = (await objs(app)).find((q) => q.id === rect.id)!;
+  expect(f.rot, "turned the other way").toBe(2 ** 32 - r.rot!);
+  expect(await tool(app), "Shift+H is not the Hand tool").toBe("select");
+  await p.keyboard.press("Control+z");
+  expect((await screenBox(app, ring.id)).minX).toBeCloseTo(s0.b.minX, 0);
+  // one shape alone: mirrored in its own box (Shift+V): its middle stays, its turn goes the other way
+  await click(app, 920, 370);
+  const c0 = await screenBox(app, rect.id);
+  await click(app, (c0.minX + c0.maxX) / 2, (c0.minY + c0.maxY) / 2);
+  await key(app, "Shift+V");
+  await app.frame();
+  const c1 = await screenBox(app, rect.id);
+  expect([(c1.minX + c1.maxX) / 2, (c1.minY + c1.maxY) / 2]).toEqual([expect.closeTo((c0.minX + c0.maxX) / 2, 0), expect.closeTo((c0.minY + c0.maxY) / 2, 0)]);
+  expect((await objs(app)).find((q) => q.id === rect.id)!.rot).toBe(2 ** 32 - r.rot!);
+  expect(app.consoleErrors).toEqual([]);
 });
 
 test("Edit nodes: move a node, drag a mirrored handle, add a node on a segment, turn a node smooth, delete a node; one undo each", async ({ app }) => {

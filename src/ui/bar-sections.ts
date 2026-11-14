@@ -30,6 +30,7 @@ export const SECTIONS: readonly Section[] = [
   { id: "shapetext", label: "Text in shape", icon: ICONS.textInShape },
   { id: "connector", label: "Connector", icon: ICONS.balloonConnector },
   { id: "picture", label: "Picture", icon: ICONS.image },
+  { id: "flip", label: "Flip", icon: ICONS.flipHorizontal },
   { id: "size", label: "Size", icon: ICONS.ratio },
   { id: "layout", label: "Layout", icon: ICONS.autoLayout },
   { id: "spacing", label: "Spacing", icon: ICONS.distH },
