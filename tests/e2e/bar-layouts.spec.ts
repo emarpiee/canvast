@@ -33,7 +33,7 @@ test("a shape drawn with the Shape tool: its chips stand above it and edit it, t
   await expect(p.getByRole("radio", { name: "Shape and path" })).toHaveAttribute("aria-checked", "true");
   const near = p.locator(".props-near");
   // (named groups as the Actions bar's: the section's name, and on its chip the section's icon and value)
-  await expect(near.locator(".tb-cap")).toHaveText(["Look", "Shape", "Size"]);
+  await expect(near.locator(".tb-cap")).toHaveText(["Look", "Shape", "Flip", "Size"]);
   expect((await near.boundingBox())!.y + (await near.boundingBox())!.height, "the chips above the shape, clear of its rotate handle (26 px over it)").toBeLessThanOrEqual(380 - 26 - 6);
   // the Shape chip: its corner radius is the drawn shape's
   const chip = near.locator('[data-vchip="shape"]');
@@ -51,7 +51,7 @@ test("a shape drawn with the Shape tool: its chips stand above it and edit it, t
   await p.mouse.move(slider.x + slider.width * 0.3, slider.y + slider.height / 2);
   await p.mouse.down();
   await p.mouse.move(slider.x + slider.width * 0.7, slider.y + slider.height / 2, { steps: 4 });
-  await expect(near.locator(".tb-cap"), "while the colour is dragged").toHaveText(["Look", "Shape", "Size"]);
+  await expect(near.locator(".tb-cap"), "while the colour is dragged").toHaveText(["Look", "Shape", "Flip", "Size"]);
   await p.mouse.up();
   const hex = p.locator(".colour-pop [data-hex]");
   await hex.fill("ff8800");
@@ -136,7 +136,7 @@ test("a speech balloon's options are chips (Body, Tail) with the forms of every 
   await p.keyboard.press("v");
   await p.mouse.click(680, 480);
   const near = p.locator(".props-near");
-  await expect(near.locator(".tb-cap")).toHaveText(["Look", "Body", "Tail", "Size"]);
+  await expect(near.locator(".tb-cap")).toHaveText(["Look", "Body", "Tail", "Flip", "Size"]);
   await expect(p.getByTestId("balloon-panel"), "no panel of its own any more").toHaveCount(0);
   expect(await auditChips(app, ".props-near")).toEqual([]);
   const tails = () => p.evaluate(() => (window.__canvastDebug.objects().find((o) => o["params"]) as unknown as { params: { balloon: { tails: Array<{ width: number }> } } }).params.balloon.tails);

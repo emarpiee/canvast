@@ -47,6 +47,13 @@ Unverified / Committed / Next bounded task**.
 - **Committed:** v0.57.19 on `main`.
 - **Next bounded task:** retake the README screenshots in Stone when the owner says.
 
+## v0.59.2: tests follow the new words; the Flip picture (2026-11-15)
+
+- **Implemented:** specs updated for objects (export count, Object names, tag rows), the Flip chip in the chip lists of `bar-layouts.spec`, the mirrored-gradient unit test made exact to 1e-9; `flip.webp` taken again (Screenshots run on `shots-flip-0591`).
+- **Tested:** 0.59.1 on GitHub: Pan and zoom green; CI failed on the float compare in the new unit test, Tests on the old words in five specs and the chip lists; the flip specs passed. Fixed here; read the new runs.
+- **Committed:** v0.59.2 on `main`.
+- **Next bounded task:** read CI and Tests on 0.59.2.
+
 ## v0.59.1: Flip for shapes and paths; the words audit (2026-11-14)
 
 - **Implemented:** Flip for shapes and paths and several selected flipped as one (ADR 0203: `mirrored`, `mirroredPaint`, `flipSelection`, the Flip section, `Shift+H`/`Shift+V`); the words audit (objects on the canvas, items in the Library, click for buttons, picture, Object names, `StyleKind.hint`), README text with it.

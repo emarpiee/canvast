@@ -23,7 +23,7 @@ test("any file imports: a 3D model becomes a card on the canvas and in the libra
   // The Object names button (bottom right) cycles: shown, shown when picked, hidden.
   const labels = () => p.evaluate(() => window.__canvastDebug.itemLabels().map((l) => l.text));
   const names = p.getByRole("button", { name: /^Object names/ });
-  await expect(names).toHaveAttribute("aria-label", /shown on every item/);
+  await expect(names).toHaveAttribute("aria-label", /shown on every object/);
   await names.click();
   await expect(names).toHaveAttribute("aria-label", /shown on the selected objects/);
   await expect.poll(labels).toEqual([]);

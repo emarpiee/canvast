@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.59.2 — The Flip picture, tests for the new words (2026-11-15)
+
+- **Changed:** the README's Flip picture shows the Flip chip.
+- **Fixed:** the Shortcuts page said "press the keys" twice, so its waiting key could not be told apart.
+
 ## 0.59.1 — Flip for shapes and paths, one word per idea (2026-11-14)
 
 - **Added:** **Flip horizontally** and **Flip vertically** for shapes and paths, as pictures have: their points, gradients and a speech balloon's tails are mirrored, a turned one turns the other way. The buttons are in a **Flip** chip of their own; `Shift+H` and `Shift+V` and the command palette do it too.

@@ -2005,7 +2005,7 @@ test("in-canvas tags: rename and delete a tag on every canvas, from the Tags pan
   await expect.poll(() => tagsOf(first)).toEqual(["cloud", "keep"]);
   await saved(p);
   // The panel lists the tags of this canvas with their counts; pressing one selects its items.
-  await p.getByRole("button", { name: "Select the 1 item tagged keep" }).click();
+  await p.getByRole("button", { name: "Select the 1 object tagged keep" }).click();
   expect(await p.evaluate(() => window.__canvastDebug.selection())).toEqual([first]);
   await openCanvas(p, /Canvas 2/, "Board 1 › Canvas 2");
   await expect.poll(() => tagsOf(second)).toEqual(["cloud"]);
