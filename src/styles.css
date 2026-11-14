@@ -1144,7 +1144,7 @@ input[type="radio"]:checked::before { content: ""; width: var(--sp-3); height: v
 /* The buttons that change the view (Library, Canvas, Settings) have a look of their own, a tint of the accent, so they read apart from the tools. Library and Canvas are joined as one set; the one in use is filled. */
 .view-switch { height: var(--bar-h); align-items: center; padding: 0; gap: 0; background: none; border: 0; box-shadow: none; backdrop-filter: none; }
 .view-switch button { box-sizing: border-box; height: var(--bar-h); border: 1px solid var(--view-edge); border-right: 0; border-radius: var(--ctl-r) 0 0 var(--ctl-r); box-shadow: var(--hud-lift); }
-.view-switch button:not([aria-selected="true"]), .nav-pill:not([data-active="true"]) .nav-crumb, .view-settings button:not([aria-pressed="true"]) { color: var(--hud-accent-text); background: var(--view-tint); }
+.view-switch button:not([aria-selected="true"]), .nav-pill:not([data-active="true"]) .nav-crumb, .nav-pill .nav-name-btn, .view-settings button:not([aria-pressed="true"]) { color: var(--hud-accent-text); background: var(--view-tint); }
 .view-switch button + button { border-radius: 0; } /* (one set: only the first is rounded on the left, the name after it on the right) */
 .nav-pill .nav-crumb { border: 1px solid var(--view-edge); border-radius: 0 var(--ctl-r) var(--ctl-r) 0; }
 .view-settings button { border: 1px solid var(--view-edge); border-radius: var(--ctl-r); box-shadow: var(--hud-lift); }
@@ -1152,11 +1152,13 @@ input[type="radio"]:checked::before { content: ""; width: var(--sp-3); height: v
 #nav { gap: var(--near); }
 .view-switch button:only-of-type { border-right: 1px solid var(--view-edge); border-radius: var(--ctl-r); }
 .nav-pill .nav-crumb { border-radius: var(--ctl-r) 0 0 var(--ctl-r); }
-.nav-pill .nav-name-btn { box-sizing: border-box; height: var(--bar-h); margin-left: 0; border: 1px solid var(--view-edge); border-left: 0; border-radius: 0 var(--ctl-r) var(--ctl-r) 0; background: var(--hud-bg); box-shadow: var(--hud-lift); }
+.nav-pill { gap: 0; } /* (∞ and the canvas's name are one pill) */
+.nav-pill .nav-name-btn, .nav-pill .nav-name-btn svg { color: var(--hud-accent-text); text-shadow: none; } /* (in the pill, as the other view buttons: no glow over the canvas, its arrow its colour) */
+.nav-pill .nav-name-btn { box-sizing: border-box; height: var(--bar-h); margin-left: 0; border: 1px solid var(--view-edge); border-left: 0; border-radius: 0 var(--ctl-r) var(--ctl-r) 0; box-shadow: var(--hud-lift); }
 .pc-switch button[data-view] { border-right: 1px solid var(--view-edge); border-radius: var(--ctl-r); }
 .pc-switch:has(.view-close:not([hidden])) button[data-view] { border-right: 0; border-radius: var(--ctl-r) 0 0 var(--ctl-r); }
 .pc-switch .view-close { border-right: 1px solid var(--view-edge); border-radius: 0 var(--ctl-r) var(--ctl-r) 0; }
-.view-switch button:not([aria-selected="true"]):hover, .nav-pill:not([data-active="true"]) .nav-crumb:hover, .view-settings button:not([aria-pressed="true"]):hover { background: var(--view-tint-hover); }
+.view-switch button:not([aria-selected="true"]):hover, .nav-pill:not([data-active="true"]) .nav-crumb:hover, .nav-pill .nav-name-btn:hover, .view-settings button:not([aria-pressed="true"]):hover { background: var(--view-tint-hover); }
 #nav { left: var(--edge); top: var(--edge); }
 #toolbar > .dock { top: calc(var(--edge) / var(--ui-scale, 1)); right: calc((var(--edge) + var(--bar-h) + var(--near)) / var(--ui-scale, 1)); } /* (the Settings button is in the corner) */
 /* Settings: a button of its own in the top-right corner of every view. */
