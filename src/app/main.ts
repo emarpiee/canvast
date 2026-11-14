@@ -3240,6 +3240,13 @@ async function start(): Promise<void> {
   }, true);
   // (first, before anything on the page: Firefox sends the paste to a hidden editable box that holds a selection, whose own handler would take it)
   const onPaste = (e: ClipboardEvent): void => {
+    // (PhotoCraft's view is shown: what is pasted is PhotoCraft's, never put on the canvas behind it)
+    if (appView === "photocraft") {
+      // (a field or dialog of the app's own, the library chooser's search, keeps its paste)
+      if (typing(clipTarget(e)) || document.querySelector("dialog:modal, .lib-pick")) return;
+      if (e.clipboardData) photoCraft.paste(e.clipboardData);
+      return void e.preventDefault();
+    }
     // (the fallback above already pasted for these keys: the late event is the same paste)
     if (pasteEventAt >= pasteKeyAt && performance.now() - pasteKeyAt > PASTE_EVENT_WAIT_MS && performance.now() - pasteKeyAt < 3000) return void e.preventDefault();
     pasteEventAt = performance.now();

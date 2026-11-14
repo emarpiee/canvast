@@ -683,6 +683,7 @@ input[type="range"], .media-scrub, .tb-count[data-scrub] input, input[data-scrub
 .view-switch button svg { width: var(--icon-md); height: var(--icon-md); }
 .view-switch button:hover { background: var(--hud-hover); }
 .view-switch button[aria-selected="true"] { background: var(--hud-accent); color: var(--hud-accent-fg); }
+.view-switch button[hidden] { display: none; }
 
 body[data-view="assets"] #canvas-host, body[data-view="settings"] #canvas-host, body[data-view="photocraft"] #canvas-host { visibility: hidden; }
 /* what belongs to the canvas and floats on <body> goes with it (the hint line) */
@@ -954,7 +955,7 @@ dialog.confirm .secret-field .prompt-input { padding-right: calc(var(--icon-xl) 
 #settings-view[hidden] { display: none; }
 /* PhotoCraft's view (src/artcraft/photocraft/): the shared panel over the whole app, its frame filling the body */
 /* (as the Library and Settings: the whole window, opaque, its frame under the top bar; nothing of the canvas shows or reaches through) */
-.photocraft-view.layers-panel { position: fixed; inset: 0; z-index: var(--z-view); padding-top: calc((var(--nav-bottom, var(--s-15)) + 2 * var(--near)) / var(--ui-scale, 1)); border: 0; border-radius: 0; background: var(--theme-bg); backdrop-filter: none; overflow: hidden; }
+.photocraft-view.layers-panel { position: fixed; inset: 0; z-index: var(--z-view); padding-top: calc((var(--nav-bottom, var(--s-15)) + var(--near)) / var(--ui-scale, 1)); border: 0; border-radius: 0; background: var(--theme-bg); backdrop-filter: none; overflow: hidden; }
 .photocraft-view .panel-body { display: flex; overflow: hidden; }
 .photocraft-frame { flex: 1 1 auto; width: 100%; height: 100%; border: 0; display: block; }
 .photocraft-status { margin: 0; padding: var(--s-2) var(--s-6); }

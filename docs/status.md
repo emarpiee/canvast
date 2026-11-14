@@ -38,6 +38,13 @@ Unverified / Committed / Next bounded task**.
 | 5 | Creative editing, including **arrange selected items in a grid (A–Z, Z–A, by date, size, type), align and distribute** | **done** ([ADR 0036](adr/0036-arrange-align-distribute.md)) |
 | WF | Workspace folder and the desktop app ([ADR 0177](adr/0177-workspace-folder-desktop-app.md)): Electron shell, the workspace as a folder of files, encrypted hidden items, outside changes; Linux packages (AppImage with updates, `.deb`, `.rpm`, `.tar.gz`, x86_64 and aarch64) | **done** (v0.49.0; packages v0.50.33 to 0.50.35) |
 
+## v0.59.8: PhotoCraft save as type, saving again replaces, paste, top bar (2026-11-15)
+
+- **Implemented:** `savedAs` (a document's earlier save replaced: `retarget` on the canvas, `deleteAssets` of the older item), `chooseType`/`asType` (PSD/ORA merged picture to PNG/JPEG/WebP; `photocraft.saveType`), paste forwarded to PhotoCraft in its view (`frame.paste`), icon-only tab with an inline × (`.view-switch button[hidden]`), view padding from `--nav-bottom` + `--near`, the theme kept against PhotoCraft's forced Pro start (`withThemeOf`, `frame.touched`).
+- **Found:** PhotoCraft's web build sets its theme to Pro at every start (`apps/photocraft-web/src/web.rs`, `app.set_theme(&cc.egui_ctx, ThemeKind::Pro)`): only an upstream change shows the chosen theme again. Its other settings (preferences, shortcuts, menus, toolbar, panel layout) are in its preferences and survive.
+- **Known failures (v0.59.4 run, before this):** `organize.spec` 66 and 1069 and `assets.spec` 1318 (the second nav row, fixed here), `contrast.spec` 70 (likely the shown ×), `styles.spec` 64 and `file-views.spec` 265 (not yet compared with the run before PhotoCraft).
+- **Committed:** v0.59.8 on `main`.
+
 ## v0.59.5: PhotoCraft's view tidied, no false "not saved" (2026-11-15)
 
 - **Implemented:** the view covers the window under the top bar (canvas host and hint hidden as for Library/Settings), no title row, the × beside its tab closes it, one notice per save; `unsaved()` is false when nothing was pressed or typed in it since a file of it came back. PhotoCraft keeps choosing a saved file's extension (owner: its default is fine).

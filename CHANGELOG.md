@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.59.8 — PhotoCraft: save as type, saving again replaces, paste, a tidier top bar (2026-11-15)
+
+- **Added:** **Save as type** for PhotoCraft: its page saves a new document as PSD with its layers; at the document's first save you choose PSD (as it saved it), PNG, JPEG or WebP (its layers merged), with **Always this type** (Settings > ArtCraft > PhotoCraft > Save as type). Its other types (TIFF, OpenEXR, JPEG XL…) are in its File › Export › Export As…, which also comes to the library.
+- **Changed:** saving a document again in PhotoCraft replaces its earlier save, in the library (the older file goes to the trash) and on the canvas, instead of adding a new item each time.
+- **Changed:** the PhotoCraft tab is an icon, with its **×** beside it on the same row; PhotoCraft's view starts right under the top bar.
+- **Changed:** the theme chosen in PhotoCraft is kept with the workspace although PhotoCraft's own web build starts in its Pro theme each time (a limit of that build: the theme shows again once PhotoCraft keeps it).
+- **Fixed:** pasting while PhotoCraft was shown put the pasted picture on the canvas: it goes to PhotoCraft.
+- **Fixed:** the PhotoCraft tab's hidden **×** made the top bar two rows high, which moved the library's bar and panels down.
+- **Fixed:** where PhotoCraft cannot start (no WebGPU or WebGL2), making a layered project cleared the line that said so.
+
 ## 0.59.7 — PhotoCraft's other files from and to the library (2026-11-15)
 
 - **Fixed:** PhotoCraft's file choosers for other kinds of file (Import Shortcuts, presets, swatches) offered only pictures from the library: they now offer the files of the kind it asks for, and every file when it names none; **Import…** in the chooser asks for that kind too.

@@ -111,6 +111,12 @@ test("what PhotoCraft saves comes back: asked, added beside, Don't ask again kep
   // a new library item, named after the original (Settings > Saving to the library > Edited pictures), the original kept
   const names = (await p.evaluate(() => window.__canvastDebug.assetListing())).entries.map((e) => e.name).sort();
   expect(names).toEqual(["harbour-edited.png", "harbour.png"]);
+  // saved again under its first name: it replaces its earlier save (the canvas shows it, the library does not grow)
+  const before = (await p.evaluate(() => window.__canvastDebug.assetListing())).entries.length;
+  await saveFromPhotoCraft(p, "harbour.png", makePng(90, 60, () => [10, 10, 220, 255]));
+  await expect.poll(async () => (await p.evaluate(() => window.__canvastDebug.assetListing())).entries.map((e) => e.name).sort()).toEqual(["harbour-edited.png", "harbour.png"]);
+  expect((await p.evaluate(() => window.__canvastDebug.assetListing())).entries.length).toBe(before);
+  expect((await objs(app)).length).toBe(2);
   // not asked again
   await saveFromPhotoCraft(p, "harbour-v2.png", makePng(90, 60, () => [40, 200, 40, 255]));
   await expect.poll(async () => (await objs(app)).length).toBe(3);

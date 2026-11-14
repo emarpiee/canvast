@@ -3,6 +3,7 @@ import { applySwitches, preparePrefs } from "../../src/artcraft/photocraft/prefs
 import { browserKey } from "../../src/artcraft/photocraft/frame";
 import { editableInPhotoCraft } from "../../src/artcraft/photocraft/app";
 import { layerTree } from "../../src/artcraft/photocraft/layers";
+import { withThemeOf } from "../../src/artcraft/photocraft/state";
 import type { LayerNode } from "../../src/artcraft/photocraft/layers";
 import type { CanvasObject } from "../../src/doc/model";
 // @ts-expect-error (plain JavaScript, no types)
@@ -12,6 +13,13 @@ describe("PhotoCraft's preferences as canvast leaves them", () => {
   it("a false switch hides, a true one shows, an unlisted id stays as the person left it", () => {
     expect(applySwitches(["a", "b"], { b: true, c: false })).toEqual(["a", "c"]);
     expect(applySwitches([], {})).toEqual([]);
+  });
+
+  it("the theme chosen survives PhotoCraft's own start (it sets Pro), the rest is what it wrote", () => {
+    const chosen = JSON.stringify({ interface: { theme: "classic", uiScale: 1 } });
+    const started = JSON.stringify({ interface: { theme: "pro", uiScale: 1.25 }, tools: { a: 1 } });
+    expect(JSON.parse(withThemeOf(started, chosen))).toEqual({ interface: { theme: "classic", uiScale: 1.25 }, tools: { a: 1 } });
+    expect(withThemeOf(started, "{}")).toBe(started);
   });
 
   it("keeps everything else, empties the recent files, and starts a new file at its current version", () => {

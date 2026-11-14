@@ -28,7 +28,19 @@ const FIXED_DATE = new Date(Date.UTC(2020, 0, 1));
 /** What a set of preset files is, cheaply: their keys and sizes (to know whether they changed without packing them). */
 const signature = (files: readonly PresetFile[]): string => JSON.stringify(files.map((f) => [f.key, f.blob.size]));
 
-export function createState(deps: StateDeps): { restore(): Promise<void>; keep(): Promise<void>; keepPrefs(text: string | null): void } {
+/** `text` with the theme of `from` (its preferences JSON), when `from` has one. */
+export function withThemeOf(text: string, from: string): string {
+  try {
+    const now = JSON.parse(text) as { interface?: Record<string, unknown> };
+    const theme = (JSON.parse(from) as { interface?: Record<string, unknown> }).interface?.["theme"];
+    if (theme === undefined || now.interface?.["theme"] === theme) return text;
+    return JSON.stringify({ ...now, interface: { ...(now.interface ?? {}), theme } });
+  } catch {
+    return text;
+  }
+}
+
+export function createState(deps: StateDeps): { restore(): Promise<void>; keep(touched?: boolean): Promise<void>; keepPrefs(text: string | null, touched: boolean): void } {
   const { settings, session, assets } = deps;
   let lastSignature: string | null = null;
   let keeping: Promise<void> = Promise.resolve();
@@ -59,16 +71,23 @@ export function createState(deps: StateDeps): { restore(): Promise<void>; keep()
     lastSignature = signature(files);
   }
 
-  /** Its preferences as it just saved them. */
-  function keepPrefs(text: string | null): void {
-    if (text !== null && text !== settings.get("photocraft.prefs") && text.length <= 4_000_000) settings.set("photocraft.prefs", text);
+  /**
+   * Its preferences as it just saved them. `touched`: something was done in it since it started. Until then a change is its own start's:
+   * its web build sets its theme to Pro each time it starts (its `apps/photocraft-web/src/web.rs`), which would replace the theme chosen;
+   * the workspace keeps the one chosen.
+   */
+  function keepPrefs(text: string | null, touched: boolean): void {
+    if (text === null || text.length > 4_000_000) return;
+    const was = settings.get("photocraft.prefs");
+    if (!touched && was) text = withThemeOf(text, was);
+    if (text !== was) settings.set("photocraft.prefs", text);
   }
 
   /** What it keeps now, into the workspace (its preferences, and its presets when they changed). */
-  function keep(): Promise<void> {
+  function keep(touched = true): Promise<void> {
     keeping = keeping.then(async () => {
       try {
-        keepPrefs(localStorage.getItem(PREFS_KEY));
+        keepPrefs(localStorage.getItem(PREFS_KEY), touched);
       } catch {
         // (no storage)
       }

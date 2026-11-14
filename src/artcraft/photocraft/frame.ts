@@ -38,6 +38,10 @@ export interface PhotoCraftFrame {
   open(files: readonly File[]): Promise<void>;
   /** Whether a document in it has changes not saved (asked as closing its page would, and nothing done in it since its last save). */
   unsaved(): boolean;
+  /** Whether anything was pressed or typed in it since it started. */
+  touched(): boolean;
+  /** A paste that reached the app's page while PhotoCraft is shown: given to it, as if pasted in it. */
+  paste(data: DataTransfer): void;
   /** Takes it away (what is not saved is lost: ask `unsaved` first). */
   destroy(): void;
 }
@@ -205,6 +209,17 @@ export function startPhotoCraft(container: HTMLElement, host: PhotoCraftHost, fe
       // (dropped away from a document's canvas, a file opens in a tab of its own; on it, it would be placed as a layer)
       target.dispatchEvent(new win.DragEvent("drop", { bubbles: true, cancelable: true, dataTransfer: dt, clientX: 1, clientY: 1 }));
       iframe.focus();
+    },
+    touched: () => lastInput > 0,
+    paste(data) {
+      const dt = new win.DataTransfer();
+      for (const type of ["text/plain", "text/html", "text/uri-list"]) {
+        const v = data.getData(type);
+        if (v) dt.setData(type, v);
+      }
+      for (const f of data.files) dt.items.add(new win.File([f], f.name, { type: f.type, lastModified: f.lastModified }));
+      iframe.focus();
+      (doc.activeElement ?? doc.body).dispatchEvent(new win.ClipboardEvent("paste", { clipboardData: dt, bubbles: true, cancelable: true }));
     },
     unsaved() {
       if (destroyed) return false;

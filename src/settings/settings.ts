@@ -242,6 +242,8 @@ export const SETTINGS = {
   "edit.tagsCustom": { scope: "workspace", default: "", validate: text(200), effect: "immediate" } as Def<string>,
   // PhotoCraft (Settings > ArtCraft > PhotoCraft): what a picture edited from a canvas does there when PhotoCraft saves it.
   "photocraft.saveCanvas": { scope: "device", default: "ask", validate: oneOf("ask", "replace", "beside"), effect: "immediate" } as Def<"ask" | "replace" | "beside">,
+  // The type of a document's first save when PhotoCraft writes a layered file (its page saves a new one as PSD): asked, or always one.
+  "photocraft.saveType": { scope: "device", default: "ask", validate: oneOf("ask", "keep", "png", "jpeg", "webp"), effect: "immediate" } as Def<"ask" | "keep" | "png" | "jpeg" | "webp">,
   // PhotoCraft's own preferences (its JSON: Edit > Preferences, Keyboard Shortcuts, Menus, Toolbar) and its brush presets (the hash of the
   // library item that packs them), kept with the workspace so they go into its folder, backups and exports (artcraft/photocraft/state.ts).
   "photocraft.prefs": { scope: "workspace", default: "", validate: text(4_000_000), effect: "immediate" } as Def<string>,
