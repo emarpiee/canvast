@@ -19,13 +19,23 @@ async function place(app: App, name: string): Promise<Pic> {
   return (await objs(app)).at(-1)!;
 }
 
-/** Selects the picture and opens it in PhotoCraft from the Actions bar; resolves once PhotoCraft runs (its loading message is gone). */
+/** Whether this browser can draw PhotoCraft (it needs WebGPU or WebGL2: a test machine's headless Firefox has neither). */
+const canDraw = (p: Page): Promise<boolean> => p.evaluate(() => !!(navigator as Navigator & { gpu?: unknown }).gpu || !!document.createElement("canvas").getContext("webgl2"));
+
+/**
+ * Selects the picture and opens it in PhotoCraft from the Actions bar; resolves once PhotoCraft runs (its loading message is gone). Where
+ * the browser cannot draw it, canvast says it could not start, and the test ends there.
+ */
 async function editInPhotoCraft(app: App, pic: Pic): Promise<void> {
   const p = app.page;
   await p.evaluate((id) => window.__canvastDebug.select([id]), pic.id);
   await app.frame();
   await p.locator('[data-ctx="photocraft"]').click();
   await expect(p.getByTestId("photocraft-view")).toBeVisible();
+  if (!(await canDraw(p))) {
+    await expect(p.locator(".photocraft-status")).toContainText("could not start", { timeout: 120_000 });
+    test.skip(true, "no WebGPU or WebGL2 in this browser: PhotoCraft cannot draw (canvast said so)");
+  }
   await expect.poll(() => p.evaluate(() => {
     const d = document.querySelector<HTMLIFrameElement>(".photocraft-frame")?.contentDocument;
     const stopped = d?.getElementById("photocraft_stopped");

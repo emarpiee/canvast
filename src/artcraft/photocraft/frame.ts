@@ -59,7 +59,7 @@ export function startPhotoCraft(container: HTMLElement, host: PhotoCraftHost, fe
   const iframe = document.createElement("iframe");
   iframe.title = "PhotoCraft";
   iframe.className = "photocraft-frame";
-  iframe.setAttribute("allow", "clipboard-read; clipboard-write; fullscreen");
+  iframe.setAttribute("allow", "fullscreen"); // (same origin: the clipboard is the page's)
   container.append(iframe);
   const win = iframe.contentWindow as FrameWindow;
   const doc = iframe.contentDocument!;
