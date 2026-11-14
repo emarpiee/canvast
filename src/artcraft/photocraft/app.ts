@@ -99,6 +99,8 @@ export const editableInPhotoCraft = (name: string, type = ""): boolean =>
 type SaveType = "keep" | "png" | "jpeg" | "webp";
 /** The layered kinds its page saves a new document as (PSD), or a Krita or OpenRaster one (ORA). */
 const LAYERED = ["psd", "psb", "ora"];
+/** Project files: saved as the same kind, they are written over (a new version in their place). */
+const PROJECTS = [...LAYERED, "pcraft"];
 
 /** The library folder of the files PhotoCraft saves that are not pictures (its shortcuts, presets, swatches). */
 const FILES_FOLDER = "PhotoCraft files";
@@ -130,47 +132,55 @@ export function createPhotoCraft(deps: PhotoCraftDeps): PhotoCraftApp {
   });
 
   /** A document saved before while it runs: its library item, the object it is on a canvas, and the type chosen for it (by its name). */
-  const savedAs = new Map<string, { hash: string; objectId?: string; type: SaveType }>();
+  const savedAs = new Map<string, { hash: string; name: string; type: SaveType }>();
 
-  /** A file it saved: into the library, and back on the canvas when it came from there; saved again, it replaces its earlier save. */
+  /**
+   * A file it saved. Saved again (in this run), or saved as the kind of file it was opened from (a PSD of the library saved as PSD), it is
+   * a new version of that library item, in its place everywhere (its name, folder, tags, and the canvases that show it; the older version
+   * in the trash): the library does not grow with each save. Otherwise (a picture saved as PSD, a new document) it is a new item, and on
+   * the canvas in place of the picture it came from or beside it (asked), or beside the sheet or pictures a project was made of.
+   */
   async function saved(name: string, blob: Blob): Promise<void> {
     savedCount++;
     const key = stem(name);
     const prev = savedAs.get(key);
+    // (by the name it opened with; renamed in its Save As, it is still the one file open, when only one is)
+    const origin = origins.get(key) ?? (origins.size === 1 ? [...origins.values()][0] : undefined);
+    const extOf = (n: string): string => splitName(n).ext.toLowerCase();
+    // the item this save is a new version of: its earlier save, or the item it was opened from when it is saved as the same kind
+    // (only a project file is written over so: a picture opened, a photo or a reference, never is; an edit of it is an item of its own)
+    const project = (n: string): boolean => PROJECTS.includes(extOf(n).replace(/^\./, ""));
+    const target = prev ?? (origin && origin.kind !== "beside" && extOf(origin.name) === extOf(name) && project(name) ? { hash: origin.hash, name: origin.name, type: "keep" as SaveType } : null);
+    if (target) {
+      const out = await asType(name, blob, target.type);
+      const hash = await session.saveVersion(target.hash, new File([out.blob], target.name, { type: out.blob.type }));
+      if (!hash) return; // (it said why)
+      savedAs.set(key, { ...target, hash });
+      if (origin && origin.kind !== "beside" && origin.hash === target.hash) origin.hash = hash;
+      return say(hash === target.hash ? `“${target.name}” saved again: nothing changed.` : `“${target.name}” saved from PhotoCraft: a new version in its place (the earlier one is in the trash).`);
+    }
     // A file that is not a picture (a set of shortcuts, presets, a swatch file it exported): kept in the library as it is, in its own folder.
     if (!editableInPhotoCraft(name, blob.type)) {
       const { record } = await assets.importFileDetailed(new File([blob], name, { type: blob.type }), true);
       const where = await fileInLibrary(session, record.hash, FILES_FOLDER, ["photocraft"]);
-      if (prev && prev.hash !== record.hash) await session.deleteAssets([prev.hash]).catch(() => 0);
-      savedAs.set(key, { hash: record.hash, type: "keep" });
+      savedAs.set(key, { hash: record.hash, name: record.name, type: "keep" });
       return say(`“${record.name}” saved from PhotoCraft to ${where}.`);
     }
-    // its type: asked the first time a layered file of it comes back (its page saves every new document as PSD), then kept for it
-    const type = prev?.type ?? (await chooseType(name));
+    // its type: asked at the first save of a new document when it comes as a layered file (its page saves every new one as PSD)
+    const type = await chooseType(name);
     if (!type) return say(`“${name}” was not kept: no type was chosen.`);
     const out = await asType(name, blob, type);
-    // (by the name it opened with; renamed in its Save As, it is still the one file open, when only one is)
-    const origin = origins.get(key) ?? (origins.size === 1 ? [...origins.values()][0] : undefined);
     const sameName = origin && origin.kind !== "beside" && stem(out.name) === stem(origin.name);
     const fileName = sameName ? `${editedName(session, settings, origin.name)}${splitName(out.name).ext}` : out.name;
     const { record } = await assets.importFileDetailed(new File([out.blob], fileName, { type: out.blob.type }), true);
+    savedAs.set(key, { hash: record.hash, name: record.name, type });
     const tags: string[] = [];
     if (settings.get("edit.tagEdited")) tags.push("edited-picture");
     if (origin && origin.kind !== "beside" && settings.get("edit.tagInherit")) tags.push(...((await session.catalog?.entry(origin.hash).catch(() => undefined))?.tags ?? []));
     tags.push(...parseTags(settings.get("edit.tagsCustom")));
     const where = await fileInLibrary(session, record.hash, settings.get("edit.folder"), tags);
     const placeable = !record.type.startsWith("video/") && !record.type.startsWith("audio/");
-    if (prev) {
-      // Saved again: the earlier save is replaced, on the canvas (one step of undo) and in the library (it goes to the trash), not added to.
-      if (prev.hash === record.hash) return say(`“${record.name}” saved again: nothing changed.`);
-      const o = prev.objectId ? doc.get(prev.objectId) : undefined;
-      if (o?.kind === "image" && o.assetId === prev.hash && placeable) retarget(o, record);
-      await session.deleteAssets([prev.hash]).catch(() => 0);
-      savedAs.set(key, { ...prev, hash: record.hash });
-      return say(`“${record.name}” saved again from PhotoCraft: it replaces its earlier save${o ? ", on the canvas too" : ""}.`);
-    }
-    let objectId: string | undefined;
-    if (origin?.kind === "beside" && placeable) objectId = placeBeside(origin.target, record, where);
+    if (origin?.kind === "beside" && placeable) placeBeside(origin.target, record, where);
     else if (origin?.kind !== "canvas" || !placeable) say(`“${record.name}” saved from PhotoCraft to ${where}.`);
     else {
       const o = doc.get(origin.objectId);
@@ -195,10 +205,9 @@ export function createPhotoCraft(deps: PhotoCraftDeps): PhotoCraftApp {
           }
         }
         if (how === "ask") say(`“${record.name}” saved to ${where}; the canvas is as it was.`);
-        else objectId = putOnCanvas(o, record, how === "replace");
+        else putOnCanvas(o, record, how === "replace");
       }
     }
-    savedAs.set(key, { hash: record.hash, ...(objectId ? { objectId } : {}), type });
   }
 
   /** The type of a document's first save, when PhotoCraft wrote a layered file (as its desktop Save As asks). Null: cancelled. */
@@ -245,13 +254,6 @@ export function createPhotoCraft(deps: PhotoCraftDeps): PhotoCraftApp {
     }
     const enc = await encodePicture(png, type, settings.get("edit.quality"));
     return { name: `${splitName(name).stem}.${enc.ext}`, blob: enc.blob };
-  }
-
-  /** The object on the canvas shows `record` instead (its earlier save): one step of undo. */
-  function retarget(o: ImageObject, record: AssetRecord): void {
-    const sameSize = record.pixelW === o.pixelW && record.pixelH === o.pixelH;
-    const { crop, preview: _pv, ...rest } = o;
-    doc.commit(doc.transaction("Edit in PhotoCraft", [{ ...rest, ...(sameSize && crop ? { crop } : {}), assetId: record.hash, pixelW: record.pixelW, pixelH: record.pixelH, h: sameSize ? o.h : (o.w * record.pixelH) / Math.max(1, record.pixelW) }]));
   }
 
   /** The edited file on the canvas: in place of `o` (one step of undo) or beside it. */

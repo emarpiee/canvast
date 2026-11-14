@@ -93,6 +93,15 @@ test("PhotoCraft opens a selected picture; its File > Open asks the library, and
   // its preferences, as it saves them, are kept with the workspace
   await p.evaluate(() => document.querySelector<HTMLIFrameElement>(".photocraft-frame")!.contentWindow!.localStorage.setItem("photocraft.preferences", '{"version":2,"probe":7}'));
   await expect.poll(() => p.evaluate(() => window.__canvastDebug.getSetting("photocraft.prefs"))).toContain('"probe":7');
+  // a PSD of the library saved as PSD is a new version of that item, in its place: no copy, and no question of its type
+  await p.getByTestId("view-assets").click();
+  await p.getByTestId("assets-import-input").setInputFiles({ name: "sketch.psd", mimeType: "image/vnd.adobe.photoshop", buffer: Buffer.from("8BPS not a real one") });
+  await p.getByTestId("asset-card").filter({ hasText: "sketch.psd" }).click();
+  await p.getByTestId("asset-photocraft").click();
+  await running(p);
+  await saveFromPhotoCraft(p, "sketch.psd", makePng(20, 20, () => [1, 2, 3, 255]));
+  await expect.poll(async () => (await p.evaluate(() => window.__canvastDebug.assetListing())).entries.map((e) => e.name).sort()).toEqual(["harbour.png", "sketch.psd"]);
+  await expect(p.getByTestId("choose-dialog")).toBeHidden();
   expect(await p.evaluate(() => document.querySelector<HTMLIFrameElement>(".photocraft-frame")!.contentDocument!.getElementById("photocraft_stopped")!.hidden)).toBe(true);
 });
 
