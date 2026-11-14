@@ -60,7 +60,7 @@ export const SHOTS: Record<string, ShotSpec> = {
   "viewer-grey": { section: "#the-viewer", use: "Check a print's values: see it in greyscale in the viewer.", alt: "Hokusai's Great Wave in the viewer, shown in greyscale, the strip of the folder's other prints below" },
   "organize": { section: "#organize", use: "File a reference and tag it in one dialog.", alt: "The Organize dialog for Mary Delany's Botanical Study: the folders as a tree with Botanical chosen, and the Tags tab" },
   "bulk": { section: "#selecting-and-details", use: "Tag or file several drawings at once.", alt: "Four Degas dancer drawings selected, the details panel listing their tags with how many have each, their folder, and what can be done to all four" },
-  "similar": { section: "#similar-images", use: "Find a second scan of the same print hiding in the collection.", alt: "Similar images: Hokusai's Great Wave beside a smaller, warmer second scan of it" },
+  "similar": { section: "#similar-pictures", use: "Find a second scan of the same print hiding in the collection.", alt: "Similar pictures: Hokusai's Great Wave beside a smaller, warmer second scan of it" },
   "art-files": { section: "#art-files", use: "Keep paintings in progress from other apps beside their references: their picture shows without opening them.", alt: "A Krita file and an OpenRaster file in the Library, each showing the picture it keeps, the Krita painting-over of a Degas dancer selected" },
   "font": { section: "#fonts", use: "Keep the fonts of a project with its pictures and see each one set.", alt: "The Bangers font selected in the Library: its card in its own letters and a sample in the details" },
 

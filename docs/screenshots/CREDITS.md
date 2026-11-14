@@ -36,7 +36,7 @@ Public-domain works from [The Met's Open Access](https://www.metmuseum.org/about
 | Notes, names, folders, tags and boards (study notes on The Great Wave, a made-up picture book) | Written by the tests; facts about an artwork come from its museum record (`art.json`); they describe no real person or project |
 | The deep-zoom showcase | `showcase.canvast`, built by `scripts/showcase/build.mjs` |
 | The PDF handout and the 3D vase in the viewer shots, the camera pan clip | Generated in code by `tests/shots/views.shot.ts` and `tests/shots/boards.shot.ts` (the clip with ffmpeg) |
-| The art files (`.ora`, `.kra`) and the smaller copy for *Similar images* | Made from the artworks above |
+| The art files (`.ora`, `.kra`) and the smaller copy for *Similar pictures* | Made from the artworks above |
 
 ## Fonts
 

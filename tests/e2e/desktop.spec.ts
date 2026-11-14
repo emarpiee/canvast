@@ -1424,9 +1424,9 @@ test("a hidden item's picture is not read while locked, so after a restart its c
   }
   ({ app, page } = await launch(ws));
   try {
-    // Locked: Similar images reads how every picture looks, but not the hidden one's.
+    // Locked: Similar pictures reads how every picture looks, but not the hidden one's.
     await page.getByTestId("view-assets").click();
-    await page.getByTestId("assets-side").getByRole("button", { name: /^Similar images/ }).click();
+    await page.getByTestId("assets-side").getByRole("button", { name: /^Similar pictures/ }).click();
     await page.waitForTimeout(500);
     await page.getByTestId("assets-search").fill("hidden:");
     await page.getByTestId("prompt-input").fill("pw");

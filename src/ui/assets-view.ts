@@ -707,7 +707,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       choices: [
         { value: "existing", label: "Uploaded thumbnails", help: "Reuse a picture you uploaded or pasted before." },
         { value: "library", label: "From the library", help: "Use the picture of another item." },
-        { value: "upload", label: "Upload a picture", help: "Pick one from your computer. It is saved small, not added to the library." },
+        { value: "upload", label: "Upload a picture", help: "Choose one from your computer. It is saved small, not added to the library." },
         { value: "paste", label: "Paste a picture", help: "Use the picture you copied." },
         { value: "auto", label: "Original", help: `Show ${hashes.length === 1 ? "the item's" : "the items'"} own picture again.` },
         { value: "delete", label: "Delete an uploaded thumbnail…", help: "Items that use it show their own picture again." },
@@ -2483,7 +2483,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     if (scope === "favorites") return "Favourites";
     if (scope === "unfiled") return "Unfiled";
     if (scope === "missing") return "Missing";
-    if (scope === "similar") return "Similar images";
+    if (scope === "similar") return "Similar pictures";
     if (scope.startsWith("folder:")) return listing!.folders.find((f) => `folder:${f.id}` === scope)?.name ?? "Folder";
     if (/^(ext|tag):/.test(scope) && /[|&]/.test(scope)) return [...pickedKeys(scope)].map((k) => (k.startsWith("ext:") ? `.${k.slice(4).toUpperCase()}` : `#${tagCounts?.get(k.slice(4))?.label ?? k.slice(4)}`)).join(", ");
     if (scope.startsWith("ext:")) return `File type .${scope.slice(4).toUpperCase()}`;
@@ -2881,7 +2881,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
           ${item("all", hiddenMode ? "All hidden items" : "All items", hiddenMode ? counts.hidden : counts.shown, { icon: ICONS.images })}
           ${item("favorites", "Favourites", counts.favourites, { icon: ICONS.star })}
           ${item("unfiled", "Unfiled", counts.unfiled, { icon: ICONS.folderX })}
-          ${pagesNow() ? "" : item("similar", "Similar images", similar().reduce((n, g) => n + g.length, 0), { icon: ICONS.copyCheck })}
+          ${pagesNow() ? "" : item("similar", "Similar pictures", similar().reduce((n, g) => n + g.length, 0), { icon: ICONS.copyCheck })}
           ${counts.missing || scope === "missing" ? item("missing", "Missing", counts.missing, { icon: ICONS.fileMissing }) : ""}
           ${desktopBridge() ? item("trash", "Trash", trashCount, { icon: ICONS.trashBin }) : ""}
         </ul>
@@ -4929,7 +4929,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       [
         { id: "import-files", label: "Import files", hint: "From this device", icon: ICONS.arrowDownToLine, run: press('[data-action="import"]') },
         { id: "import-folder", label: "Import a folder", hint: "With its subfolders", icon: ICONS.arrowDownToLine, run: () => root.querySelector<HTMLInputElement>('[data-testid="assets-import-folder-input"]')?.click() },
-        { id: "new-folder", label: "New folder", hint: "To file things in", icon: ICONS.folderPlus, run: press('[data-folder-action="new"][data-id=""]') },
+        { id: "new-folder", label: "New folder", hint: "To file items in", icon: ICONS.folderPlus, run: press('[data-folder-action="new"][data-id=""]') },
       ],
       [
         { id: "slideshow", label: "Slideshow", hint: "One after another", icon: ICONS.play, run: press('[data-action="slideshow"]') },

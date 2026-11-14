@@ -586,7 +586,7 @@ async function start(): Promise<void> {
   if (storage?.libraryFolder && externalFolder.state === "needs-permission") {
     void storage.libraryFolder.keptHashes().then((h) => {
       if (!h.length) return;
-      editor.message = "The library folder needs your permission again: open the storage panel and press Reconnect folder.";
+      editor.message = "The library folder needs your permission again: open the storage panel and click Reconnect folder.";
       editor.changed();
     });
   }
@@ -1298,9 +1298,9 @@ async function start(): Promise<void> {
       anchor.style.cssText = `position:fixed;left:${box.left + at.x}px;top:${box.top + at.y}px;width:0;height:0;pointer-events:none`;
       document.body.appendChild(anchor);
       let add = opts.add ?? false;
-      const HINT: Record<RevealWhy, string> = { hidden: "Hidden: press to show it", locked: "Locked: press to unlock it", mask: "Part of a mask" };
+      const HINT: Record<RevealWhy, string> = { hidden: "Hidden: click to show it", locked: "Locked: click to unlock it", mask: "Part of a mask" };
       const items = (): MenuItem[] => [
-        { id: "reveal-add", label: "Add to the selection", hint: "Press to add or remove; press outside to end", icon: ICONS.listChecks, checked: add, run: () => { add = !add; } },
+        { id: "reveal-add", label: "Add to the selection", hint: "Click to add or remove; click outside to end", icon: ICONS.listChecks, checked: add, run: () => { add = !add; } },
         ...rows.map((r, i): MenuItem => {
           const on = r.ids.every((id) => editor.selection.has(id));
           return { id: `reveal:${r.key ?? r.ids[0]}`, label: `${"\u2003".repeat(r.depth ?? 0)}${r.label}`, hint: r.why ? HINT[r.why] : r.from === "selection" ? "In the selection: select this one" : "Select this one", icon: r.icon, checked: on, disabled: r.why === "mask", ...(r.sep && i > 0 ? { sep: true } : {}), run: () => {
@@ -1327,7 +1327,7 @@ async function start(): Promise<void> {
       try {
         if (!localStorage.getItem("canvast.hint.pickList")) {
           localStorage.setItem("canvast.hint.pickList", "1");
-          editor.message = "Choose what to select: what is here, hidden and locked things too, and what the selection holds. Shift adds; Alt goes on to the one below.";
+          editor.message = "Choose what to select: what is here, hidden and locked objects too, and what the selection holds. Shift adds; Alt goes on to the one below.";
           editor.changed();
         }
       } catch { /* (a browser that keeps nothing says it each time it would: nothing) */ }
@@ -1352,7 +1352,7 @@ async function start(): Promise<void> {
     focusSelection: () => focusCycle.tap(),
     labels: () => labels,
     openSearch: (prefix) => canvasSearch.open(prefix),
-    // The list to choose from (ADR 0151), one for a long press and Ctrl+click: what is under the pointer (hidden and locked things too, which a
+    // The list to choose from (ADR 0151), one for a long press and Ctrl+click: what is under the pointer (hidden and locked objects too, which a
     // press shows or unlocks), then, inside the selection's box, what the selection holds (a group's items, or each selected thing). A row
     // outlines its thing while touched and picks it when pressed; "Add to the selection" keeps what is picked; on touch the right-click menu follows.
     revealList: (at, pick, opts) => openChoiceList(at, pick, opts),
@@ -3044,7 +3044,7 @@ async function start(): Promise<void> {
       { group: "View", title: "Play the bookmarks as a tour", words: "present", enabled: () => onCanvas && bookmarkList.items.length > 0, run: () => bookmarkTour.start() },
       { group: "Panel", title: "Adjust", words: "toggle show hide adjustments picture exposure contrast", enabled: () => onCanvas, run: () => { editor.adjustOpen = !editor.adjustOpen; editor.changed(); } },
       { group: "Panel", title: "Layers", words: "toggle show hide", enabled: () => onCanvas, run: () => { editor.layersOpen = !editor.layersOpen; editor.changed(); } },
-      { group: "View", title: "Bookmark the selected things", words: "save view selection", enabled: () => onCanvas && editor.selection.size > 0, run: bookmarkPicked },
+      { group: "View", title: "Bookmark the selected objects", words: "save view selection", enabled: () => onCanvas && editor.selection.size > 0, run: bookmarkPicked },
       { group: "Panel", title: "Bookmarks", words: "toggle show hide", enabled: () => onCanvas, run: () => { editor.bookmarksOpen = !editor.bookmarksOpen; editor.changed(); } },
       { group: "Panel", title: "Pattern", words: "toggle show hide generator wave blob background random tiles", enabled: () => onCanvas, run: () => { editor.patternOpen = !editor.patternOpen; editor.changed(); } },
       { group: "Panel", title: "Styles", words: "toggle show hide adjustments saved", enabled: () => onCanvas, run: () => { editor.stylesOpen = !editor.stylesOpen; editor.changed(); } },

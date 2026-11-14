@@ -60,7 +60,7 @@ export const SIZE_RULES: ReadonlyArray<readonly [SizeRule, string, string]> = [
   ["width", "Same width", "Each as wide as this; its height from its own shape"],
   ["height", "Same height", "Each as tall as this; its width from its own shape"],
   ["long", "Longest side", "Each one's longer side this long"],
-  ["scale", "Scale", "Each at this many times its size on the canvas: big things stay bigger"],
+  ["scale", "Scale", "Each at this many times its size on the canvas: big objects stay bigger"],
 ];
 export const cleanSizeRule = (v: unknown): SizeRule => (v === "height" || v === "long" || v === "scale" ? v : "width");
 

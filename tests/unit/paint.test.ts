@@ -5,7 +5,7 @@ import { lookAt } from "../../src/core/camera";
 import type { PathObject } from "../../src/doc/model";
 import { InvalidObjectError, deserializeObject, newObjectId, serializeObject, validateObject } from "../../src/doc/model";
 import type { Gradient } from "../../src/doc/paint";
-import { angleOf, asKind, colourOfPaintAt, gradientFrom, inkOfPaint, isPaint, linearAt, paintCss, paintFromText, paintToText, rgbaOf, sliceStops, stopsAt } from "../../src/doc/paint";
+import { angleOf, asKind, mirroredPaint, colourOfPaintAt, gradientFrom, inkOfPaint, isPaint, linearAt, paintCss, paintFromText, paintToText, rgbaOf, sliceStops, stopsAt } from "../../src/doc/paint";
 import { rectSubs } from "../../src/doc/path";
 import { boxToLocal, canvasPaint, localToBox, paintAt } from "../../src/render/gradient";
 import { classifyCoarse } from "../../src/render/coarse";
@@ -176,5 +176,23 @@ describe("a gradient seen from far below (render/coarse.ts)", () => {
     expect(at(0.001)).toEqual({ color: colourOfPaintAt(RED_BLUE, 0.001 / 200) });
     expect(at(100)).toEqual({ color: "#800080" });
     expect(at(199.5)).toEqual({ color: colourOfPaintAt(RED_BLUE, 199.5 / 200) });
+  });
+});
+
+describe("a mirrored paint (Flip, ADR 0203)", () => {
+  const stops = [{ o: 0, c: "#ff0000" }, { o: 0.3, c: "#00ff00" }, { o: 1, c: "#0000ff" }];
+  const lin: Gradient = { type: "linear", x0: 0.1, y0: 0.2, x1: 0.9, y1: 0.6, stops };
+  const ang: Gradient = { type: "angular", cx: 0.3, cy: 0.4, angle: 30, stops };
+  it("moves a gradient's points to the other side of its box; twice is the same paint; a colour stays", () => {
+    expect(mirroredPaint(lin, "x")).toEqual({ ...lin, x0: 0.9, x1: 0.1 });
+    expect(mirroredPaint(mirroredPaint(ang, "y"), "y")).toEqual(ang);
+    expect(mirroredPaint("#123456", "x")).toBe("#123456");
+  });
+  it("an angular gradient's colours go round the other way, from the mirrored start", () => {
+    // (the colour at an angle before is the colour at the mirrored angle after)
+    const colourAt = (g: Extract<Gradient, { type: "angular" }>, deg: number) => colourOfPaintAt(g, ((((deg - g.angle) % 360) + 360) % 360) / 360);
+    const m = mirroredPaint(ang, "x") as Extract<Gradient, { type: "angular" }>;
+    for (const d of [40, 100, 200, 350]) expect(colourAt(m, 180 - d)).toBe(colourAt(ang as Extract<Gradient, { type: "angular" }>, d));
+    expect(m.cx).toBeCloseTo(0.7, 12);
   });
 });

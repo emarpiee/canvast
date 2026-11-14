@@ -179,7 +179,7 @@ function openDialog(deps: ExportDeps, again = false): void {
   const startW = t.ratio >= 1 ? 1920 : 1920 * t.ratio;
   const exact = multi ? undefined : sizeSuggestions(t.ratio, 8).find((s) => s.exact);
   let widthPx = last?.widthPx ?? (t.original && !multi ? t.original.w : (exact?.w ?? (multi ? 1080 : startW)));
-  const noun = ts.every((x) => x.kind === "sheet") ? "sheets" : "items";
+  const noun = ts.every((x) => x.kind === "sheet") ? "sheets" : "objects";
   // (several pictures leave at their own pixels, each page its picture's shape, until a width is set)
   const firstWidth = widthPx;
   const ownSizes = (): boolean => multi && ts.every((x) => x.original) && widthPx === firstWidth;
@@ -305,7 +305,7 @@ function openDialog(deps: ExportDeps, again = false): void {
     const shape = dlg.querySelector<HTMLElement>('[data-testid="export-shape"] strong');
     if (shape && multi) shape.textContent = plural(n, noun.slice(0, -1));
     const count = dlg.querySelector<HTMLElement>("[data-ex-count]");
-    if (count) count.textContent = n === raw.length ? `All ${plural(n, "item")}` : `${n} of ${raw.length} ${raw.length === 1 ? "item" : "items"}`;
+    if (count) count.textContent = n === raw.length ? `All ${plural(n, "object")}` : `${n} of ${raw.length} ${raw.length === 1 ? "object" : "objects"}`;
   };
   /** The small pictures of several sheets, numbered as they will leave, each with buttons to move it earlier or later. */
   const drawMinis = (): void => {

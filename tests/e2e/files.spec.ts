@@ -20,12 +20,12 @@ test("any file imports: a 3D model becomes a card on the canvas and in the libra
   expect(card!.kind).toBe("image"); // a card is an ordinary instance of the stored original
   // Its file name is drawn above it, like a sheet's name (ADR 0125).
   await expect.poll(async () => p.evaluate(() => window.__canvastDebug.itemLabels().map((l) => l.text))).toEqual(["robot.glb"]);
-  // The Item names button (bottom right) cycles: shown, shown when picked, hidden.
+  // The Object names button (bottom right) cycles: shown, shown when picked, hidden.
   const labels = () => p.evaluate(() => window.__canvastDebug.itemLabels().map((l) => l.text));
-  const names = p.getByRole("button", { name: /^Item names/ });
+  const names = p.getByRole("button", { name: /^Object names/ });
   await expect(names).toHaveAttribute("aria-label", /shown on every item/);
   await names.click();
-  await expect(names).toHaveAttribute("aria-label", /shown on the selected items/);
+  await expect(names).toHaveAttribute("aria-label", /shown on the selected objects/);
   await expect.poll(labels).toEqual([]);
   await p.locator("#canvas").focus();
   await p.keyboard.press("Control+a");

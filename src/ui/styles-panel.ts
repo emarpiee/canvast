@@ -119,7 +119,7 @@ export function mountStylesPanel(host: HTMLElement, editor: EditorState, styles:
   const card = (item: StyleItem, can: boolean): string => {
     const k = kindsShown.find((x) => x.id === item.kind)!;
     const look = k.look?.(item.data);
-    const title = can ? `Apply ${item.name} to the selection` : "Select items it applies to first";
+    const title = can ? `Apply ${item.name} to the selection` : "Select objects it applies to first";
     const body =
       item.kind === "gradient"
         ? `<span class="style-card-name">${esc(item.name)}</span><span class="style-bar" style="background-image:${esc(look?.bar ?? "")}"></span><span class="style-card-sum">${esc(k.summary(item.data))}</span>`
@@ -152,17 +152,17 @@ export function mountStylesPanel(host: HTMLElement, editor: EditorState, styles:
   /** The short line under each kind in the list of kinds. */
   const KIND_HINT: Record<string, string> = { adjustment: "From the Adjust panel", gradient: "Blends of colours", colour: "Single colours", palette: "Sets of colours", text: "Size, spacing, colour", pattern: "A generator and its seed", balloon: "Speech balloon looks", lines3d: "Line art of 3D views", layout: "Auto layouts of sheets", ratio: "Shapes of sheets and shapes", export: "Choices of Export…", exportname: "File names for Export…" };
   const GUIDE: Record<string, string> = {
-    adjustment: "Save an adjustment from the Adjust panel of a picture, then press it here to give other pictures the same look.",
+    adjustment: "Save an adjustment from the Adjust panel of a picture, then click it here to give other pictures the same look.",
     gradient: "A gradient is a blend of colours. Save one from the fill or outline picker, make a new one here, or import a GIMP .ggr file.",
     colour: "Keep the colours you use. Add one here, or save one from any colour picker.",
     palette: "A palette is a set of colours you reuse together, like a brand's.",
-    pattern: "A pattern style is a generator with its settings and seed. Save one from the Pattern panel, then press it to make the same pattern on the selected sheet or shape.",
+    pattern: "A pattern style is a generator with its settings and seed. Save one from the Pattern panel, then click it to make the same pattern on the selected sheet or shape.",
     export: "An export preset keeps the Export dialog's choices: format, quality, background, padding, resolution and size. Choose one in the dialog's Preset list.",
     exportname: "A name format names exported files: words and tokens such as {name}, {n} for the number, {w} and {h} for the size. Save one from the Export dialog; it is offered there next time, and goes with the workspace's backups.",
-    layout: "A layout is a sheet's auto layout: its flow, gap, padding, alignments, columns and order. Save one from Layout styles in the bar, then select a sheet and press it here to lay that sheet out the same way.",
-    lines3d: "A 3D line style is the line art of a 3D view: its lines, shading, fill and background. Save one from the Line styles menu of a 3D view, then press it here, or choose it in that menu, to give another model the same drawing.",
-    ratio: "Your own shapes for sheets and shapes, beside the built-in ones of the Shapes… list. Select a sheet or shape, then press one to give it that ratio.",
-    text: "A text style is a size, spacing, alignment and colour. Select a text, save its style here, then press it to give other texts the same look.",
+    layout: "A layout is a sheet's auto layout: its flow, gap, padding, alignments, columns and order. Save one from Layout styles in the bar, then select a sheet and click it here to lay that sheet out the same way.",
+    lines3d: "A 3D line style is the line art of a 3D view: its lines, shading, fill and background. Save one from the Line styles menu of a 3D view, then click it here, or choose it in that menu, to give another model the same drawing.",
+    ratio: "Your own shapes for sheets and shapes, beside the built-in ones of the Shapes… list. Select a sheet or shape, then click one to give it that ratio.",
+    text: "A text style is a size, spacing, alignment and colour. Select a text, save its style here, then click it to give other texts the same look.",
   };
 
   const render = (): void => {
@@ -213,7 +213,7 @@ export function mountStylesPanel(host: HTMLElement, editor: EditorState, styles:
       body: `<div class="styles-body" role="tabpanel" aria-label="${esc(k.plural)}">
         <div class="styles-tab-head"><h3>${esc(k.plural)}</h3>${k.id === "gradient" || k.id === "palette" ? moreButton(`More actions for ${k.plural}`, `data-kind-more="${k.id}"`) : ""}</div>
         ${paints ? `<div class="styles-target"><span id="styles-target-l">Apply to</span><div class="seg" role="radiogroup" aria-labelledby="styles-target-l">${seg("fill", "Fill", "Colours go on the fill of the selected shapes")}${seg("stroke", "Outline", "Colours go on the outline of the selected shapes")}${seg("both", "Both", "Fill and outline")}</div></div>` : ""}
-        ${!can ? `<p class="styles-hint">${ICONS.pointer}<span>${paints ? (k.id === "gradient" ? "Select shapes or pictures on the canvas, then press one to apply it (on a picture it becomes a gradient map)." : "Select shapes on the canvas, then press one to apply it.") : k.id === "text" ? "Select texts on the canvas, then press one to apply it." : k.id === "lines3d" ? "Open a 3D model, then press one to give its view these lines." : k.id === "layout" ? "Select a sheet on the canvas, then press one to lay it out that way." : "Select pictures on the canvas, then press one to apply it."}</span></p>` : ""}
+        ${!can ? `<p class="styles-hint">${ICONS.pointer}<span>${esc(k.hint)}</span></p>` : ""}
         ${actions ? `<div class="styles-actions">${actions}</div>` : ""}
         ${empty}
         ${all.length ? `<ul class="styles-list" aria-label="${esc(k.plural)}">${items.map((st) => card(st, can)).join("") || `<li class="layers-empty">No ${esc(k.plural.toLowerCase())} match.</li>`}</ul>` : ""}
@@ -301,7 +301,7 @@ export function mountStylesPanel(host: HTMLElement, editor: EditorState, styles:
       else skipped++;
     }
     const said = [gradients ? `${gradients} gradient${gradients === 1 ? "" : "s"}` : "", palettes ? `${palettes} palette${palettes === 1 ? "" : "s"}` : ""].filter(Boolean).join(" and ");
-    deps.notify(said ? `Imported ${said}${skipped ? `; ${skipped} file${skipped === 1 ? " was" : "s were"} not a gradient or palette file` : ""}${notes.size ? ` (${[...notes].join("; ")})` : ""}.` : "Nothing imported: pick GIMP gradient (.ggr), GIMP palette (.gpl), Adobe swatch (.ase) or Adobe colour (.aco) files.");
+    deps.notify(said ? `Imported ${said}${skipped ? `; ${skipped} file${skipped === 1 ? " was" : "s were"} not a gradient or palette file` : ""}${notes.size ? ` (${[...notes].join("; ")})` : ""}.` : "Nothing imported: choose GIMP gradient (.ggr), GIMP palette (.gpl), Adobe swatch (.ase) or Adobe colour (.aco) files.");
   };
   fileInput.addEventListener("change", () => {
     const files = [...(fileInput.files ?? [])];
@@ -343,7 +343,7 @@ export function mountStylesPanel(host: HTMLElement, editor: EditorState, styles:
       return [
         { label: "Apply to the fill", hint: "On what is selected", icon: ICONS.pointer, disabled: deps.paint.count() === 0, aria: `Apply ${item.name} to the fill`, run: () => deps.paint.apply(item.data as Paint, item.name, "fill", false, item.id) },
         { label: "Apply to the outline", hint: "On what is selected", icon: ICONS.pointer, disabled: deps.paint.count() === 0, aria: `Apply ${item.name} to the outline`, run: () => deps.paint.apply(item.data as Paint, item.name, "stroke", false, item.id) },
-        { label: "Change colour", hint: "Pick another colour", icon: ICONS.droplets, aria: `Change the colour of ${item.name}`, run: () => editColour(panel.querySelector<HTMLElement>(`[data-more="${item.id}"]`)!, `Colour ${item.name}`, String(item.data), (hex) => void styles.update(item.id, hex)) },
+        { label: "Change colour", hint: "Choose another colour", icon: ICONS.droplets, aria: `Change the colour of ${item.name}`, run: () => editColour(panel.querySelector<HTMLElement>(`[data-more="${item.id}"]`)!, `Colour ${item.name}`, String(item.data), (hex) => void styles.update(item.id, hex)) },
         { label: "Copy hex", hint: "As a colour code", icon: ICONS.clipboardCopy, aria: `Copy the hex of ${item.name}`, run: () => copyItem(item) },
         ...common(item),
         del,

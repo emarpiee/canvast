@@ -386,8 +386,8 @@ test("the command palette has the bars' buttons and the settings as commands, an
   await expect.poll(async () => ((await p.evaluate(() => window.__canvastDebug.objects())) as Array<Record<string, unknown>>).filter((o) => o["locked"] === true).length).toBe(1);
   // Controls of the Properties bar and the view buttons are there too (a field is focused, a button pressed).
   await p.keyboard.press("Control+k");
-  await box.fill("@toolbar item names");
-  expect(await titles()).toContain("Item names");
+  await box.fill("@toolbar object names");
+  expect(await titles()).toContain("Object names");
   // @ alone offers the kinds; @kind narrows to one and the other words still apply.
   await box.fill("@");
   const kinds = await titles();

@@ -4,7 +4,7 @@ import { promptDialog } from "./confirm";
 export async function askTagName(label: string, where: "library" | "canvases"): Promise<string | null> {
   const name = await promptDialog({
     title: `Rename the tag “${label}”`,
-    lines: [`It changes on every ${where === "library" ? "item" : "canvas item"} that has it. A name another tag has joins the two.`],
+    lines: [`It changes on every ${where === "library" ? "item" : "canvas object"} that has it. A name another tag has joins the two.`],
     value: label,
     confirmLabel: "Rename tag",
   });

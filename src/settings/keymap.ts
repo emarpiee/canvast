@@ -106,7 +106,7 @@ const cmd = (id: string, name: string, group: string, internal: Combo | readonly
 };
 
 export const TOOLS_GROUP = "Tools";
-export const STEP_GROUP = "Step to the next item";
+export const STEP_GROUP = "Step to the next object";
 export const VIEW_GROUP = "View";
 export const FIND_GROUP = "Find and commands";
 export const EDIT_GROUP = "Editing";
@@ -158,7 +158,7 @@ export const KEY_COMMANDS: readonly KeyCommand[] = [
   cmd("edit.duplicate", "Duplicate", EDIT_GROUP, "Ctrl+D"),
   cmd("edit.group", "Group", EDIT_GROUP, "Ctrl+G"),
   cmd("edit.ungroup", "Ungroup", EDIT_GROUP, "Ctrl+Shift+G"),
-  cmd("edit.autoLayout", "Auto layout: on or off for the picked sheets, or a new sheet that lays out the picked things", EDIT_GROUP, "Shift+A"),
+  cmd("edit.autoLayout", "Auto layout: on or off for the selected sheets, or a new sheet that lays out the selected objects", EDIT_GROUP, "Shift+A"),
   cmd("edit.flipH", "Flip horizontally", EDIT_GROUP, "Shift+H"),
   cmd("edit.flipV", "Flip vertically", EDIT_GROUP, "Shift+V"),
   cmd("edit.front", "Bring to front", EDIT_GROUP, "Ctrl+]"),

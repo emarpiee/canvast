@@ -215,7 +215,7 @@ One icon per function: two buttons that do different things never share an icon,
 | `arrow-up` | Move a board or canvas up in its list; Move a bookmark up |
 | `arrow-down` | Move a board or canvas down in its list; Move a bookmark down |
 | `scissors` | Eraser: cut parts out of strokes |
-| `copy-check` | Similar images (the library) |
+| `copy-check` | Similar pictures (the library) |
 | `corner-up-left` | Previous view (camera history) |
 | `corner-up-right` | Next view (camera history) |
 | `dice-5` | Every randomizer: Random empty view (bottom-right controls), Randomize in the Pattern panel, the gradient editor, the options of a pattern or picture fill (the picker module draws its own copy of it) |

@@ -154,7 +154,7 @@ test("bulk", async ({ scene: s }) => {
 
 test("similar", async ({ scene: s }) => {
   await s.look({ theme: "dark", hue: 210 });
-  // (a second scan of the same print, smaller and warmer, as a collection gathers: Similar images finds the pair)
+  // (a second scan of the same print, smaller and warmer, as a collection gathers: Similar pictures finds the pair)
   const work = mkdtempSync(join(tmpdir(), "cv-sim-"));
   const scan = join(work, "great_wave_second_scan.jpg");
   execFileSync("convert", [resolve("scripts/showcase/art", artFiles("hokusai-under")[0]!), "-resize", "70%", "-modulate", "100,108,98", scan]);

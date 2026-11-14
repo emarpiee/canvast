@@ -230,7 +230,7 @@ See [Building from source](#building-from-source), in the developers' part.
 | Move around | Drag with the middle button, hold `Space` and drag (a `Space` let go in another window is let go here too, once it stops repeating), or use two fingers; scroll the wheel to zoom |
 | Go back to the start | Press `0` or `Home` |
 | Find any command | Press `Ctrl/⌘+K` |
-| Undo | `Ctrl/⌘+Z` (undoing a delete brings the items back selected) |
+| Undo | `Ctrl/⌘+Z` (undoing a delete brings the objects back selected) |
 
 The info bar at the bottom left shows the zoom level and position. Click the zoom, type a level (`3000`, `2^-500`, `10^900`) and press Enter to jump there.
 
@@ -262,8 +262,8 @@ Gather what you work from on a canvas: pictures, video, sound, PDFs, 3D models a
 | [Auto layout](#auto-layout) | Rows, columns, wraps and grids laid out by rules |
 | [Arranging and snapping](#arranging-and-snapping) | Align, distribute, grids, snapping, the same size |
 | [Layers](#layers) | Groups, names, order, hiding and locking |
-| [Reveal and the Ctrl list](#reveal-and-the-ctrl-list) | Seeing and picking what lies under other things |
-| [Tags on the canvas](#tags-on-the-canvas) | Labels for the things on a canvas |
+| [Reveal and the Ctrl list](#reveal-and-the-ctrl-list) | Seeing and picking what lies under other objects |
+| [Tags on the canvas](#tags-on-the-canvas) | Labels for the objects on a canvas |
 
 ### Bringing files in
 
@@ -307,7 +307,7 @@ Give a print rounded corners and a thin outline, as a card on a mood board.
 | **Make a new picture** | Bakes the crop, flip and adjustments into a new library item; **Copy as picture** puts the result on the clipboard |
 | **Make vector copy** | Turns an SVG picture into editable shapes in its place, at its size, turn and layer (one undo step; the file stays in the library) |
 | **Show in library** | Opens the Library with the file selected |
-| **Names on the canvas** | A sheet, picture, video or file card shows its name above its top-left corner; any other item shows its layer name while selected. Where the names of selected items would overlap (a group selected whole, a sheet and what is on it), only the outermost is written |
+| **Names on the canvas** | A sheet, picture, video or file card shows its name above its top-left corner; any other object shows its layer name while selected. Where the names of selected objects would overlap (a group selected whole, a sheet and what is on it), only the outermost is written |
 
 ### Adjust
 
@@ -331,7 +331,7 @@ Give prints a soft drop shadow so they read as paper laid on a table.
 
 | How it works | |
 | --- | --- |
-| Stacks | Reorder, hide, and **Copy** and **Paste adjustments** (the Adjust group of the Actions bar) to move a whole stack between items. Each group has its own *Reset* |
+| Stacks | Reorder, hide, and **Copy** and **Paste adjustments** (the Adjust group of the Actions bar) to move a whole stack between objects. Each group has its own *Reset* |
 | Ranges | Past 100 where a stronger change means something: exposure, temperature, tint and the three primaries from -200 to 200, contrast, saturation and vibrance up to 200, blur up to 400, sharpen and grain up to 200, a shadow's blur and spread up to 400 and its offset to ±300 |
 | Saturation and gradient map | Change how colourful a colour is, never how light it looks (measured in OKLab): at *Saturation* -100 a yellow and a blue of one lightness become one grey, as light as they look. The **Gradient map** places each colour by that lightness too, so a grey keeps its place |
 | Blur types and pixelate | The blur's *Type*: **Soft**, **Motion** (with its *Angle*), **Zoom** or **Spin**, as wide as a soft blur of the same number. **Pixelate** makes square cells, a tenth of the object at 100 |
@@ -340,11 +340,11 @@ Give prints a soft drop shadow so they read as paper laid on a table.
 | On shapes, strokes and text | Applied to the object as drawn (fill, outline, gradient and texture together). A blur is a share of the object's size, so it does not change with zoom (far inside an object it stays at most about 330 px wide) |
 | Exporting | A selection leaves room for a blur or a drop shadow. An exported SVG carries them as a filter on the shape, and making the SVG into shapes again brings them back. A vector PDF draws such a shape as a picture instead (see [Limitations](#limitations)) |
 | On a sheet that clips | The sheet cuts what a blur or a shadow spreads past its edge too |
-| **Adjust what is under it** | For shapes (rectangle, ellipse, polygon, star, speech balloon; not a line or a path): the adjustments are made on what lies under the shape, inside its outline, not on the shape. A circle with no fill and a blur of 100 over a picture blurs that part of it; move it and the effect follows. Objects only (not the grid); its own fill and outline stay plain over it; its opacity is the strength. Picked anywhere inside; *Adjustment ellipse* in Layers. Making it a path turns it off |
+| **Adjust what is under it** | For shapes (rectangle, ellipse, polygon, star, speech balloon; not a line or a path): the adjustments are made on what lies under the shape, inside its outline, not on the shape. A circle with no fill and a blur of 100 over a picture blurs that part of it; move it and the effect follows. Objects only (not the grid); its own fill and outline stay plain over it; its opacity is the strength. Selected anywhere inside; *Adjustment ellipse* in Layers. Making it a path turns it off |
 
 ### Video, audio and GIFs
 
-Videos, audio and animated GIFs play on the canvas, with a player right under the item.
+Videos, audio and animated GIFs play on the canvas, with a player right under the object.
 
 Plan a camera move for an animatic: a slow pan across a painting, played on the board.
 
@@ -387,11 +387,11 @@ Put a print and its label on a sheet: the sheet holds them, moves them as one an
 | **Pins** | Each object on a sheet has pins per axis (left, right, both, centre or scale) that decide what it does when the sheet is resized |
 | **Scale contents** | Everything on the sheet grows with it, whatever its pins say |
 | **On sheet** | X, Y, W and H of something on a sheet are per cent of the sheet, so they read the same at any zoom |
-| **Picking** | A click on a thing on a sheet picks that thing alone; a click on the empty part of the sheet picks the sheet with everything on it; the name above a sheet picks it too. A sheet is ground: dragging on a selected sheet draws a selection box (hold `Ctrl` to move the sheet) |
+| **Picking** | A click on an object on a sheet selects that object alone; a click on the empty part of the sheet picks the sheet with everything on it; the name above a sheet picks it too. A sheet is ground: dragging on a selected sheet draws a selection box (hold `Ctrl` to move the sheet) |
 
 ### Auto layout
 
-Auto layout places what is on a sheet by rules, so a board, a page of panels or a row of studies stays in order as you add, remove and resize things.
+Auto layout places what is on a sheet by rules, so a board, a page of panels or a row of studies stays in order as you add, remove and resize objects.
 
 Let a sheet lay its pictures out in a grid that stays tidy as you add more.
 
@@ -399,22 +399,22 @@ Let a sheet lay its pictures out in a grid that stays tidy as you add more.
 
 | Turn it on | |
 | --- | --- |
-| On a sheet | `Shift+A`, **Auto layout** in the Sheets menu of the Actions bar, or the layout badge on the sheet's row in Layers. It reads the layout from where things are, so they stay put |
-| On loose things | `Shift+A`, or **Auto layout on a new sheet** in the Sheets menu: a new sheet round them (with no fill) that lays them out and fits them |
+| On a sheet | `Shift+A`, **Auto layout** in the Sheets menu of the Actions bar, or the layout badge on the sheet's row in Layers. It reads the layout from where objects are, so they stay put |
+| On loose objects | `Shift+A`, or **Auto layout on a new sheet** in the Sheets menu: a new sheet round them (with no fill) that lays them out and fits them |
 
 | Control (Properties bar, sheet selected) | What it does |
 | --- | --- |
 | **Flow** | **Row**, **column**, **wrap** (rows that break at the sheet's width), **grid**, **masonry** or **justified rows** (see below) |
 | **Gap** | Between items along the flow, and between lines |
 | **Pad** | Padding left and right, top and bottom; the button beside it opens each side |
-| **Start, Centre, End** | Where items sit across the flow (and the block of lines in a sheet with room for them) |
-| **Pack start, centre, end, Spread** | Where items sit along the flow, in a sheet wider than they are. Shown only when there is room to pack in (not in a masonry, nor when the sheet fits its contents that way) |
+| **Start, Centre, End** | Where objects sit across the flow (and the block of lines in a sheet with room for them) |
+| **Pack start, centre, end, Spread** | Where objects sit along the flow, in a sheet wider than they are. Shown only when there is room to pack in (not in a masonry, nor when the sheet fits its contents that way) |
 | **Size** | **Fits contents**: the sheet grows and shrinks to what is on it. **Set width**: you set the width, the height fits (a column: **Set height**). **Set size**: you set both, and what does not fit is cut off at the edge |
 | **Doesn't fit: Fit** | Shown when something runs past the edge of a sheet whose size is set: makes the sheet fit it on that side |
-| **Columns** | For a grid or a masonry: how many. Empty: chosen by the list beside it, **Auto: by shape** (from the items' shapes: a board about as wide as tall when the sheet fits its contents, or one that fills a sheet whose size you set; new layouts start with it) or **Auto: by count** (about as many as rows from the number of items alone; layouts made before keep it) |
+| **Columns** | For a grid or a masonry: how many. Empty: chosen by the list beside it, **Auto: by shape** (from the objects' shapes: a board about as wide as tall when the sheet fits its contents, or one that fills a sheet whose size you set; new layouts start with it) or **Auto: by count** (about as many as rows from the number of objects alone; layouts made before keep it) |
 | **Columns and rows** | For a grid: each column and row **Hug** (as large as what is in it), **Fixed** (a size in px) or **Share** (a share of the room left, never smaller than what is in it); rows past those set hug |
 | **Row** | For justified rows: the height a row aims at before it is made as wide as the sheet |
-| **Order** | The stacking order (as Layers lists it), or a rule kept as things are added: name A–Z or Z–A (a picture's name as placed, a text's first words), newest first (when the picture's file came into the library), largest first, by kind. An Arrange order on things of the sheet sets it too |
+| **Order** | The stacking order (as Layers lists it), or a rule kept as objects are added: name A–Z or Z–A (a picture's name as placed, a text's first words), newest first (when the picture's file came into the library), largest first, by kind. An Arrange order on objects of the sheet sets it too |
 | **Layout styles** | Your saved layouts, and *Save this layout as a style*: kept in the [Styles](#styles) panel, given to a selected sheet from there or this menu. Lengths are kept in px as seen |
 
 | On the sheet itself | |
@@ -424,8 +424,8 @@ Let a sheet lay its pictures out in a grid that stays tidy as you add more.
 
 | Flows that size the items | |
 | --- | --- |
-| **Masonry** | Columns of one width share the sheet's width; each item is made that wide, in its own shape, and goes in the shortest column, so pictures of every shape pack with no holes. A sheet that fits its contents makes the columns as wide as its widest item |
-| **Justified rows** | Every item in a row is one height and the row is as wide as the sheet, as a gallery of photographs; the last row keeps the height aimed at. The row height is taken from the items when you choose it; choosing it sets the width (Set width) |
+| **Masonry** | Columns of one width share the sheet's width; each object is made that wide, in its own shape, and goes in the shortest column, so pictures of every shape pack with no holes. A sheet that fits its contents makes the columns as wide as its widest object |
+| **Justified rows** | Every object in a row is one height and the row is as wide as the sheet, as a gallery of photographs; the last row keeps the height aimed at. The row height is taken from the objects when you choose it; choosing it sets the width (Set width) |
 
 Pack references of every shape into tidy columns with no holes.
 
@@ -439,17 +439,17 @@ Plan a page: a wide panel across all the columns, the columns sized by rule.
 
 ![A grid of dancer and horse studies, a wide horse study by Rosa Bonheur spanning all three columns, with the Columns and rows popover open: the middle column set to a share of the room](docs/screenshots/layout-tracks.webp)
 
-| On a thing on such a sheet | What it does |
+| On an object on such a sheet | What it does |
 | --- | --- |
 | **Fill** | Stretches it to the room along an axis: width, height or both. A picture keeps its shape: **Fill the room** makes it as large as its room allows, in the middle of it |
-| **Min**, **Max** | For a thing that fills: its least and most size on that axis, in % of the room inside the sheet (0: no limit) |
+| **Min**, **Max** | For an object that fills: its least and most size on that axis, in % of the room inside the sheet (0: no limit) |
 | **Span** | In a grid: how many columns and rows it covers; the others flow round it |
 | **Keep out of the layout** | It stays where it is put; the others flow round it |
 
 | Behaviour | |
 | --- | --- |
 | Changes | Anything added to, taken off, resized or moved on the sheet lays it out again, in the same undo step; a sheet that fits its contents inside another lays that one out too |
-| Order | The stacking order, front first, as Layers lists it, unless an Order rule is set. A thing dropped on the sheet takes the place it is dropped at |
+| Order | The stacking order, front first, as Layers lists it, unless an Order rule is set. An object dropped on the sheet takes the place it is dropped at |
 | While dragging | The others make room as you drag over the sheet, closing the gap behind it and opening one where it would land; dragged off the sheet, its place closes; over another sheet with auto layout, that sheet makes room. Nothing is stored until you let go |
 | Resizing the sheet by hand | It keeps the width you give it (a column: the height) and the other side goes on fitting, so nothing is cut off. Set size keeps both |
 
@@ -465,8 +465,8 @@ Line studies up along their bottom edges.
 
 | Feature | What it does |
 | --- | --- |
-| **Align and distribute** | The Align menu of the Actions bar lines the selection up by its edges or middles, or spaces it evenly. One thing on a sheet aligns with its sheet |
-| **Arrange in a grid** | By name, date, size or type, with a gap: once, where they are. With **Keep it tidy** (in the Arrange menu, or Settings > Drawing) the grid is made as a sheet with [auto layout](#auto-layout), its order kept as a rule, so it stays a grid as things are added |
+| **Align and distribute** | The Align menu of the Actions bar lines the selection up by its edges or middles, or spaces it evenly. One object on a sheet aligns with its sheet |
+| **Arrange in a grid** | By name, date, size or type, with a gap: once, where they are. With **Keep it tidy** (in the Arrange menu, or Settings > Drawing) the grid is made as a sheet with [auto layout](#auto-layout), its order kept as a rule, so it stays a grid as objects are added |
 | **On a sheet with auto layout** | The sheet places what is on it: Align and distribute are greyed out (the sheet's own alignment is in the bar), and an Arrange order becomes the sheet's Order rule |
 | **Size** menu | Gives the selected pictures, note cards, shapes, strokes and text the width or height of the smallest, the middle or the largest of them, in proportion. **Reset size** puts pictures, videos, GIFs, sounds and note cards back to the size they are placed at, at the current zoom (one pixel of the file for one of the screen; a note card at Settings > Notes > Note tool card size), about their middle. Several selected keep their layout: they move apart only as far as it takes to keep their gaps |
 | **Copy, cut, paste, duplicate** | `Ctrl/⌘+C`, `X`, `V`, `D`; `Alt`+drag copies |
@@ -479,7 +479,7 @@ Line studies up along their bottom edges.
 
 | What snaps | How |
 | --- | --- |
-| Moving, resizing, turning, a node, a gradient's handles | To other things, with guide lines; also to the grid's lines as shown, and to a group's box and middle as a whole |
+| Moving, resizing, turning, a node, a gradient's handles | To other objects, with guide lines; also to the grid's lines as shown, and to a group's box and middle as a whole |
 | Drawing | A shape, sheet, speech balloon or text box starts on the corner, edge or grid line it is pressed near, and its far corner snaps as a resized one does |
 | Boxes | Line up by their sides and middles |
 | Moving | Each axis on its own, so a corner can settle on a crossing of two lines, for one object, a group or several selected |
@@ -504,7 +504,7 @@ Keep a master study in groups: the reference locked, the construction and the li
 
 ### Reveal and the Ctrl list
 
-Find and pick what lies under other things, without moving anything.
+Find and pick what lies under other objects, without moving anything.
 
 Find and pick a print buried under others in a pile.
 
@@ -513,16 +513,16 @@ Find and pick a print buried under others in a pile.
 | Do | What happens |
 | --- | --- |
 | Hold `Ctrl` and move over the canvas | The outline of everything under the pointer shows, with their names in a small list beside it |
-| `Ctrl`+click | Selects exactly that thing, even deep inside a group, mask or sheet. On a revealed outline you get the thing it belongs to, even under a filled shape; elsewhere you get the top thing (`Ctrl`+`Alt`+click goes down the stack) |
+| `Ctrl`+click | Selects exactly that object, even deep inside a group, mask or sheet. On a revealed outline you get the object it belongs to, even under a filled shape; elsewhere you get the top object (`Ctrl`+`Alt`+click goes down the stack) |
 | In the list, move onto a row | Its outline turns strong; `Ctrl`+click selects it, `Ctrl`+`Shift`+click adds or removes it. Selected ones are ticked |
-| Hold `Ctrl` over an empty spot inside the selection | The list holds everything the selection holds, groups by their Layers name with their items indented under them |
+| Hold `Ctrl` over an empty spot inside the selection | The list holds everything the selection holds, groups by their Layers name with their objects indented under them |
 | A long list | Up to 16 rows show; the wheel scrolls it while `Ctrl` is held, and with *Scroll the Ctrl list at its ends* on (Settings > Navigation) so does resting the pointer on its top or bottom row or just past it (the list stays open there) |
-| `Ctrl`+click where nothing can be picked, or a long press on a touch screen | Opens a menu of the same rows: what is here, hidden and locked things too (pressed, they are shown or unlocked), and what the selection holds |
-| Drag from inside a selected thing | It moves, even under other things. A click without moving still selects the top thing |
+| `Ctrl`+click where nothing can be picked, or a long press on a touch screen | Opens a menu of the same rows: what is here, hidden and locked objects too (clicked, they are shown or unlocked), and what the selection holds |
+| Drag from inside a selected object | It moves, even under other objects. A click without moving still selects the top object |
 
 ### Tags on the canvas
 
-Tags label the things on a canvas, to find them with search (`#`) and in the **Tags** panel, which lists every tag and its count. Renaming or deleting a tag applies to every canvas. They are separate from the Library's tags of a file.
+Tags label the objects on a canvas, to find them with search (`#`) and in the **Tags** panel, which lists every tag and its count. Renaming or deleting a tag applies to every canvas. They are separate from the Library's tags of a file.
 
 Tag the studies on a canvas by what they teach, and find them again.
 
@@ -592,7 +592,7 @@ Refine a combined shape by its nodes: here the claws of the wave crest.
 
 | Feature | What it does |
 | --- | --- |
-| **Handles and snapping** | Each node's handles, snapping to other things |
+| **Handles and snapping** | Each node's handles, snapping to other objects |
 | **Several nodes, several paths** | A lasso or a box picks several nodes, across several paths at once |
 | **A whole outline** | A double-click in Edit nodes selects a whole closed path with its holes, to move it as one |
 | **Split into pieces** | Each outline of a path its own object |
@@ -617,7 +617,7 @@ Build an icon from simple shapes: a wave crest is a circle and a block joined, w
 
 ### Masks
 
-The **Masks** menu of the Actions bar: the top thing selected cuts or shows the others.
+The **Masks** menu of the Actions bar: the top object selected cuts or shows the others.
 
 Frame a reference in an oval, as on a botanical print, without cutting the file.
 
@@ -626,8 +626,8 @@ Frame a reference in an oval, as on a botanical print, without cutting the file.
 | Mask | What it does |
 | --- | --- |
 | **Clipping mask** | The top shape cuts what else is selected to its outline. It becomes a sheet of its own shape (no fill, its outline stays, named "Mask n") holding the others |
-| **Mask by opacity** | The top thing shows the others only where it is solid |
-| **Mask by brightness** | The top thing shows the others where it is light |
+| **Mask by opacity** | The top object shows the others only where it is solid |
+| **Mask by brightness** | The top object shows the others where it is light |
 | **Brush mask** | Painted in black and white with the Pen |
 
 Masks can be inverted, selected on their own and released. A click on a mask selects it as one unit; a double click goes inside.
@@ -714,7 +714,7 @@ Match a colour by eye: mix a swatch until it sits beside the Prussian blue of th
 | **Numbers** | Change by dragging their name left or right; with `Shift` they snap to round steps worked out from the range (steps of 5 for 0–100, 10 for 0–255) |
 | **Copy and paste** | A long press (or right click) on a swatch or saved gradient copies it without choosing it. Copying the hex field includes the `#`; pasting one drops it |
 | **Pasting CSS** | With shapes selected, a pasted CSS colour (hex, `rgb()`, `hsl()`, `oklch()` and the other notations, or a name such as `rebeccapurple`) or gradient (`linear-gradient(...)`, `radial-gradient(...)`, `conic-gradient(...)`) becomes their fill |
-| **Colour chips** | The colours of a selected pen stroke, or of several selected things, show as chips in the Properties bar; changing a chip changes that colour everywhere it is used |
+| **Colour chips** | The colours of a selected pen stroke, or of several selected objects, show as chips in the Properties bar; changing a chip changes that colour everywhere it is used |
 
 ### Styles
 
@@ -730,8 +730,8 @@ Take the colours of a reference as a palette to paint with.
 | Palettes | *Palette from a colour* builds harmonies; a palette can be taken from a picture. Imported and exported as `.gpl`, `.ase`, `.aco` and `.ggr` files |
 | Text styles | Size, alignment, spacing, colour |
 | Adjustments | A whole Adjust stack |
-| Patterns | A generator with its settings and seed: pressing its card puts it back in the Pattern panel and makes it on what is selected (on each of several selected shapes) |
-| Speech balloons | Size, tails, paint and the look of the text; goes on the selected balloons when you press its card. Not linked: changing the style later does not change them |
+| Patterns | A generator with its settings and seed: clicking its card puts it back in the Pattern panel and makes it on what is selected (on each of several selected shapes) |
+| Speech balloons | Size, tails, paint and the look of the text; goes on the selected balloons when you click its card. Not linked: changing the style later does not change them |
 | Layouts | A sheet's auto layout: see [Auto layout](#auto-layout) |
 | 3D line styles | The line art of a 3D view: see [Line art of a 3D model](#line-art-of-a-3d-model) |
 | Custom ratios | See [Sheets](#sheets) |
@@ -830,7 +830,7 @@ Set a cover's type: a title and a subtitle in fonts of your own.
 
 | Feature | What it does |
 | --- | --- |
-| **Formatting** | Bold, italic, underline, strikethrough, links, colour and size of any range, headings, bulleted, numbered and nested lists (`Tab` nests a list item). The format bar stands just above the text being typed, as the Properties chips stand by the selection, and keeps its tools in groups with a line between them: style, the selected text (link, colour, the size menu and the font), paragraph (the paragraph and list menus) and finish. Its menus stay open after a choice, ticking the one made, until `Esc` or a press outside, and never cover the text. **Copy Markdown** is one click away |
+| **Formatting** | Bold, italic, underline, strikethrough, links, colour and size of any range, headings, bulleted, numbered and nested lists (`Tab` nests a list item). The format bar stands just above the text being typed, as the Properties chips stand by the selection, and keeps its tools in groups with a line between them: style, the selected text (link, colour, the size menu and the font), paragraph (the paragraph and list menus) and finish. Its menus stay open after a choice, ticking the one made, until `Esc` or a click outside, and never cover the text. **Copy Markdown** is one click away |
 | **Look** | Colour or gradient, outline, size, line height, letter spacing, alignment, auto or fixed width, paragraph spacing, indent, case, line limit, a set height, kerning, OpenType features and the axes of variable fonts |
 | **Fonts** | Import `.ttf`, `.otf`, `.woff` or `.woff2` into the library, including variable fonts. One text may use several fonts. Right-to-left and mixed-direction text are supported |
 | **Paragraph and box** | At the start of the text's bar: the paragraph and card settings (a text can sit on a coloured card; **Make note files** turns such texts into notes) |
@@ -873,7 +873,7 @@ Keep every reference once, in folders by subject, and see a print's details besi
 | [PDFs and 3D models](#pdfs-and-3d-models) | A reader for PDFs, a lit view of 3D models and their line art |
 | [Art files](#art-files) | Pictures from `.kra`, `.psd`, `.procreate` and others |
 | [Fonts](#fonts) | Samples of the library's fonts |
-| [Similar images](#similar-images) | Duplicates and near-duplicates |
+| [Similar pictures](#similar-pictures) | Duplicates and near-duplicates |
 | [Selecting and details](#selecting-and-details) | Several items at once, properties, thumbnails, renaming |
 | [Taking files out](#taking-files-out) | The clipboard, real files, other apps, exports |
 | [Deleting and Trash](#deleting-and-trash) | Safe deletion, Trash, missing files |
@@ -950,7 +950,7 @@ Pin the folder you work from most, nest tags by subject and keep the searches yo
 | **Tags** | Several per item. A tag with a `/` (`reference/anatomy`) is a branch of a tree, with arrows that fold it and a parent that finds and counts what is nested under it, each item once; or all in a row with their whole names, by the button on the Tags header. Renamed in one dialog, from a tag's ⋯ menu in the sidebar or the Tags panel, or a double-click on it in the details |
 | **Favourites**, **File types**, **Canvas tags** | The starred items; each kind of file; the tags of the canvases' objects |
 | **Unfiled**, **Missing** | Items in no folder; the items whose file is gone (as `is:missing`), shown while there are some |
-| **Similar images** | Duplicates and near-duplicates found by their pixels (see [Similar images](#similar-images)) |
+| **Similar pictures** | Duplicates and near-duplicates found by their pixels (see [Similar pictures](#similar-pictures)) |
 | **Saved searches** | With how many each finds |
 | **Trash** | Desktop app (see [Deleting and Trash](#deleting-and-trash)) |
 | **Hidden** | Kept out of every list, and listed only in hidden mode (see [Privacy and hidden items](#privacy-and-hidden-items)) |
@@ -962,7 +962,7 @@ Pin the folder you work from most, nest tags by subject and keep the searches yo
 | **Show more** | A long list shows its first rows and **Show N more**, remembered on this device |
 | **Sort a list** | The sort button in its head (or `Alt+↑` / `Alt+↓` on a section's name) changes the order at each click, remembered on this device: folders A to Z, Z to A, newest first and oldest first; tags A to Z and Z to A; file types the most first, A to Z, Z to A. Newest and oldest follow the order the library holds its folders in, as folders have no date of their own: one found on the disk counts from when it was found, and one hidden and shown again can count as newer |
 | **Pin a folder** | The pin button on a folder's row (it shows when the pointer is on the row, not on small or touch screens; a pinned folder always shows its filled pin), or **Pin to top** in its ⋯ menu or on a right click, puts it first in the Folders list, a subfolder too, with an arrow on its folder icon; **Unpin** puts it back. Pins are kept in the workspace (pins made before on a device move there), and a search shows every folder in its usual place |
-| **Conceal a folder** | **Conceal folder** in a folder's ⋯ menu: a view filter. Its items, and its subfolders', are listed only when that folder (or one in it) is opened: not in All items, a search, a file type, a tag, another folder, Similar images, the pickers of the Library and of notes, or a note's link and tag suggestions. Nothing of the folder or its items changes, and they stay on the canvases they are placed on, in exports and on the disk. The folder shows a fog mark; **Reveal folder** lists its items everywhere again. Kept in the workspace, for every device; Settings > Privacy counts them and lists them |
+| **Conceal a folder** | **Conceal folder** in a folder's ⋯ menu: a view filter. Its items, and its subfolders', are listed only when that folder (or one in it) is opened: not in All items, a search, a file type, a tag, another folder, Similar pictures, the pickers of the Library and of notes, or a note's link and tag suggestions. Nothing of the folder or its items changes, and they stay on the canvases they are placed on, in exports and on the disk. The folder shows a fog mark; **Reveal folder** lists its items everywhere again. Kept in the workspace, for every device; Settings > Privacy counts them and lists them |
 | **Quick filters** | A file type or a tag in the sidebar lists only those items; `Ctrl`+click (`⌘` on a Mac) adds another type or tag to the filter, or takes it out: any of the types chosen and any of the tags chosen |
 | **File by dragging** | Drop items onto a folder to move them into it, onto *Unfiled* to take them out of their folders, onto a tag to tag them, onto *Favourites* to mark them; a selected item carries the whole selection |
 
@@ -1062,7 +1062,7 @@ Give a model the look of a blueprint or a comic in one choice, and keep your own
 | Line styles (in the bar) | |
 | --- | --- |
 | Built in | Blueprint, Ink, Architectural, Etching, Patent, Comic dots, Pencil, Toon: each sets all the lines, their fill and the background (Toon also the surface) |
-| Your own | *Save these lines as a style* keeps them in the [Styles](#styles) panel as a 3D line style, offered in this menu for any model; pressing its card in the panel gives it to the 3D view in front |
+| Your own | *Save these lines as a style* keeps them in the [Styles](#styles) panel as a 3D line style, offered in this menu for any model; clicking its card in the panel gives it to the 3D view in front |
 
 | Using the lines | |
 | --- | --- |
@@ -1104,13 +1104,13 @@ Keep the fonts of a project with its pictures and see each one set.
 | The details | A sample sentence |
 | The viewer | Four sizes with the alphabet and digits, on the same background as a see-through picture (by the same button); another button changes the sample sentence, and a box under the samples takes your own words. All three are kept, and its preview in the details and its card on a canvas show the same |
 
-### Similar images
+### Similar pictures
 
-**Similar images** in the sidebar groups duplicates and near-duplicates found by their pixels: a scan and its crop, a picture saved twice at two sizes.
+**Similar pictures** in the sidebar groups duplicates and near-duplicates found by their pixels: a scan and its crop, a picture saved twice at two sizes.
 
 Find a second scan of the same print hiding in the collection.
 
-![Similar images: Hokusai's Great Wave beside a smaller, warmer second scan of it](docs/screenshots/similar.webp)
+![Similar pictures: Hokusai's Great Wave beside a smaller, warmer second scan of it](docs/screenshots/similar.webp)
 
 ### Selecting and details
 
@@ -1485,10 +1485,10 @@ Export several pictures at once: leave some out, name the files by a pattern, an
 | Presets | *Save these as a preset…* keeps the choices (format, quality, background, padding, resolution, size, name pattern, size rule, extra versions) as a saved style; choose one from *Preset*, update it there, or manage them in the Styles panel |
 | Again | It opens as you last exported that sheet or selection on this device; *Export again* in the Export menu does it with no dialog. `Enter` exports as last time, `Ctrl+C` copies |
 | Result | Download it, copy it, or keep it in the library |
-| Several items | Selected sheets, or with *Separate files* any selected items (pictures at their own pixels). A balloon and its text are one item, and a connector is none. Otherwise a selection is one picture |
+| Several objects | Selected sheets, or with *Separate files* any selected objects (pictures at their own pixels). A balloon and its text are one object, and a connector is none. Otherwise a selection is one picture |
 | What goes | Each item has a tick: click an item anywhere to leave it out (it fades and loses its number) or bring it back; `Ctrl`+click (`⌘` on a Mac) several, `Shift`+click to set a whole run like the last one clicked, or use *All* and *None*. `Space` on an item ticks or unticks it, `Delete` leaves it out. Reorder them with the arrows or by dragging |
 | Output | For several items: *Separate files* (one ZIP), *PDF pages* (one PDF, a page for each, in the order shown) or *One picture* (all of them together) |
-| Size of each | For several items: *Same width*, *Same height*, *Longest side*, or *Scale* (1× to 4× each one's size on the canvas, so big things stay bigger) |
+| Size of each | For several objects: *Same width*, *Same height*, *Longest side*, or *Scale* (1× to 4× each one's size on the canvas, so big objects stay bigger) |
 | Names | A name pattern, the same as the Library's Rename: `###` (the number, as many digits as `#`, from *Starting with*; `{n}` is `##`), `{name}` (without its file's extension; click an item's name to give it another), `{date}` or `{date:YYYYMMDD}` (today or a day you set, see [Rename](#rename)), and Export's own `{w}` `{h}` (pixels), `{canvas}`, `{format}`. The files it makes are listed under it before you export; two alike get `-2`. The ZIP or PDF has its own name |
 | Name formats | *Formats…* beside the name: built-in patterns, yours, and *Save it as a name format…*. They are saved styles, managed in the Styles panel, and go with the workspace's backups. Settings > Saving to the library sets the pattern and the size rule a new export starts with |
 | Also | Extra versions of each file: *@2x* and *@3x* (twice and three times as big, named `…@2x.png`), and *SVG* beside each picture when it is vectors |
@@ -1522,7 +1522,7 @@ Show a project on a tablet on the same network, read-only, without copying it th
 | **Follow the host** | In a guest's read-only bar: it goes where you are, on your canvas, as you move; moving the view yourself stops it |
 | **Hidden items** | Only with **Share hidden items too**. Their files go out encrypted, as they are in the folder; a guest needs your Hidden password, and its own browser or app opens them. Your computer never decrypts them for a guest |
 | **Allowed devices** | Listed in *Settings > Sharing*, with whether each is connected; **Remove** stops one at once. Sharing is off at every start of the app |
-| **The code and the folder's password** | Stay the same across starts, until you press **New code**, **New password** or **Set a password…** (at least 8 characters). Devices already allowed stay allowed. Five wrong codes in a row pause pairing for a minute |
+| **The code and the folder's password** | Stay the same across starts, until you click **New code**, **New password** or **Set a password…** (at least 8 characters). Devices already allowed stay allowed. Five wrong codes in a row pause pairing for a minute |
 | **The desktop app as a guest** | Checks the fingerprint the first time (compare it with the sharing computer's *Settings > Sharing*) and then accepts only that certificate |
 | **Start sharing when the app opens** | Off by default. The hidden items are never shared at a start: you turn that on yourself each time |
 | **Activity** | *Settings > Sharing* lists what happened (devices allowed or refused, wrong codes, connected and left, the folder's sign-ins and files opened, with time and address) and the apps using the folder; **Open the log file** shows all of it (a file in the app's own settings folder, the latest megabyte and one older file) |
@@ -1552,7 +1552,7 @@ Go anywhere on one canvas: the showcase's Solar System at home.
 | [Boards and canvases](#boards-and-canvases) | The board and canvas menu |
 | [Bookmarks and tours](#bookmarks-and-tours) | Saved places, played as a tour |
 | [Search on the canvas](#search-on-the-canvas) | By name, tag or bookmark, with keywords; saved searches |
-| [Stepping from item to item](#stepping-from-item-to-item) | `W` `A` `S` `D` and `F` |
+| [Stepping from object to object](#stepping-from-object-to-object) | `W` `A` `S` `D` and `F` |
 | [Camera travel](#camera-travel) | How the view gets to a far place |
 | [Try the showcase: powers of two](#try-the-showcase-powers-of-two) | A million and one thousand zoom levels on one canvas |
 
@@ -1596,7 +1596,7 @@ Bookmark each study on a long reference canvas to go back to it in one click.
 
 | Feature | How |
 | --- | --- |
-| **Add** | *Add bookmark* saves the view as it is; the check-mark button saves one that brings the selected things into view (the camera stays where it is) |
+| **Add** | *Add bookmark* saves the view as it is; the check-mark button saves one that brings the selected objects into view (the camera stays where it is) |
 | **Change** | Rename, update, move or delete one from its ⋯ menu, or drag a card to reorder the list |
 | **Go** | `Alt+1`…`Alt+9` go to the first nine; `]` and `[` to the next and previous (changeable in Shortcuts). Getting there is a glide; a far one zooms out from here and in to there (see [Camera travel](#camera-travel)) |
 | **Tour** | *Play the bookmarks as a tour*: they play in list order, the bars fade, `→` and `←` step, `Esc` ends it. With *Tour: wait at each stop* (Settings) it moves on by itself. The tour has its own travel speed |
@@ -1622,7 +1622,7 @@ Searches that found something are remembered, and a help card lists the syntax.
 
 #### Saved searches
 
-The save button in the search box keeps the search typed (pressed while it is saved; press it again to remove it).
+The save button in the search box keeps the search typed (pressed while it is saved; click it again to remove it).
 
 | | |
 | --- | --- |
@@ -1630,11 +1630,11 @@ The save button in the search box keeps the search typed (pressed while it is sa
 | Where they are kept | The canvas search and the library search each keep their own list (up to 200 each), in the workspace (its folder, on desktop), and they travel in a workspace backup with the other settings. With the Hidden items open, the library keeps a separate list on this device only |
 | In the Library | A saved search also keeps its layout, columns and sort, in the same list; *Update* in its ⋯ in the sidebar gives it the ones shown now. In the sidebar each row shows how many items it finds (not in a library listed a page at a time) and opens with the look it was saved with (its tooltip says grid or list); its ⋯ renames it (a name of its own, its words stay what it searches for), updates its look, moves it up or down (in your order), or deletes it. The sort button in the section's head lists them in your order, A to Z, Z to A, or the most found first. A new one goes last |
 
-### Stepping from item to item
+### Stepping from object to object
 
 | Key | What it does |
 | --- | --- |
-| `W` `A` `S` `D` | Step to the next item: the nearest in view (when you are zoomed in on an item and nothing is near enough on the screen, the nearest of its size that way, however far), the nearest anywhere, by layer or by name A to Z (each either among the items in the window or among all of them; `W` and `A` go back, `S` and `D` on). On arriving, focus on the item or keep the zoom (Settings > Navigation) |
+| `W` `A` `S` `D` | Step to the next object: the nearest in view (when you are zoomed in on an object and nothing is near enough on the screen, the nearest of its size that way, however far), the nearest anywhere, by layer or by name A to Z (each either among the objects in the window or among all of them; `W` and `A` go back, `S` and `D` on). On arriving, focus on the object or keep the zoom (Settings > Navigation) |
 | `F` | Brings the selection into view; press it again to fit everything, a third time to go back to the selection |
 
 ### Camera travel
@@ -1676,7 +1676,7 @@ Zoom out as far as in: the multiverse a thousand levels above.
 | Other universes, **1,000 levels up** | Inside a proton (+60), the Planck length (+116) |
 | | Universes again at **+1,000**, and a last scene **one million levels down** |
 
-To open it: click the save indicator at the bottom left, choose **Import archive…** and choose the file (or drop it on the page). Open the canvas *Powers of two*, then either scroll, or open **Bookmarks** and press **Play the bookmarks as a tour** (`→` and `←` step through its 19 stops).
+To open it: click the save indicator at the bottom left, choose **Import archive…** and choose the file (or drop it on the page). Open the canvas *Powers of two*, then either scroll, or open **Bookmarks** and click **Play the bookmarks as a tour** (`→` and `←` step through its 19 stops).
 
 How the showcase and its pictures are made is in [Releasing and project scripts](#releasing-and-project-scripts).
 
@@ -2042,7 +2042,7 @@ A hidden drawing already placed on a canvas shows a padlock, not its picture.
 
 | | |
 | --- | --- |
-| Out of every list | A hidden item is left out of *All items*, every folder, tag and file type, the counts and totals, searches and their suggestions, *Similar images*, and the pickers that list the library (a texture fill's picture, the fonts) |
+| Out of every list | A hidden item is left out of *All items*, every folder, tag and file type, the counts and totals, searches and their suggestions, *Similar pictures*, and the pickers that list the library (a texture fill's picture, the fonts) |
 | On a canvas | Where it is already placed, its picture shows a padlock at once (with or without a password) until it is shown again, and it is named *Hidden item* there (its label, the Layers panel): its name shows only with its picture. Canvas files hold no name of a hidden item: the file name a placed item took as its layer name goes when the item is hidden (a name you typed yourself stays). A hidden video or sound does not play |
 | Remembered password | With *Remember the Hidden password* on (Settings > Privacy), once the password is given its picture shows on the canvas until the tab or app closes, the hidden items are locked, or remembering is turned off. That is the screen only: exports, copies, pattern fills, baked pictures, screenshots and bookmark pictures still draw the padlock, so nothing readable of it leaves the app |
 | The file | Hiding does not move, delete or change the file. In hidden mode, the same button shows the item again |
@@ -2065,7 +2065,7 @@ A workspace with a password shows nothing until it is given.
 | | |
 | --- | --- |
 | Beginning it | Outside it, nothing hidden is listed, counted or suggested anywhere. Type the **opening word** in the library's search box (`hidden:` by default; change it, or empty it to turn this off, in Settings > Privacy); the password is asked for if there is one |
-| In it | The Library is the same view with every function (folders, *Unfiled*, *Favourites*, tags, file types, *Similar images*, search, sorts, layouts, the viewer and slideshow, rename, descriptions and properties, filing, bulk actions), over the hidden items only. The folders listed are the hidden ones and those holding hidden items; the counts are of hidden items |
+| In it | The Library is the same view with every function (folders, *Unfiled*, *Favourites*, tags, file types, *Similar pictures*, search, sorts, layouts, the viewer and slideshow, rename, descriptions and properties, filing, bulk actions), over the hidden items only. The folders listed are the hidden ones and those holding hidden items; the counts are of hidden items |
 | The chip | At the start of the status bar: *Hidden mode*, with a pin (filled when on: stay in hidden mode when leaving the library), **Exit** and **Lock** (on a phone, the eye and *Exit*) |
 | Folders | A folder made in hidden mode is hidden. **Unhide folder** (a folder's ⋯ menu in hidden mode) shows the folder, its subfolders and every item in them again, also the items in it that were hidden one by one, and the folders above it |
 | Ending it | **Exit** on that chip, locking the hidden items, or leaving the library, unless the chip's pin (or *Stay in hidden mode when leaving the library*, Settings > Privacy) keeps it on until then. While hidden mode stays on outside the library, hidden items placed on canvases show their pictures on the screen (files, copies and screenshots keep the padlock). The library is then as it was before (its list, search and scroll), and the hidden items' pictures are dropped from memory. With *Remember the Hidden password until the tab closes* (Settings > Privacy) it begins again without the password until the tab is closed or reloaded |
@@ -2195,7 +2195,7 @@ node scripts/hidden-items.mjs encrypt ~/Art/my-workspace ~/decrypted/sketch.png
 | --- | --- | --- |
 | **Tool rail** | Left | Undo and Redo, the tools (Import after Note), then Screenshot and Search |
 | **Properties bar** | By the selection, or at the top | The options of the tool or of what is selected, as named chips just above what is selected, each showing its first value; a chip opens its options as a short form, one named option a row; the menus it opens (Outline, Paragraph and box, Font, Columns and rows) are forms too, with switches for what is on or off. They never stand under the bars on the edges: just past or beside the one in the way. With nothing selected, or another tool picked, the chips stand at the top. On a small window the chips scroll sideways |
-| **Actions bar** | Bottom | What can be done with the selection, in named groups (Items, Files, Adjust, Edit shapes, Arrange, Attach, Selection, Find), always in that order, some of them menus (Align, Arrange, Shapes, Masks, Path tools, Sheets, Export, Initial state) that list only what applies. The names of its groups show over the buttons. When wider than the window it shows a fade and an arrow; the mouse wheel scrolls it sideways |
+| **Actions bar** | Bottom | What can be done with the selection, in named groups (Objects, Files, Adjust, Edit shapes, Arrange, Attach, Selection, Find), always in that order, some of them menus (Align, Arrange, Shapes, Masks, Path tools, Sheets, Export, Initial state) that list only what applies. The names of its groups show over the buttons. When wider than the window it shows a fade and an arrow; the mouse wheel scrolls it sideways |
 | **Panels** | Either side, or floating | Layers, Bookmarks, Tags, Styles, Adjust, Pattern: they float or dock to either side, are resizable, and can minimize when inactive. *Reset the panel layout* puts them back |
 | **Zen mode** | `Z`, or the leaf button | Fades the bars and panels until the pointer is over them |
 | **Screenshot** | The camera button | Saves the selection, or the whole view, to the library. Settings choose the format, quality, name, folder and tags, and whether to include the canvas pattern and the interface, a transparent background, and a copy on the clipboard |
@@ -2218,7 +2218,7 @@ Run any command by name: typing flip finds the flip commands for the selected pr
 
 A right click, the menu key, or a long press on a touch screen opens a menu at the pointer (to its left when there is no room), of what fits where you are.
 
-Reach what fits the thing under the pointer with a right click.
+Reach what fits the object under the pointer with a right click.
 
 ![The context menu of a print on the canvas: its commands in groups, each with an icon and a short description](docs/screenshots/context-menu.webp)
 
@@ -2233,7 +2233,7 @@ Reach what fits the thing under the pointer with a right click.
 
 ### The info bar
 
-The bottom left shows the zoom, position and save state; the bottom-right buttons cycle the canvas pattern (grid and others) and the item names (always, when selected, hidden). *Information shown* (the ⓘ button) switches between simple, more and technical.
+The bottom left shows the zoom, position and save state; the bottom-right buttons cycle the canvas pattern (grid and others) and the object names (always, when selected, hidden). *Information shown* (the ⓘ button) switches between simple, more and technical.
 
 See what the app is doing: zoom, frame times and memory, with Information shown set to Technical.
 
@@ -2269,13 +2269,13 @@ Make the app yours: theme, theme colour, density and the canvas.
 | Group | What it holds |
 | --- | --- |
 | Drawing and selection | Pen, colour picker model and layout, pen width and stabilizer, lasso filter, snapping, align to the selection box, grid spacing for Arrange, initial shape and paint, the distance Fill gaps closes openings by, eraser |
-| Navigation | How `W` `A` `S` `D` choose the next item (nearest in view or anywhere, by layer or by name A to Z, in view or anywhere); focus on the item or keep the zoom; camera travel (style, time, longest trip, easing) and the wait at each tour stop; whether dragging near an edge pans the view, and how fast (Pan at the edge while dragging, Edge panning speed) |
+| Navigation | How `W` `A` `S` `D` choose the next object (nearest in view or anywhere, by layer or by name A to Z, in view or anywhere); focus on the object or keep the zoom; camera travel (style, time, longest trip, easing) and the wait at each tour stop; whether dragging near an edge pans the view, and how fast (Pan at the edge while dragging, Edge panning speed) |
 | Shortcuts | Rebind any shortcut to a key or a chord; the full list is also on `?` |
 | Notes | The notes editor's style in the library and on a canvas (each its own, Document at first); on a canvas, Panel or Window; a new note's name (a pattern, as screenshots have) and the width of the Note tool's card; the Notes folder new notes are filed in; light or dark previews (Preview look); whether note cards show the whole note or a part (Note cards show), and which properties they show (Note cards show properties); Write tags and properties into note files; whether typed markdown marks make formats (Markdown marks make formats); Save notes on close; what to do when a note's formatting does not fit its file |
 | Media and playback | Players: starting volume and step sizes. The library viewer: its edges (a click on the left or right goes to the previous or next item), how long the player stays while a video plays, slideshow time |
 | Saving to the library | Extracted frames and PDF pages (format, quality, a page's resolution, folder, name, tags) and edited pictures (format, quality, folder, name, tags), and the folder and tags of what is saved to the library from the canvas, one pair for each kind: pictures from Export… (*Exports*, `export`), patterns (*Patterns*, `pattern`) and shapes saved as SVG (*Shapes*, `shape`); screenshots have theirs in the Screenshot group. In the desktop app, Keep file names and Sort files by kind |
 | Screenshot | Format, quality, pattern, transparency, interface, clipboard, folder, name and tags |
-| Appearance | Theme (system, light, dark), theme colour (or adaptive, from the canvas background), colourfulness, information shown, hints and tooltips, canvas pattern, item names, density (comfortable, compact, dense), round or sharp corners, Zen mode; panels: minimize inactive ones, how many stay open |
+| Appearance | Theme (system, light, dark), theme colour (or adaptive, from the canvas background), colourfulness, information shown, hints and tooltips, canvas pattern, object names, density (comfortable, compact, dense), round or sharp corners, Zen mode; panels: minimize inactive ones, how many stay open |
 | Performance | Adaptive quality, fixed quality level, memory for pictures, animation and its speed |
 | Storage | Space used and whether the browser keeps the data; the library folder (choose it, move files in and out, the library index and its automatic saving); how saving is going; backups (export, Advanced export, changes only, files as ZIP, import); in the desktop app, where deleted files go and when `.trash` is emptied; *Start from scratch* (delete all data, after a warning with a backup offered first) |
 | Privacy | The word that begins hidden mode, remembering the Hidden password until the tab closes, the passwords of the workspace and of the Hidden items, Lock now and New key; what stays on your machine |
@@ -2312,7 +2312,7 @@ Change any shortcut, with a warning when two clash.
 | Delete | `Delete` · `Backspace` |
 | Group · ungroup | `Ctrl/⌘+G` · `Ctrl/⌘+Shift+G` |
 | Put the selection on a sheet · flatten | `Ctrl+Alt+G` · `Ctrl/⌘+E` (text to paths, a boolean group to one path) |
-| Auto layout on or off (picked sheets), or a new sheet that lays out the picked things | `Shift+A` |
+| Auto layout on or off (selected sheets), or a new sheet that lays out the selected objects | `Shift+A` |
 | Bring to front · send to back | `Ctrl/⌘+]` · `Ctrl/⌘+[` |
 | Bookmarks | `[` previous · `]` next · `Alt+1` … `Alt+9` go to bookmark 1 to 9 |
 | Previous view · next view | `Alt+Shift+←` · `Alt+Shift+→` |
@@ -2320,7 +2320,7 @@ Change any shortcut, with a warning when two clash.
 | Context menu | Right-click the canvas |
 | Search | `Ctrl+F` (library: `Ctrl+Shift+F`); on the canvas `#` searches tags, `@` bookmarks, `/` is the command palette and `?` the shortcut list |
 | Focus on selection · fit everything | `F` · `F` again |
-| Step to next item | `W` `A` `S` `D` |
+| Step to next object | `W` `A` `S` `D` |
 | Zen mode | `Z` (bars fade out until the pointer is over them) |
 | Text editing | `Ctrl/⌘+B` · `Ctrl/⌘+I` · `Tab` nests a list item · `Esc` or `Ctrl/⌘+Enter` finishes |
 | Resize | Drag a handle; `Shift` keeps proportions, `Alt` resizes about the middle, `Ctrl` turns snapping off. A box stops at a small size and never flips |
@@ -2363,7 +2363,7 @@ What canvast does not do today, for both versions, then each. **The limits that 
 | Angular gradient in SVG | Exported as a picture, not vectors, with a warning |
 | Varied fills | Repeat after 16 to 31 cells |
 | Pattern | No rotated sheets; at most 600 shapes |
-| Auto layout | A masonry and justified rows resize the items; a turned sheet has none; a sort rule cannot order by colour |
+| Auto layout | A masonry and justified rows resize the objects; a turned sheet has none; a sort rule cannot order by colour |
 | SVG import | No text, patterns or masks from inside an SVG |
 | Adjustments and shadows | Not on a playing video or GIF; only shapes keep them in SVG |
 | Boolean groups | No per-corner radii |
@@ -2383,12 +2383,12 @@ What canvast does not do today, for both versions, then each. **The limits that 
 | Text | Complex scripts that need Indic shaping are not supported; OpenType positioning goes no further than kerning. Characters missing from the interface font fall back to a system font: their width then comes from the browser, so such text can wrap differently on another computer and pixelates at extreme depth |
 | Vector networks | One fill for the whole network (no fill per region) |
 | Note zoom | Only a note's text grows; pictures keep their size |
-| Size menu | Locked items, sheets and a flat line on the side it has no size are left out. Items at different depths of the canvas keep their layout separately, so they could overlap |
+| Size menu | Locked objects, sheets and a flat line on the side it has no size are left out. Objects at different depths of the canvas keep their layout separately, so they could overlap |
 | Notes | Markdown cannot hold fonts, sizes, alignment, table styles or the page layout: such a note is saved as a rich text note (or that formatting is dropped). Math, embedded web pages (YouTube, posts) and PDF export are not in the editor: they need a server or another library the app does not ship. A save changes only the blocks that were edited; those are written in one spelling (`- ` for lists, `**` for bold, ` ``` ` for code, an underlined heading as `#`). Obsidian's `![[embed]]` shows its picture in the editor when it is one, and stays as written when it is another kind of file. Saving is manual (no autosave while you work; **Save notes on close** saves on leaving a note) and there is no version history: a saved note replaces the file |
 | Angular gradient in SVG | SVG has no sweep gradient, so an SVG holds a picture of it (up to 384 px a side, about 300 KB), not vectors; the Export dialog, Save as SVG and Copy as SVG warn. A PDF of such a shape is made as a picture, and picture exports are exact |
 | Varied fills | The copies of a varied texture repeat after a block of 16 to 31 cells |
 | Pattern | A rotated sheet or shape is refused. A result is at most 600 shapes. Ungrouping a pattern, or moving one of its shapes out of its group, ends its link with the panel (the shapes stay as ordinary ones). Resizing the sheet makes the pattern again at the new size from its settings and seed, so a generator whose layout depends on the size (how many waves fit, say) can place its shapes differently |
-| Auto layout | A turned sheet cannot have one. A masonry and justified rows resize the items to their places: a pen stroke and a turned thing are scaled as a whole, text only gets wider (it wraps again). A grid places spanning items row by row in order, so a hole a big item leaves is not filled by a later small one. A sort rule orders by what the canvas holds (a picture's name as placed and when its file came into the library, a text's first words, size, kind), not by colour; a picture placed before it kept its date gets it from the library when a date order is chosen. Lengths of a saved layout style are px as seen when it was saved |
+| Auto layout | A turned sheet cannot have one. A masonry and justified rows resize the items to their places: a pen stroke and a turned object are scaled as a whole, text only gets wider (it wraps again). A grid places spanning items row by row in order, so a hole a big item leaves is not filled by a later small one. A sort rule orders by what the canvas holds (a picture's name as placed and when its file came into the library, a text's first words, size, kind), not by colour; a picture placed before it kept its date gets it from the library when a date order is chosen. Lengths of a saved layout style are px as seen when it was saved |
 | SVG import | Text, patterns and masks inside an SVG are not imported; a dropped SVG file is placed as a picture (make a vector copy to edit it) |
 | Adjustments and shadows | Shadows are not shown on a video or GIF while it plays. Adjustments (and shadows) are written to an exported SVG only for shapes (not pen strokes or text), as an SVG filter that matches the canvas closely but not exactly (curves, levels and the gradient map are sampled; grain differs). A shape bigger than about 8 million pixels on screen is drawn unadjusted. Grain on a shape is fixed to the screen pixels, not to the shape |
 | Boolean groups | Per-corner radii on a boolean result are not available |
@@ -2413,7 +2413,7 @@ What canvast does not do today, for both versions, then each. **The limits that 
 | Far zoom-out | Too-small content is a soft mark you cannot select |
 | Very large documents | A million objects: about 940 MB and 6 s to load |
 | Undo on a canvas | The last 500 steps, or about 64 MiB of them if that comes first: big edits (pictures, patterns) keep fewer steps |
-| Large libraries | From 20,000 items on desktop, listed in pages; no *Similar images*, no counts on saved searches, no list of an item's copies in its details |
+| Large libraries | From 20,000 items on desktop, listed in pages; no *Similar pictures*, no counts on saved searches, no list of an item's copies in its details |
 | Copies of a file (desktop) | A copy found in another folder is an item of its own on desktop only; placed on a canvas it is its first item, and a backup carries it as its first item (not its own name, folder or tags) |
 | Frame rate | Measured on one desktop machine only |
 
@@ -2427,7 +2427,7 @@ What canvast does not do today, for both versions, then each. **The limits that 
 | Dense scenes | With hundreds to thousands of objects visible at once, zooming shows a briefly scaled image of the last exact frame and snaps to the exact picture about 150 ms after you stop. Zooming out before the next level out has been prepared (it is made while the view rests, in a fraction of a second), the edge the scaled image does not reach is drawn exactly, so those frames are slower but the view is never cut off. While the wheel keeps turning, the exact picture waits until the zoom holds still; past what is prepared, it is built a few tiles a frame over the scaled one (the part that does not reach drawn exactly), so no frame waits for all of it. A drawing where thousands of long strokes all cross the same small area can still take one slow frame (about half a second) for one tile |
 | Far zoom-out | Content too small to draw is shown as a soft mark in its own colour (pictures as grey). Marks cannot be selected; zoom in to edit |
 | Very large documents | A board of one million objects needs about 940 MB of memory and about 6 s to build its index on load |
-| Large libraries | The Library draws only the cards near the view, so scrolling stays smooth however deep you go (measured with 20,000 items: opening about 1 s, wheel scrolling at 60 frames a second at the top and at the end, no stall while typing a search). Search results are redrawn when typing pauses for a quarter of a second. A thumbnail missing from storage is made from its file, three at a time. Backups of many gigabytes have not been measured; an import holds about one 128 MiB batch of files in memory at a time, and each canvas is read whole. In the desktop app a library of 20,000 items or more is listed a page at a time: only the cards near the view are read, and search, sort and counts are worked out where the library is kept; *Similar images* is then not offered (it reads how every picture looks), and a selection of more than 5,000 items shows its count but not its size. Measured on a GitHub runner with a million files: the app opens in about 8 s and the Library shows them all about 2 s later (about 500 MB); the first open on a new device takes about 2 minutes; a file put into `library/` from outside is listed in about 3 s |
+| Large libraries | The Library draws only the cards near the view, so scrolling stays smooth however deep you go (measured with 20,000 items: opening about 1 s, wheel scrolling at 60 frames a second at the top and at the end, no stall while typing a search). Search results are redrawn when typing pauses for a quarter of a second. A thumbnail missing from storage is made from its file, three at a time. Backups of many gigabytes have not been measured; an import holds about one 128 MiB batch of files in memory at a time, and each canvas is read whole. In the desktop app a library of 20,000 items or more is listed a page at a time: only the cards near the view are read, and search, sort and counts are worked out where the library is kept; *Similar pictures* is then not offered (it reads how every picture looks), and a selection of more than 5,000 items shows its count but not its size. Measured on a GitHub runner with a million files: the app opens in about 8 s and the Library shows them all about 2 s later (about 500 MB); the first open on a new device takes about 2 minutes; a file put into `library/` from outside is listed in about 3 s |
 | Frame rate | Measured on one desktop machine, and panning and zooming on GitHub's Linux machines in Chromium ([the pan and zoom standard](#the-pan-and-zoom-standard)); no results exist for Firefox, phones, tablets or other device classes |
 
 #### Platform

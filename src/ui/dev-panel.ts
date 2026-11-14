@@ -24,7 +24,7 @@ const SAMPLES: ReadonlyArray<Notice> = [
   { kind: "success", text: "Imported 12 files." },
   { kind: "success", text: "Exported “Board 1” (4.2 MB)." },
   { kind: "warning", text: "Read-only: another tab is editing this workspace." },
-  { kind: "warning", text: "Select at least 3 items to distribute." },
+  { kind: "warning", text: "Select at least 3 objects to distribute." },
   { kind: "error", text: "Could not save: the browser refused to write (storage full?)." },
   { kind: "error", text: "Import failed: “scene.png” is not a picture the browser can read." },
 ];

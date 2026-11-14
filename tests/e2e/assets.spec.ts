@@ -361,7 +361,7 @@ test("deleting canvases and boards removes their objects, keeps shared originals
   await openMenu(p);
   await rowAction(p, "canvas", "Canvas 2", "Delete");
   await expect(p.getByTestId("confirm-dialog")).toContainText("It holds 2 objects on board “Board 1”.");
-  await expect(p.getByTestId("confirm-dialog")).toContainText("Images placed on it stay in the library.");
+  await expect(p.getByTestId("confirm-dialog")).toContainText("Pictures placed on it stay in the library.");
   await p.keyboard.press("Escape");
   await expect(p.getByTestId("confirm-dialog")).toHaveCount(0);
   expect((await sess(p)).tree![0]!.canvases.map((c) => c.name)).toEqual(["Canvas 1", "Canvas 2"]);
@@ -2604,7 +2604,7 @@ test("the library filters by size, shape and colour, and lists look-alikes toget
   await search.fill("");
 
   // look-alikes: the two photos, side by side; the red and blue ones are not among them
-  await p.getByRole("button", { name: /^Similar images/ }).click();
+  await p.getByRole("button", { name: /^Similar pictures/ }).click();
   await expect.poll(names, { timeout: 8000 }).toEqual(["photo-bright.png", "photo.png"]);
   expect(app.consoleErrors).toEqual([]);
 });

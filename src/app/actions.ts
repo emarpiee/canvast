@@ -176,7 +176,7 @@ function layoutUnits(doc: DocumentStore, editor: EditorState, names: ReadonlyMap
     objs = homed ? picked.map((o) => expressObjectIn(o, f0)) : picked;
     if (container) around = [...doc.all()].filter((o) => o.groups?.includes(container) && !isResult(o) && !o.hidden).map((o) => (homed || (o.frame ?? doc.space.world) !== f0 ? expressObjectIn(o, f0) : o));
   } catch {
-    return "These items are too far apart in size to arrange together.";
+    return "These objects are too far apart in size to arrange together.";
   }
   const byUnit = new Map<string, CanvasObject[]>();
   for (const o of objs) {
@@ -197,7 +197,7 @@ function layoutUnits(doc: DocumentStore, editor: EditorState, names: ReadonlyMap
     try {
       within = worldBounds(expressObjectIn(sheet, f0));
     } catch {
-      return "That item is too far from its sheet in size to line it up with it.";
+      return "That object is too far from its sheet in size to line it up with it.";
     }
   }
   return { units, within, homed };
@@ -235,7 +235,7 @@ export function layoutSelection(doc: DocumentStore, editor: EditorState, cmd: La
   const out = "grid" in cmd ? arrangeGrid(units, cmd.grid, cmd.gap) : "align" in cmd ? alignUnits(units, cmd.align, alone ? (within ?? undefined) : undefined) : distributeUnits(units, cmd.distribute);
   if (!out.length) return; // already in place
   const moved = homed ? out.map((o) => homeObject(o, doc.space)) : out;
-  const label = "grid" in cmd ? `Arrange ${units.length} items in a grid ${LABELS[cmd.grid]}` : "align" in cmd ? `Align ${cmd.align}` : `Distribute ${cmd.distribute === "x" ? "horizontally" : "vertically"}`;
+  const label = "grid" in cmd ? `Arrange ${units.length} objects in a grid ${LABELS[cmd.grid]}` : "align" in cmd ? `Align ${cmd.align}` : `Distribute ${cmd.distribute === "x" ? "horizontally" : "vertically"}`;
   doc.commit(doc.transaction(label, moved));
   editor.changed();
 }
@@ -2294,7 +2294,7 @@ export function drawSheetOver(doc: DocumentStore, editor: EditorState, sheet: Pa
   const placed = below ? (placeAbove(all, [body], below)[0] ?? body) : body;
   doc.commit(doc.transaction("Draw sheet", [placed, ...roots.map((o) => ({ ...o, parent: sheet.id }) as CanvasObject)]));
   editor.selectMade([placed.id]);
-  editor.message = `${sheet.name ?? "The sheet"} holds ${roots.length === 1 ? "1 item" : `${roots.length} items`} it was drawn over.`;
+  editor.message = `${sheet.name ?? "The sheet"} holds ${roots.length === 1 ? "1 object" : `${roots.length} objects`} it was drawn over.`;
   editor.changed();
 }
 
@@ -2367,7 +2367,7 @@ export function sheetEach(doc: DocumentStore, editor: EditorState): void {
     if (m) made.push(m);
   }
   if (!made.length) return;
-  doc.commit(doc.transaction(`Put ${plural(made.length, "item")} on a sheet each`, made.flatMap((m) => [m.sheet, ...m.inside])));
+  doc.commit(doc.transaction(`Put ${plural(made.length, "object")} on a sheet each`, made.flatMap((m) => [m.sheet, ...m.inside])));
   editor.select(made.map((m) => m.sheet.id));
   editor.changed();
 }
@@ -2588,7 +2588,7 @@ export function canMakeMask(doc: DocumentStore, editor: EditorState): boolean {
 export function makeMask(doc: DocumentStore, editor: EditorState, mode: "alpha" | "luminance"): void {
   if (editor.blockEdit()) return;
   if (!canMakeMask(doc, editor)) {
-    editor.message = "Select two or more things that are not masks already: the top one becomes the mask of the others.";
+    editor.message = "Select two or more objects that are not masks already: the top one becomes the mask of the others.";
     editor.changed();
     return;
   }
@@ -2686,7 +2686,7 @@ export function startBrushMask(doc: DocumentStore, editor: EditorState, revealed
   const roots = rootsOf(selected(doc, editor).filter((o) => !o.locked));
   const level = editor.entered.length;
   if (!roots.length || roots.some((o) => o.isMask || o.mask)) {
-    editor.message = "Select the things to paint a mask for (not masks already).";
+    editor.message = "Select the objects to paint a mask for (not masks already).";
     editor.changed();
     return;
   }
@@ -2696,7 +2696,7 @@ export function startBrushMask(doc: DocumentStore, editor: EditorState, revealed
   const w = D.toNumber(D.shift(D.sub(b.max.x, b.min.x), -unit));
   const h = D.toNumber(D.shift(D.sub(b.max.y, b.min.y), -unit));
   if (!(w > 0 && h > 0 && Number.isFinite(w + h))) {
-    editor.message = "Those things have no common size to paint a mask on.";
+    editor.message = "Those objects have no common size to paint a mask on.";
     editor.changed();
     return;
   }
@@ -2871,7 +2871,7 @@ function laidOutAround(doc: DocumentStore, editor: EditorState, label: string, l
   const roots = rootsOf(selected(doc, editor).filter((o) => !o.locked));
   const made = roots.length ? sheetAround(doc, roots, doc.ordered(), null) : null;
   if (!made) {
-    editor.message = "Select things to lay out, or a sheet.";
+    editor.message = "Select objects to lay out, or a sheet.";
     editor.changed();
     return false;
   }
@@ -2906,7 +2906,7 @@ export function orderLaidOutSheet(doc: DocumentStore, editor: EditorState, sheet
   const items = doc.ordered().filter((o) => o.parent === sheet.id);
   const dated = key === "date" ? withDates(items, dates).filter((o, i) => o !== items[i]) : [];
   doc.commit(doc.transaction("Order of the layout", [{ ...sheet, container: { ...sheet.container, layout } } as CanvasObject, ...dated]));
-  editor.message = key === "stack" ? "The sheet orders its things by their stacking again." : "The sheet keeps this order as things are added.";
+  editor.message = key === "stack" ? "The sheet orders its objects by their stacking again." : "The sheet keeps this order as objects are added.";
   editor.changed();
 }
 

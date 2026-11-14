@@ -79,7 +79,7 @@ export function duplicateNotice(names: ReadonlyArray<{ name: string; duplicate: 
   const restored = names.filter((n) => n.duplicate === "restored").length;
   if (names.length === 1) {
     const n = names[0]!;
-    const label = n.name ? `“${n.name}”` : "This image";
+    const label = n.name ? `“${n.name}”` : "This picture";
     return n.duplicate === "restored" ? `${label} was in the deleted list and is back in your library.` : `${label} is already in your library: no second copy is stored.`;
   }
   return `${names.length} of ${plural(total, "file")} were already in your library: no second copies are stored${restored ? ` (${restored} restored from the deleted list)` : ""}.`;

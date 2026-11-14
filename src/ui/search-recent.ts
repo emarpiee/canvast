@@ -75,7 +75,7 @@ export function paintSaveToggle(btn: HTMLButtonElement, typed: string, way: Sear
   btn.setAttribute("aria-pressed", String(on));
   const full = !on && list.length >= MAX_SAVED;
   btn.disabled = full;
-  btn.title = on ? "Saved: press to remove it from the saved searches" : full ? `${MAX_SAVED} searches are saved: remove one to save another` : "Save this search";
+  btn.title = on ? "Saved: click to remove it from the saved searches" : full ? `${MAX_SAVED} searches are saved: remove one to save another` : "Save this search";
 }
 
 /** Press: save the search typed, or remove it when it is saved. `changed` repaints. */

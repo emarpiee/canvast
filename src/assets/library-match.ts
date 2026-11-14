@@ -14,7 +14,7 @@ import type { Query } from "../search/query";
 
 /**
  * From how many items the desktop app's Library lists a page at a time (`CatalogStore.pages`); below it, the whole library is in the
- * page, as in the browser (every feature works over it, Similar images too). Tests lower it.
+ * page, as in the browser (every feature works over it, Similar pictures too). Tests lower it.
  */
 export const libraryPaging = { from: 20_000 };
 

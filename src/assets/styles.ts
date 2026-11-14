@@ -42,6 +42,8 @@ export interface StyleKind {
   readonly plural: string;
   /** What the empty list says. */
   readonly empty: string;
+  /** How one is used, shown while it cannot be applied yet ("Select pictures on the canvas, then click one to apply it."). */
+  readonly hint: string;
   /** The data when it is what this kind keeps, else null. The result is what is stored. */
   validate(data: unknown): unknown | null;
   /** One short line about the data. */
@@ -62,6 +64,7 @@ export const ADJUSTMENT_KIND: StyleKind = {
   label: "Adjustment",
   plural: "Adjustments",
   empty: "None yet. Save one from the Adjust panel.",
+  hint: "Select pictures on the canvas, then click one to apply it.",
   validate: (d) => (d && typeof d === "object" ? (cleanAdjust(d as Adjust) ?? null) : null),
   summary: (d) => {
     const a = d as Adjust;
@@ -75,6 +78,7 @@ export const COLOUR_KIND: StyleKind = {
   label: "Colour",
   plural: "Colours",
   empty: "None yet. Save one from the colour picker.",
+  hint: "Select shapes on the canvas, then click one to apply it.",
   validate: (d) => (isColour(d) ? d.toLowerCase() : null),
   summary: (d) => String(d).toUpperCase(),
   look: (d) => ({ swatches: [String(d)] }),
@@ -88,6 +92,7 @@ export const GRADIENT_KIND: StyleKind = {
   label: "Gradient",
   plural: "Gradients",
   empty: "None yet. Save one from the fill or outline picker, or import a .ggr file.",
+  hint: "Select shapes or pictures on the canvas, then click one to apply it (on a picture it becomes a gradient map).",
   validate: (d) => (isPaint(d) && isGradient(d) ? d : null),
   summary: (d) => {
     const g = d as Gradient;
@@ -105,6 +110,7 @@ export const PALETTE_KIND: StyleKind = {
   label: "Palette",
   plural: "Palettes",
   empty: "None yet. Make one from the selection or a picture, or import a .gpl file.",
+  hint: "Select shapes on the canvas, then click one to apply it.",
   validate: (d) => {
     const list = (d as { colours?: unknown } | null)?.colours;
     if (!Array.isArray(list) || list.length < 1 || list.length > MAX_PALETTE) return null;
@@ -128,6 +134,7 @@ export const TEXT_KIND: StyleKind = {
   label: "Text style",
   plural: "Text styles",
   empty: "None yet. Save one from a text.",
+  hint: "Select text on the canvas, then click one to apply it.",
   validate: (d) => cleanLook(d),
   summary: (d) => {
     const l = d as TextLook;
@@ -149,6 +156,7 @@ export const PATTERN_KIND: StyleKind = {
   label: "Pattern",
   plural: "Patterns",
   empty: "None yet. Save one from the Pattern panel.",
+  hint: "Select a sheet or shape on the canvas, then click one to make its pattern there.",
   validate: (d) => {
     const p = d as { id?: unknown; seed?: unknown; v?: unknown } | null;
     const g = p && typeof p.id === "string" ? generatorById(p.id) : undefined;
@@ -165,6 +173,7 @@ export const BALLOON_KIND: StyleKind = {
   label: "Speech balloon",
   plural: "Speech balloons",
   empty: "None yet. Save one from a balloon's Body options (Save as style).",
+  hint: "Select speech balloons on the canvas, then click one to give them its look.",
   validate: (d) => validLook(d),
   summary: (d) => BODIES.find(([id]) => id === (d as BalloonLook).body)?.[1] ?? "Balloon",
   look: () => ({}),
@@ -176,6 +185,7 @@ export const RATIO_KIND: StyleKind = {
   label: "Ratio",
   plural: "Ratios",
   empty: "None yet. Save one from the Shapes… list of a sheet or shape.",
+  hint: "Select a sheet or shape on the canvas, then click one to give it that ratio.",
   validate: (d) => (typeof d === "number" && Number.isFinite(d) && d > 0.01 && d < 100 ? d : null),
   summary: (d) => formatRatio(d as number),
 };
@@ -186,6 +196,7 @@ export const EXPORT_KIND: StyleKind = {
   label: "Export preset",
   plural: "Export presets",
   empty: "None yet. Save one from the Export dialog's Preset list.",
+  hint: "Choose one in the Export dialog's Preset list.",
   validate: (d) => cleanExportPreset(d),
   summary: (d) => exportPresetSummary(d as ExportPreset),
 };
@@ -196,6 +207,7 @@ export const EXPORT_NAME_KIND: StyleKind = {
   label: "Name format",
   plural: "Name formats",
   empty: "None yet. Save one from the Export dialog's name formats.",
+  hint: "Choose one in the Export dialog's name formats.",
   validate: (d) => cleanNamePattern(d),
   summary: (d) => (d as { pattern: string }).pattern,
 };
@@ -206,6 +218,7 @@ export const LAYOUT_STYLE_KIND: StyleKind = {
   label: "Layout",
   plural: "Layouts",
   empty: "None yet. Save one from Layout styles in the bar, with a sheet with auto layout selected.",
+  hint: "Select a sheet on the canvas, then click one to lay it out that way.",
   validate: (d) => (isSheetLayout(d) ? d : null),
   summary: (d) => {
     const l = d as SheetLayout;
@@ -221,6 +234,7 @@ export const LINE_STYLE_KIND: StyleKind = {
   label: "3D line style",
   plural: "3D line styles",
   empty: "None yet. Save one from the Line styles menu of a 3D view.",
+  hint: "Open a 3D model, then click one to give its view these lines.",
   validate: (d) => cleanLineStyle(d),
   summary: (d) => lineStyleSummary(d as ModelLook),
   look: (d) => ({ swatches: [(d as ModelLook)["linesColour"], (d as ModelLook)["bg"], (d as ModelLook)["toneColour"]].filter((c): c is string => typeof c === "string" && isColour(c)) }),

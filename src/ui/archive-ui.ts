@@ -405,7 +405,7 @@ export async function runSaveLibraryFile(session: Session): Promise<boolean> {
 export async function runOpenLibraryFile(session: Session): Promise<void> {
   const file = await externalFolder.readLibraryFile();
   if (!file) {
-    tell(session, `This folder has no ${LIBRARY_FILE}. On the device that has the library, press “Save library index to the folder”.`);
+    tell(session, `This folder has no ${LIBRARY_FILE}. On the device that has the library, click “Save library index to the folder”.`);
     return;
   }
   const p = beginProgress(session.editor, "library-index", "Opening the library");

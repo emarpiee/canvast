@@ -58,11 +58,11 @@ const PATTERN_ICON: Record<CanvasPattern, string> = { grid: ICONS.grid3x3, dots:
 
 export type ItemNames = "all" | "picked" | "off";
 const NAMES: readonly ItemNames[] = ["all", "picked", "off"];
-const NAMES_LABEL: Record<ItemNames, string> = { all: "shown on every item", picked: "shown on the selected items", off: "hidden" };
+const NAMES_LABEL: Record<ItemNames, string> = { all: "shown on every object", picked: "shown on the selected objects", off: "hidden" };
 const NAMES_ICON: Record<ItemNames, string> = { all: ICONS.captions, picked: ICONS.scanText, off: ICONS.captionsOff };
 
 export interface HudStatus {
-  /** The names above items (Settings > Appearance > Item names), and a way to change them. */
+  /** The names above items (Settings > Appearance > Object names), and a way to change them. */
   itemNames(): ItemNames;
   setItemNames(mode: ItemNames): void;
   subscribeItemNames(fn: () => void): void;
@@ -126,7 +126,7 @@ export function mountHud(root: HTMLElement, view: ViewState, stats: FrameStats, 
       <button type="button" data-action="pattern" aria-label="Canvas pattern" title="Canvas pattern"></button>
       <button type="button" data-action="background" aria-haspopup="dialog" aria-label="Canvas background colour" title="Canvas background colour. Hold to go back to the app's own.">${ICONS.paintBucket}</button>
       <button type="button" data-action="info" aria-label="Information shown" title="Information shown"></button>
-      <button type="button" data-action="names" aria-label="Item names" title="Item names"></button>
+      <button type="button" data-action="names" aria-label="Object names" title="Object names"></button>
       <button type="button" data-action="zen" aria-pressed="false" aria-label="Zen mode" title="Zen mode: fade the bars and panels out; each shows while the pointer is over it (Z)">${ICONS.leaf}</button>
       <span class="hud-sep" role="separator"></span>
       <button type="button" data-action="zoom-out" aria-label="Zoom out" title="Zoom out (−)">${ICONS.minus}</button>
@@ -313,8 +313,8 @@ export function mountHud(root: HTMLElement, view: ViewState, stats: FrameStats, 
     const next = NAMES[(NAMES.indexOf(m) + 1) % NAMES.length]!;
     namesButton.innerHTML = NAMES_ICON[m];
     namesButton.dataset["names"] = m;
-    namesButton.setAttribute("aria-label", `Item names: ${NAMES_LABEL[m]}`);
-    namesButton.title = `Item names: ${NAMES_LABEL[m]}. Click for ${NAMES_LABEL[next]}.`;
+    namesButton.setAttribute("aria-label", `Object names: ${NAMES_LABEL[m]}`);
+    namesButton.title = `Object names: ${NAMES_LABEL[m]}. Click for ${NAMES_LABEL[next]}.`;
   };
   status.subscribeItemNames(applyNames);
   applyNames();

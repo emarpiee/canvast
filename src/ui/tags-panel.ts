@@ -9,7 +9,7 @@ import { moreButton, openMoreMenu } from "./more-menu";
 
 /**
  * Floating Tags panel (ADR 0076): the in-canvas tags (ADR 0062) in one place, next to Layers and Bookmarks.
- *  - On the selection: the tags the selected items carry (× takes one off), a box to add more (a comma separates several), and the other
+ *  - On the selection: the tags the selected objects carry (× takes one off), a box to add more (a comma separates several), and the other
  *    tags of this canvas as one-press suggestions.
  *  - On this canvas: every tag with how many items carry it. Press a tag to select those items (Shift or Ctrl adds them to the selection);
  *    its ⋯ menu renames or deletes it on every canvas (ADR 0070).
@@ -66,7 +66,7 @@ export function mountTagsPanel(host: HTMLElement, editor: EditorState, doc: Docu
       .map(([k, e]) => {
         const n = onSel.get(k)!;
         const partial = n < sel.length;
-        return `<span class="tag-chip${partial ? " is-partial" : ""}" title="${partial ? `On ${n} of the ${sel.length} selected items` : "On every selected item"}">#${esc(e.label)}<button type="button" data-untag="${esc(e.label)}" aria-label="Remove tag ${esc(e.label)} from the selection">×</button></span>`;
+        return `<span class="tag-chip${partial ? " is-partial" : ""}" title="${partial ? `On ${n} of the ${sel.length} selected objects` : "On every selected object"}">#${esc(e.label)}<button type="button" data-untag="${esc(e.label)}" aria-label="Remove tag ${esc(e.label)} from the selection">×</button></span>`;
       })
       .join("");
     const free = sorted.filter(([k]) => (onSel.get(k) ?? 0) < sel.length).slice(0, SUGGESTIONS);
@@ -77,7 +77,7 @@ export function mountTagsPanel(host: HTMLElement, editor: EditorState, doc: Docu
     const shown = sorted.filter(([k]) => !q || k.includes(q.replace(/^#/, "")));
     const rows = shown
       .map(([k, e]) =>
-        `<li class="tag-row"><button type="button" class="tag-row-main" data-select-tag="${esc(k)}" aria-label="Select the ${e.ids.length} item${e.ids.length === 1 ? "" : "s"} tagged ${esc(e.label)}" title="Select the items with this tag (Shift: add them to the selection)"><span class="tag-row-name">#${esc(e.label)}</span><span class="tag-row-n">${e.ids.length}</span></button>${moreButton(`More actions for tag ${e.label}`, `data-tag-more="${esc(e.label)}"`)}</li>`,
+        `<li class="tag-row"><button type="button" class="tag-row-main" data-select-tag="${esc(k)}" aria-label="Select the ${e.ids.length} object${e.ids.length === 1 ? "" : "s"} tagged ${esc(e.label)}" title="Select the objects with this tag (Shift: add them to the selection)"><span class="tag-row-name">#${esc(e.label)}</span><span class="tag-row-n">${e.ids.length}</span></button>${moreButton(`More actions for tag ${e.label}`, `data-tag-more="${esc(e.label)}"`)}</li>`,
       )
       .join("");
     panel.innerHTML = panelHtml({
@@ -85,16 +85,16 @@ export function mountTagsPanel(host: HTMLElement, editor: EditorState, doc: Docu
       count: tags.size,
       body: `<div class="tags-body">
         <section class="layers-tags" data-testid="canvas-tags" aria-label="Tags of the selection">
-          <h3>${sel.length ? `On the selection <span class="tags-sub">${sel.length} item${sel.length === 1 ? "" : "s"}</span>` : "On the selection"}</h3>
-          ${sel.length ? "" : `<p class="tags-hint">Select items on the canvas to tag them.</p>`}
-          <div class="tag-chips">${chips}<input class="tag-input" data-tag-add list="tags-suggest" placeholder="${sel.length ? "Add a tag" : "Select items to tag"}" aria-label="Add a tag to the selection" maxlength="${MAX_TAG_TEXT}" ${sel.length ? "" : "disabled"}><datalist id="tags-suggest">${free.map(([, e]) => `<option value="${esc(e.label)}">`).join("")}</datalist></div>
+          <h3>${sel.length ? `On the selection <span class="tags-sub">${sel.length} object${sel.length === 1 ? "" : "s"}</span>` : "On the selection"}</h3>
+          ${sel.length ? "" : `<p class="tags-hint">Select objects on the canvas to tag them.</p>`}
+          <div class="tag-chips">${chips}<input class="tag-input" data-tag-add list="tags-suggest" placeholder="${sel.length ? "Add a tag" : "Select objects to tag"}" aria-label="Add a tag to the selection" maxlength="${MAX_TAG_TEXT}" ${sel.length ? "" : "disabled"}><datalist id="tags-suggest">${free.map(([, e]) => `<option value="${esc(e.label)}">`).join("")}</datalist></div>
           ${suggest ? `<div class="tag-chips tags-suggest">${suggest}</div>` : ""}
           <p class="tags-rules">Tags use letters, numbers, <code>_</code> <code>-</code> and <code>/</code> (<code>project/design</code> is nested). No spaces.</p>
         </section>
         <section class="tags-canvas" aria-label="Tags on this canvas">
           <h3>On this canvas</h3>
           ${tags.size > FILTER_FROM ? `<div class="layers-filter"><input data-tag-filter type="search" placeholder="Filter ${tags.size} tags" aria-label="Filter the tags of this canvas" autocomplete="off" value="${esc(filter)}"></div>` : ""}
-          <ul aria-label="Tags on this canvas">${rows || `<li class="layers-empty">${tags.size ? "No tag matches." : "No tags yet. Select items and add one above."}</li>`}</ul>
+          <ul aria-label="Tags on this canvas">${rows || `<li class="layers-empty">${tags.size ? "No tag matches." : "No tags yet. Select objects and add one above."}</li>`}</ul>
         </section>
       </div>`,
     });
@@ -138,9 +138,9 @@ export function mountTagsPanel(host: HTMLElement, editor: EditorState, doc: Docu
       openMoreMenu(
         more,
         [
-          { label: "Select the items with this tag", hint: "Everything tagged with it", icon: ICONS.pointer, aria: `Select the items tagged ${tag}`, run: () => { editor.entered = []; editor.select(doc.ordered().filter((o) => (o.tags ?? []).some((x) => x.toLowerCase() === key)).map((o) => o.id)); } },
+          { label: "Select the objects with this tag", hint: "Everything tagged with it", icon: ICONS.pointer, aria: `Select the items tagged ${tag}`, run: () => { editor.entered = []; editor.select(doc.ordered().filter((o) => (o.tags ?? []).some((x) => x.toLowerCase() === key)).map((o) => o.id)); } },
           { label: "Rename on every canvas", hint: "Everywhere it is used", icon: ICONS.textCursorInput, aria: `Rename tag ${tag}`, run: () => void askTagName(tag, "canvases").then((to) => to !== null && to.trim() && actions.renameTag(tag, to)) },
-          { label: "Delete from every canvas", hint: "The items stay", icon: ICONS.trash2, danger: true, aria: `Delete tag ${tag}`, run: () => actions.deleteTag(tag) },
+          { label: "Delete from every canvas", hint: "The objects stay", icon: ICONS.trash2, danger: true, aria: `Delete tag ${tag}`, run: () => actions.deleteTag(tag) },
         ],
         `Actions for tag ${tag}`,
       );

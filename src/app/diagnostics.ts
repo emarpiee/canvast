@@ -50,7 +50,7 @@ export function capabilities(): Array<{ name: string; ok: boolean; note: string 
     { name: "Video decoding (WebCodecs)", ok: "VideoDecoder" in w, note: "frames of video files" },
     { name: "Brotli in the browser", ok: brotli, note: brotli ? "WOFF2 fonts unpack faster" : "WOFF2 fonts use the decoder of the app" },
     { name: "Persistent storage", ok: typeof nav.storage?.persist === "function", note: "ask the browser not to clear the data" },
-    { name: "Clipboard images", ok: "ClipboardItem" in w, note: "copy a picture out" },
+    { name: "Clipboard pictures", ok: "ClipboardItem" in w, note: "copy a picture out" },
     { name: "Folder import", ok: "webkitdirectory" in document.createElement("input"), note: "import a folder" },
   ];
 }
