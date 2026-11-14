@@ -130,9 +130,10 @@ test("text", async ({ scene: s }) => {
   const [h] = await s.art("hokusai-under");
   await s.canvas("Cover");
   const [pic] = await s.place([h!]);
-  await s.fit([pic!], 0.6, [0.5, 0.56]);
+  await s.fit([pic!], 0.52, [0.5, 0.52]); // (room above for the title, below for the subtitle, clear of the Actions bar)
   const b = (await s.box([pic!]))!;
-  const sub = await s.text(b.minX, b.minY - 46, "a story told in four prints", { size: 26, font: "cormorant garamond semibold italic", colour: "#e9dfc8" });
+  // (the subtitle under the print: the title's format bar stands between them, over nothing)
+  const sub = await s.text(b.minX, b.maxY + 24, "a story told in four prints", { size: 26, font: "cormorant garamond semibold italic", colour: "#e9dfc8" });
   // the title, left being edited: its formatting bar shows
   await s.tool("text");
   await s.font("bangers");

@@ -820,7 +820,7 @@ Press `T`, click and type. Text is stored as Markdown, and you can zoom into a l
 
 Set a cover's type: a title and a subtitle in fonts of your own.
 
-![Hokusai's Great Wave with the title THE CROSSING being set in Bangers above it and a subtitle in Cormorant Garamond italic, its formatting bar over it](docs/screenshots/text.webp)
+![Hokusai's Great Wave with the title THE CROSSING being set in Bangers above it and a subtitle in Cormorant Garamond italic under it, the title's format bar between them](docs/screenshots/text.webp)
 
 | Making text | |
 | --- | --- |
