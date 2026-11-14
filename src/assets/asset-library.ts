@@ -11,7 +11,7 @@ import { probeMp4 } from "./mp4-probe";
 import { makeFileCardFrom } from "./adapters";
 import { MAX_IMPORT_BYTES } from "../storage/disk-file";
 import { externalFolder } from "../storage/external-folder";
-import { artCardPicture, isArtFile } from "./art-preview";
+import { artCardPicture, artFullPicture, isArtFile } from "./art-preview";
 import { FILE_CARD_H, FILE_CARD_W, cardFromPicture, makeCard } from "./card";
 import { describeFile, isCard, isMediaType } from "./file-kind";
 
@@ -463,6 +463,8 @@ export class AssetLibrary {
 
   /** An item's custom thumbnail, for its file card on a canvas (null: none, or one that must not show here). Set by the app. */
   customPicture: ((hash: string) => Promise<Blob | null>) | null = null;
+  /** An art file's card on a canvas from its whole merged picture (else the small one it keeps). */
+  artFullSize: () => boolean = () => false;
 
   /** Drop the decoded copy of an erased original (after garbage collection). */
   forget(hash: string): void {
@@ -599,7 +601,9 @@ export class AssetLibrary {
   private async cardOf(rec: AssetRecord, size = { w: rec.pixelW, h: rec.pixelH }, /** A note's page width (a smaller copy keeps the full card's). */ layoutW?: number, /** What this object shows of the file. */ preview?: string): Promise<ImageBitmap> {
     // A custom thumbnail stands for a file card on a canvas too (never a hidden one: see `customPicture`).
     // (and an art file's card shows the picture the file keeps)
-    const own = preview ? null : (await this.customPicture?.(rec.hash).catch(() => null)) ?? (isArtFile(rec.name) ? await artCardPicture(await externalFolder.fileOf(rec), rec.name) : null);
+    // (an art file's: the small picture it keeps, or its whole merged one: Settings > Performance > Art file pictures on the canvas)
+    const art = (file: Blob): Promise<Blob | null> => (this.artFullSize() ? artFullPicture(file, rec.name) : artCardPicture(file, rec.name));
+    const own = preview ? null : (await this.customPicture?.(rec.hash).catch(() => null)) ?? (isArtFile(rec.name) ? await art(await externalFolder.fileOf(rec)) : null);
     if (own) {
       try {
         return await cardFromPicture(own, size);

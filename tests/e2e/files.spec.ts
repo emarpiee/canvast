@@ -1,6 +1,6 @@
 import { exportWith, expect, test } from "./harness";
 import { readFileSync } from "node:fs";
-import { blockyFixture, makePng } from "./png";
+import { blockyFixture, makePng, makePsd } from "./png";
 import { writeZip } from "../../src/storage/zip";
 
 /** Any file can be imported (ADR 0078): what the browser cannot show is kept as a card with its extension, name and kind. */
@@ -117,6 +117,37 @@ test("an art file shows the picture it keeps, in that picture's shape, on the ca
   await p.getByTestId("asset-preview").click();
   await expect(p.locator('[data-testid="slide-view"] figcaption')).toContainText("automatic backup");
   await p.keyboard.press("Escape");
+  expect(app.consoleErrors).toEqual([]);
+});
+
+test("a Photoshop file's card on the canvas: the small picture it keeps, or its whole merged one (Settings > Performance > Art file pictures on the canvas)", async ({ app }) => {
+  const p = app.page;
+  // its own small picture red, its merged one blue: what the card shows tells which it is made from
+  const jpeg = await p.evaluate(async () => {
+    const c = document.createElement("canvas");
+    c.width = 16;
+    c.height = 12;
+    const x = c.getContext("2d")!;
+    x.fillStyle = "#d02020";
+    x.fillRect(0, 0, 16, 12);
+    const b = await new Promise<Blob>((ok) => c.toBlob((v) => ok(v!), "image/jpeg", 0.9));
+    return [...new Uint8Array(await b.arrayBuffer())];
+  });
+  await p.getByTestId("import-input").setInputFiles({ name: "study.psd", mimeType: "", buffer: makePsd(160, 120, [20, 40, 220], new Uint8Array(jpeg)) });
+  await expect.poll(async () => (await objects(p)).length).toBe(1);
+  const id = (await objects(p))[0]!.id;
+  const middle = async (): Promise<number[]> => {
+    await p.evaluate(() => window.__canvastDebug.nextFrame());
+    const box = (await p.evaluate((i) => window.__canvastDebug.objectScreen(i), id))!.box;
+    return p.evaluate(([x, y]) => window.__canvastDebug.pixelAt(x!, y!), [Math.round((box.minX + box.maxX) / 2), Math.round((box.minY + box.maxY) / 2)]) as Promise<number[]>;
+  };
+  const reddish = (c: number[]): boolean => c[0]! > 150 && c[2]! < 100;
+  const bluish = (c: number[]): boolean => c[2]! > 150 && c[0]! < 100;
+  await expect.poll(async () => reddish(await middle())).toBe(true);
+  await p.evaluate(() => window.__canvastDebug.setSetting("quality.artCards", "full"));
+  await expect.poll(async () => bluish(await middle())).toBe(true);
+  await p.evaluate(() => window.__canvastDebug.setSetting("quality.artCards", "quick"));
+  await expect.poll(async () => reddish(await middle())).toBe(true);
   expect(app.consoleErrors).toEqual([]);
 });
 

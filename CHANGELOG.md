@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.59.15 — Sharp art file cards on the canvas (2026-11-15)
+
+- **Added:** Settings > Performance > **Art file pictures on the canvas**: **Quick** (the small picture a Photoshop file keeps for previews, about 160 px, enlarged to the card: as before) or **Full size** (the file's whole merged picture: sharp however close you zoom, slower and heavier for a large file). Krita and OpenRaster files show their full-size picture either way. Changing it draws the cards again at once.
+
 ## 0.59.14 — PhotoCraft's theme comes back after a restart (2026-11-15)
 
 - **Fixed:** PhotoCraft's theme went back to Pro each time it started (its web build sets Pro at every start, over the preferences it has just read). The theme chosen is now applied again by its own Window › Theme commands once it runs, as a click on them would; its appearance mode and its light and dark themes are kept with the workspace, and nothing of these start-up steps is kept in its shortcuts.

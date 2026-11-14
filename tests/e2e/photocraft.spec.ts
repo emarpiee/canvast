@@ -1,7 +1,7 @@
 import type { Page } from "@playwright/test";
 import { expect, test } from "./harness";
 import type { App } from "./harness";
-import { makePng } from "./png";
+import { makePng, makePsd } from "./png";
 
 /**
  * PhotoCraft (src/artcraft/photocraft/): its released web build runs in a frame of its own; canvast stands in for its file picker (the
@@ -64,20 +64,6 @@ const saveFromPhotoCraft = (p: Page, name: string, bytes: Buffer, type = "image/
     a.remove();
   }, [name, [...bytes], type] as const);
 
-/** A Photoshop file as PhotoCraft's page saves one: 8 bits, RGB, its merged picture stored as it is (`rgb` for every pixel). */
-function makePsd(w: number, h: number, rgb: readonly [number, number, number]): Buffer {
-  const head = Buffer.alloc(26);
-  head.write("8BPS", 0, "latin1");
-  head.writeUInt16BE(1, 4);
-  head.writeUInt16BE(3, 12);
-  head.writeUInt32BE(h, 14);
-  head.writeUInt32BE(w, 18);
-  head.writeUInt16BE(8, 22);
-  head.writeUInt16BE(3, 24);
-  const lengths = Buffer.alloc(12); // (no colour mode data, no image resources, no layers)
-  const planes = Buffer.concat(rgb.map((c) => Buffer.alloc(w * h, c)));
-  return Buffer.concat([head, lengths, Buffer.from([0, 0]), planes]);
-}
 
 test("PhotoCraft opens a selected picture; its File > Open asks the library, and cancelling leaves it running", async ({ app }) => {
   const p = app.page;

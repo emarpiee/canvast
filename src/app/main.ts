@@ -159,6 +159,7 @@ import { isArchiveFile, runExport, runExportChanges, runAdvancedExport, runExpor
 import { copyText, mountTextEditor } from "../ui/text-editor";
 import { FontLoader, whyNotFont } from "./font-loader";
 import { fontFor, onFontsChange } from "../text/fonts";
+import { isArtFile } from "../assets/art-preview";
 import { PHOTOCRAFT_FEATURES, createPhotoCraft } from "../artcraft/photocraft/app";
 import { describeFile } from "../assets/file-kind";
 import { styleOf, toolLook } from "../text/text-style";
@@ -2530,6 +2531,14 @@ async function start(): Promise<void> {
     invalidate();
   };
   session.onFontLook = fontCardsLook;
+  // Art files' cards: from the small picture each keeps, or its whole merged one (Settings > Performance); drawn again when it changes.
+  assets.artFullSize = () => settings.get("quality.artCards") === "full";
+  settings.subscribe((key) => {
+    if (key !== "quality.artCards") return;
+    for (const [h, n] of assetNames.map) if (isArtFile(n)) assets.forget(h);
+    tiles.clear();
+    invalidate();
+  });
   fontCardsLook();
   settings.subscribe((key) => key === "ui.theme" && fontCardsLook());
   // A note's card on a canvas opens in the note panel (a double-click, Edit note): the same editor and saving as in the library.

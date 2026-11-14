@@ -128,6 +128,9 @@ export const SETTINGS = {
   "select.ignoreFilling": { scope: "device", default: false, validate: bool, effect: "immediate" } as Def<boolean>,
   "ui.info": { scope: "device", default: "simple", validate: oneOf("simple", "more", "technical", "hidden"), effect: "immediate" } as Def<"simple" | "more" | "technical" | "hidden">,
   "quality.auto": { scope: "device", default: true, validate: bool, effect: "immediate" } as Def<boolean>,
+  // An art file's card on a canvas (PSD, Krita, OpenRaster…): "quick" fills it from the small picture the file keeps (a Photoshop file's
+  // is about 160 px), "full" from its whole merged picture: sharp at its size, slower and heavier for a large file.
+  "quality.artCards": { scope: "device", default: "quick", validate: oneOf("quick", "full"), effect: "immediate" } as Def<"quick" | "full">,
   "quality.level": { scope: "device", default: "full", validate: oneOf("full", "balanced", "fast"), effect: "immediate" } as Def<"full" | "balanced" | "fast">,
   "cache.decodedMb": { scope: "device", default: decodedMbFor(typeof navigator === "undefined" ? undefined : (navigator as { deviceMemory?: number }).deviceMemory), validate: oneOf("128", "256", "384", "768", "1536"), effect: "immediate" } as Def<"128" | "256" | "384" | "768" | "1536">,
   "panel.autoFold": { scope: "device", default: "off", validate: oneOf("off", "all", "latest"), effect: "immediate" } as Def<"off" | "all" | "latest">,
