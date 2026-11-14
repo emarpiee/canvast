@@ -217,7 +217,8 @@ test("a file of any kind saved in PhotoCraft goes back into that file, session a
     { name: "paint.ora", type: "image/openraster", back: (n) => ({ name: "paint.ora", bytes: Buffer.concat([png, Buffer.from([n])]), type: "image/openraster" }) },
   ];
   await p.getByTestId("view-assets").click();
-  for (const k of kinds) await p.getByTestId("assets-import-input").setInputFiles({ name: k.name, mimeType: k.type, buffer: k.name.endsWith(".psd") ? makePsd(40, 30, [5, 5, 5]) : png });
+  // (each its own bytes: the library keeps one item for the same bytes)
+  for (const [i, k] of kinds.entries()) await p.getByTestId("assets-import-input").setInputFiles({ name: k.name, mimeType: k.type, buffer: k.name.endsWith(".psd") ? makePsd(40, 30, [5, 5, 5]) : makePng(40, 30, () => [20 * i, 200 - 20 * i, 90, 255]) });
   const names = kinds.map((k) => k.name).sort();
   await expect.poll(() => itemNames(p)).toEqual(names);
   for (const session of [1, 2]) {
