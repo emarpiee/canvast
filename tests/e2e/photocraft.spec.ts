@@ -153,3 +153,37 @@ test("two pictures as layers of one document: the size asked as Export asks, wha
   await expect.poll(async () => (await objs(app)).length).toBe(3);
   await expect(p.getByTestId("choose-dialog")).toBeHidden();
 });
+
+test("PhotoCraft's own settings survive a restart: its theme (which its web build sets to Pro at each start) is applied again by its own command, its shortcuts and toolbar kept", async ({ app }) => {
+  const p = app.page;
+  await p.getByTestId("view-photocraft").click();
+  await running(p);
+  // what PhotoCraft saves when its theme, a shortcut and its toolbar are changed in it (its preferences, in the browser's storage)
+  const chosen = { version: 2, interface: { theme: "solarizedDark", appearanceMode: "dark", darkTheme: "solarizedDark" }, shortcuts: { "file.new": "Cmd+Alt+Shift+N" }, toolbar: { hidden: ["Sponge"], order: [] } };
+  // (chosen in it: a press in it first, as any change there begins with one)
+  await p.evaluate((t) => {
+    const w = document.querySelector<HTMLIFrameElement>(".photocraft-frame")!.contentWindow! as Window & typeof globalThis;
+    w.document.body.dispatchEvent(new w.Event("pointerdown", { bubbles: true }));
+    w.localStorage.setItem("photocraft.preferences", t);
+  }, JSON.stringify(chosen));
+  await expect.poll(() => p.evaluate(() => String(window.__canvastDebug.getSetting("photocraft.prefs")))).toContain("solarizedDark");
+  await p.getByTestId("photocraft-close").click();
+  await expect(p.getByTestId("photocraft-view")).toBeHidden();
+  await p.evaluate(() => window.__canvastDebug.flushSave());
+  // the app started again
+  await p.reload();
+  await p.waitForFunction(() => typeof window.__canvastDebug !== "undefined");
+  await p.getByTestId("view-photocraft").click();
+  await running(p);
+  // PhotoCraft's preferences as it holds them now (it saves them when they change): the theme chosen, applied by its own Window › Theme command
+  const held = (): Promise<{ interface?: Record<string, unknown>; shortcuts?: Record<string, string>; toolbar?: { hidden?: string[] } }> =>
+    p.evaluate(() => JSON.parse(document.querySelector<HTMLIFrameElement>(".photocraft-frame")!.contentWindow!.localStorage.getItem("photocraft.preferences") ?? "{}"));
+  await expect.poll(async () => (await held()).interface?.["darkTheme"], { timeout: 20_000 }).toBe("solarizedDark");
+  const now = await held();
+  expect(now.interface?.["appearanceMode"]).toBe("dark");
+  expect(now.shortcuts?.["file.new"]).toBe("Cmd+Alt+Shift+N");
+  expect(now.toolbar?.hidden).toContain("Sponge");
+  // the keys canvast gave its theme commands for the start are not kept in the workspace
+  const kept = JSON.parse(String(await p.evaluate(() => window.__canvastDebug.getSetting("photocraft.prefs")))) as { shortcuts?: Record<string, string> };
+  expect(Object.values(kept.shortcuts ?? {})).not.toContain("F13");
+});

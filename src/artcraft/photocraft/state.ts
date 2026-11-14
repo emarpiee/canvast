@@ -3,7 +3,7 @@ import type { SettingsStore } from "../../settings/settings";
 import type { Session } from "../../app/session";
 import { fileInLibrary } from "../../app/library-filing";
 import { readZip, writeZip } from "../../storage/zip";
-import { PREFS_KEY } from "./prefs";
+import { PREFS_KEY, themeKeys } from "./prefs";
 import { readPresets, writePresets } from "./presets";
 import type { PresetFile } from "./presets";
 
@@ -28,13 +28,29 @@ const FIXED_DATE = new Date(Date.UTC(2020, 0, 1));
 /** What a set of preset files is, cheaply: their keys and sizes (to know whether they changed without packing them). */
 const signature = (files: readonly PresetFile[]): string => JSON.stringify(files.map((f) => [f.key, f.blob.size]));
 
-/** `text` with the theme of `from` (its preferences JSON), when `from` has one. */
+/** The fields of its preferences that choose its theme on screen (its Window › Theme, Edit › Preferences › Interface). */
+export const THEME_FIELDS = ["theme", "appearanceMode", "darkTheme", "lightTheme"] as const;
+
+/** `text` with the theme of `from` (its preferences JSON): the fields that choose it, as `from` has them. */
 export function withThemeOf(text: string, from: string): string {
   try {
     const now = JSON.parse(text) as { interface?: Record<string, unknown> };
-    const theme = (JSON.parse(from) as { interface?: Record<string, unknown> }).interface?.["theme"];
-    if (theme === undefined || now.interface?.["theme"] === theme) return text;
-    return JSON.stringify({ ...now, interface: { ...(now.interface ?? {}), theme } });
+    const was = (JSON.parse(from) as { interface?: Record<string, unknown> }).interface ?? {};
+    const keep = THEME_FIELDS.filter((k) => was[k] !== undefined && now.interface?.[k] !== was[k]);
+    if (!keep.length) return text;
+    return JSON.stringify({ ...now, interface: { ...(now.interface ?? {}), ...Object.fromEntries(keep.map((k) => [k, was[k]])) } });
+  } catch {
+    return text;
+  }
+}
+
+/** Its preferences without the keys canvast gave its theme commands for a start (prefs.ts `THEME_KEYS`). */
+export function withoutHelperKeys(text: string, helper: Readonly<Record<string, string>>): string {
+  try {
+    const p = JSON.parse(text) as { shortcuts?: Record<string, string> };
+    if (!p.shortcuts) return text;
+    const shortcuts = Object.fromEntries(Object.entries(p.shortcuts).filter(([id, key]) => helper[id] !== key));
+    return JSON.stringify({ ...p, shortcuts });
   } catch {
     return text;
   }
@@ -43,12 +59,15 @@ export function withThemeOf(text: string, from: string): string {
 export function createState(deps: StateDeps): { restore(): Promise<void>; keep(touched?: boolean): Promise<void>; keepPrefs(text: string | null, touched: boolean): void } {
   const { settings, session, assets } = deps;
   let lastSignature: string | null = null;
+  /** The keys given to its theme commands for this start (taken out of what is kept). */
+  let helperKeys: Record<string, string> = {};
   let keeping: Promise<void> = Promise.resolve();
 
   /** The workspace's state, where PhotoCraft reads it (before it starts). */
   async function restore(): Promise<void> {
     try {
       const prefs = settings.get("photocraft.prefs");
+      helperKeys = Object.fromEntries(themeKeys(prefs).map((k) => [k.command, k.key]));
       if (prefs) localStorage.setItem(PREFS_KEY, prefs);
       else localStorage.removeItem(PREFS_KEY);
     } catch {
@@ -79,6 +98,7 @@ export function createState(deps: StateDeps): { restore(): Promise<void>; keep(t
   function keepPrefs(text: string | null, touched: boolean): void {
     if (text === null || text.length > 4_000_000) return;
     const was = settings.get("photocraft.prefs");
+    text = withoutHelperKeys(text, helperKeys);
     if (!touched && was) text = withThemeOf(text, was);
     if (text !== was) settings.set("photocraft.prefs", text);
   }

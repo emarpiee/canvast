@@ -1,7 +1,7 @@
 import { PHOTOCRAFT_FEATURES } from "./features";
 import type { PhotoCraftFeatures } from "./features";
 import { photoCraftPayload, photoCraftWasm } from "./payload";
-import { PREFS_KEY, preparePrefs } from "./prefs";
+import { PREFS_KEY, preparePrefs, themeKeys } from "./prefs";
 
 /**
  * PhotoCraft running in a frame of its own (same origin, no address: the page's security policy holds in it too, so it can reach no
@@ -63,8 +63,11 @@ type FrameWindow = Window & typeof globalThis & { __photocraftWasm?: Uint8Array;
 export function startPhotoCraft(container: HTMLElement, host: PhotoCraftHost, features: PhotoCraftFeatures = PHOTOCRAFT_FEATURES): PhotoCraftFrame {
   const payload = photoCraftPayload();
   if (!payload) throw new Error("PhotoCraft is not in this build.");
+  let keys: ReturnType<typeof themeKeys> = [];
   try {
-    localStorage.setItem(PREFS_KEY, preparePrefs(localStorage.getItem(PREFS_KEY), features.menus, features.tools));
+    const saved = localStorage.getItem(PREFS_KEY);
+    keys = themeKeys(saved);
+    localStorage.setItem(PREFS_KEY, preparePrefs(saved, features.menus, features.tools, keys));
   } catch {
     // (no storage: it starts with its defaults, and shows every menu item)
   }
@@ -163,7 +166,9 @@ export function startPhotoCraft(container: HTMLElement, host: PhotoCraftHost, fe
   });
   // (its page cannot know a download was kept, so a document stays "not saved" after its Save: canvast knows when a file of it came
   // back, and whether anything was done in it since; nothing is done in it without a press or a key)
-  for (const kind of ["pointerdown", "keydown"]) win.addEventListener(kind, () => void (lastInput = performance.now()), true);
+  // (the keys canvast presses itself, for its theme, are not something done in it)
+  let pressing = false;
+  for (const kind of ["pointerdown", "keydown"]) win.addEventListener(kind, () => void (pressing || (lastInput = performance.now())), true);
 
   // ---- its own messages: running, stopped, could not start
   doc.addEventListener("click", (e) => {
@@ -176,6 +181,14 @@ export function startPhotoCraft(container: HTMLElement, host: PhotoCraftHost, fe
   let notStarted!: (e: Error) => void;
   const ready = new Promise<void>((ok, no) => { started = ok; notStarted = no; });
   ready.catch(() => undefined);
+  // (the theme chosen, by its own Window › Theme commands, once it runs: see prefs.ts `themeKeys`)
+  void ready.then(() => {
+    const canvas = doc.getElementById("photocraft_canvas");
+    canvas?.focus();
+    pressing = true;
+    for (const k of keys) for (const type of ["keydown", "keyup"]) (canvas ?? doc).dispatchEvent(new win.KeyboardEvent(type, { key: k.key, code: k.key, bubbles: true, cancelable: true }));
+    pressing = false;
+  }, () => undefined);
   const watch = new win.MutationObserver(() => {
     const loading = doc.getElementById("photocraft_loading");
     if (!loading) started();

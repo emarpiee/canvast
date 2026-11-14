@@ -9,6 +9,10 @@
 - **Changed:** a pattern's variations say **Rotation ± °**, **Rotation steps °**, **Position ± %** and **Random flip**; the 3D line option is **Thicker near lines**; the sheet size *Story* is **Instagram story**; *Brush mask* in Find is **Painted mask**.
 - **Fixed:** the README said the thickness lock keeps strokes the same width on screen; it keeps them the same size on the canvas.
 
+## 0.59.13 — PhotoCraft's theme comes back after a restart (2026-11-15)
+
+- **Fixed:** PhotoCraft's theme went back to Pro each time it started (its web build sets Pro at every start, over the preferences it has just read). The theme chosen is now applied again by its own Window › Theme commands once it runs, as a click on them would; its appearance mode and its light and dark themes are kept with the workspace, and nothing of these start-up steps is kept in its shortcuts.
+
 ## 0.59.12 — PhotoCraft saves into the file it opened (2026-11-15)
 
 - **Changed:** in PhotoCraft, **Save** on a document opened from a file of the library or the canvas saves into that file, in its own kind, as Save does on a desktop: a PNG stays a PNG (its layers merged), a JPEG a JPEG, a PSD a PSD. The file keeps its name, folder and tags, every canvas that shows it shows the new version, and the older one goes to the trash. Nothing is asked. (PhotoCraft's web build writes every document as PSD, having no file to write back to: canvast puts it into the file.) **Save a Copy**, or Save As under another name, makes a new item beside the picture. The type is asked only for a new document's first save.

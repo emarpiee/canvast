@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { applySwitches, preparePrefs } from "../../src/artcraft/photocraft/prefs";
+import { applySwitches, preparePrefs, themeKeys } from "../../src/artcraft/photocraft/prefs";
 import { browserKey } from "../../src/artcraft/photocraft/frame";
 import { editableInPhotoCraft } from "../../src/artcraft/photocraft/app";
 import { layerTree } from "../../src/artcraft/photocraft/layers";
@@ -20,6 +20,15 @@ describe("PhotoCraft's preferences as canvast leaves them", () => {
     const started = JSON.stringify({ interface: { theme: "pro", uiScale: 1.25 }, tools: { a: 1 } });
     expect(JSON.parse(withThemeOf(started, chosen))).toEqual({ interface: { theme: "classic", uiScale: 1.25 }, tools: { a: 1 } });
     expect(withThemeOf(started, "{}")).toBe(started);
+  });
+
+  it("its theme is given back by its own Window › Theme commands, each on a key no keyboard sends: a mode that follows the system sets both themes, then the mode", () => {
+    const t = (i: Record<string, string>) => themeKeys(JSON.stringify({ interface: i }));
+    expect(t({ appearanceMode: "dark", darkTheme: "solarizedDark", lightTheme: "classic" })).toEqual([{ command: "window.theme.solarizedDark", key: "F13" }]);
+    expect(t({ appearanceMode: "light", darkTheme: "pro", lightTheme: "classic" })).toEqual([{ command: "window.theme.classic", key: "F13" }]);
+    expect(t({ appearanceMode: "auto", darkTheme: "studio", lightTheme: "adwaita" }).map((k) => k.command)).toEqual(["window.theme.studio", "window.theme.adwaita", "window.theme.system"]);
+    expect(themeKeys(null)).toEqual([]);
+    expect(JSON.parse(preparePrefs(null, {}, {}, t({ appearanceMode: "dark", darkTheme: "studio" }))).shortcuts).toEqual({ "window.theme.studio": "F13" });
   });
 
   it("keeps everything else, empties the recent files, and starts a new file at its current version", () => {

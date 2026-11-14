@@ -256,7 +256,9 @@ test("the folder is the truth: a new device opens the whole workspace, another d
   await add(a.page, 3);
   // Settings: the workspace's go with the folder (in workspace.json), a device's stay on it.
   const setting = (p: Page, k: string) => p.evaluate((key) => window.__canvastDebug.getSetting(key), k);
-  await a.page.evaluate(() => (window.__canvastDebug.setSetting("notes.folder", "Journal"), window.__canvastDebug.setSetting("pen.widthPx", 9)));
+  // (PhotoCraft's own preferences too: they are the workspace's, so they come with the folder to a new device, or an update of the app)
+  const PC = JSON.stringify({ interface: { appearanceMode: "dark", darkTheme: "solarizedDark" }, shortcuts: { "file.new": "Cmd+Alt+Shift+N" } });
+  await a.page.evaluate((pc) => (window.__canvastDebug.setSetting("notes.folder", "Journal"), window.__canvastDebug.setSetting("pen.widthPx", 9), window.__canvastDebug.setSetting("photocraft.prefs", pc)), PC);
   await a.page.evaluate(() => window.__canvastDebug.flushStorage());
   const filed = () => (JSON.parse(readFileSync(join(ws, ".canvast/workspace.json"), "utf8")) as { settings?: Record<string, unknown> }).settings?.["notes.folder"];
   await expect.poll(filed, { timeout: 20_000 }).toBe("Journal");
@@ -268,6 +270,7 @@ test("the folder is the truth: a new device opens the whole workspace, another d
   await expect.poll(() => counts(b.page)).toEqual([["Sketches", "Characters", 3]]);
   await expect.poll(() => setting(b.page, "notes.folder")).toBe("Journal");
   expect(await setting(b.page, "pen.widthPx")).toBe(3);
+  expect(await setting(b.page, "photocraft.prefs")).toBe(PC);
   await b.page.evaluate(() => window.__canvastDebug.setSetting("notes.folder", "Diary"));
   await add(b.page, 2);
   await b.page.evaluate(() => window.__canvastDebug.flushStorage());

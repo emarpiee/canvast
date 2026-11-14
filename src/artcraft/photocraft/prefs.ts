@@ -16,7 +16,7 @@ export function applySwitches(hidden: readonly string[], switches: Readonly<Reco
 }
 
 /** The preferences text PhotoCraft finds when it starts, from what it saved last (null or unreadable: none yet). */
-export function preparePrefs(saved: string | null, menus: Readonly<Record<string, boolean>>, tools: Readonly<Record<string, boolean>>): string {
+export function preparePrefs(saved: string | null, menus: Readonly<Record<string, boolean>>, tools: Readonly<Record<string, boolean>>, keys: ReadonlyArray<{ command: string; key: string }> = []): string {
   let p: Json = {};
   try {
     p = obj(saved ? JSON.parse(saved) : {});
@@ -33,5 +33,26 @@ export function preparePrefs(saved: string | null, menus: Readonly<Record<string
     menus: { ...m, hidden: applySwitches(strings(m["hidden"]), menus) },
     toolbar: { ...t, hidden: applySwitches(strings(t["hidden"]), tools) },
     fileHandling: { ...files, recentFiles: [] },
+    ...(keys.length ? { shortcuts: { ...obj(p["shortcuts"]), ...Object.fromEntries(keys.map((k) => [k.command, k.key])) } } : {}),
   });
+}
+
+/**
+ * Its web build starts in its Pro theme each time, over the theme chosen (its `apps/photocraft-web/src/web.rs`). The theme chosen is
+ * then applied by its own Window › Theme commands, as a click on them would: each is given a key no keyboard of a person sends (F13…),
+ * pressed once it runs (frame.ts), and taken out of what is kept (state.ts). In the order to press: a mode that follows the system sets
+ * both its themes, then the mode.
+ */
+export function themeKeys(saved: string | null): Array<{ command: string; key: string }> {
+  let i: Json = {};
+  try {
+    i = obj(obj(saved ? JSON.parse(saved) : {})["interface"]);
+  } catch {
+    return [];
+  }
+  const mode = typeof i["appearanceMode"] === "string" ? i["appearanceMode"] : null;
+  const dark = typeof i["darkTheme"] === "string" ? i["darkTheme"] : null;
+  const light = typeof i["lightTheme"] === "string" ? i["lightTheme"] : null;
+  const commands = mode === "light" ? [light] : mode === "dark" ? [dark] : mode === "auto" ? [dark, light, "system"] : [typeof i["theme"] === "string" ? i["theme"] : null];
+  return commands.filter((c): c is string => !!c && /^[a-zA-Z]+$/.test(c)).map((c, n) => ({ command: `window.theme.${c}`, key: `F${13 + n}` }));
 }
