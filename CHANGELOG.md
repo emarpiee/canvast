@@ -1,7 +1,8 @@
 # Changelog
 
-## 0.59.14 — PhotoCraft's theme is given back until it shows (2026-11-15)
+## 0.59.14 — PhotoCraft's theme comes back after a restart (2026-11-15)
 
+- **Fixed:** PhotoCraft's theme went back to Pro each time it started (its web build sets Pro at every start, over the preferences it has just read). The theme chosen is now applied again by its own Window › Theme commands once it runs, as a click on them would; its appearance mode and its light and dark themes are kept with the workspace, and nothing of these start-up steps is kept in its shortcuts.
 - **Fixed:** PhotoCraft's theme could still start as Pro: its runtime takes keys only while its canvas has the focus, and the theme's command was pressed once, while the page around it still held it. The frame and its canvas are now given the focus, and the command is pressed again until PhotoCraft's own preferences show the theme chosen (its mode and that mode's theme), for 15 seconds at most.
 
 ## 0.59.13 — Standard words in the interface (2026-11-15)
@@ -12,10 +13,6 @@
 - **Changed:** Settings: *Lasso takes* → **Lasso selects**, *Eraser takes whole groups* → **Erase whole groups**, *Colourfulness* → **Saturation**, *Signs wrap selected text* → **Auto-surround selected text**, *Markdown marks make formats* → **Markdown shortcuts**.
 - **Changed:** a pattern's variations say **Rotation ± °**, **Rotation steps °**, **Position ± %** and **Random flip**; the 3D line option is **Thicker near lines**; the sheet size *Story* is **Instagram story**; *Brush mask* in Find is **Painted mask**.
 - **Fixed:** the README said the thickness lock keeps strokes the same width on screen; it keeps them the same size on the canvas.
-
-## 0.59.13 — PhotoCraft's theme comes back after a restart (2026-11-15)
-
-- **Fixed:** PhotoCraft's theme went back to Pro each time it started (its web build sets Pro at every start, over the preferences it has just read). The theme chosen is now applied again by its own Window › Theme commands once it runs, as a click on them would; its appearance mode and its light and dark themes are kept with the workspace, and nothing of these start-up steps is kept in its shortcuts.
 
 ## 0.59.12 — PhotoCraft saves into the file it opened (2026-11-15)
 

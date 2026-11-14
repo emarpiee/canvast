@@ -122,7 +122,8 @@ test("a picture saved in PhotoCraft is saved into its file, as Save does on a de
   // saved again: still that one file, its newer version
   await saveFromPhotoCraft(p, "harbour.png", makePng(90, 60, () => [10, 10, 220, 255]));
   await expect.poll(hashes).not.toEqual(first);
-  expect(await itemNames(p)).toEqual(["harbour.png"]);
+  // (the new version comes in, then the older one goes to the trash)
+  await expect.poll(() => itemNames(p)).toEqual(["harbour.png"]);
   // Save a Copy (another name): a new item, beside the picture
   await saveFromPhotoCraft(p, "harbour copy.png", makePng(90, 60, () => [40, 200, 40, 255]));
   await expect.poll(() => itemNames(p)).toEqual(["harbour copy.png", "harbour.png"]);
