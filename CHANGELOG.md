@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.59.11 — The panels' buttons on the right edge (2026-11-15)
+
+- **Changed:** the panels' buttons (Adjust, Layers, Tags, Styles, Pattern, Bookmarks) are a column on the right edge, under the Settings button, as the tools are on the left; only the view buttons are in the top corners, and the Properties bar has the top row to itself. The panels docked on the right open beside the column, never under it. On a phone it is on the right under the bars too, no longer a row across the screen; a short window scrolls it, clear of the bottom-right bar.
+
 ## 0.59.10 — The top bar in three sets (2026-11-15)
 
 - **Changed:** the buttons at the top left are three sets apart, each of one look: **Library**; the canvas (∞ and its name, one pill); and **PhotoCraft** (its icon, and its **×** while it runs).

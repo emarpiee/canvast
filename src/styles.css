@@ -1160,7 +1160,10 @@ input[type="radio"]:checked::before { content: ""; width: var(--sp-3); height: v
 .pc-switch .view-close { border-right: 1px solid var(--view-edge); border-radius: 0 var(--ctl-r) var(--ctl-r) 0; }
 .view-switch button:not([aria-selected="true"]):hover, .nav-pill:not([data-active="true"]) .nav-crumb:hover, .nav-pill .nav-name-btn:hover, .view-settings button:not([aria-pressed="true"]):hover { background: var(--view-tint-hover); }
 #nav { left: var(--edge); top: var(--edge); }
-#toolbar > .dock { top: calc(var(--edge) / var(--ui-scale, 1)); right: calc((var(--edge) + var(--bar-h) + var(--near)) / var(--ui-scale, 1)); } /* (the Settings button is in the corner) */
+/* The panels' buttons: a column on the right edge, as the tools' rail is on the left, under the Settings button in the corner (only the view
+   buttons are in the top corners). The panels docked on the right open beside it; a short window scrolls it, clear of the bottom-right bar. */
+#toolbar > .dock > .tb-group { flex-direction: column; gap: var(--s-2); }
+#toolbar > .dock { flex-direction: column; gap: var(--s-2); top: calc((var(--edge) + var(--bar-h) + var(--near)) / var(--ui-scale, 1)); right: calc(var(--edge) / var(--ui-scale, 1)); max-height: calc(100dvh - (2 * var(--edge) + var(--bar-h) + 2 * var(--near) + var(--hud-bottom-h, var(--bar-h))) / var(--ui-scale, 1)); overflow-y: auto; scrollbar-width: none; }
 /* Settings: a button of its own in the top-right corner of every view. */
 .view-settings { position: fixed; pointer-events: auto; top: var(--edge); right: var(--edge); z-index: var(--z-edge); zoom: var(--ui-scale, 1); }
 .view-settings button { display: inline-flex; align-items: center; justify-content: center; width: var(--bar-h); height: var(--bar-h); padding: 0; box-sizing: border-box; color: inherit; background: var(--hud-bg); border: 1px solid var(--hud-border); border-radius: var(--r-lg); box-shadow: var(--hud-lift); backdrop-filter: blur(8px); cursor: pointer; }
@@ -1189,7 +1192,7 @@ input[type="radio"]:checked::before { content: ""; width: var(--sp-3); height: v
 .win-row button:focus-visible { outline: 2px solid var(--hud-accent); outline-offset: -2px; }
 .win-row svg { width: var(--icon-md); height: var(--icon-md); }
 #toolbar > .rail { left: calc(var(--edge) / var(--ui-scale, 1)); }
-#toolbar { top: var(--edge); left: calc((var(--nav-w, 0px) + var(--edge)) / var(--ui-scale, 1)); right: calc((var(--dock-w, 0px) + var(--bar-h) + 2 * var(--near) + 2 * var(--edge)) / var(--ui-scale, 1)); }
+#toolbar { top: var(--edge); left: calc((var(--nav-w, 0px) + var(--edge)) / var(--ui-scale, 1)); right: calc((var(--bar-h) + 2 * var(--near) + 2 * var(--edge)) / var(--ui-scale, 1)); }
 /* The Properties bar takes the room between the left cluster and the dock and no more: wider than that, its row scrolls (ADR 0128). */
 #toolbar > .toolbar { min-width: 0; }
 .tb-options-row { min-width: 0; }
@@ -1197,7 +1200,7 @@ input[type="radio"]:checked::before { content: ""; width: var(--sp-3); height: v
 .tb-options-row { gap: var(--gap); align-items: center; }
 .hud-readout { left: var(--edge); bottom: var(--edge); }
 .hud-controls { right: var(--edge); bottom: var(--edge); }
-#side-panels, #side-panels-left { top: calc(var(--bar-bottom, 56px) + var(--near)); right: var(--edge); gap: var(--near); }
+#side-panels, #side-panels-left { top: calc(var(--bar-bottom, 56px) + var(--near)); right: calc(var(--edge) + var(--dock-w, 0px) + var(--near)); gap: var(--near); }
 #side-panels-left { right: auto; left: calc(var(--rail-right, 52px) + var(--near)); }
 #side-panels-left > *, #side-panels > *, .layers-panel, .bookmarks-panel { border-radius: var(--r-lg); border: 1px solid var(--hud-border); background: var(--hud-bg); box-shadow: var(--hud-lift); backdrop-filter: blur(8px); }
 .panel-head { padding: var(--s-4) var(--s-4) var(--s-4) var(--s-6); min-height: 40px; }
@@ -2028,15 +2031,15 @@ body[data-viewing] #nav, body[data-viewing] .view-settings { display: none; }
   .nav-pill { width: 100%; max-width: none; }
   .nav-name-btn { flex: 1; justify-content: space-between; } /* (the ∞ stays its own size: the name takes the room) */
   .nav-menu { width: min(340px, calc(100vw - 2 * var(--edge))); }
-  /* Row 2: the dock, spread across the width. */
-  #toolbar > .dock { top: calc((var(--nav-bottom) + var(--near)) / var(--ui-scale, 1)); left: calc(var(--edge) / var(--ui-scale, 1)); right: calc(var(--edge) / var(--ui-scale, 1)); justify-content: space-between; overflow-x: auto; scrollbar-width: none; }
-  /* Row 3: the options of the tool, full width. */
-  #toolbar { top: calc((var(--nav-bottom) + var(--near) + var(--dock-h) + var(--near)) / var(--ui-scale, 1)); left: var(--edge); right: var(--edge); justify-content: stretch; }
+  /* Row 2: the options of the tool, full width. */
+  #toolbar { top: calc((var(--nav-bottom) + var(--near)) / var(--ui-scale, 1)); left: var(--edge); right: var(--edge); justify-content: stretch; }
+  /* The panels' buttons below the rows on the right, as the tools on the left (scrolled when the window is short). */
+  #toolbar > .dock { top: calc((var(--bar-bottom, 140px) + var(--near)) / var(--ui-scale, 1)); max-height: calc(100dvh - 3 * var(--sp-14) - var(--sp-6) - (var(--bar-bottom, 110px) + var(--near)) / var(--ui-scale, 1)); }
   #toolbar > .toolbar { width: 100%; max-width: none; }
   /* The tools sit below the rows, never under them; the panels go to their right. */
   /* Under the bars, and no lower than the Actions bar: a short window scrolls the rail instead of letting it run under the bar. */
   #toolbar > .rail { top: calc((var(--bar-bottom, 140px) + var(--near)) / var(--ui-scale, 1)); max-height: calc(100dvh - 3 * var(--sp-14) - var(--sp-6) - (var(--bar-bottom, 110px) + var(--near)) / var(--ui-scale, 1)); overflow-y: auto; scrollbar-width: none; }
-  #side-panels { top: calc(var(--bar-bottom, 140px) + var(--near)); left: calc(var(--rail-right, 52px) + var(--near)); right: var(--edge); width: auto; max-height: calc(100% - var(--bar-bottom, 140px) - 84px); overflow: auto; }
+  #side-panels { top: calc(var(--bar-bottom, 140px) + var(--near)); left: calc(var(--rail-right, 52px) + var(--near)); right: calc(var(--edge) + var(--dock-w, 0px) + var(--near)); width: auto; max-height: calc(100% - var(--bar-bottom, 140px) - 84px); overflow: auto; }
   /* The readout and the view controls keep to the bottom edge, the readout narrower. */
   .hud-readout { max-width: calc(100vw - 8 * var(--ctl)); overflow: hidden; }
   .cs { top: calc(var(--bar-bottom, 56px) + var(--near)); }
@@ -3085,7 +3088,6 @@ dialog.export-dlg.is-multi[open] { display: flex; flex-direction: column; height
 @media (max-width: 640px) {
   .hud-controls { max-width: calc(100% - 2 * var(--edge)); overflow-x: auto; scrollbar-width: none; }
   .hud-controls::-webkit-scrollbar { display: none; }
-  #toolbar > .dock > .tb-group { flex: 1; justify-content: space-evenly; }
 }
 
 /* Phones: the gear sits in the top-right corner, so the tabs and the workspace menu stop short of it. */

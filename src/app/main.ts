@@ -2423,7 +2423,7 @@ async function start(): Promise<void> {
   const measureNav = (): void => {
     const root = document.documentElement.style;
     root.setProperty("--nav-w", `${Math.ceil(navBox.getBoundingClientRect().right)}px`);
-    // The tool options sit between the view tabs and the dock (history, panels, import) at the top right.
+    // The panels' buttons are a column at the right edge: the panels docked on the right open beside it (stylesheet: --dock-w).
     const dock = barBox.querySelector<HTMLElement>(".dock")?.getBoundingClientRect();
     root.setProperty("--dock-w", `${Math.ceil(dock ? dock.width : 0)}px`);
     // Side panels start below the toolbar, however many rows it wraps to: the Properties bar, or its chips at the top (ADR 0198).
@@ -2449,10 +2449,10 @@ async function start(): Promise<void> {
     if (window.matchMedia("(max-width: 640px)").matches) {
       // (the rows' own places are not final until the stylesheet has used the numbers above: only these sums count)
       const mainH = heightOf(mainRows), extraH = heightOf(extraRows);
-      main = navBottom + near + dockH + (mainH ? near + mainH : 0);
+      main = navBottom + (mainH ? near + mainH : 0); // (the panels' buttons are a column on the right, not a row)
       below = extraH ? near + extraH : 0;
     } else {
-      main = Math.max(navBottom, dock?.bottom ?? 0, ...mainRows.map((t) => t.getBoundingClientRect().bottom));
+      main = Math.max(navBottom, ...mainRows.map((t) => t.getBoundingClientRect().bottom)); // (the panels' buttons are a column at the right edge)
       below = 0; // (a wide window: the colours row is in the middle, between the panels at the sides; they stay where they are)
     }
     const html = document.documentElement;
