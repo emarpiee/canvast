@@ -47,6 +47,14 @@ Unverified / Committed / Next bounded task**.
 - **Committed:** v0.57.19 on `main`.
 - **Next bounded task:** retake the README screenshots in Stone when the owner says.
 
+## v0.59.1: Flip for shapes and paths; the words audit (2026-11-14)
+
+- **Implemented:** Flip for shapes and paths and several selected flipped as one (ADR 0203: `mirrored`, `mirroredPaint`, `flipSelection`, the Flip section, `Shift+H`/`Shift+V`); the words audit (objects on the canvas, items in the Library, click for buttons, picture, Object names, `StyleKind.hint`), README text with it.
+- **Tested:** typecheck only on this machine; `vectors.spec` (flip of two shapes and of one turned shape) and `paint.test` (mirrored gradients) run on GitHub.
+- **Unverified:** the `flip` README picture still shows the Picture chip: it is taken again with the Screenshots workflow.
+- **Committed:** v0.59.1 on `main`.
+- **Next bounded task:** read the CI and Tests runs; retake the `flip` shot.
+
 ## v0.59.0: release (2026-11-14)
 
 - **Implemented:** the release of 0.58.1 to 0.58.34 (CHANGELOG 0.59.0 sums them).

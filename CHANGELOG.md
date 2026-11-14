@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.59.1 — Flip for shapes and paths, one word per idea (2026-11-14)
+
+- **Added:** **Flip horizontally** and **Flip vertically** for shapes and paths, as pictures have: their points, gradients and a speech balloon's tails are mirrored, a turned one turns the other way. The buttons are in a **Flip** chip of their own; `Shift+H` and `Shift+V` and the command palette do it too.
+- **Changed:** several selected pictures, shapes and paths are flipped as one: they change sides too (before, each picture flipped in its own place). A turned picture flipped alone also turns the other way.
+- **Changed:** one word per idea: what is on a canvas is an **object** (never a thing or an item), what is in the Library an **item**; buttons say **click**, keys **press**; "picked" became selected or chosen, "image" became picture (**Similar pictures** in the Library), and a sheet is no longer called a frame. **Object names** (was Item names) and the Actions bar's **Objects** group follow.
+- **Fixed:** the Styles panel told you to "Select pictures on the canvas" for speech balloons, ratios and name formats: each kind of style now says how it is used.
+
 ## 0.59.0 — Speech balloon chips, text along a path with handles, one field look, OKLab saturation, new README pictures and animation (2026-11-14)
 
 Everything since 0.58.0 (0.58.1 to 0.58.34).

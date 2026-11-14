@@ -292,7 +292,7 @@ Crop a study down to the part you are learning from, without changing the file.
 
 Mirror a drawing to see its proportions with fresh eyes.
 
-![De Gheyn's two studies of a saddled horse beside a mirrored copy, labelled original and flipped under them, Flip horizontally on in the Picture chip's options above the copy](docs/screenshots/flip.webp)
+![De Gheyn's two studies of a saddled horse beside a mirrored copy, labelled original and flipped under them, Flip horizontally on in the Flip chip's options above the copy](docs/screenshots/flip.webp)
 
 Give a print rounded corners and a thin outline, as a card on a mood board.
 
@@ -301,7 +301,7 @@ Give a print rounded corners and a thin outline, as a card on a mood board.
 | Feature | What it does |
 | --- | --- |
 | **Crop** | The **Crop** button of the Properties bar: the picture's handles move its window, what stays does not move, and pulling back out restores it. On a flipped picture, crop cuts the side you drag |
-| **Flip horizontally**, **Flip vertically** | Mirrored in the same box; **Reset flip** turns it back |
+| **Flip horizontally**, **Flip vertically** | In the **Flip** chip, or `Shift+H` and `Shift+V`: mirrored in the same box; **Reset flip** turns it back. Several selected objects are mirrored as one: they change sides too |
 | **Corners and outline** | Rounded corners and an outline, as shapes have, on pictures, video and GIFs |
 | **Masks** | By a shape, by opacity or by brightness, or a brush mask painted with the Pen (see [Masks](#masks)) |
 | **Make a new picture** | Bakes the crop, flip and adjustments into a new library item; **Copy as picture** puts the result on the clipboard |
@@ -579,6 +579,7 @@ Block in a composition as flat value shapes before painting.
 | --- | --- |
 | **Ratio** | The *Ratio* field of one selected shape (not a line) gives it another width to height, keeping its area: typed, a preset, or turned on its side |
 | **Corners** | Per-corner radii, and *Corner smoothing* that rounds corners continuously |
+| **Flip** | The **Flip** chip, or `Shift+H` and `Shift+V`, mirrors shapes and paths as [pictures](#pictures) are: their points, gradients and a speech balloon's tails; a turned one turns the other way. Several selected are mirrored as one |
 | **New shapes** | Start with a fill and no outline (a line and an open path get one, or they would not show): set a width, or move the Outline width slider off its left end, to add one |
 | **Default ink** | The pen's ink, those lines' and a first outline's is near-black on a light canvas and light on a dark one, chosen when the object is made and stored with it. *Change the old default ink to the canvas ink* (command palette) updates older drawings |
 
@@ -2313,6 +2314,7 @@ Change any shortcut, with a warning when two clash.
 | Group · ungroup | `Ctrl/⌘+G` · `Ctrl/⌘+Shift+G` |
 | Put the selection on a sheet · flatten | `Ctrl+Alt+G` · `Ctrl/⌘+E` (text to paths, a boolean group to one path) |
 | Auto layout on or off (selected sheets), or a new sheet that lays out the selected objects | `Shift+A` |
+| Flip horizontally · vertically (pictures, shapes, paths) | `Shift+H` · `Shift+V` |
 | Bring to front · send to back | `Ctrl/⌘+]` · `Ctrl/⌘+[` |
 | Bookmarks | `[` previous · `]` next · `Alt+1` … `Alt+9` go to bookmark 1 to 9 |
 | Previous view · next view | `Alt+Shift+←` · `Alt+Shift+→` |
