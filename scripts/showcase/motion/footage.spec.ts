@@ -335,6 +335,8 @@ async function balloon(s: Scene, b: Balloon, r?: Rec): Promise<string> {
     const tip = (await p.evaluate(() => window.__canvastDebug.balloonDots())).find((d) => d.part === "tip");
     if (tip) { if (r) await r.drag([tip.x, tip.y], b.tip, 8, 2); else await s.app.drag({ x: tip.x, y: tip.y }, { x: b.tip[0], y: b.tip[1] }, 5); }
   }
+  // (painted and lettered with the balloon in the middle of the view, its chips clear of the top bar; no frame is taken meanwhile, the camera goes back after)
+  await s.fit([id], 0.3);
   await s.paint(id, "fill", b.fill ?? "#ffffff");
   await s.paint(id, "stroke", "#111111");
   const words = (await p.evaluate(() => window.__canvastDebug.objects() as unknown as Array<{ id: string; kind: string; inShape?: { shape: string } }>)).find((o) => o.kind === "text" && o.inShape?.shape === id);
@@ -348,6 +350,7 @@ async function balloon(s: Scene, b: Balloon, r?: Rec): Promise<string> {
     await s.hex("#111111");
   }
   await s.select([]);
+  await p.evaluate((c) => window.__canvastDebug.setCamera(c), cam);
   await s.settle();
   if (r) await r.snap();
   return id;
