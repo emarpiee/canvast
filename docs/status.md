@@ -47,6 +47,13 @@ Unverified / Committed / Next bounded task**.
 - **Committed:** v0.57.19 on `main`.
 - **Next bounded task:** retake the README screenshots in Stone when the owner says.
 
+## v0.58.31: chips by the selection keep off the bars on the edges (2026-11-14)
+
+- **Implemented:** `edgeBarsIn` and an `avoid` list in `placeBy` (`ui/near-selection.ts`): on each side with room, the place where it would stand, else just past or beside an edge bar in the way, the nearest that is clear; `placeAbove` (the chips, the text format bar) and the Actions bar that follows the selection (`ui/context-bar.ts`) pass the edge bars. ADR 0198, CLAUDE.md's floating rules, README (Properties bar). Also since 0.58.30: every README picture taken again (91) and `text-on-path` added; `scripts/showcase/motion/` in the repository and the `Showcase GIF` workflow; `docs/testing/workflow-times.md`.
+- **Tested:** build and typecheck here. Scratch (Chromium and Firefox, 1440 × 900 and 1280 × 800): a shape under the top-left bar, under the buttons at the top right, by the tool rail, and under the Actions bar: every chip can be pressed (`elementFromPoint`), the chips beside the top bars or just above the Actions bar; no errors.
+- **Tests:** `bar-layouts.spec.ts`'s first test draws a shape under the bars at the top right and checks every chip can be pressed and its options open.
+- **Committed:** v0.58.31 on `main`.
+
 ## v0.58.30: text along a path follows its boolean group, and has handles (2026-11-14)
 
 - **Implemented:** `shownShape` in `doc/text-in-shape.ts` (ADR 0202): `withShapeTexts` and the drag preview (`render/scene-view.ts`) place a text by its shape's outermost boolean result; a remade result brings the texts on its members. `pathTextGrips`, `nearestAlong`, `startFor` and `ALIGN_AT` in `text/glyph-space.ts`; `pathText` handles in `shapeHandles` and `hitCornerHandle` (`interaction/path-edit.ts`), `handleTarget` and the `pathtext` drag in `interaction/tools.ts` (through `setTextStyle`), drawn with the balloon's glyphs (`render/scene-renderer.ts`); `pathTextDots()` in the debug hook. A text's start may be -1 to 1 (model check, the *Start at* field from -100). README: Text on a path.

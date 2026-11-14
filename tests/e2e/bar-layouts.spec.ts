@@ -65,6 +65,16 @@ test("a shape drawn with the Shape tool: its chips stand above it and edit it, t
   expect(second.id).not.toBe(first.id);
   expect(JSON.stringify(second.fill), "the tool kept the colour").toContain("ff8800");
   expect(await auditChips(app, ".props-near")).toEqual([]);
+  // a shape just under the bars at the top right: its chips keep off them (drawn over the chips, they took the presses), beside them
+  await app.drag({ x: 960, y: 95 }, { x: 1200, y: 150 }, 6);
+  const covered = () => p.evaluate(() => [...document.querySelectorAll<HTMLElement>(".props-near [data-vchip]")].filter((c) => {
+    const r = c.getBoundingClientRect();
+    return !c.contains(document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2));
+  }).map((c) => c.dataset["vchip"]));
+  await expect.poll(covered, "every chip can be pressed").toEqual([]);
+  await near.locator('[data-vchip="look"]').click();
+  await expect(p.locator(".vchip-pop")).toBeVisible();
+  await p.keyboard.press("Escape");
   expect(app.consoleErrors).toEqual([]);
 });
 

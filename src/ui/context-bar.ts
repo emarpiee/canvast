@@ -8,7 +8,7 @@ import { GAP_LABEL, GAP_ORDER } from "../doc/arrange";
 import type { GapKey } from "../doc/arrange";
 import { LAYOUT_MENU } from "./toolbar";
 import { captionedGroup, hoverNames, syncGroups, syncScroll } from "./bar";
-import { placeBy, selectionBoxIn, uiScale } from "./near-selection";
+import { placeBy, selectionBoxIn, uiScale, edgeBarsIn } from "./near-selection";
 import { isContainer } from "../doc/containers";
 import { closeMoreMenu, MENU_GAP, openMoreMenu } from "./more-menu";
 import { mediaBarTop } from "./media-player";
@@ -453,7 +453,7 @@ export function mountContextBar(host: HTMLElement, editor: EditorState, doc: Doc
     // A media player stands right under its picture and never moves from there (ui/media-player.ts): this bar goes above the picture; with no room
     // above, under the player; with no room there either (a picture that fills the view), just above the player, over the picture.
     const playerEl = document.querySelector<HTMLElement>("[data-testid=media-bar]:not([hidden])");
-    const at = placeBy(b, w, h, "below", edge); // (the one rule with the value chips over the selection, ui/near-selection.ts)
+    const at = placeBy(b, w, h, "below", edge, edge, edgeBarsIn(host, wrap)); // (the one rule with the value chips over the selection, ui/near-selection.ts: off the bars on the edges too)
     let top = at.top;
     if (playerEl) {
       const above = b.top - MENU_GAP - h;

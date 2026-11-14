@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.58.31 — Chips by the selection keep off the bars on the edges (2026-11-14)
+
+- **Fixed:** with the selection near the top of the window, its chips stood under the bar at the top left (Library and the canvas name) or the buttons at the top right, which are drawn over them: a chip there could not be pressed. The chips, the text format bar and the Actions bar that follows the selection now keep off every bar on the edges: just past it or beside it, whichever is nearest.
+- **Changed:** the README's pictures are all taken again, with a new one of a text along a path and its handles; the motion piece's sources are in the repository, and a *Showcase GIF* workflow makes the animation on GitHub.
+
 ## 0.58.30 — Text along a path: follows its boolean group, and handles (2026-11-14)
 
 - **Fixed:** a text along a shape kept following the shape's own outline after the shape was put into a boolean group; it had to be set along the path again. It follows the group's result now (what is seen), and the shape again when the group is let go. Text inside a shape does the same.

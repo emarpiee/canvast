@@ -37,6 +37,8 @@ The Properties bar at the top was felt as cluttered: one long row, different for
 - **The command palette** offers a control in a closed chip (`data-parked`) and opens the chip first.
 - **Rules and an audit**: CLAUDE.md "Floating bars and popovers" and "Tools that make things"; `floatingProblems(page)` in the harness checks the window, the selection, the chip, names, one font, token spacing, width and swatch sizes, and `bar-layouts.spec.ts` runs it on every chip of a shape, a sheet, a thing on it, several things, a mix and the Pen.
 
+- **Off the bars on the edges** (0.58.31): the edge bars (the top-left bar, the tool rail, the buttons and panels at the right, the Actions bar, the view controls) are drawn over what floats by the selection, so `placeBy` keeps the chips, the format bar and the Actions bar that follows the selection off them (`edgeBarsIn`): where it would stand if that is clear, else just past the bar in the way or beside it, the nearest; then the other side.
+
 ## Consequences
 
 - A new control of the Properties bar needs a section (its group's is enough) and an `aria-label`; it is then named and placed in the form with no further code.
