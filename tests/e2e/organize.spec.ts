@@ -1068,6 +1068,8 @@ test("properties: a column, a sort, typed search, suggested values; a saved sear
 
 test("the library's details panel: its sections move as the sidebar's do, and stay; a double-click on its name renames", async ({ app }) => {
   const p = app.page;
+  // (tall enough that every section is in view: a drag that has to scroll the panel on its way is lost by the browser, not by the app)
+  await p.setViewportSize({ width: 1280, height: 1100 });
   await p.getByTestId("view-assets").click();
   await p.getByTestId("assets-import-input").setInputFiles({ name: "d.png", mimeType: "image/png", buffer: makePng(8, 8, () => [40, 90, 200, 255]) });
   await p.locator('[data-testid="asset-card"]').first().click();
