@@ -47,6 +47,13 @@ Unverified / Committed / Next bounded task**.
 - **Committed:** v0.57.19 on `main`.
 - **Next bounded task:** retake the README screenshots in Stone when the owner says.
 
+## v0.59.0: release (2026-11-14)
+
+- **Implemented:** the release of 0.58.1 to 0.58.34 (CHANGELOG 0.59.0 sums them).
+- **Tested:** CI, Tests and Pan and zoom green on 0.58.34 (b0027813) before the release.
+- **Committed:** v0.59.0 on `main`, released on the owner's go.
+- **Next bounded task:** the words/terms audit (owner's backlog).
+
 ## v0.58.34: a fresh start's settings, kept apart (2026-11-14)
 
 - **Implemented:** `SettingsStore.fresh` (nothing stored yet); its first save adds `ui.barPlaces` 1, and the one-time bar migration in `main.ts` skips a fresh start; no value is set in memory (`snapshot()` of a fresh store is empty again: the CI unit test of 0.58.33).
