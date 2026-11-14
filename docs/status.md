@@ -56,7 +56,7 @@ Unverified / Committed / Next bounded task**.
 
 ## v0.59.1: Flip for shapes and paths; the words audit (2026-11-14)
 
-- **Implemented:** Flip for shapes and paths and several selected flipped as one (ADR 0203: `mirrored`, `mirroredPaint`, `flipSelection`, the Flip section, `Shift+H`/`Shift+V`); the words audit (objects on the canvas, items in the Library, click for buttons, picture, Object names, `StyleKind.hint`), README text with it.
+- **Implemented:** Flip for shapes and paths and several selected flipped as one (ADR 0203: `mirrored`, `mirroredPaint`, `flipSelection`, the Flip section, `Shift+H`/`Shift+V`); the words audit (objects on the canvas, items in the Library, click for buttons, picture, Object names, `StyleKind.howTo`), README text with it.
 - **Tested:** typecheck only on this machine; `vectors.spec` (flip of two shapes and of one turned shape) and `paint.test` (mirrored gradients) run on GitHub.
 - **Unverified:** the `flip` README picture still shows the Picture chip: it is taken again with the Screenshots workflow.
 - **Committed:** v0.59.1 on `main`.

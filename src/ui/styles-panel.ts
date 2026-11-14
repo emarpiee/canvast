@@ -213,7 +213,7 @@ export function mountStylesPanel(host: HTMLElement, editor: EditorState, styles:
       body: `<div class="styles-body" role="tabpanel" aria-label="${esc(k.plural)}">
         <div class="styles-tab-head"><h3>${esc(k.plural)}</h3>${k.id === "gradient" || k.id === "palette" ? moreButton(`More actions for ${k.plural}`, `data-kind-more="${k.id}"`) : ""}</div>
         ${paints ? `<div class="styles-target"><span id="styles-target-l">Apply to</span><div class="seg" role="radiogroup" aria-labelledby="styles-target-l">${seg("fill", "Fill", "Colours go on the fill of the selected shapes")}${seg("stroke", "Outline", "Colours go on the outline of the selected shapes")}${seg("both", "Both", "Fill and outline")}</div></div>` : ""}
-        ${!can ? `<p class="styles-hint">${ICONS.pointer}<span>${esc(k.hint)}</span></p>` : ""}
+        ${!can ? `<p class="styles-hint">${ICONS.pointer}<span>${esc(k.howTo)}</span></p>` : ""}
         ${actions ? `<div class="styles-actions">${actions}</div>` : ""}
         ${empty}
         ${all.length ? `<ul class="styles-list" aria-label="${esc(k.plural)}">${items.map((st) => card(st, can)).join("") || `<li class="layers-empty">No ${esc(k.plural.toLowerCase())} match.</li>`}</ul>` : ""}
