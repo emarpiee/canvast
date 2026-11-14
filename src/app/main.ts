@@ -158,7 +158,8 @@ import { entriesOfDrop, fileByFolders, filesOfEntries, hasFolder } from "./direc
 import { isArchiveFile, runExport, runExportChanges, runAdvancedExport, runExportFiles, runImport, takeAfterReload, takeStayUnlocked } from "../ui/archive-ui";
 import { copyText, mountTextEditor } from "../ui/text-editor";
 import { FontLoader, whyNotFont } from "./font-loader";
-import { onFontsChange } from "../text/fonts";
+import { fontFor, onFontsChange } from "../text/fonts";
+import { PHOTOCRAFT_FEATURES, createPhotoCraft } from "../artcraft/photocraft/app";
 import { describeFile } from "../assets/file-kind";
 import { styleOf, toolLook } from "../text/text-style";
 import { installTextFont } from "../text/inter";
@@ -1176,6 +1177,19 @@ async function start(): Promise<void> {
     await Promise.all(fonts.map((e) => fontLoader.ensure(e.hash)));
     return fonts.map((e) => ({ hash: e.hash, name: e.name.replace(/\.[A-Za-z0-9]{1,5}$/, ""), unusable: fontLoader.state(e.hash) === "failed" ? fontLoader.reason(e.hash) : "" }));
   };
+  // PhotoCraft (src/artcraft/photocraft/): ArtCraft's photo editor, its released build, opened over the app.
+  const photoCraft = createPhotoCraft({
+    doc,
+    editor,
+    assets,
+    session,
+    settings,
+    fonts: async () => (await libraryFonts()).filter((f) => !f.unusable).map((f) => {
+      const n = fontFor(f.hash).names;
+      return { hash: f.hash, family: n.family, style: n.style, ext: (/\.(ttf|otf|ttc)$/i.exec(assetNames.get(f.hash) ?? "")?.[1] ?? "ttf").toLowerCase() };
+    }),
+    showCanvas: () => setView("canvas"),
+  });
   const textEditor = mountTextEditor(host, view, doc, editor, libraryFonts, () => settings.get("ui.properties"));
   textFollow = textEditor.follow;
   const copySelectedMarkdown = (): void => {
@@ -2290,6 +2304,7 @@ async function start(): Promise<void> {
       pasteAdjust: () => pasteAdjustments(doc, editor),
       copyRendered: () => void copyAsShown(),
       bake: () => void bakePicture(doc, editor, filesAssets, (shot) => storeFrame(assets, session, settings, shot)),
+      photoCraft: PHOTOCRAFT_FEATURES.entry.canvasPictures && photoCraft.available ? () => void photoCraft.editSelection() : null,
       svgPicture: () => {
         const ids = [...editor.selection];
         const o = ids.length === 1 ? doc.get(ids[0]!) : undefined;
@@ -2492,7 +2507,7 @@ async function start(): Promise<void> {
   followScrolling();
   markTab("canvas");
   markNav("canvas");
-  const assetsView = mountAssetsView(assetsRoot, session, assets, () => setView("canvas"), notices, settings, libraryFonts);
+  const assetsView = mountAssetsView(assetsRoot, session, assets, () => setView("canvas"), notices, settings, libraryFonts, PHOTOCRAFT_FEATURES.entry.libraryItems && photoCraft.available ? (hash) => void photoCraft.editItem(hash) : undefined);
   // A font's card on a canvas: the viewer's sample sentence, on its ground (a ground that follows the theme is drawn again with it).
   const fontCardsLook = (): void => {
     setFontCardLook({ sample: session.fontSample, ground: session.viewGround });
@@ -3087,6 +3102,10 @@ async function start(): Promise<void> {
     ...settingCommands(SETTINGS_TABS, settings, (tab) => { setView("settings"); settingsView.show(tab); }),
   ]);
   registry.setProvider("bars", () => (appView === "canvas" ? barCommands() : []));
+  registry.setProvider("artcraft", () =>
+    PHOTOCRAFT_FEATURES.entry.newDocument && photoCraft.available
+      ? [{ id: "artcraft.photocraft.open", group: "ArtCraft", kind: "artcraft", title: "Open PhotoCraft", words: "photo editor new document image edit layers", run: () => void photoCraft.openBlank() }]
+      : []);
   // Boards and canvases of the navigator, and the fixed shortcuts of Settings > Shortcuts (choosing one opens that list).
   registry.setProvider("navigator", () => {
     const tree = session.tree;

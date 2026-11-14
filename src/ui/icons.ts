@@ -99,6 +99,7 @@ import pointer from "lucide-static/icons/mouse-pointer-2.svg";
 import pencil from "lucide-static/icons/pencil.svg";
 import lasso from "lucide-static/icons/lasso.svg";
 import imagePlus from "lucide-static/icons/image-plus.svg";
+import paintbrushSvg from "lucide-static/icons/paintbrush.svg";
 import undo from "lucide-static/icons/undo-2.svg";
 import redo from "lucide-static/icons/redo-2.svg";
 import trash from "lucide-static/icons/trash-2.svg";
@@ -400,6 +401,8 @@ export const ICONS = {
   pencil: clean(pencil),
   lasso: clean(lasso),
   imagePlus: clean(imagePlus),
+  /** PhotoCraft (ArtCraft's photo editor): Edit in PhotoCraft, its Settings tab. */
+  photoCraft: clean(paintbrushSvg),
   undo: clean(undo),
   redo: clean(redo),
   trash: clean(trash),

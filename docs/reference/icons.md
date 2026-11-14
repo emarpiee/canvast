@@ -229,6 +229,7 @@ One icon per function: two buttons that do different things never share an icon,
 | `clipboard-paste` | Paste adjustments |
 | `clipboard` | Copy a picture to the clipboard as it looks |
 | `copy-plus` | Make a new picture of it as it looks |
+| `paintbrush` | PhotoCraft: Edit in PhotoCraft (Actions bar, a library item), New PhotoCraft document, its Settings tab (ArtCraft > PhotoCraft) |
 | `list-restart` | Reset the adjustments of a picture |
 | `map-pinned` | Actions bar: Initial state (set, update, reset) |
 | `map-pin-plus` | Set initial state |

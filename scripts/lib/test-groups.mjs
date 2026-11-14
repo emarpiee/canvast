@@ -12,6 +12,7 @@ export const GROUPS = {
   desktop: ["desktop"],
   interface: ["settings", "dock", "a11y", "contrast", "icon-audit", "scrub-audit", "bar-layouts"],
   packages: ["colour-picker", "colour-picker-package", "patterns-package"],
+  artcraft: ["photocraft"],
   smoke: ["scenarios", "release"],
 };
 /** Always run, whatever changed: a few whole-app scenarios and the release checks (about a minute). */
@@ -35,6 +36,8 @@ export const RULES = [
   [/\.md$/, []],
   // the specs themselves: their own group
   [/^tests\/e2e\/(.+)\.spec\.ts$/, (m) => [groupOf(m[1])]],
+  // ArtCraft's tools (PhotoCraft): their helpers and the release they carry
+  [/^(src|scripts)\/artcraft\//, ["artcraft"]],
   // the test machinery, the build and the shared heart of the app: everything
   [/^(tests\/e2e\/|playwright\.config\.ts$|scripts\/test-snap\.mjs$|scripts\/build\.mjs$|scripts\/lib\/source-hash\.mjs$|tsconfig\.json$)/, ALL],
   [/^src\/(styles\.css|app\/(main|session|debug-hook|editor-state)\.ts|doc\/(model|document-store)\.ts)$/, ALL],

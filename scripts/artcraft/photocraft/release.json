@@ -1,0 +1,6 @@
+{
+  "comment": "The PhotoCraft web release canvast embeds (scripts/photocraft/package.mjs). Never built here: only this released zip is used. `npm run photocraft:check -- --latest` checks the newest release against the helpers and, with --write, moves this file to it.",
+  "version": "0.23.1",
+  "zip": "https://github.com/storytold/photocraft/releases/download/v0.23.1/photocraft-web-0.23.1.zip",
+  "sha256": "3a498eb517bca6cec89f9c6b1fc6448269a05428c8a3a4637c16817da157f03c"
+}

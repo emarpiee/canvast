@@ -138,6 +138,8 @@ export interface ChooseOptions extends DialogSummary {
   /** The ways to go on: one is picked (the first is selected). */
   choices: Array<{ value: string; label: string; help: string }>;
   confirmLabel: string;
+  /** A checkbox under the choices (Don't ask again): `set` gets whether it was ticked when a choice is taken. */
+  remember?: { label: string; set(on: boolean): void };
 }
 
 /** Modal choice between a few options (radio buttons). Resolves with the picked value, or null when cancelled. */
@@ -153,6 +155,7 @@ export function chooseDialog(opts: ChooseOptions): Promise<string | null> {
     <div class="choose-list" role="radiogroup" aria-labelledby="choose-title">
       ${opts.choices.map((c, i) => `<label class="choose-item"><input type="radio" name="choose" value="${esc(c.value)}"${i === 0 ? " checked" : ""}><span><strong>${esc(c.label)}</strong><small>${esc(c.help)}</small></span></label>`).join("")}
     </div>
+    ${opts.remember ? `<label class="choose-remember"><input type="checkbox" data-testid="choose-remember"> ${esc(opts.remember.label)}</label>` : ""}
     <div class="confirm-actions">
       <button type="button" data-testid="choose-cancel" value="cancel">Cancel</button>
       <button type="button" class="is-primary" data-testid="choose-ok" value="ok">${esc(opts.confirmLabel)}</button>
@@ -163,7 +166,10 @@ export function chooseDialog(opts: ChooseOptions): Promise<string | null> {
     dlg.addEventListener("click", (e) => {
       const b = (e.target as HTMLElement).closest("button");
       if (!b) return;
-      if (b.value === "ok") answer = dlg.querySelector<HTMLInputElement>('input[name="choose"]:checked')?.value ?? null;
+      if (b.value === "ok") {
+        answer = dlg.querySelector<HTMLInputElement>('input[name="choose"]:checked')?.value ?? null;
+        opts.remember?.set(!!dlg.querySelector<HTMLInputElement>('[data-testid="choose-remember"]')?.checked);
+      }
       dlg.close();
     });
         showModal(dlg, () => resolve(answer));

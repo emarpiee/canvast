@@ -38,6 +38,14 @@ Unverified / Committed / Next bounded task**.
 | 5 | Creative editing, including **arrange selected items in a grid (A–Z, Z–A, by date, size, type), align and distribute** | **done** ([ADR 0036](adr/0036-arrange-align-distribute.md)) |
 | WF | Workspace folder and the desktop app ([ADR 0177](adr/0177-workspace-folder-desktop-app.md)): Electron shell, the workspace as a folder of files, encrypted hidden items, outside changes; Linux packages (AppImage with updates, `.deb`, `.rpm`, `.tar.gz`, x86_64 and aarch64) | **done** (v0.49.0; packages v0.50.33 to 0.50.35) |
 
+## v0.59.3: PhotoCraft inside canvast (branch `photocraft`, 2026-11-15)
+
+- **Implemented:** ADR 0204: PhotoCraft 0.23.1's released web build in the single file (`scripts/artcraft/photocraft/package.mjs`), started in a frame of its own (`src/artcraft/photocraft/`), its file picker, downloads and fonts met by canvast; Edit in PhotoCraft (Actions bar, library item), Open PhotoCraft (command list), Settings > ArtCraft > PhotoCraft, switches in `features.ts`, `npm run photocraft:check`, the PhotoCraft release workflow.
+- **Tested:** typecheck (web and desktop), build, `check:offline`, `check:names`, `check:tokens`, `check:storage`, `check:groups`, `photocraft:check` on 0.23.1 (and a made-up menu id fails it) on this machine; `photocraft.spec` (chromium, firefox) and `photocraft.test` run on GitHub.
+- **Unverified:** PhotoCraft running inside the desktop app; WebGPU in a frame from `file://` (it falls back to WebGL2 on its own).
+- **Committed:** v0.59.3 on branch `photocraft`, not on `main`.
+- **Next bounded task:** read the GitHub runs; README section after the owner has tried it.
+
 ## v0.57.19: the README animation in the new brand (2026-11-13)
 
 - **Implemented:** `docs/screenshots/canvast-60s.gif` made again from all 25 footage clips (one new: an adjustment shape) recorded from the current app, the composition recoloured to Stone; the GIF palette from frame differences (about 20 MB).

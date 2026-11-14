@@ -209,3 +209,9 @@ SOFTWARE.
 
 - Package: `three` 0.187.0 (draws 3D models)
 - Licence: MIT
+
+## PhotoCraft
+
+- Package: PhotoCraft's released web build (`photocraft-web-<version>.zip` from https://github.com/storytold/photocraft/releases, the version in `scripts/artcraft/photocraft/release.json`), carried unmodified: the photo editor that opens from canvast (Settings > ArtCraft > PhotoCraft)
+- Licence: MIT OR Apache-2.0, at your option. Copyright (c) 2026 ArtCraft Team and the PhotoCraft contributors. Its NOTICE (the third-party material it bundles: Inter and JetBrains Mono fonts under the SIL OFL 1.1, Lucide icons under ISC, the SCOWL word list, libfacedetection under BSD-3-Clause, and others) and both licence texts travel inside the built file, in its notices comment.
+- The ArtCraft name, wordmark and logos are trademarks of the ArtCraft Team, not covered by the licence; canvast uses the names only to say what the tool is, and carries none of the logos.

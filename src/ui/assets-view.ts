@@ -44,6 +44,7 @@ import { typeOfName } from "../storage/workspace-names";
 import type { AssetRecord } from "../assets/asset-library";
 import { newObjectId } from "../doc/model";
 import { ICONS } from "./icons";
+import { editableInPhotoCraft } from "../artcraft/photocraft/app";
 import { clearRect, MENU_GAP, moreButton, openMoreMenu, pressAs } from "./more-menu";
 import type { MenuItem } from "./more-menu";
 import { bindContextMenu, grouped as groupedMenu } from "./context-menu";
@@ -261,7 +262,7 @@ const NO_FILTERS = { usage: "all", sort: "newest", reversed: false, scope: "all"
 /** The widest a list column can be made by dragging its header's edge. */
 const COL_W_MAX = 900;
 
-export function mountAssetsView(root: HTMLElement, session: Session, assets: AssetLibrary, showCanvas: () => void, notices: { subscribe(fn: (text: string) => void): void }, settings: SettingsStore, /** The fonts of the library, loaded (the notes editor's font list). */ fonts: () => Promise<Array<{ hash: string; name: string; unusable: string }>> = async () => []): AssetsView {
+export function mountAssetsView(root: HTMLElement, session: Session, assets: AssetLibrary, showCanvas: () => void, notices: { subscribe(fn: (text: string) => void): void }, settings: SettingsStore, /** The fonts of the library, loaded (the notes editor's font list). */ fonts: () => Promise<Array<{ hash: string; name: string; unusable: string }>> = async () => [], /** Edit in PhotoCraft (Settings > ArtCraft > PhotoCraft); absent where it is not offered. */ editInPhotoCraft?: (hash: string) => void): AssetsView {
   root.innerHTML = `
     <div class="assets-place-zone drop-zone" data-testid="assets-place-zone" hidden>${ICONS.mapPin}<span></span></div>
     <div class="assets-bar" role="toolbar" aria-label="Library">
@@ -3093,6 +3094,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
           : fileActionsOf(e.name, e.type).canOpen ? `<button type="button" class="assets-btn" data-action="open-tab" data-testid="asset-open-tab" title="Show it in a new browser tab">${ICONS.externalLink}<span>Open in tab</span></button>`
           : ""
         }
+        ${e?.present && editInPhotoCraft && !meta(e).hidden && editableInPhotoCraft(e.type, e.card) ? `<button type="button" class="assets-btn" data-action="photocraft" data-testid="asset-photocraft" title="Open it in PhotoCraft, the photo editor; what it saves becomes a new library item (this file is not written over)">${ICONS.photoCraft}<span>Edit in PhotoCraft</span></button>` : ""}
         ${e?.present ? `<button type="button" class="assets-btn" data-action="export" data-testid="asset-export" title="Save it as a .canvast archive, with its tags, notes and folder, to import into canvast">${ICONS.fileOutput}<span>Export</span></button>` : ""}
         ${e ? `<button type="button" class="assets-btn is-danger" data-action="${instances > 0 ? "delete-everywhere" : "delete"}" data-testid="asset-delete" title="${instances > 0 ? "Delete it from the library and from every canvas it is on" : "Delete it from the library"}"${ro}>${ICONS.trash2}<span>Delete…</span></button>` : ""}
       </div>`;
@@ -3874,6 +3876,9 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
         break;
       case "open-tab":
         void openOriginalInTab(assets, hash);
+        break;
+      case "photocraft":
+        editInPhotoCraft?.(hash);
         break;
       case "thumb":
       case "thumb-all":
@@ -4836,7 +4841,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   // The item rows are read from the panel's buttons (their words, icon and state) and press them, so the menu and the panel can never disagree.
   const PANEL_GROUPS: ReadonlyArray<ReadonlyArray<readonly [action: string, hint: string, icon: string, label?: string]>> = [
     [["slide", "See it large", ICONS.maximize, "Open in the viewer"], ["place", "On the canvas in view", ICONS.imagePlus], ["place-all", "On the canvas in view", ICONS.imagePlus], ["slideshow-all", "One after another", ICONS.play], ["favorite", "Find it under Favourites", ICONS.star], ["favorite-all", "Find them under Favourites", ICONS.star], ["organize", "Move to a folder, add tags", ICONS.folderTree], ["hide", "Only with the password", ICONS.eyeClosed], ["hide-all", "Only with the password", ICONS.eyeClosed]],
-    [["rename", "Give it a new name", ICONS.textCursorInput, "Rename…"], ["rename-all", "Give them new names", ICONS.textCursorInput], ["download", "Save a copy", ICONS.download, "Download"], ["open-tab", "In a new browser tab", ICONS.externalLink], ["open-app", "In your usual program", ICONS.externalLink], ["show-file", "In your file manager", ICONS.folderOpen], ["export", "A file to keep or share", ICONS.fileArchive, "Export as archive"], ["export-all", "A file to keep or share", ICONS.fileArchive], ["export-files-all", "The files, in a ZIP", ICONS.fileArchive]],
+    [["rename", "Give it a new name", ICONS.textCursorInput, "Rename…"], ["rename-all", "Give them new names", ICONS.textCursorInput], ["download", "Save a copy", ICONS.download, "Download"], ["photocraft", "The photo editor; saves a new item", ICONS.photoCraft], ["open-tab", "In a new browser tab", ICONS.externalLink], ["open-app", "In your usual program", ICONS.externalLink], ["show-file", "In your file manager", ICONS.folderOpen], ["export", "A file to keep or share", ICONS.fileArchive, "Export as archive"], ["export-all", "A file to keep or share", ICONS.fileArchive], ["export-files-all", "The files, in a ZIP", ICONS.fileArchive]],
     [["delete", "From the library", ICONS.trash2], ["delete-all", "From the library", ICONS.trash2], ["delete-everywhere", "Library and every canvas", ICONS.trash2]],
   ];
   const panelGroups = (): MenuItem[][] =>

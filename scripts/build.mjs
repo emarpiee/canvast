@@ -8,6 +8,7 @@ import { dirname, resolve } from "node:path";
 import { execSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { sourceHash } from "./lib/source-hash.mjs";
+import { photocraftBlock } from "./artcraft/photocraft/package.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const pkg = JSON.parse(await readFile(resolve(root, "package.json"), "utf8"));
@@ -65,17 +66,22 @@ const inter = await pkgOf("@expo-google-fonts/inter");
 const sun = await pkgOf("suneditor");
 const pdfjs = await pkgOf("pdfjs-dist");
 const threejs = await pkgOf("three");
+// PhotoCraft's released web build (scripts/artcraft/photocraft/): an inert data block, read only when PhotoCraft is first opened.
+const photocraft = await photocraftBlock(root);
 const own = (await readFile(resolve(root, "LICENSE"), "utf8")).replace(/--/g, "- -").trim(); // (canvast's own licence, the GNU GPL v3, travels in the file too)
 const notices =
   `<!--\ncanvast, copyright (C) 2026 emarpiee. Free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version. Source: https://github.com/emarpiee/canvast\n\n${own}\n-->\n<!--\nThird-party notices\n\nLucide icons (lucide-static ${lucide.version})\n${await licence("lucide-static/LICENSE")}\n\n` +
   `Inter Regular font (@expo-google-fonts/inter ${inter.version}, Inter_400Regular.ttf, unmodified)\n${await licence("@expo-google-fonts/inter/LICENSE_FONT")}\n\n` +
   `SunEditor (suneditor ${sun.version}, the notes editor)\n${await licence("suneditor/LICENSE.txt")}\n\n` +
   `pdf.js (pdfjs-dist ${pdfjs.version}, draws PDFs), Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0\n\n` +
-  `three.js (three ${threejs.version}, draws 3D models)\n${await licence("three/LICENSE")}\n-->\n`;
+  `three.js (three ${threejs.version}, draws 3D models)\n${await licence("three/LICENSE")}\n` +
+  (photocraft ? `\nPhotoCraft ${photocraft.version} (its released web build, unmodified; the photo editor opened from canvast), MIT OR Apache-2.0\n${photocraft.notice.replace(/--/g, "- -")}\n` : "") +
+  `-->\n`;
 const html = template
   .replaceAll("__CANVAST_VERSION__", pkg.version)
   .replace("/*__CANVAST_STYLES__*/", () => styles)
   .replace("/*__CANVAST_SCRIPT__*/", () => script)
+  .replace("<!--__PHOTOCRAFT__-->", () => photocraft?.html ?? "")
   .replace("<html", () => `${notices}<html`);
 
 const outDir = resolve(root, process.argv.includes("--out") ? process.argv[process.argv.indexOf("--out") + 1] : "dist");

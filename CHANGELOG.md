@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.59.3 — PhotoCraft, ArtCraft's photo editor, inside canvast (2026-11-15)
+
+- **Added:** **PhotoCraft**, the open-source photo editor of ArtCraft, in its own released web build, unchanged (ADR 0204): **Edit in PhotoCraft** on the Actions bar for selected pictures, on a library item (its details and its menu), and **Open PhotoCraft** in the command list. Its File > Open takes files from the library; what it saves becomes a new library item (filed as Edited pictures), and a picture from a canvas is replaced there or added beside it (asked, with Don't ask again). The library's fonts are in its font menus. It makes no network requests: its links and update check are hidden.
+- **Added:** Settings > **ArtCraft** > **PhotoCraft**: what a saved picture does on the canvas, PhotoCraft's version and licence, and Reset PhotoCraft's own preferences.
+- **Added:** `npm run photocraft:check` and the daily **PhotoCraft release** workflow: a new PhotoCraft release is checked against canvast's helpers before it is used. The switches of what of it is shown are `true`/`false` in `src/artcraft/photocraft/features.ts`.
+- **Changed:** the choice dialog can carry a Don't ask again box.
+
 ## 0.59.2 — The Flip picture, tests for the new words (2026-11-15)
 
 - **Changed:** the README's Flip picture shows the Flip chip.

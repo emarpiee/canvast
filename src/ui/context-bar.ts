@@ -77,6 +77,8 @@ export interface ContextActions {
   pasteAdjust(): void;
   copyRendered(): void;
   bake(): void;
+  /** Edit the selected pictures in PhotoCraft (Settings > ArtCraft > PhotoCraft); null where it is not offered. */
+  photoCraft: (() => void) | null;
   /** A picked SVG picture: its shapes can be made into vectors (a copy beside it). */
   svgPicture(): boolean;
   vectorise(): void;
@@ -205,6 +207,7 @@ export function mountContextBar(host: HTMLElement, editor: EditorState, doc: Doc
       btn("open", ICONS.externalLink, desktopBridge() ? "Open in default app" : "Open in a new tab"),
       btn("copypng", ICONS.clipboardPlain, "Copy the picture to the clipboard as it looks now (crop and adjustments included)"),
       btn("bake", ICONS.copyPlus, "Make a new picture of it as it looks now, beside it"),
+      btn("photocraft", ICONS.photoCraft, "Edit in PhotoCraft: the photo editor opens the selected pictures; what it saves comes back to the library and the canvas"),
       btn("vectorise", ICONS.vectorPolygon, "Turn this SVG picture into editable vector shapes, in its place (the file stays in the library)")) +
     // (the adjustments, for any picture, shape or text: one group, with their copy and paste: ADR 0198)
     group("Adjust",
@@ -408,6 +411,7 @@ export function mountContextBar(host: HTMLElement, editor: EditorState, doc: Doc
       case "pasteadj": actions.pasteAdjust(); break;
       case "copypng": actions.copyRendered(); break;
       case "bake": actions.bake(); break;
+      case "photocraft": actions.photoCraft?.(); break;
       case "unrotate": actions.resetRotation(); break;
       case "baserot": actions.applyRotation(); break;
       case "unstretch": actions.resetProportions(); break;
@@ -510,6 +514,7 @@ export function mountContextBar(host: HTMLElement, editor: EditorState, doc: Doc
     q("pasteadj").disabled = !pic?.canPaste;
     q("copypng").hidden = !pic?.still;
     q("bake").hidden = !pic?.still;
+    q("photocraft").hidden = !pic?.still || !actions.photoCraft;
     q("exportmenu").hidden = !(actions.canExport() || actions.canDownload() || actions.canExportSvg() || sel.some((o) => o!.kind === "text"));
     q("statemenu").hidden = !actions.initialState();
     q("unrotate").hidden = !reset.turned;

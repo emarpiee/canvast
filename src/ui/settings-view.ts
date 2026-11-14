@@ -1,6 +1,6 @@
 import { NOTE_STYLES } from "../notes/note-file";
 import { mountSharing } from "./share-panel";
-import { listDialog } from "./confirm";
+import { confirmDialog, listDialog } from "./confirm";
 import type { SettingRow } from "./share-panel";
 import { DOCK_PANEL_IDS } from "../settings/panels";
 import type { SettingKey, SettingValue, SettingsStore } from "../settings/settings";
@@ -22,6 +22,8 @@ import { ICONS } from "./icons";
 import { logoSvg } from "./brand";
 import { desktopBridge } from "../storage/desktop-bridge";
 import { openWorkspaceSwitcher } from "./workspace-switch";
+import { photoCraftVersion } from "../artcraft/photocraft/payload";
+import { PREFS_KEY as PHOTOCRAFT_PREFS } from "../artcraft/photocraft/prefs";
 
 /** The desktop build (ADR 0177): the workspace is a folder, so what Settings says about storage, privacy and the page differs. */
 /** A row for something that is not a stored setting (Sharing's), with the settings rows' look. */
@@ -110,13 +112,15 @@ function cardsOf(rows: readonly Row[]): Array<{ title: string; rows: Row[] }> {
 
 /** The tabs in the sidebar, in groups. */
 /** The icon of each tab (Screenshot shares the camera of the Screenshot button). */
-const TAB_ICON: Record<string, keyof typeof ICONS> = { drawing: "tabDrawing", navigation: "tabNavigation", shortcuts: "tabShortcuts", media: "tabMedia", library: "tabLibrary", notes: "tabNotes", saving: "tabSaving", screenshot: "camera", appearance: "tabAppearance", panels: "tabPanels", performance: "tabPerformance", storage: "tabStorage", sharing: "tabSharing", privacy: "tabPrivacy", about: "tabAbout", develop: "tabDevelop" };
+const TAB_ICON: Record<string, keyof typeof ICONS> = { drawing: "tabDrawing", navigation: "tabNavigation", shortcuts: "tabShortcuts", media: "tabMedia", library: "tabLibrary", notes: "tabNotes", saving: "tabSaving", screenshot: "camera", appearance: "tabAppearance", panels: "tabPanels", performance: "tabPerformance", storage: "tabStorage", sharing: "tabSharing", privacy: "tabPrivacy", about: "tabAbout", develop: "tabDevelop", photocraft: "photoCraft" };
 
 const TAB_GROUPS: ReadonlyArray<readonly [title: string, ids: readonly string[]]> = [
   ["Working", ["drawing", "navigation", "shortcuts"]],
   ["Library", ["notes", "saving"]],
   ["Media", ["media", "screenshot"]],
   ["Interface", ["appearance", "performance"]],
+  // (ArtCraft's tools, each a tab: PhotoCraft today)
+  ["ArtCraft", ["photocraft"]],
   ["App", ["storage", "sharing", "privacy", "about", "develop"]],
 ];
 
@@ -311,6 +315,13 @@ export const SETTINGS_TABS: readonly Tab[] = [
     ],
   },
   { id: "shortcuts", label: "Shortcuts" },
+  {
+    id: "photocraft",
+    label: "PhotoCraft",
+    rows: [
+      { key: "photocraft.saveCanvas", label: "Saving a picture from the canvas", help: "What a picture edited from a canvas does there when PhotoCraft saves it.", more: "Ask (the default): asked each time, with Don't ask again. Replace the picture: the picture on the canvas shows the edited file (Undo brings the old one back). Add it beside: a new picture next to it. Either way the file is a new library item, filed like Edited pictures (Settings > Saving to the library); the original file is never written over.", control: { kind: "select", options: [["ask", "Ask each time"], ["replace", "Replace the picture"], ["beside", "Add it beside"]] } },
+    ],
+  },
   { id: "storage", label: "Storage" },
   ...(desktopBridge()?.share ? [{ id: "sharing", label: "Sharing" }] : []),
   {
@@ -434,6 +445,12 @@ export function mountSettingsView(root: HTMLElement, settings: SettingsStore, ke
                 DEVICE_DATA_CARD
               : pwCard("workspace", "Password for the workspace", "Asked when the app opens: nothing of the workspace is read or shown until it is given. It keeps people at your screen out; it does not encrypt your data, so someone with access to this browser's storage or to an exported file is not stopped. It cannot be recovered: to change or remove it you enter the old one.") +
                 pwCard("hidden", "Password for the Hidden items", "A password asked before the Hidden items open and before an export that includes them. The same limits apply: it does not encrypt the files. It cannot be recovered either."))
+          : t.id === "photocraft"
+          ? `<div class="set-info set-card" data-photocraft><h3>About PhotoCraft</h3>
+             <p>PhotoCraft is the photo editor of ArtCraft, open source (MIT or Apache-2.0). canvast carries its released web build unchanged${photoCraftVersion() ? ` (version <span data-testid="photocraft-version">${esc(photoCraftVersion())}</span>)` : ""} and opens it from a selected picture (Edit in PhotoCraft on the Actions bar), a library item, or the command list. Its File > Open takes files from the library; what it saves comes back to the library. It makes no network requests: its help links and update check are hidden.</p>
+             ${photoCraftVersion() ? "" : `<p class="set-help">PhotoCraft is not in this build.</p>`}
+             <div class="storage-actions"><button type="button" data-photocraft-reset data-testid="photocraft-reset">Reset PhotoCraft's own preferences</button></div>
+             <p class="set-help">Its own preferences (Edit > Preferences in it) are kept on this device, in this ${DESKTOP ? "app" : "browser"}; resetting them does not touch your files.</p></div>`
           : t.id === "develop"
           ? `<div class="set-info set-card" data-develop><dl><dt>Version</dt><dd>${esc(document.documentElement.dataset["version"] ?? "")}</dd><dt>Build</dt><dd>${DESKTOP ? "The desktop app runs the same single file as the browser build." : "One file: this page. There is no separate debug build."}</dd></dl>
              <p class="set-note" data-dev-note role="status" hidden>Reload to apply the change. <button type="button" class="set-done" data-reload>Reload now</button></p></div>`
@@ -865,6 +882,14 @@ export function mountSettingsView(root: HTMLElement, settings: SettingsStore, ke
     const reset = t.closest<HTMLElement>("[data-reset]");
     if (reset) return settings.reset(reset.dataset["reset"] as SettingKey);
     if (t.closest("[data-reload]")) location.reload();
+    const pcReset = t.closest<HTMLButtonElement>("[data-photocraft-reset]");
+    if (pcReset) {
+      void confirmDialog({ title: "Reset PhotoCraft's own preferences?", lines: ["Its preferences go back to their defaults the next time it opens (its brush presets stay). Your files are not touched."], confirmLabel: "Reset them", danger: false }).then((yes) => {
+        if (!yes) return;
+        try { localStorage.removeItem(PHOTOCRAFT_PREFS); } catch { /* (no storage: nothing kept) */ }
+        pcReset.textContent = "Reset: they are the defaults from its next start";
+      });
+    }
     const sw = t.closest<HTMLElement>("[data-switch-workspace]");
     if (sw) void openWorkspaceSwitcher(sw);
     if (t.closest("[data-done]")) onClose();

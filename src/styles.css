@@ -70,6 +70,7 @@
   --z-item-bar: 6;
   --z-item-pop: 7;
   --z-edge: 10;
+  --z-view: 50; /* a view over the whole app (PhotoCraft): above the edge bars, under the menus and popovers it opens */
   --z-pop: 60; /* menus and popovers opened from a button: above the edge bars, the panels and the Settings view */
   --z-window: 70; /* the frameless window's row and its top edge, over everything of the page (in a modal, they are in its top layer) */
   /* Animation (Settings > Performance): every duration and curve here, so one setting changes them all. --anim-speed and --anim-move are set by the settings (none: the durations below are made 0 by the rule at the end of this block). */
@@ -949,6 +950,11 @@ dialog.confirm .secret-field .prompt-input { padding-right: calc(var(--icon-xl) 
 /* Settings view (ui/settings-view.ts). */
 #settings-view { position: fixed; inset: 0; z-index: 2; display: flex; flex-direction: column; padding: calc((var(--nav-bottom, var(--s-15)) + 2 * var(--near)) / var(--ui-scale, 1)) var(--s-8) 0; background: var(--theme-bg); font: var(--text-md)/1.4 var(--font-ui); }
 #settings-view[hidden] { display: none; }
+/* PhotoCraft's view (src/artcraft/photocraft/): the shared panel over the whole app, its frame filling the body */
+.photocraft-view.layers-panel { position: fixed; inset: 0; z-index: var(--z-view); border: 0; border-radius: 0; background: var(--theme-bg); backdrop-filter: none; }
+.photocraft-view .panel-body { display: flex; overflow: hidden; }
+.photocraft-frame { flex: 1 1 auto; width: 100%; height: 100%; border: 0; display: block; }
+.photocraft-status { margin: 0; padding: var(--s-2) var(--s-6); }
 .set-head { display: flex; align-items: center; gap: var(--s-6); max-width: 1600px; width: 100%; margin: 0 auto var(--s-6); }
 .set-title { margin: 0; font-size: var(--text-3xl); font-weight: 600; flex: 1; }
 .set-body { display: flex; gap: var(--s-10); max-width: 1600px; width: 100%; margin: 0 auto; min-height: 0; flex: 1; }
@@ -1814,6 +1820,7 @@ body[data-viewing] #nav, body[data-viewing] .view-settings { display: none; }
 .nav-ws svg { width: 16px; height: 16px; flex: none; }
 .choose-list { display: grid; gap: var(--s-4); margin: var(--s-6) 0; }
 .choose-item { display: flex; gap: var(--s-6); align-items: flex-start; padding: var(--s-6); border: 1px solid var(--hud-border); border-radius: var(--r-lg); cursor: pointer; }
+.choose-remember { display: flex; gap: var(--s-4); align-items: center; margin: 0 0 var(--s-6); cursor: pointer; }
 .choose-item:has(input:checked) { border-color: var(--hud-accent); background: color-mix(in oklch, var(--hud-accent) 10%, transparent); }
 .choose-item span { display: grid; gap: var(--s-1); }
 .choose-item small { color: var(--hud-muted); }

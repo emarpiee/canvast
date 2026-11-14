@@ -240,6 +240,8 @@ export const SETTINGS = {
   "edit.tagSource": { scope: "workspace", default: false, validate: (v: unknown) => (typeof v === "boolean" ? v : undefined), effect: "immediate" } as Def<boolean>,
   "edit.tagInherit": { scope: "workspace", default: true, validate: (v: unknown) => (typeof v === "boolean" ? v : undefined), effect: "immediate" } as Def<boolean>,
   "edit.tagsCustom": { scope: "workspace", default: "", validate: text(200), effect: "immediate" } as Def<string>,
+  // PhotoCraft (Settings > ArtCraft > PhotoCraft): what a picture edited from a canvas does there when PhotoCraft saves it.
+  "photocraft.saveCanvas": { scope: "device", default: "ask", validate: oneOf("ask", "replace", "beside"), effect: "immediate" } as Def<"ask" | "replace" | "beside">,
   // Extracted frames (ADR 0081).
   "frame.format": { scope: "workspace", default: "png", validate: oneOf("webp", "png", "jpeg"), effect: "immediate" } as Def<"webp" | "png" | "jpeg">,
   "frame.quality": { scope: "workspace", default: 92, validate: range(10, 100), effect: "immediate" } as Def<number>,

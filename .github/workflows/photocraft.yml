@@ -1,0 +1,48 @@
+name: PhotoCraft release
+
+# canvast carries PhotoCraft's released web build, never one built here (scripts/artcraft/photocraft/). Each day this checks the newest
+# PhotoCraft release against canvast's helpers (npm run photocraft:check -- --latest). When it is newer than the one in
+# scripts/artcraft/photocraft/release.json, an issue says so, with the check's report: what is new, and whether the helpers still read it.
+# Moving to it is then `npm run photocraft:check -- --latest --write`, a build, and the photocraft tests (Tests, spec photocraft).
+
+on:
+  schedule:
+    - cron: "17 5 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Check the newest release
+        id: check
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set +e
+          node scripts/artcraft/photocraft/check.mjs --latest > report.txt 2>&1
+          echo "status=$?" >> "$GITHUB_OUTPUT"
+          cat report.txt
+          have=$(node -p "require('./scripts/artcraft/photocraft/release.json').version")
+          latest=$(head -1 report.txt | sed -E 's/^PhotoCraft ([^ ]+).*/\1/')
+          echo "have=$have" >> "$GITHUB_OUTPUT"
+          echo "latest=$latest" >> "$GITHUB_OUTPUT"
+      - name: Say so in an issue
+        if: steps.check.outputs.latest != steps.check.outputs.have
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          title="PhotoCraft ${{ steps.check.outputs.latest }} is out (canvast has ${{ steps.check.outputs.have }})"
+          verdict=$([ "${{ steps.check.outputs.status }}" = "0" ] && echo "✅ The helpers read it." || echo "❌ The helpers need a change before it can ship.")
+          body=$(printf '%s\n\n```\n%s\n```\n\nNext: `npm run photocraft:check -- --latest --write`, build, then run the photocraft tests on GitHub.' "$verdict" "$(cat report.txt)")
+          existing=$(gh issue list --state open --search "\"$title\" in:title" --json number --jq '.[0].number')
+          if [ -n "$existing" ]; then gh issue comment "$existing" --body "$body"; else gh issue create --title "$title" --body "$body"; fi
