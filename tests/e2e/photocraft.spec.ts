@@ -19,6 +19,9 @@ async function place(app: App, name: string): Promise<Pic> {
   return (await objs(app)).at(-1)!;
 }
 
+/** The names of the library's items, but PhotoCraft's own presets pack (it keeps it there while it runs). */
+const itemNames = async (p: Page): Promise<string[]> => (await p.evaluate(() => window.__canvastDebug.assetListing())).entries.map((e) => e.name).filter((n) => n !== "photocraft-presets.zip").sort();
+
 /** Whether this browser can draw PhotoCraft (it needs WebGPU or WebGL2: a test machine's headless Firefox has neither). */
 const canDraw = (p: Page): Promise<boolean> => p.evaluate(() => !!(navigator as Navigator & { gpu?: unknown }).gpu || !!document.createElement("canvas").getContext("webgl2"));
 
@@ -100,7 +103,7 @@ test("PhotoCraft opens a selected picture; its File > Open asks the library, and
   await p.getByTestId("asset-photocraft").click();
   await running(p);
   await saveFromPhotoCraft(p, "sketch.psd", makePng(20, 20, () => [1, 2, 3, 255]));
-  await expect.poll(async () => (await p.evaluate(() => window.__canvastDebug.assetListing())).entries.map((e) => e.name).sort()).toEqual(["harbour.png", "sketch.psd"]);
+  await expect.poll(() => itemNames(p)).toEqual(["harbour.png", "sketch.psd"]);
   await expect(p.getByTestId("choose-dialog")).toBeHidden();
   expect(await p.evaluate(() => document.querySelector<HTMLIFrameElement>(".photocraft-frame")!.contentDocument!.getElementById("photocraft_stopped")!.hidden)).toBe(true);
 });
@@ -118,13 +121,13 @@ test("what PhotoCraft saves comes back: asked, added beside, Don't ask again kep
   await expect.poll(async () => (await objs(app)).length).toBe(2);
   expect(await p.evaluate(() => window.__canvastDebug.getSetting("photocraft.saveCanvas"))).toBe("beside");
   // a new library item, named after the original (Settings > Saving to the library > Edited pictures), the original kept
-  const names = (await p.evaluate(() => window.__canvastDebug.assetListing())).entries.map((e) => e.name).sort();
-  expect(names).toEqual(["harbour-edited.png", "harbour.png"]);
+  expect(await itemNames(p)).toEqual(["harbour-edited.png", "harbour.png"]);
   // saved again under its first name: it replaces its earlier save (the canvas shows it, the library does not grow)
-  const before = (await p.evaluate(() => window.__canvastDebug.assetListing())).entries.length;
+  const items = (): Promise<string[]> => itemNames(p);
+  const before = (await items()).length;
   await saveFromPhotoCraft(p, "harbour.png", makePng(90, 60, () => [10, 10, 220, 255]));
-  await expect.poll(async () => (await p.evaluate(() => window.__canvastDebug.assetListing())).entries.map((e) => e.name).sort()).toEqual(["harbour-edited.png", "harbour.png"]);
-  expect((await p.evaluate(() => window.__canvastDebug.assetListing())).entries.length).toBe(before);
+  await expect.poll(items).toEqual(["harbour-edited.png", "harbour.png"]);
+  expect((await items()).length).toBe(before);
   expect((await objs(app)).length).toBe(2);
   // not asked again
   await saveFromPhotoCraft(p, "harbour-v2.png", makePng(90, 60, () => [40, 200, 40, 255]));
