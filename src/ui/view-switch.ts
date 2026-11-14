@@ -11,7 +11,7 @@ export function mountViewSwitch(root: HTMLElement, onSelect: (v: AppView) => voi
   root.innerHTML = `
     <div class="view-switch" data-cmd-group="Navigate" role="tablist" aria-label="View">
       <button type="button" role="tab" data-view="assets" data-testid="view-assets" title="Library">${ICONS.images}<span>Library</span></button>${photoCraft ? `<button type="button" role="tab" data-view="photocraft" data-testid="view-photocraft" title="PhotoCraft, the photo editor (it keeps running while you are in another view)">${ICONS.photoCraft}<span>PhotoCraft</span></button>` : ""}
-    </div>
+    </div>${photoCraft ? `<div class="view-switch"><button type="button" data-photocraft-close data-testid="photocraft-close" hidden aria-label="Close PhotoCraft (it asks first when something is not saved)" title="Close PhotoCraft">${ICONS.x}</button></div>` : ""}
     <div class="view-settings" data-cmd-group="Navigate"><button type="button" data-view="settings" data-testid="view-settings" aria-pressed="false" aria-label="Settings" title="Settings">${ICONS.settings}</button></div>`;
   const tabs = [...root.querySelectorAll<HTMLButtonElement>('[role="tab"]')];
   const set = (v: AppView): void => {

@@ -36,7 +36,7 @@ export interface PhotoCraftFrame {
   readonly ready: Promise<void>;
   /** Opens files in it, each in a tab of its own. */
   open(files: readonly File[]): Promise<void>;
-  /** Whether a document in it has changes not saved (asked as closing its page would). */
+  /** Whether a document in it has changes not saved (asked as closing its page would, and nothing done in it since its last save). */
   unsaved(): boolean;
   /** Takes it away (what is not saved is lost: ask `unsaved` first). */
   destroy(): void;
@@ -80,6 +80,10 @@ export function startPhotoCraft(container: HTMLElement, host: PhotoCraftHost, fe
     if (!destroyed) host.failed(message);
   };
 
+  /** When something was last done in it, and when a file of it last came back (`unsaved`). */
+  let lastInput = 0;
+  let lastSaved = -1;
+
   // ---- downloads: its saved and exported files come back here
   const blobs = new Map<string, Blob>();
   const createUrl = win.URL.createObjectURL.bind(win.URL);
@@ -99,6 +103,7 @@ export function startPhotoCraft(container: HTMLElement, host: PhotoCraftHost, fe
     if (!blob) return; // (a link: there is no network)
     if (!features.bridge.saveToLibrary) return void anchorClick.call(this);
     const name = this.download;
+    lastSaved = performance.now();
     // (copied into this page at once: a Blob of the frame cannot be read once the frame is gone)
     void blob.arrayBuffer().then((buf) => host.saved(name, new Blob([new Uint8Array(buf)], { type: blob.type })), (e: unknown) => stop(`A file it saved could not be read: ${String(e)}`));
   };
@@ -152,6 +157,9 @@ export function startPhotoCraft(container: HTMLElement, host: PhotoCraftHost, fe
   win.addEventListener("keydown", (e) => {
     if (browserKey(e)) e.preventDefault();
   });
+  // (its page cannot know a download was kept, so a document stays "not saved" after its Save: canvast knows when a file of it came
+  // back, and whether anything was done in it since; nothing is done in it without a press or a key)
+  for (const kind of ["pointerdown", "keydown"]) win.addEventListener(kind, () => void (lastInput = performance.now()), true);
 
   // ---- its own messages: running, stopped, could not start
   doc.addEventListener("click", (e) => {
@@ -200,8 +208,8 @@ export function startPhotoCraft(container: HTMLElement, host: PhotoCraftHost, fe
     },
     unsaved() {
       if (destroyed) return false;
-      // (its page asks before closing when a document has unsaved changes: asked the same way)
-      return !win.dispatchEvent(new win.Event("beforeunload", { cancelable: true }));
+      // (its page asks before closing when a document has unsaved changes: asked the same way; not when nothing was done since it saved)
+      return !win.dispatchEvent(new win.Event("beforeunload", { cancelable: true })) && lastInput > lastSaved;
     },
     destroy() {
       destroyed = true;

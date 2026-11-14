@@ -62,6 +62,8 @@ export interface PhotoCraftDeps {
   enterView(): void;
   /** Back to the view it was opened from (its Close). */
   leaveView(): void;
+  /** It started or stopped (its tab's ×, to close it, shows while it runs). */
+  runningChanged(on: boolean): void;
 }
 
 export interface PhotoCraftApp {
@@ -79,6 +81,8 @@ export interface PhotoCraftApp {
   show(): void;
   /** Another view is shown: it keeps running; what it keeps is taken into the workspace. */
   hide(): void;
+  /** Close it (asked first when a document in it has unsaved changes), and go back to the view it came from. */
+  close(): Promise<void>;
   /** For the debug hook: whether it is open and running, and what came back from it. */
   state(): { open: boolean; ready: boolean; saved: number; failed: string };
 }
@@ -100,11 +104,10 @@ export function createPhotoCraft(deps: PhotoCraftDeps): PhotoCraftApp {
   const origins = new Map<string, Origin>();
   const stem = (name: string): string => splitName(name).stem.toLowerCase();
   const state = createState({ settings, session, assets });
-  /** A line in PhotoCraft's view (it is in front), and on the canvas for when you go back. */
+  /** What happened, in the app's notices (shown over PhotoCraft's view too). */
   const say = (text: string): void => {
     editor.message = text;
     editor.changed();
-    view?.note(text);
   };
 
   // Its preferences as soon as it saves them (its frame writing the browser's storage tells this page).
@@ -220,7 +223,7 @@ export function createPhotoCraft(deps: PhotoCraftDeps): PhotoCraftApp {
   function ensureStarted(): Promise<PhotoCraftFrame> {
     if (frame) return Promise.resolve(frame);
     starting ??= (async () => {
-      const v = (view ??= mountPhotoCraftView(() => void askClose()));
+      const v = (view ??= mountPhotoCraftView());
       failed = "";
       v.status("Starting PhotoCraft…");
       await state.restore().catch(() => undefined);
@@ -237,6 +240,7 @@ export function createPhotoCraft(deps: PhotoCraftDeps): PhotoCraftApp {
         },
       });
       frame = started;
+      deps.runningChanged(true);
       started.ready.then(() => {
         ready = true;
         view?.status("");
@@ -259,6 +263,7 @@ export function createPhotoCraft(deps: PhotoCraftDeps): PhotoCraftApp {
     frame?.destroy();
     frame = null;
     ready = false;
+    deps.runningChanged(false);
     origins.clear();
     await state.keep();
   }
@@ -271,7 +276,7 @@ export function createPhotoCraft(deps: PhotoCraftDeps): PhotoCraftApp {
 
   function show(): void {
     if (!photoCraftPayload()) return say("PhotoCraft is not in this build.");
-    view ??= mountPhotoCraftView(() => void askClose());
+    view ??= mountPhotoCraftView();
     view.show();
     void ensureStarted();
   }
@@ -352,6 +357,7 @@ export function createPhotoCraft(deps: PhotoCraftDeps): PhotoCraftApp {
         { id: "photocraft-layers", label: "As layers of one document", hint: "Placed as on the canvas", icon: ICONS.layers, run: () => void asProject({ ...t, ids: new Set(pics.map((p) => p.o.id)) }, "pictures") },
       ], "Edit in PhotoCraft");
     },
+    close: askClose,
     async editItem(hash) {
       const rec = await assets.record(hash).catch(() => undefined);
       const entry = await session.catalog?.entry(hash).catch(() => undefined);

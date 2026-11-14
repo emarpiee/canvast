@@ -84,7 +84,7 @@ test("PhotoCraft opens a selected picture; its File > Open asks the library, and
   expect(await p.evaluate(() => document.querySelector<HTMLIFrameElement>(".photocraft-frame")!.contentDocument!.getElementById("photocraft_stopped")!.hidden)).toBe(true);
 });
 
-test("what PhotoCraft saves comes back: asked, added beside, Don't ask again kept; closing takes it away", async ({ app }) => {
+test("what PhotoCraft saves comes back: asked, added beside, Don't ask again kept; closed from its tab without asking once saved", async ({ app }) => {
   const p = app.page;
   const pic = await place(app, "harbour.png");
   await editInPhotoCraft(app, pic);
@@ -104,9 +104,9 @@ test("what PhotoCraft saves comes back: asked, added beside, Don't ask again kep
   await expect.poll(async () => (await objs(app)).length).toBe(3);
   await expect(p.getByTestId("choose-dialog")).toBeHidden();
   // close: the view and its frame go
-  await p.getByTestId("photocraft-view").locator("[data-close]").click();
-  // (asked only when a document in it has unsaved changes)
-  if (await p.getByTestId("confirm-dialog").isVisible().catch(() => false)) await p.getByTestId("confirm-ok").click();
+  // (its tab's ×; nothing was done in it since its last save, so it is not asked about unsaved changes)
+  await p.getByTestId("photocraft-close").click();
+  await expect(p.getByTestId("confirm-dialog")).toBeHidden();
   await expect(p.getByTestId("photocraft-view")).toBeHidden();
   await expect(p.locator(".photocraft-frame")).toHaveCount(0);
 });

@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.59.5 — PhotoCraft's view tidied, no false "not saved" (2026-11-15)
+
+- **Changed:** PhotoCraft's view is the whole window under the top bar, as Library and Settings are: the canvas, its bars and its panels no longer show behind or around it, its own title row is gone (its tab says PhotoCraft), it is closed with the **×** beside its tab, and what it saved is said once, in the notices.
+- **Fixed:** closing PhotoCraft asked about unsaved changes right after a save: it now asks only when something was done in it since its last save.
+
 ## 0.59.4 — PhotoCraft as a view, layered projects from sheets and pictures, every art file, its settings with the workspace (2026-11-15)
 
 - **Added:** a **PhotoCraft** tab beside Library: PhotoCraft is a view of its own, and keeps running with its documents while another view is shown; its Close goes back to the view it was opened from.

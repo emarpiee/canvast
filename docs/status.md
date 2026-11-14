@@ -38,6 +38,13 @@ Unverified / Committed / Next bounded task**.
 | 5 | Creative editing, including **arrange selected items in a grid (A–Z, Z–A, by date, size, type), align and distribute** | **done** ([ADR 0036](adr/0036-arrange-align-distribute.md)) |
 | WF | Workspace folder and the desktop app ([ADR 0177](adr/0177-workspace-folder-desktop-app.md)): Electron shell, the workspace as a folder of files, encrypted hidden items, outside changes; Linux packages (AppImage with updates, `.deb`, `.rpm`, `.tar.gz`, x86_64 and aarch64) | **done** (v0.49.0; packages v0.50.33 to 0.50.35) |
 
+## v0.59.5: PhotoCraft's view tidied, no false "not saved" (2026-11-15)
+
+- **Implemented:** the view covers the window under the top bar (canvas host and hint hidden as for Library/Settings), no title row, the × beside its tab closes it, one notice per save; `unsaved()` is false when nothing was pressed or typed in it since a file of it came back. PhotoCraft keeps choosing a saved file's extension (owner: its default is fine).
+- **Tested:** typecheck (web, desktop), build here; `photocraft.spec` on GitHub.
+- **Committed:** v0.59.5 on `main`.
+- **Next bounded task:** the owner tries the AppImage; README section after.
+
 ## v0.59.4: PhotoCraft pass 2 (branch `photocraft`, 2026-11-15)
 
 - **Implemented:** the owner's 7 items: PhotoCraft view and tab (`AppView` "photocraft", kept running), several pictures each or as layers, sheets as layered OpenRaster projects (`layers.ts`, size by the Export rules in `size-dialog.ts`, saved file beside), every kind it opens (`PHOTOCRAFT_OPENS`, checked against its `OPEN_EXTS`), its keys kept from the browser (`browserKey`), its preferences in the workspace setting `photocraft.prefs` and its presets as a library pack (`state.ts`, `presets.ts`), middle-cut names in the library chooser.

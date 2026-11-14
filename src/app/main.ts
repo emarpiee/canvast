@@ -1193,6 +1193,13 @@ async function start(): Promise<void> {
     nameOf: (hash) => assetNames.get(hash),
     enterView: () => setView("photocraft"),
     leaveView: () => setView(viewBeforePhotoCraft),
+    runningChanged: (on) => {
+      const x = document.querySelector<HTMLButtonElement>("[data-photocraft-close]");
+      if (x) x.hidden = !on;
+    },
+  });
+  document.addEventListener("click", (e) => {
+    if ((e.target as HTMLElement).closest?.("[data-photocraft-close]")) void photoCraft.close();
   });
   const textEditor = mountTextEditor(host, view, doc, editor, libraryFonts, () => settings.get("ui.properties"));
   textFollow = textEditor.follow;
