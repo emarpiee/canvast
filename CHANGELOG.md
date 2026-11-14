@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.59.7 — PhotoCraft's other files from and to the library (2026-11-15)
+
+- **Fixed:** PhotoCraft's file choosers for other kinds of file (Import Shortcuts, presets, swatches) offered only pictures from the library: they now offer the files of the kind it asks for, and every file when it names none; **Import…** in the chooser asks for that kind too.
+- **Fixed:** a file PhotoCraft saves that is not a picture (an exported set of shortcuts, presets) was filed as an edited picture: it now goes to the library's **PhotoCraft files** folder, as it is.
+
 ## 0.59.6 — A layered project is in PhotoCraft before you save it (2026-11-15)
 
 - **Fixed:** with several pictures or a sheet opened as layers, PhotoCraft's view opened while the layers were still being drawn, and its start cleared the "Making the layers" line: a file saved in that moment did not come back beside them. The line now stays until the project is open in PhotoCraft.

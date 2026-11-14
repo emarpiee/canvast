@@ -72,6 +72,18 @@ test("PhotoCraft opens a selected picture; its File > Open asks the library, and
   await expect(p.locator(".lib-pick")).toContainText("harbour.png");
   await p.keyboard.press("Escape");
   await expect(p.locator(".lib-pick")).toBeHidden();
+  // a picker of another kind (its Import Shortcuts asks for "kys,json", without dots): only files of that kind are offered
+  await p.evaluate(() => {
+    const d = document.querySelector<HTMLIFrameElement>(".photocraft-frame")!.contentDocument!;
+    const i = d.createElement("input");
+    i.type = "file";
+    i.accept = "kys,json";
+    i.click();
+  });
+  await expect(p.locator(".lib-pick")).toBeVisible();
+  await expect(p.locator(".lib-pick .lib-item")).toHaveCount(0);
+  await p.keyboard.press("Escape");
+  await expect(p.locator(".lib-pick")).toBeHidden();
   // a view of its own: the Library shown, then PhotoCraft again, still running (its frame kept)
   await p.getByTestId("view-assets").click();
   await expect(p.getByTestId("photocraft-view")).toBeHidden();

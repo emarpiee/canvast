@@ -91,6 +91,9 @@ export interface PhotoCraftApp {
 export const editableInPhotoCraft = (name: string, type = ""): boolean =>
   !type.startsWith("video/") && !type.startsWith("audio/") && PHOTOCRAFT_OPENS.includes(splitName(name).ext.replace(/^\./, "").toLowerCase());
 
+/** The library folder of the files PhotoCraft saves that are not pictures (its shortcuts, presets, swatches). */
+const FILES_FOLDER = "PhotoCraft files";
+
 export function createPhotoCraft(deps: PhotoCraftDeps): PhotoCraftApp {
   const { doc, editor, assets, session, settings } = deps;
   const F = PHOTOCRAFT_FEATURES;
@@ -122,6 +125,12 @@ export function createPhotoCraft(deps: PhotoCraftDeps): PhotoCraftApp {
     savedCount++;
     // (by the name it opened with; renamed in its Save As, it is still the one file open, when only one is)
     const origin = origins.get(stem(name)) ?? (origins.size === 1 ? [...origins.values()][0] : undefined);
+    // A file that is not a picture (a set of shortcuts, presets, a swatch file it exported): kept in the library as it is, in its own folder.
+    if (!editableInPhotoCraft(name, blob.type)) {
+      const { record } = await assets.importFileDetailed(new File([blob], name, { type: blob.type }), true);
+      const where = await fileInLibrary(session, record.hash, FILES_FOLDER, ["photocraft"]);
+      return say(`“${record.name}” saved from PhotoCraft to ${where}.`);
+    }
     const sameName = origin && origin.kind !== "beside" && name.toLowerCase() === origin.name.toLowerCase();
     const fileName = sameName ? `${editedName(session, settings, origin.name)}${splitName(name).ext}` : name;
     const { record } = await assets.importFileDetailed(new File([blob], fileName, { type: blob.type }), true);
@@ -203,8 +212,11 @@ export function createPhotoCraft(deps: PhotoCraftDeps): PhotoCraftApp {
 
   /** The library chooser for its File > Open and Place: every item of a kind it opens (by its `accept`), hidden ones left out. */
   async function pick(accept: string): Promise<File[] | null> {
-    const exts = accept.split(",").map((a) => a.trim().toLowerCase()).filter((a) => a.startsWith("."));
-    const fits = (name: string): boolean => (exts.length ? exts.some((x) => name.toLowerCase().endsWith(x)) : editableInPhotoCraft(name));
+    // (its file picker names the kinds with or without a dot, "kys,json" or ".kys"; a type with a slash is not a file's kind)
+    const exts = accept.split(",").map((a) => a.trim().toLowerCase().replace(/^\*?\./, "")).filter((a) => a && !a.includes("/"));
+    const extOf = (name: string): string => splitName(name).ext.replace(/^\./, "").toLowerCase();
+    const fits = (name: string): boolean => !exts.length || exts.includes(extOf(name));
+    const deviceAccept = exts.map((x) => `.${x}`).join(",");
     const list = (await session.catalog?.list().catch(() => undefined))?.entries ?? [];
     const items = list
       .filter((e) => e.present && !meta(e).hidden && fits(e.name))
@@ -212,7 +224,7 @@ export function createPhotoCraft(deps: PhotoCraftDeps): PhotoCraftApp {
       .map((e) => ({ hash: e.hash, name: e.name, ...(e.type.startsWith("image/") && !e.card ? {} : { chip: splitName(e.name).ext.replace(/^\./, "").toUpperCase() }), thumb: async () => (await session.catalog?.thumb(e.hash).catch(() => undefined))?.blob }));
     const hash = await openLibraryPicker(null, items, {
       noun: ["file", "files"],
-      importFiles: { accept, run: async (files) => (await Promise.all(files.map((f) => assets.importFileDetailed(f, true)))).map((r) => r.record.hash) },
+      importFiles: { accept: deviceAccept, run: async (files) => (await Promise.all(files.map((f) => assets.importFileDetailed(f, true)))).map((r) => r.record.hash) },
     });
     if (!hash) return null;
     const rec = await assets.record(hash).catch(() => undefined);
