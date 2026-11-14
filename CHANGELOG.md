@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.58.33 — The README's animation made again (2026-11-14)
+
+- **Changed:** the one-minute animation at the top of the README is made again from this version, by the *Showcase GIF* workflow: the chips by the selection, one field look, the balloon's chips.
+
 ## 0.58.32 — A text on a combined shape stays tied to it; fixes the tests found (2026-11-14)
 
 - **Fixed:** a text along a shape that went into a boolean group followed the group's result but was then tied to the result (since 0.58.30): letting the group go turned it into plain text. It stays tied to its own shape now, and goes back onto it when the group is let go.

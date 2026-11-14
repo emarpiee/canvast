@@ -1,4 +1,4 @@
-import { exportWith, expect, outlineShapes, test, styleKind, openAdjust } from "./harness";
+import { exportWith, expect, outlineShapes, test, styleKind, openAdjust, saveSettings } from "./harness";
 import type { App } from "./harness";
 import { makePng } from "./png";
 import { encodeGif } from "./gif";
@@ -308,7 +308,7 @@ test("Reset beside Adjust takes the adjustments off at once, and is there only w
 test("the player stays right under its video, whatever else is on screen; the Actions bar (set to follow) goes above the video, or under the player when there is no room above", async ({ app }) => {
   const slow = expect.configure({ timeout: 20_000 });
   const p = app.page;
-  await p.evaluate(() => localStorage.setItem("canvast.settings", JSON.stringify({ ...JSON.parse(localStorage.getItem("canvast.settings") ?? "{}"), "ui.actions": "follow" })));
+  await saveSettings(p, { "ui.actions": "follow" });
   await p.reload();
   await p.waitForFunction(() => typeof window.__canvastDebug !== "undefined");
   await p.getByTestId("import-input").setInputFiles({ name: "clip.webm", mimeType: "video/webm", buffer: await makeWebm(p, 2) });

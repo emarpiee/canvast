@@ -1,4 +1,4 @@
-import { stateWith, alignWith, boolWith, expect, exportWith, maskWith, outlineShapes, pathWith, test } from "./harness";
+import { stateWith, alignWith, boolWith, expect, exportWith, maskWith, outlineShapes, pathWith, test, saveSettings } from "./harness";
 import type { App } from "./harness";
 
 /**
@@ -3189,7 +3189,7 @@ test("gradients written by another design tool are read: a radial one sized by i
 
 test("initial shape with the setting on keeps the fill and outline, and Reset puts them back", async ({ app }) => {
   const p = app.page;
-  await p.evaluate(() => localStorage.setItem("canvast.settings", JSON.stringify({ "shape.initialPaint": true })));
+  await saveSettings(p, { "shape.initialPaint": true });
   await reload(app);
   await key(app, "u");
   await drag(app, [500, 300], [740, 440]);

@@ -1,5 +1,5 @@
 import * as D from "../../src/core/dyadic";
-import { LIMITS, boolWith, chooseInMenu, distance, expect, maskWith, pathWith, recordMetric, reps, setPenColour, sheetWith, test } from "./harness";
+import { LIMITS, boolWith, chooseInMenu, distance, expect, maskWith, pathWith, recordMetric, reps, setPenColour, sheetWith, test, saveSettings } from "./harness";
 import { encodeGif } from "./gif";
 import { makeWav } from "./video";
 import type { App } from "./harness";
@@ -356,7 +356,7 @@ test("delete, undo delete (what comes back is selected), and invalid imports are
 
 test("Actions bar set to follow the selection: it sits just under the picked thing, not at the bottom, and moves when the view pans", async ({ app }) => {
   const p = app.page;
-  await p.evaluate(() => localStorage.setItem("canvast.settings", JSON.stringify({ ...JSON.parse(localStorage.getItem("canvast.settings") ?? "{}"), "ui.actions": "follow" })));
+  await saveSettings(p, { "ui.actions": "follow" });
   await p.reload();
   await p.waitForFunction(() => typeof window.__canvastDebug !== "undefined");
   await key(app, "p");
@@ -460,7 +460,7 @@ test("W A S D step the selection between items (nearest in view, by layer) and f
   expect(Math.abs((back.minX + back.maxX) / 2 - vp.width / 2)).toBeLessThan(60);
   // By layer (a setting): the next layer up or down the stacking order, whatever its place on the canvas.
   expect(await p.evaluate(() => window.__canvastDebug.flushSave())).toBe("saved");
-  await p.evaluate(() => localStorage.setItem("canvast.settings", JSON.stringify({ "nav.mode": "layer" })));
+  await saveSettings(p, { "nav.mode": "layer" });
   await p.reload();
   await p.waitForFunction(() => typeof window.__canvastDebug !== "undefined");
   await key(app, "Escape");
@@ -496,7 +496,7 @@ test("W A S D by name A to Z, anywhere and in view: in the order of the names in
   const [cherry, apple, banana] = await objects(app);
   const mode = async (m: string) => {
     expect(await p.evaluate(() => window.__canvastDebug.flushSave())).toBe("saved");
-    await p.evaluate((v) => localStorage.setItem("canvast.settings", JSON.stringify({ "nav.mode": v, "nav.arrive": "keep" })), m);
+    await saveSettings(p, { "nav.mode": m, "nav.arrive": "keep" });
     await p.reload();
     await p.waitForFunction(() => typeof window.__canvastDebug !== "undefined");
   };
@@ -556,7 +556,7 @@ test("W A S D: 'nearest in view' skips an item too small to see at this zoom, 'n
   expect(await selection(app), "the tiny item is skipped").toEqual([b!.id]);
   // The same step with the setting "anywhere" reaches it.
   expect(await p.evaluate(() => window.__canvastDebug.flushSave())).toBe("saved");
-  await p.evaluate(() => localStorage.setItem("canvast.settings", JSON.stringify({ "nav.mode": "anywhere" })));
+  await saveSettings(p, { "nav.mode": "anywhere" });
   await p.reload();
   await p.waitForFunction(() => typeof window.__canvastDebug !== "undefined");
   await key(app, "v");
@@ -584,7 +584,7 @@ test("W A S D on arriving: 'Focus on the item' zooms to it, 'Keep the zoom level
   await expect.poll(() => selection(app)).toEqual([b!.id]);
   const focused = await level();
   expect(focused.zi + focused.zf, "focus zoomed in on the item").toBeGreaterThan(zoom0.zi + zoom0.zf + 0.5);
-  await p.evaluate(() => localStorage.setItem("canvast.settings", JSON.stringify({ "nav.arrive": "keep" })));
+  await saveSettings(p, { "nav.arrive": "keep" });
   await p.reload();
   await p.waitForFunction(() => typeof window.__canvastDebug !== "undefined");
   await key(app, "v");

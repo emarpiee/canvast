@@ -1,4 +1,4 @@
-import { APP_URL, expect, settingsRowProblems, test } from "./harness";
+import { APP_URL, expect, settingsRowProblems, test, saveSettings } from "./harness";
 
 /** The Settings view (ADR 0048): tabs, rows that write the shared store, scope and reset, theme, and what is remembered. */
 
@@ -434,7 +434,7 @@ test("Settings > Performance holds the quality held when adaptive quality is off
 test("Adaptive theme colour: the hue follows the canvas background colour, and the hue set by hand comes back when it is off", async ({ app }) => {
   const p = app.page;
   const hue = () => p.evaluate(() => document.documentElement.style.getPropertyValue("--hue"));
-  await p.evaluate(() => localStorage.setItem("canvast.settings", JSON.stringify({ "ui.hue": 40, "ui.background": "#2a6fdb", "ui.hueAdaptive": true })));
+  await saveSettings(p, { "ui.hue": 40, "ui.background": "#2a6fdb", "ui.hueAdaptive": true });
   await p.reload();
   await p.waitForFunction(() => typeof window.__canvastDebug !== "undefined");
   const adaptive = Number(await hue());
@@ -462,7 +462,7 @@ test("a custom canvas background is what the canvas draws, and the grid and the 
   const p = app.page;
   const grid = () => p.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue("--canvas-grid").trim());
   const plain = await grid();
-  await p.evaluate(() => localStorage.setItem("canvast.settings", JSON.stringify({ "ui.background": "#d98c5f" })));
+  await saveSettings(p, { "ui.background": "#d98c5f" });
   await p.reload();
   await p.waitForFunction(() => typeof window.__canvastDebug !== "undefined");
   await expect(p.locator("html")).toHaveAttribute("data-custom-bg", "");

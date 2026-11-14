@@ -206,6 +206,10 @@ export async function barControl(page: Page, sel: string): Promise<Locator> {
   return inForm;
 }
 
+/** Settings for the page's next load, added to what is saved (the bar places the specs use stay as they are): a test's own settings before a reload. */
+export const saveSettings = (page: Page, values: Record<string, unknown>): Promise<void> =>
+  page.evaluate((v) => localStorage.setItem("canvast.settings", JSON.stringify({ ...JSON.parse(localStorage.getItem("canvast.settings") ?? "{}"), ...v })), values);
+
 export async function outlineShapes(page: Page): Promise<void> {
   await page.keyboard.press("u");
   await (await barControl(page, "[data-shape-width]")).fill("25");

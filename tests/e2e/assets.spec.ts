@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import type { BrowserContext, Page } from "@playwright/test";
-import { APP_URL, expect, openActions, rowAction, test } from "./harness";
+import { APP_URL, expect, openActions, rowAction, test, saveSettings } from "./harness";
 import { blockyFixture, makePng } from "./png";
 import { encodeGif } from "./gif";
 import { makeFakeMp4 } from "./mp4";
@@ -2159,7 +2159,7 @@ test("viewer edges: a click on the invisible left or right side goes to the prev
   await expect(viewer.locator(".viewer-edge").first()).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
   expect((await viewer.locator("figcaption").boundingBox())!.width).toBeLessThanOrEqual(1);
   // Width 0 turns them off.
-  await p.evaluate(() => localStorage.setItem("canvast.settings", JSON.stringify({ "assets.edgeWidth": 0 })));
+  await saveSettings(p, { "assets.edgeWidth": 0 });
   await p.reload();
   await p.waitForFunction(() => typeof window.__canvastDebug !== "undefined");
   await toAssets(p);

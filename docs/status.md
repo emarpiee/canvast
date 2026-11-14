@@ -47,6 +47,12 @@ Unverified / Committed / Next bounded task**.
 - **Committed:** v0.57.19 on `main`.
 - **Next bounded task:** retake the README screenshots in Stone when the owner says.
 
+## v0.58.33: the README's animation made again; specs keep their bar settings over a reload (2026-11-14)
+
+- **Implemented:** `docs/screenshots/canvast-60s.gif` from the `Showcase GIF` run 43536039426 (0.58.31; 23.5 MB, README says about 23 MB). Tests: `saveSettings` in the harness adds a test's own settings to what is saved; the twelve places in six specs that replaced all the settings before a reload use it (with the harness writing only on a page's first load since 0.58.32, a spec that replaced them lost the bar at the top: `vectors.spec`'s initial shape timed out in Firefox).
+- **Tested:** typecheck here. Tests on 0.58.32: 37 of 38 jobs green; the one failure is the one fixed here.
+- **Committed:** v0.58.33 on `main`.
+
 ## v0.58.32: a text on a combined shape stays tied to it; the test failures of 0.58.27-0.58.31 (2026-11-14)
 
 - **Implemented:** `withShapeTexts` keeps `onPath.path` / `inShape.shape` on the text's own shape when it is placed by the boolean result (`doc/text-in-shape.ts`); `main.ts` updates the Actions bar when `ui.actions` changes; `SettingsStore` starts a fresh install with `ui.barPlaces` 1 in memory (nothing written). Tests: the harness writes its bar settings on a page's first load only (a `sessionStorage` mark), never on a reload (in Chromium a read at the start of a reload could come before the leaving page's last write and keep the old settings: the WASD, theme, Zen, Information shown, bookmarks panel and following Actions bar specs lost their setting over a reload; Start from scratch found the settings written again); `barControl` in the harness (a Properties-bar control wherever it stands), used by `setPenColour`, `outlineShapes` (the release spec hung on a hidden field in a fresh profile) and the shots' `scene.control`; `fieldLooks` leaves out Settings' search (room for its icon); `bar-layouts.spec` lets the last shape go before drawing under the top bars; `text.spec` releases the group (the text back on the circle).

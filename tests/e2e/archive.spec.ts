@@ -2,7 +2,7 @@ import { createHash, scrypt as nodeScrypt } from "node:crypto";
 import { createVault, nameKeys, sealFile, sealName, sealText, useScrypt } from "../../src/storage/hidden-vault";
 import { readFile } from "node:fs/promises";
 import type { Browser, BrowserContext, Page } from "@playwright/test";
-import { APP_URL, expect, openActions, rowAction, test, importMode, styleKind } from "./harness";
+import { APP_URL, expect, openActions, rowAction, test, importMode, styleKind, saveSettings } from "./harness";
 import { blockyFixture, makePng } from "./png";
 import { encodeGif } from "./gif";
 import { readZip, writeZip } from "../../src/storage/zip";
@@ -149,7 +149,7 @@ test("a workspace backup round-trips to another browser profile exactly", async 
   const p = app.page;
   await buildWorkspace(p);
   // Device settings travel in the backup (ADR 0160): nav.mode and nav.arrive are changed here.
-  await p.evaluate(() => localStorage.setItem("canvast.settings", JSON.stringify({ "nav.mode": "anywhere", "nav.arrive": "keep" })));
+  await saveSettings(p, { "nav.mode": "anywhere", "nav.arrive": "keep" });
   await p.reload();
   await p.waitForFunction(() => typeof window.__canvastDebug !== "undefined");
   const src = (await sess(p)).tree!;
@@ -183,7 +183,7 @@ test("a workspace backup round-trips to another browser profile exactly", async 
   const other = await freshProfile(browser);
   const q = other.page;
   // The other device has set nav.mode itself: that one is kept; nav.arrive, which it has not set, comes with the backup.
-  await q.evaluate(() => localStorage.setItem("canvast.settings", JSON.stringify({ "nav.mode": "layer" })));
+  await saveSettings(q, { "nav.mode": "layer" });
   await q.reload();
   await q.waitForFunction(() => typeof window.__canvastDebug !== "undefined");
   const text = await importArchive(q, file.name, file.bytes);
