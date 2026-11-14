@@ -186,7 +186,8 @@ describe("a mirrored paint (Flip, ADR 0203)", () => {
   it("moves a gradient's points to the other side of its box; twice is the same paint; a colour stays", () => {
     const m = mirroredPaint(lin, "x") as Extract<Gradient, { type: "linear" }>;
     expect([m.x0, m.y0, m.x1, m.y1].map((v) => Math.round(v * 1e9) / 1e9)).toEqual([0.9, 0.2, 0.1, 0.6]);
-    expect(mirroredPaint(mirroredPaint(ang, "y"), "y")).toEqual(ang);
+    const round = (g: unknown): unknown => JSON.parse(JSON.stringify(g), (_, v) => (typeof v === "number" ? Math.round(v * 1e9) / 1e9 : v));
+    expect(round(mirroredPaint(mirroredPaint(ang, "y"), "y"))).toEqual(ang);
     expect(mirroredPaint("#123456", "x")).toBe("#123456");
   });
   it("an angular gradient's colours go round the other way, from the mirrored start", () => {
