@@ -1168,6 +1168,54 @@ test("hidden items are encrypted: sealed into .hidden/ with nothing readable lef
   }
 });
 
+test("a hidden sound or video plays as it is read: its parts decrypted by the page, served by the shell a byte range at a time", async () => {
+  const ws = tempDir("canvast-ws-");
+  // (a WAV made here, 8 kHz mono 16-bit: 5.4 MB, longer than one 4 MiB part the shell asks of the page at a time)
+  const n = 2_700_000, pcm = Buffer.alloc(n * 2);
+  for (let i = 0; i < n; i++) pcm.writeInt16LE(Math.round(8000 * Math.sin(i / 4)), i * 2);
+  const head = Buffer.alloc(44);
+  head.write("RIFF", 0); head.writeUInt32LE(36 + pcm.length, 4); head.write("WAVEfmt ", 8); head.writeUInt32LE(16, 16); head.writeUInt16LE(1, 20); head.writeUInt16LE(1, 22);
+  head.writeUInt32LE(8000, 24); head.writeUInt32LE(16000, 28); head.writeUInt16LE(2, 32); head.writeUInt16LE(16, 34); head.write("data", 36); head.writeUInt32LE(pcm.length, 40);
+  const wav = Buffer.concat([head, pcm]);
+  const { app, page } = await launch(ws);
+  try {
+    await page.getByTestId("import-input").setInputFiles({ name: "tone.wav", mimeType: "audio/wav", buffer: wav });
+    await expect.poll(() => page.evaluate(() => window.__canvastDebug.assetListing().then((l) => l.entries.length))).toBe(1);
+    const hash = await page.evaluate(() => window.__canvastDebug.assetListing().then((l) => l.entries[0]!.hash));
+    expect(await page.evaluate(() => window.__canvastDebug.hiddenOp("set", "pw"))).toEqual({ ok: true, state: "open" });
+    await page.evaluate((h) => window.__canvastDebug.libraryOp("hide", h, "1"), hash);
+    await page.evaluate(() => window.__canvastDebug.flushStorage());
+    await expect.poll(() => files(ws).filter((f) => f.startsWith(".hidden/")).length).toBe(1);
+    const fetchRange = (range: string) => app.evaluate(async ({ BrowserWindow }, [h, range]) => {
+      const r = await BrowserWindow.getAllWindows()[0]!.webContents.session.fetch(`app://canvast/hidden-media/${h}`, { headers: { Range: range! } });
+      return `${r.status} ${r.headers.get("content-range") ?? ""} ${r.headers.get("content-type") ?? ""} ${r.status === 206 ? [...new Uint8Array(await r.arrayBuffer())].join(",") : ""}`;
+    }, [hash, range] as const);
+    // the bytes asked for, as they were before they were sealed
+    expect(await fetchRange("bytes=0-3")).toBe(`206 bytes 0-3/${wav.length} audio/wav ${[...wav.subarray(0, 4)].join(",")}`);
+    expect(await fetchRange("bytes=40-43")).toBe(`206 bytes 40-43/${wav.length} audio/wav ${[...wav.subarray(40, 44)].join(",")}`);
+    // across the end of the first part, and from a place to the end as a player asks: the whole range, as it was
+    const across = 4 * 2 ** 20 - 2;
+    expect(await fetchRange(`bytes=${across}-${across + 3}`)).toBe(`206 bytes ${across}-${across + 3}/${wav.length} audio/wav ${[...wav.subarray(across, across + 4)].join(",")}`);
+    const rest = await app.evaluate(async ({ BrowserWindow }, [h, from]) => {
+      const r = await BrowserWindow.getAllWindows()[0]!.webContents.session.fetch(`app://canvast/hidden-media/${h}`, { headers: { Range: `bytes=${from}-` } });
+      const b = new Uint8Array(await r.arrayBuffer());
+      return { status: r.status, range: r.headers.get("content-range"), length: b.length, sum: b.reduce((a, x) => (a * 31 + x) >>> 0, 7) };
+    }, [hash, 1000] as const);
+    expect(rest).toEqual({ status: 206, range: `bytes 1000-${wav.length - 1}/${wav.length}`, length: wav.length - 1000, sum: wav.subarray(1000).reduce((a, x) => (a * 31 + x) >>> 0, 7) });
+    // and the page's player plays it from there
+    expect(await page.evaluate((h) => new Promise<string>((ok) => {
+      const a = new Audio(`app://canvast/hidden-media/${h}`);
+      a.addEventListener("loadedmetadata", () => ok(`loaded ${a.duration.toFixed(2)}`), { once: true });
+      a.addEventListener("error", () => ok(`error ${a.error?.code} ${a.error?.message}`), { once: true });
+    }), hash)).toBe("loaded 337.50");
+    // locked: nothing
+    expect(await page.evaluate(() => window.__canvastDebug.hiddenOp("lock"))).toMatchObject({ ok: true });
+    expect(await fetchRange("bytes=0-3")).toMatch(/^404/);
+  } finally {
+    await app.close();
+  }
+});
+
 test("hidden items and sync tools: a conflict copy of hidden.json is joined, a lost entry's file comes back, a copied sealed file is not sealed twice, no second key", async () => {
   const ws = tempDir("canvast-ws-");
   const alpha = makePng(3, 2, () => [200, 40, 160, 255]);

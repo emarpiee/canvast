@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.60.5 — Big hidden videos play, a frame for big videos, imports in hidden mode hidden (2026-11-16)
+
+- **Added:** a hidden video or sound plays as it is read, of any size, in the gallery and on the canvas, while the Hidden items are open: the desktop app asks the page for each part, decrypted there with the key in memory and never written (it played only after being decrypted whole, and one past the import limit not at all).
+- **Added:** a video past the import limit (a card) shows a frame of it as its thumbnail, in the desktop app.
+- **Fixed:** what was pasted, dropped or imported while hidden mode was on came in shown, outside hidden mode: it is now hidden at once (a dropped folder's folders too), into the folder open in the sidebar, by one rule for every way in.
+
 ## 0.60.3 — Several folders at once in the Library (2026-11-16)
 
 - **Added:** the Library's sidebar shows several folders at once: **Ctrl+click** a folder to show it too (or take it out), **Shift+click** to show every folder from the last one clicked to this one, **Ctrl+Shift+click** to add that run. Each with its subfolders; the filter chip names them.

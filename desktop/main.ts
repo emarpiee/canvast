@@ -282,6 +282,56 @@ async function mediaResponse(root: string, rel: string, range: string | null): P
 }
 
 /**
+ * A hidden item's video or sound, served to the page's player a byte range at a time: each part is asked of the window's page, which holds the
+ * key while the hidden items are open and decrypts only the chunks of that part. Nothing decrypted is written anywhere. The range asked is
+ * one stream, as a readable file's is (a player asks for "from here to the end"), asked of the page 4 MiB at a time as it is read and never
+ * further than it is read; not found when the page cannot answer (locked, or not a hidden item).
+ */
+const hiddenMediaAsks = new Map<string, (v: { bytes: Uint8Array; size: number; type: string } | null) => void>();
+const HIDDEN_PART = 4 * 2 ** 20;
+async function hiddenMediaResponse(win: BrowserWindow, hash: string, range: string | null): Promise<Response> {
+  const none = (): Response => new Response("not found", { status: 404 });
+  if (!/^[0-9a-f]{64}$/.test(hash) || win.isDestroyed()) return none();
+  const ask = (from: number, to: number): Promise<{ bytes: Uint8Array; size: number; type: string } | null> =>
+    new Promise((ok) => {
+      const id = randomUUID();
+      hiddenMediaAsks.set(id, ok);
+      setTimeout(() => hiddenMediaAsks.delete(id) && ok(null), 30_000);
+      win.webContents.send("canvast:hiddenMediaAsk", { id, hash, from, to });
+    });
+  const m = /^bytes=(\d*)-(\d*)$/.exec(range?.trim() ?? "");
+  const head = await ask(0, 0);
+  if (!head) return none();
+  const size = head.size;
+  const type = head.type || "application/octet-stream";
+  if (!size) return new Response("", { status: 200, headers: { "Content-Type": type, "Content-Length": "0" } });
+  const start = m && m[1] ? Number(m[1]) : m && m[2] ? Math.max(0, size - Number(m[2])) : 0;
+  const asked = m && m[1] && m[2] ? Math.min(Number(m[2]), size - 1) : size - 1;
+  if (start > asked || start >= size) return new Response("", { status: 416, headers: { "Content-Range": `bytes */${size}` } });
+  const end = asked;
+  let at = start;
+  const body = new ReadableStream<Uint8Array>({
+    async pull(c) {
+      if (at > end) return c.close();
+      const to = Math.min(end + 1, at + HIDDEN_PART);
+      const part = await ask(at, to);
+      if (!part || part.bytes.length !== to - at) return c.error(new Error("the hidden file could not be read"));
+      c.enqueue(new Uint8Array(part.bytes));
+      at = to;
+      if (at > end) c.close();
+    },
+  });
+  return new Response(body, { status: 206, headers: { "Content-Type": type, "Content-Length": String(end - start + 1), "Content-Range": `bytes ${start}-${end}/${size}`, "Accept-Ranges": "bytes" } });
+}
+ipcMain.handle("canvast:hiddenMediaAnswer", (_e, id: unknown, value: unknown) => {
+  if (typeof id !== "string") return;
+  const v = value as { bytes?: unknown; size?: unknown; type?: unknown } | null;
+  const ok = v && v.bytes instanceof Uint8Array && typeof v.size === "number" && typeof v.type === "string" ? { bytes: v.bytes, size: v.size, type: v.type } : null;
+  hiddenMediaAsks.get(id)?.(ok);
+  hiddenMediaAsks.delete(id);
+});
+
+/**
  * Write a file safely: a temporary file beside it, flushed to the disk, then renamed over it (never half a file). Not `durable`:
  * not waited for on the disk (`canvast:syncFiles` does it for many at once; the app keeps its own copy until then).
  */
@@ -1195,6 +1245,7 @@ async function openWindow(workspace: string): Promise<void> {
       }
       return mediaResponse(workspace, rel, req.headers.get("range"));
     }
+    if (url.host === "canvast" && url.pathname.startsWith("/hidden-media/")) return hiddenMediaResponse(win, url.pathname.slice("/hidden-media/".length), req.headers.get("range"));
     if (url.host !== "canvast" || (url.pathname !== "/" && url.pathname !== "/canvast.html")) return new Response("not found", { status: 404 });
     return net.fetch(pathToFileURL(HTML).toString());
   });

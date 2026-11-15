@@ -5602,7 +5602,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   folderInput.addEventListener("change", () => {
     const files = filesOfPicker(folderInput.files);
     folderInput.value = "";
-    void view.importFiles(files).then(() => fileByFolders(session, files));
+    void view.importFiles(files);
   });
   fileInput.addEventListener("change", () => {
     const files = [...(fileInput.files ?? [])];
@@ -5713,6 +5713,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     async importFiles(files, here = false) {
       const hashes: string[] = [];
       const fresh: string[] = [];
+      const hiding = hiddenMode; // (what comes in while the Hidden items are shown is hidden, wherever it comes from: a paste, a drop, Import, a new note)
       if (session.editor.blockEdit()) return hashes;
       let n = 0;
       const seen: Array<{ name: string; duplicate: "present" | "restored" }> = [];
@@ -5737,10 +5738,13 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
         }
       }
       progress.done();
-      if (here && fresh.length && (scope.startsWith("folder:") || scope.startsWith("tag:") || scope === "favorites")) {
-        const change = scopeChange(scope, sideTagLabels.get(scope) ?? scope.slice(4));
-        await session.organize((c) => c.updateMetaEach(fresh.map((hash) => ({ hash, change }))), `Import ${plural(fresh.length, "file")}`);
-      }
+      // Where new files land, one rule for every way in: into the folder (tag, favourites) open in the sidebar when they came here, hidden
+      // in hidden mode; a dropped folder's files into folders of their names (hidden ones in hidden mode).
+      const into = here && (scope.startsWith("folder:") || scope.startsWith("tag:") || scope === "favorites") ? scopeChange(scope, sideTagLabels.get(scope) ?? scope.slice(4)) : {};
+      const change: MetaChange = { ...into, ...(hiding ? { hidden: true } : {}) };
+      if (fresh.length && Object.keys(change).length) await session.organize((c) => c.updateMetaEach(fresh.map((hash) => ({ hash, change }))), `Import ${plural(fresh.length, "file")}`);
+      await fileByFolders(session, files, hiding);
+      if (hiding) await moveThumbs(fresh, true);
       if (n) {
         const notice = duplicateNotice(seen, n);
         session.editor.message = !notice ? `Imported ${plural(n, "file")} into the library.` : seen.length === n ? notice : `${plural(n - seen.length, "new file")} imported. ${notice}`;

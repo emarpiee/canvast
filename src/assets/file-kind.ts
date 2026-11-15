@@ -22,7 +22,7 @@ export const isPdfFile = (x: { type?: string; name: string }): boolean => x.type
 export const isModelFile = (name: string): boolean => ["GLB", "GLTF", "STL", "OBJ", "PLY"].includes(extOf(name));
 
 /** A file card with a thumbnail of its own (a font's letters, a note's page, a PDF's first page, a 3D model's view), else a card shows the file tile. */
-export const hasThumb = (x: { type: string; name: string; card?: boolean }): boolean => !isCard(x) || isFontFile(x) || isArtFile(x.name) || noteKindOf(x.name) !== null || isPdfFile(x) || isModelFile(x.name);
+export const hasThumb = (x: { type: string; name: string; card?: boolean }): boolean => !isCard(x) || isFontFile(x) || isArtFile(x.name) || noteKindOf(x.name) !== null || isPdfFile(x) || isModelFile(x.name) || (x.card === true && x.type.startsWith("video/"));
 
 /** The extension of a file name, upper case and at most eight letters or digits; "" when there is none. */
 export function extOf(name: string): string {

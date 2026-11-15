@@ -386,6 +386,10 @@ export interface HiddenFiles {
   list(): Promise<Array<{ path: string; size: number; at: number }> | null>;
   /** Bytes `from` to `to` of one of them (decrypted only there); null when it is not one, or they are locked. */
   read(path: string, from: number, to: number): Promise<Uint8Array | null>;
+  /** A hidden item by its hash: its size and type, and bytes `from` to `to` (decrypted only there, only these chunks); null when it is not one, or they are locked. */
+  readHash(hash: string, from: number, to: number): Promise<{ bytes: Uint8Array; size: number; type: string } | null>;
+  /** Whether `hash` is a hidden item whose file can be read a part at a time while the hidden items are open (to play it as it is read). */
+  hasHash(hash: string): Promise<boolean>;
 }
 
 /** How far the files being written into the workspace folder are: `done` of `total` after each file; `total` 0 when it ended. */

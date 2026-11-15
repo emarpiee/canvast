@@ -81,6 +81,10 @@ const bridge: DesktopBridge = {
     onAsk: (fn) => void ipcRenderer.on("canvast:shareAsk", (_e, ask) => fn(ask)),
     onDav: (fn) => void ipcRenderer.on("canvast:davAsk", (_e, ask) => fn(ask)),
   },
+  hiddenMedia: {
+    onAsk: (fn) => void ipcRenderer.on("canvast:hiddenMediaAsk", (_e, ask) => fn(ask)),
+    answer: (id, value) => ipcRenderer.invoke("canvast:hiddenMediaAnswer", id, value),
+  },
   hash: (path) => ipcRenderer.invoke("canvast:hash", path),
   libraryChanges: () => ipcRenderer.invoke("canvast:libraryChanges"),
   libraryLookDone: () => ipcRenderer.invoke("canvast:libraryLookDone"),

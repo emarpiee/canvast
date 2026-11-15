@@ -349,6 +349,31 @@ export async function openDesktopStorage(raw: DesktopBridge, opts: OpenHooks): P
   // The hidden items as files (Settings > Sharing's folder for file managers, on this computer only): their paths from the sealed index,
   // each read through the key a part at a time.
   let hiddenAt = new Map<string, { file: string; size: number }>();
+  // A hidden item played as it is read (a video or sound past the import limit): its sealed file by its hash, from the sealed index, and the
+  // file last opened kept open (its header read once), while the hidden items stay open.
+  let byHash = new Map<string, { file: string; type: string }>();
+  const hiddenByHash = async (hash: string): Promise<{ file: string; type: string } | null> => {
+    if (!hidden.isOpen()) return null;
+    if (!byHash.has(hash)) {
+      const index = await hidden.readIndex();
+      byHash = new Map((index?.items ?? []).map(readItem).flatMap((it) => (it?.file && isHiddenFile(it.file) ? [[it.hash, { file: it.file, type: it.type }] as const] : [])));
+    }
+    return byHash.get(hash) ?? null;
+  };
+  let lastOpened: { file: string; disk: DiskFile } | null = null;
+  const openedHidden = async (file: string): Promise<DiskFile | null> => {
+    if (lastOpened?.file === file && hidden.isOpen()) return lastOpened.disk;
+    const [rawSize] = await raw.sizes([file]);
+    if (rawSize == null) return null;
+    const opened = await hidden.openAt(new DiskFile((a, b) => raw.part(file, a, b).then((x) => x ?? new Uint8Array()), rawSize));
+    if (!opened) return null; // (a file sealed whole, before chunking, cannot be read a part at a time)
+    lastOpened = { file, disk: opened.file };
+    return opened.file;
+  };
+  // (the desktop shell serves a hidden item at app://canvast/hidden-media/<hash>, asking this page for each part: desktop/main.ts)
+  const plainMediaUrl = originals.mediaUrl.bind(originals);
+  originals.mediaUrl = async (hash: string): Promise<string | null> =>
+    (await plainMediaUrl(hash)) ?? (location.protocol === "app:" && (await hiddenByHash(hash)) && (await openedHidden((await hiddenByHash(hash))!.file)) ? `${location.origin}/hidden-media/${hash}` : null);
   const hiddenFiles: HiddenFiles = {
     async list() {
       if (!hidden.isOpen()) return null;
@@ -373,6 +398,16 @@ export async function openDesktopStorage(raw: DesktopBridge, opts: OpenHooks): P
       }
       hiddenAt = next;
       return out;
+    },
+    async readHash(hash, from, to) {
+      const it = await hiddenByHash(hash);
+      if (!it) return null;
+      const file = await openedHidden(it.file);
+      if (!file) return null;
+      return { bytes: new Uint8Array(await file.slice(from, Math.min(to, file.size)).arrayBuffer()), size: file.size, type: it.type };
+    },
+    async hasHash(hash) {
+      return !!(await hiddenByHash(hash));
     },
     async read(path, from, to) {
       const it = hiddenAt.get(path);

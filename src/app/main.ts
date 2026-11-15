@@ -1,3 +1,4 @@
+import { useMediaAddress } from "../assets/thumb";
 import { setSnapPx } from "../interaction/snap";
 import { followHost, sendView } from "./follow";
 import { readOnlyLine, readOnlyWhy } from "../storage/guest-page";
@@ -946,6 +947,12 @@ async function start(): Promise<void> {
   if (share) installShareAsk(share);
   if (share) sendView(view, session, share); // (for guests that follow: ADR 0184)
   if (share && storage?.hiddenFiles && storage.sharedThumb) installShareFolder(share, storage.hiddenFiles, storage.sharedThumb.bind(storage));
+  // A hidden video or sound played as it is read: the desktop shell asks for each part, decrypted here (this page holds the key).
+  const hiddenMedia = desktopBridge()?.hiddenMedia;
+  const hiddenFiles = storage?.hiddenFiles;
+  // (a video past the import limit gets a frame of it as its thumbnail, read from where it plays a part at a time)
+  if (storage) useMediaAddress((h) => storage.originals.mediaUrl(h));
+  if (hiddenMedia && hiddenFiles) hiddenMedia.onAsk((a) => void hiddenFiles.readHash(a.hash, a.from, a.to).catch(() => null).then((v) => hiddenMedia.answer(a.id, v)));
   desktopBridge()?.onClosing(async () => {
     if (!opened) return; // (still locked or starting: nothing was changed, so nothing waits to be written)
     // A note open with changes not saved: Save them, Don't save, or Cancel (the window stays).
@@ -3189,7 +3196,7 @@ async function start(): Promise<void> {
     const files = all.filter((f) => !isArchiveFile(f));
     if (!files.length) return;
     // (files that came from a folder are then put in library folders of the same names)
-    void (appView === "assets" ? assetsView.importFiles(files, true) : importFiles(files)).then(() => fileByFolders(session, files));
+    void (appView === "assets" ? assetsView.importFiles(files, true) : importFiles(files).then(() => fileByFolders(session, files))); // (the library files them itself)
   };
   // A drag that starts inside the app (a picture dragged out of the library, a layer row) is never a file import: the browser would hand
   // the dragged thumbnail over as a new file and store it as an asset of its own.

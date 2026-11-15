@@ -66,7 +66,7 @@ export function filesOfPicker(list: FileList | null): File[] {
 }
 
 /** Put the files that came from folders in library folders of the same names (nested the same way), after they were imported. */
-export async function fileByFolders(session: Session, files: readonly File[]): Promise<void> {
+export async function fileByFolders(session: Session, files: readonly File[], hidden = false): Promise<void> {
   const wanted = files.filter((f) => folderPathOf(f).length);
   if (!session.catalog || !wanted.length) return;
   const imported = new Set((await session.catalog.list()).entries.map((e) => e.hash));
@@ -75,7 +75,7 @@ export async function fileByFolders(session: Session, files: readonly File[]): P
     const hash = await sha256Hex(await f.arrayBuffer());
     if (imported.has(hash)) items.push({ hash, path: folderPathOf(f) }); // (one not imported, a type it does not take, is left out)
   }
-  await fileInFolders(session, items);
+  await fileInFolders(session, items, hidden);
 }
 
 /**

@@ -2,7 +2,7 @@ import { notePicture } from "../notes/note-preview";
 import { noteKindOf, tooBigForNote } from "../notes/note-file";
 import type { AssetRecord } from "./asset-library";
 import type { ThumbRecord } from "./asset-catalog";
-import { BlankPictureError, decodeAudio, decodeVideo } from "./video";
+import { BlankPictureError, decodeAudio, decodeVideo, decodeVideoAt } from "./video";
 import { probeMp4 } from "./mp4-probe";
 import { fillTextCentred, makeCard } from "./card";
 import { externalFolder } from "../storage/external-folder";
@@ -10,6 +10,15 @@ import { artCardPicture, isArtFile } from "./art-preview";
 import { makeFileCard } from "./card";
 import { drawnFromFile } from "./adapters";
 import { NOTE_THUMB_RATIO, chipOf, describeFile, isCard, isFontFile, isModelFile, isPdfFile } from "./file-kind";
+
+/**
+ * Where a video too big to be read into the page plays from a part at a time (`OriginalStore.mediaUrl`), set once by the app: its
+ * thumbnail is a frame taken from there. Null (the browser build) leaves such a video its card.
+ */
+let mediaAddress: ((hash: string) => Promise<string | null>) | null = null;
+export function useMediaAddress(fn: ((hash: string) => Promise<string | null>) | null): void {
+  mediaAddress = fn;
+}
 
 /** Longest edge of a stored thumbnail (CSS px: cards show them at up to 240). */
 export const THUMB_PX = 256;
@@ -27,6 +36,16 @@ export async function makeThumb(rec: AssetRecord): Promise<ThumbRecord | null> {
   if (noteKindOf(rec.name) && !tooBigForNote(rec.name, rec.blob.size)) return makeNoteThumb(rec);
   if (isArtFile(rec.name)) return makeArtThumb(rec);
   if (isPdfFile(rec) || isModelFile(rec.name)) return makePictureThumb(rec);
+  if (isCard(rec) && rec.type.startsWith("video/") && mediaAddress) {
+    // A video past the import limit (a card): a frame of it, read from where it plays a part at a time; its card when that fails.
+    const address = await mediaAddress(rec.hash).catch(() => null);
+    if (!address) return null;
+    try {
+      return await bitmapThumb(rec.hash, (await decodeVideoAt(address)).bitmap);
+    } catch (e) {
+      return e instanceof BlankPictureError ? bitmapThumb(rec.hash, e.result.bitmap) : null;
+    }
+  }
   if (isCard(rec)) return null;
   try {
     const k = Math.min(1, THUMB_PX / Math.max(rec.pixelW, rec.pixelH));
@@ -45,21 +64,26 @@ export async function makeThumb(rec: AssetRecord): Promise<ThumbRecord | null> {
       : rec.type.startsWith("audio/")
         ? (await decodeAudio(rec.blob)).bitmap
         : await createImageBitmap(rec.blob, k < 1 ? { resizeWidth: Math.max(1, Math.round(rec.pixelW * k)), resizeHeight: Math.max(1, Math.round(rec.pixelH * k)), resizeQuality: "high" } : undefined);
-    const s = Math.min(1, THUMB_PX / Math.max(bmp.width, bmp.height));
-    const c = document.createElement("canvas");
-    c.width = Math.max(1, Math.round(bmp.width * s));
-    c.height = Math.max(1, Math.round(bmp.height * s));
-    const ctx = c.getContext("2d")!;
-    ctx.imageSmoothingQuality = "high";
-    ctx.drawImage(bmp, 0, 0, c.width, c.height);
-    bmp.close();
-    let blob = await new Promise<Blob | null>((r) => c.toBlob(r, "image/webp", THUMB_QUALITY));
-    if (blob?.type !== "image/webp") blob = await new Promise<Blob | null>((r) => c.toBlob(r, "image/jpeg", THUMB_QUALITY));
-    return blob ? { hash: rec.hash, blob, w: c.width, h: c.height } : null;
+    return await bitmapThumb(rec.hash, bmp);
   } catch {
     // A picture the browser cannot decode at a size (an SVG, say) has no thumbnail: the library shows the original itself, as it always did.
     return null;
   }
+}
+
+/** A thumbnail of a decoded picture: at most THUMB_PX on its long edge, WebP (JPEG where the browser cannot encode WebP). The bitmap is closed. */
+async function bitmapThumb(hash: string, bmp: ImageBitmap): Promise<ThumbRecord | null> {
+  const s = Math.min(1, THUMB_PX / Math.max(bmp.width, bmp.height));
+  const c = document.createElement("canvas");
+  c.width = Math.max(1, Math.round(bmp.width * s));
+  c.height = Math.max(1, Math.round(bmp.height * s));
+  const ctx = c.getContext("2d")!;
+  ctx.imageSmoothingQuality = "high";
+  ctx.drawImage(bmp, 0, 0, c.width, c.height);
+  bmp.close();
+  let blob = await new Promise<Blob | null>((r) => c.toBlob(r, "image/webp", THUMB_QUALITY));
+  if (blob?.type !== "image/webp") blob = await new Promise<Blob | null>((r) => c.toBlob(r, "image/jpeg", THUMB_QUALITY));
+  return blob ? { hash, blob, w: c.width, h: c.height } : null;
 }
 
 /** What stands for an art file that keeps no picture this can read: its card, not kept, so a later reader may still find one. */

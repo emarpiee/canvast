@@ -233,6 +233,11 @@ export interface DesktopBridge {
   };
   /** Sharing this workspace on the local network (ADR 0184): absent on a guest. */
   share?: ShareCalls;
+  /** A hidden video or sound played as it is read: the shell asks this page for a part of it (it holds the key), and is answered. */
+  hiddenMedia?: {
+    onAsk(fn: (ask: { id: string; hash: string; from: number; to: number }) => void): void;
+    answer(id: string, value: { bytes: Uint8Array; size: number; type: string } | null): Promise<void>;
+  };
   /**
    * An export written outside the workspace: `begin` asks for a folder (the system's dialog, never inside the workspace) and makes
    * `name` in it; `write` puts a file at a relative path under it and answers the SHA-256 of what was read back; `end` forgets it.

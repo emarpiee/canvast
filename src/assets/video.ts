@@ -61,8 +61,11 @@ export async function decodeVideo(blob: Blob, t = 0): Promise<{ bitmap: ImageBit
   }
 }
 
-async function decodeWithElement(blob: Blob, t: number): Promise<{ bitmap: ImageBitmap; duration: number }> {
-  const url = URL.createObjectURL(blob);
+/** A frame of a video at an address (a file of the workspace folder, read a part at a time as it is asked), by the page's own player. */
+export const decodeVideoAt = (address: string, t = 0): Promise<{ bitmap: ImageBitmap; duration: number }> => decodeWithElement(address, t);
+
+async function decodeWithElement(src: Blob | string, t: number): Promise<{ bitmap: ImageBitmap; duration: number }> {
+  const url = typeof src === "string" ? src : URL.createObjectURL(src);
   const v = document.createElement("video");
   try {
     v.muted = true;
@@ -115,7 +118,7 @@ async function decodeWithElement(blob: Blob, t: number): Promise<{ bitmap: Image
     }
     return { bitmap, duration };
   } finally {
-    URL.revokeObjectURL(url);
+    if (typeof src !== "string") URL.revokeObjectURL(url);
     v.remove();
   }
 }
