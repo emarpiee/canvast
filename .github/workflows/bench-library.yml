@@ -8,6 +8,10 @@ on:
       items:
         description: How many library files
         default: "1000000"
+      scroll:
+        description: Scroll the Library view (Thumbnails and List, smallest and largest thumbnails) with real small pictures
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -29,7 +33,7 @@ jobs:
       - run: xvfb-run -a npm run test:snap -- --project=desktop tests/e2e/desktop.spec.ts -g sandboxed
         env:
           ELECTRON_DISABLE_SANDBOX: "1"
-      - run: set -o pipefail; xvfb-run -a node scripts/bench-library.mjs ${{ inputs.items }} --dir "$RUNNER_TEMP/bench" | tee bench.txt
+      - run: set -o pipefail; xvfb-run -a -s "-screen 0 1920x1080x24" node scripts/bench-library.mjs ${{ inputs.items }} --dir "$RUNNER_TEMP/bench" ${{ inputs.scroll && '--scroll' || '' }} | tee bench.txt
         env:
           ELECTRON_DISABLE_SANDBOX: "1"
       - if: always()
