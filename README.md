@@ -19,7 +19,7 @@
   <a href="#installation"><img src="https://img.shields.io/badge/runs_on-Linux_%C2%B7_any_browser-71685E" alt="Runs on Linux and in any modern browser"></a>
 </p>
 
-![A minute of canvast in use: references landing on a board, a grey value study, crop, auto layout (grid, masonry, justified rows), an adjustment shape pixelating a print, gesture lines over dancers, shapes, boolean cuts, patterns, guides, a mask, a gradient and the colour picker, a lettered comic page, the Library, its viewer, a PDF and a 3D model turned into line art, a linked note, export, a dive 24 levels into the canvas, hidden items, the lock screen, theme colours, and the logo](docs/screenshots/canvast-60s.gif)
+![Seventy seconds of canvast in use: references landing on a board, a grey value study, crop, auto layout (grid, masonry, justified rows), an adjustment shape pixelating a print, gesture lines over dancers, shapes, boolean cuts, patterns, guides, a mask, a gradient and the colour picker, a lettered comic page, the Library, its viewer, a PDF and a 3D model turned into line art, a linked note, export, a dive 24 levels into the canvas, hidden items, the lock screen, theme colours, a study opened in PhotoCraft and painted over, and the logo](docs/screenshots/canvast-60s.gif)
 
 **Your references, drawings and notes, in one place.** canvast is a creative workspace for the whole of a project: collect references and lay them out on boards, draw and edit vectors, make comic pages and storyboards, write notes that link to your files, and keep every file in a library you can search, tag and browse. All of it on one endless canvas you can zoom into without limit, and all of it on your own machine.
 
@@ -61,6 +61,7 @@ And if you are looking for more, these are the apps, sites and references that h
 | [The Library](#the-library) | [Notes from the developer](#notes-from-the-developer) |
 | [Notes](#notes) | [Licence](#licence) |
 | [Exporting and sharing](#exporting-and-sharing) | |
+| [Integration](#integration) | |
 | [The endless canvas](#the-endless-canvas) | |
 | [Your workspace and data](#your-workspace-and-data) | |
 | [Privacy and hidden items](#privacy-and-hidden-items) | |
@@ -87,6 +88,7 @@ Collect drawings by different masters on one board to compare how each handles t
 | [**The Library**](#the-library) | Every file once, in folders and tags, with a search that knows sizes, ratios, colours and dates, a viewer, previews of art files, PDFs and 3D models (lit, or drawn as line art), similar images and safe deletion |
 | [**Notes**](#notes) | Markdown, text and rich text notes in a full editor, with `[[links]]`, backlinks, properties, templates, and cards on a canvas |
 | [**Exporting and sharing**](#exporting-and-sharing) | PNG, WebP, JPEG, SVG and PDF at any size; copy to other apps; share the workspace on your local network |
+| [**Integration**](#integration) | PhotoCraft, the open-source photo editor of ArtCraft, inside the app: open pictures, art files and sheets in it, and Save puts the edit back into the file |
 | [**The endless canvas**](#the-endless-canvas) | No edge and no zoom limit; bookmarks, tours and camera travel between far places; exact positions at any depth |
 | [**Your workspace and data**](#your-workspace-and-data) | Saved as you work and verified; backups of everything; in the desktop app a plain folder any sync tool can carry |
 | [**Privacy and hidden items**](#privacy-and-hidden-items) | Hidden items and passwords; in the desktop app hidden files are encrypted, and can be decrypted outside the app |
@@ -1089,7 +1091,13 @@ Keep paintings in progress from other apps beside their references: their pictur
 | Photoshop | A file without a stored thumbnail shows its merged picture when that is 8-bit RGB or grey; the viewer shows that merged picture too, reduced to 64 megapixels when it is bigger |
 | Size | An art file of any size is only read in parts, also one past the import limit that lies in the desktop app's `library/`. A picture stored inside a ZIP-based file (`.kra`, `.ora`, `.procreate`, `.sketch`, `.fig`, `.figcraft`) is used up to 256 MiB unpacked; past that its next, smaller picture is used, or its tile if it has none |
 | On a canvas | A newly imported art file has its picture's shape; one imported earlier keeps a 4:3 card, its picture cropped to fit |
+| Sharp on a canvas | A Photoshop file's card shows the small picture it keeps (about 160 px), enlarged. *Settings › Performance › Art file pictures on the canvas › Full size* shows its whole merged picture instead: sharp at any zoom, slower for a large file. Krita and OpenRaster files show their full-size picture either way |
+| Editing | **Edit in PhotoCraft** opens an art file; its Save writes into the same file (see [PhotoCraft](#photocraft)) |
 | Other art files | `.xcf`, `.ai`, `.sai`, `.afphoto`, `.afdesign` keep their tile |
+
+Show a Photoshop file sharp on the canvas: its whole merged picture instead of the small one it keeps.
+
+![The Art file pictures on the canvas row of Settings, Performance: Quick or Full size](docs/screenshots/art-pictures.webp)
 
 ### Fonts
 
@@ -1538,6 +1546,86 @@ Show a project on a tablet on the same network, read-only, without copying it th
 ⚠️ Anyone on your network with a password can read what is shared (hidden items too, when you share them), and their device may keep copies or thumbnails of what it opened. Stop sharing when you are done.
 
 ---
+
+## Integration
+
+Tools of other open-source projects inside canvast, working on its library and its canvases.
+
+| Section | What is in it |
+| --- | --- |
+| [PhotoCraft](#photocraft) | ArtCraft's photo editor: open a picture, an art file or a sheet in it, and Save puts the edit back |
+
+### PhotoCraft
+
+[PhotoCraft](https://github.com/storytold/photocraft) is the open-source photo editor of ArtCraft (MIT or Apache-2.0). canvast carries its own released web build, unchanged, and connects it to the Library and the canvas, so you can paint over a study, retouch a reference or finish a page in a full photo editor without leaving the board.
+
+Paint over a study in a full photo editor without leaving the board: the picture opens in PhotoCraft, and Save puts the edit back into its file.
+
+![PhotoCraft open in canvast on Delacroix's Study of a Horse: its menus, tools, layers and colour panels around the drawing, the PhotoCraft tab and its close button at the top left](docs/screenshots/photocraft.webp)
+
+| | |
+| --- | --- |
+| Open it | Its tab at the top left, **Edit in PhotoCraft** on the Actions bar (selected pictures, or a sheet), **Edit in PhotoCraft** on a Library item, or *Open PhotoCraft* in the command palette |
+| What it opens | Pictures and art files of any kind it reads: PSD, PSB, Krita, OpenRaster, GIMP, Paint.NET, camera raw, Affinity, TIFF, OpenEXR and more |
+| A view of its own | It keeps running with its documents while you are on the canvas or in the Library. The **×** beside its tab closes it, and asks first when something was done since its last save |
+| Its File › Open and Place | Choose from the Library, or import from this device |
+| Its keys | Its shortcuts stay in it (`Ctrl+=` zooms its document, not the page) |
+| Pasting | A picture copied anywhere and pasted in it (`Ctrl+V`) becomes a layer of the open document, or a document of its own |
+| Drawing | Strokes get every move of the pointer, as smooth as in its desktop app |
+| Offline | It makes no network request: its help links and update check are hidden |
+
+Open a picture of the board in PhotoCraft from the Actions bar.
+
+![Delacroix's Study of a Horse selected on a canvas, the Edit in PhotoCraft button in the Files group of the Actions bar below it](docs/screenshots/photocraft-edit.webp)
+
+#### Saving
+
+| You | What happens |
+| --- | --- |
+| Save a document opened from a file | Saved into that file, in its own kind, as Save does on a desktop: a PNG stays a PNG (its layers merged), a JPEG a JPEG, a PSD a PSD. Its name, folder and tags stay, every canvas that shows it shows the new version, and the older version goes to the trash (the desktop app writes over the file) |
+| Save again | A new version of the same file, never a copy |
+| Save a Copy, or Save As under another name | A new item, beside the picture on the canvas |
+| Save a new document | Its first save asks the type: PSD with its layers, or PNG, JPEG or WebP with its layers merged (**Always this type** keeps the answer). Later saves keep it |
+| Save something that is not a picture | An exported set of shortcuts or presets goes to the Library's *PhotoCraft files* folder |
+| Other types | TIFF, OpenEXR, JPEG XL, GIF, BMP, Targa, PDF: its *File › Export › Export As…*, which comes to the Library too |
+
+Choose what a new document becomes at its first save: a layered PSD, or one picture.
+
+![The Save as type dialog: PSD as PhotoCraft saved it, PNG, JPEG or WebP, with Always this type](docs/screenshots/photocraft-save-type.webp)
+
+#### Pictures and sheets as layers
+
+| | |
+| --- | --- |
+| Several pictures | **Edit in PhotoCraft** asks: each in its own document, or as layers of one document, placed as they are on the canvas |
+| A sheet | A layered project: each object a layer, drawn as the canvas draws it (crop, flip, turn, adjustments, words), in canvast's order; groups and the sheets on it become layer groups, named as in the Layers panel |
+| Its size | Asked with the Export dialog's rules: a scale of its size on the canvas, or a width, height or longest side in pixels. **Sharpest picture** keeps every pixel of its sharpest picture |
+| Saved | What PhotoCraft saves of it is placed beside the sheet or the pictures, and kept in the Library |
+| Masks and adjustment shapes | Act on what is under them, so they are in the merged picture only, not layers of their own |
+
+Take two studies into PhotoCraft as layers of one document, placed as they are on the canvas.
+
+![Degas's Dancer Adjusting Her Slipper and Dancer with a Fan selected side by side, the Edit in PhotoCraft menu open on Each in its own document and As layers of one document](docs/screenshots/photocraft-layers.webp)
+
+Choose how big the layered document is, as Export chooses a picture's size.
+
+![The dialog that opens the pictures in PhotoCraft: 2 layers, a size rule and its value, the size in pixels, and the Sharpest picture, Cancel and Open in PhotoCraft buttons](docs/screenshots/photocraft-size.webp)
+
+#### Its settings and preferences
+
+| | |
+| --- | --- |
+| Settings › ArtCraft › PhotoCraft | Save as type; its version and licence; *Reset PhotoCraft's own preferences* |
+| Its own preferences | Its Edit › Preferences, keyboard shortcuts, menus, toolbar and panel layout are kept with the workspace: in its folder, its backups and on your other devices |
+| Its presets | Brushes, gradients, patterns and swatches you add to it are kept as one file in the Library's *PhotoCraft* folder (concealed: listed only when the folder is opened) |
+| Its theme | The theme you choose in it comes back at each start |
+| What canvast hides in it | What needs a disk of its own (folders, batch, plug-ins, printing), links and its update check. The list is in `src/artcraft/photocraft/features.ts` |
+
+Set what a new document is saved as, and reset PhotoCraft's own preferences.
+
+![Settings, ArtCraft, PhotoCraft in the light theme: Save as type, and About PhotoCraft with its version, licence and Reset PhotoCraft's own preferences](docs/screenshots/photocraft-settings.webp)
+
+What its web build cannot do is in [Limitations › PhotoCraft](#photocraft-1).
 
 ## The endless canvas
 
@@ -2192,10 +2280,20 @@ node scripts/hidden-items.mjs encrypt ~/Art/my-workspace ~/decrypted/sketch.png
 
 ### The interface
 
+Go between the Library, the canvas and PhotoCraft from the top left.
+
+![The view buttons at the top left: Library; the canvas, its icon and its name Studies in one pill; PhotoCraft's icon and its close button](docs/screenshots/view-buttons.webp)
+
+Open the panels from the right edge: they dock beside the column of their buttons.
+
+![The panels' buttons in a column on the right edge under the Settings button, the Layers panel docked beside them listing three Hokusai prints](docs/screenshots/panel-buttons.webp)
+
 | Part | Where | What it does |
 | --- | --- | --- |
+| **View buttons** | Top left | Three sets apart: **Library**; the canvas (its icon goes to it, its name opens the board and canvas menu); **PhotoCraft** (its tab, and its **×** while it runs). **Settings** is the gear in the top right corner |
+| **Panels' buttons** | Right edge | A column under the Settings button: Adjust, Layers, Tags, Styles, Pattern and Bookmarks. The panels docked on the right open beside it; a short window scrolls it |
 | **Tool rail** | Left | Undo and Redo, the tools (Import after Note), then Screenshot and Search |
-| **Properties bar** | By the selection, or at the top | The options of the tool or of what is selected, as named chips just above what is selected, each showing its first value; a chip opens its options as a short form, one named option a row; the menus it opens (Outline, Paragraph and box, Font, Columns and rows) are forms too, with switches for what is on or off. They never stand under the bars on the edges: just past or beside the one in the way. With nothing selected, or another tool picked, the chips stand at the top. On a small window the chips scroll sideways |
+| **Properties bar** | By the selection, or at the top (the whole top row is its own) | The options of the tool or of what is selected, as named chips just above what is selected, each showing its first value; a chip opens its options as a short form, one named option a row; the menus it opens (Outline, Paragraph and box, Font, Columns and rows) are forms too, with switches for what is on or off. They never stand under the bars on the edges: just past or beside the one in the way. With nothing selected, or another tool picked, the chips stand at the top. On a small window the chips scroll sideways |
 | **Actions bar** | Bottom | What can be done with the selection, in named groups (Objects, Files, Adjust, Edit shapes, Arrange, Attach, Selection, Find), always in that order, some of them menus (Align, Arrange, Shapes, Masks, Path tools, Sheets, Export, Initial state) that list only what applies. The names of its groups show over the buttons. When wider than the window it shows a fade and an arrow; the mouse wheel scrolls it sideways |
 | **Panels** | Either side, or floating | Layers, Bookmarks, Tags, Styles, Adjust, Pattern: they float or dock to either side, are resizable, and can minimize when inactive. *Reset the panel layout* puts them back |
 | **Zen mode** | `Z`, or the leaf button | Fades the bars and panels until the pointer is over them |
@@ -2257,7 +2355,7 @@ Make the app yours: theme, theme colour, density and the canvas.
 
 | Kept in | Settings |
 | --- | --- |
-| This workspace (in its folder, `.canvast/workspace.json`, on desktop) | How notes are written and named (properties, dates, names, titles, saving, their folder) and what their cards show; file names and placement (keep file names, sort files, the folder, name, tags, format and quality of saved edits, frames, screenshots, exports, patterns and SVGs); where deleted files go and for how long; property types; saved searches; pinned folders |
+| This workspace (in its folder, `.canvast/workspace.json`, on desktop) | How notes are written and named (properties, dates, names, titles, saving, their folder) and what their cards show; file names and placement (keep file names, sort files, the folder, name, tags, format and quality of saved edits, frames, screenshots, exports, patterns and SVGs); where deleted files go and for how long; property types; saved searches; pinned folders; PhotoCraft's own preferences and presets |
 | This device | Everything else: theme, density, panels, shortcuts, tools, colours, motion, media, the Hidden items' privacy settings, memory and indexing |
 
 | Workspace settings | |
@@ -2277,7 +2375,8 @@ Make the app yours: theme, theme colour, density and the canvas.
 | Saving to the library | Extracted frames and PDF pages (format, quality, a page's resolution, folder, name, tags) and edited pictures (format, quality, folder, name, tags), and the folder and tags of what is saved to the library from the canvas, one pair for each kind: pictures from Export… (*Exports*, `export`), patterns (*Patterns*, `pattern`) and shapes saved as SVG (*Shapes*, `shape`); screenshots have theirs in the Screenshot group. In the desktop app, Keep file names and Sort files by kind |
 | Screenshot | Format, quality, pattern, transparency, interface, clipboard, folder, name and tags |
 | Appearance | Theme (system, light, dark), theme colour (or adaptive, from the canvas background), colourfulness, information shown, hints and tooltips, canvas pattern, object names, density (comfortable, compact, dense), round or sharp corners, Zen mode; panels: minimize inactive ones, how many stay open |
-| Performance | Adaptive quality, fixed quality level, memory for pictures, animation and its speed |
+| Performance | Adaptive quality, fixed quality level, art file pictures on the canvas (quick or full size), memory for pictures, animation and its speed |
+| ArtCraft › PhotoCraft | Save as type of a new document; its version and licence; reset its own preferences (see [PhotoCraft](#photocraft)) |
 | Storage | Space used and whether the browser keeps the data; the library folder (choose it, move files in and out, the library index and its automatic saving); how saving is going; backups (export, Advanced export, changes only, files as ZIP, import); in the desktop app, where deleted files go and when `.trash` is emptied; *Start from scratch* (delete all data, after a warning with a backup offered first) |
 | Privacy | The word that begins hidden mode, remembering the Hidden password until the tab closes, the passwords of the workspace and of the Hidden items, Lock now and New key; what stays on your machine |
 | About and diagnostics | Version and diagnostics |
@@ -2438,6 +2537,22 @@ What canvast does not do today, for both versions, then each. **The limits that 
 | --- | --- |
 | Rendering | The canvas is Canvas 2D only, on the main thread; no GPU or WebGL path, no workers (a 3D model draws with WebGL in its own view) |
 | Collaboration | Only looking: the desktop app shares a workspace read-only on the local network. Nobody can edit together; the single file never connects anywhere |
+
+#### PhotoCraft
+
+These are limits of PhotoCraft's web build, which canvast carries unchanged.
+
+| Area | Limitation |
+| --- | --- |
+| Unsaved mark | Its `*` and `•` never clear and its own Close asks to save, as its web build cannot know a saved file was kept. *Save* in its question saves and closes; canvast's **×** does not ask when nothing was done since the last save |
+| Its tab's name | After a save its tab shows the PSD it wrote (`image.psd`); the file in the Library keeps its own name and kind |
+| Edit › Paste | Its menu's *Paste* finds the clipboard empty (its web build reads no picture from it); `Ctrl+V` pastes a picture as a layer |
+| Saving back | A file canvast cannot make (TIFF, BMP, GIF…) is saved as a new PSD item beside it. Saving into a PNG, JPEG or WebP needs the PSD's merged picture: keep *Maximize PSD compatibility* on (its default) |
+| ⚠️ What is not kept | Its open documents and undo history end when it closes (its web build has no autosave): save first. Its panel layout is kept only with its *Remember Workspace Changes* on. Presets changed less than a minute before the app is closed abruptly may be lost |
+| Hidden features | Folders, batch, plug-ins, printing, links and updates are hidden. A few items it never lets be hidden stay: Save, Save As, Exit, Edit › Menus, Keyboard Shortcuts and its Preferences pages |
+| Hidden items | Hidden items do not open in it (its own storage would keep their names) |
+| Needs | WebGPU or WebGL2: a browser without either cannot start it |
+| Size | It adds about 20 MB to `canvast.html` |
 
 ### The browser version
 
@@ -2775,7 +2890,7 @@ Every picture in this README is made by code: each one is a Playwright test in `
 | Its words | `tests/shots/manifest.ts` gives each picture its section, the use it shows and its alt text; `npm run check:shots` fails when the README and the manifest disagree |
 | On GitHub | The `Screenshots` workflow (*Run workflow*; *grep* picks pictures by name) takes them all in parallel and gives them as WebP (`cwebp -q 78`, at most 1280 px wide); a picture that fails leaves its trace and its last screen in a second artifact |
 | The desktop app | `tests/shots/desktop.shot.ts` starts the desktop build (`npm run build:desktop`) in Electron on a new workspace folder: the folder with Switch workspace, its Trash and Sharing |
-| The animation at the top | `canvast-60s.gif` is a one-minute video of the app in use, made by the `Showcase GIF` workflow (*Run workflow*; the GIF and the video come as an artifact) from `scripts/showcase/motion/`: each clip recorded frame by frame with Playwright on the shot harness, laid out with HTML, CSS and GSAP, with a soundtrack synthesized in code. The GIF is 720 px wide at 12 frames a second with its own 128-colour palette made from what changes between frames (`ffmpeg … palettegen=stats_mode=diff`, `paletteuse=dither=bayer:diff_mode=rectangle`), then `gifsicle -O3 --lossy=120`, about 23 MB |
+| The animation at the top | `canvast-60s.gif` is a 70-second video of the app in use (PhotoCraft in its last part), made by the `Showcase GIF` workflow (*Run workflow*; the GIF and the video come as an artifact) from `scripts/showcase/motion/`: each clip recorded frame by frame with Playwright on the shot harness, laid out with HTML, CSS and GSAP, with a soundtrack synthesized in code. The GIF is 720 px wide at 12 frames a second with its own 128-colour palette made from what changes between frames (`ffmpeg … palettegen=stats_mode=diff`, `paletteuse=dither=bayer:diff_mode=rectangle`), then `gifsicle -O3 --lossy=120`, about 23 MB |
 
 | Area | Its pictures (`tests/shots/`) |
 | --- | --- |
@@ -2788,6 +2903,7 @@ Every picture in this README is made by code: each one is a Playwright test in `
 | `privacy.shot.ts` | The context menu, hiding, hidden mode, the padlock, the backup question, Settings > Privacy, the lock screen |
 | `workspace.shot.ts` | The showcase (home, deep, far out, a tour), boards and canvases, bookmarks, search on the canvas, the command palette, Settings, Shortcuts, the info bar, Storage, Advanced export, Delete all, a second tab, Export |
 | `tools.shot.ts` | The canvast tools' menu in a terminal |
+| `artcraft.shot.ts` | A study opened in PhotoCraft, Edit in PhotoCraft, pictures as layers and their size, Save as type, its Settings page, the view buttons, the panels' buttons, art file pictures |
 | `desktop.shot.ts` | The desktop app: a project's folder, its Trash, Sharing |
 
 ```sh
@@ -2850,6 +2966,7 @@ The colour picker in `src/colour-picker/` is also published on its own and keeps
 | SunEditor (the notes editor), in the built file | MIT |
 | pdf.js (draws PDFs), in the built file | Apache-2.0 |
 | three.js (draws 3D models), in the built file | MIT |
+| PhotoCraft (its released web build, unchanged), in the built file | MIT or Apache-2.0 |
 | Electron and Chromium, in the desktop packages | MIT and Chromium's licences (inside the packaged app) |
 | Space Grotesk, two library files in `showcase.canvast` | SIL Open Font License 1.1, copyright 2020 The Space Grotesk Project Authors ([OFL.txt](scripts/showcase/fonts/OFL.txt)) |
 | The artworks in `scripts/showcase/art/`, shown in the README's pictures | Public domain (The Met Open Access, CC0); see [CREDITS.md](docs/screenshots/CREDITS.md) |

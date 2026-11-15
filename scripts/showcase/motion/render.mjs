@@ -1,4 +1,4 @@
-// Renders comp.html frame by frame (3600 frames, 60 fps) into H.264, makes its soundtrack (audio.mjs, from the comp's cues) and joins them.
+// Renders comp.html frame by frame (4200 frames, 60 fps) into H.264, makes its soundtrack (audio.mjs, from the comp's cues) and joins them.
 // Needs the footage first:   CANVAST_BUILD_DIR=dist npx playwright test -c scripts/showcase/motion/footage.config.ts
 // Run from the repo root:    node scripts/showcase/motion/render.mjs [out.mp4]   (default docs/media/canvast-60s.mp4)
 //   stills to check:         node scripts/showcase/motion/render.mjs --stills <dir> 1.5,9,27
@@ -10,7 +10,7 @@ import { resolve, dirname } from "node:path";
 import { pathToFileURL, fileURLToPath } from "node:url";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
-const FPS = 60, DUR = 60;
+const FPS = 60, DUR = 70;
 const args = process.argv.slice(2);
 const b = await chromium.launch({ args: ["--allow-file-access-from-files"] });
 const p = await b.newPage({ viewport: { width: 1920, height: 1080 } });

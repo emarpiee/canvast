@@ -165,6 +165,7 @@ html, body { background: #000; overflow: hidden; }
   <div id="hid" class="layer scene"></div>
   <div id="lk" class="layer scene"></div>
   <div id="themes" class="layer scene"><div class="sw"></div></div>
+  <div id="pc" class="layer scene"></div>
 
   <div class="chip" id="chip"><i></i>Recorded in canvast</div>
 
@@ -190,7 +191,7 @@ html, body { background: #000; overflow: hidden; }
 </div>
 
 <script>
-// A 60 s motion piece, "An endless canvas for drawing and references", on the app's own footage (footage.spec.ts; ?foot=<dir>, default
+// A 70 s motion piece, "An endless canvas for drawing and references", on the app's own footage (footage.spec.ts; ?foot=<dir>, default
 // docs/media/footage). Everything is a function of time: await seek(t). It also lists its sound cues (window.CUES) for audio.mjs.
 const FOOT = new URLSearchParams(location.search).get('foot') || '../../../docs/media/footage';
 const RING_D = 'M24.2 14.667H39.801A9.533 9.533 0 0 1 49.334 24.2V39.801A9.533 9.533 0 0 1 39.801 49.334H24.2A9.533 9.533 0 0 1 14.667 39.801V24.2A9.533 9.533 0 0 1 24.2 14.667ZM30.093 24.2H38.24A5.893 5.893 0 0 1 44.133 30.093V38.24A5.893 5.893 0 0 1 38.24 44.133H30.093A5.893 5.893 0 0 1 24.2 38.24V30.093A5.893 5.893 0 0 1 30.093 24.2Z';
@@ -276,7 +277,7 @@ class Zoomer extends Player {
 
 // ---------- the timeline (bars of 2 s: the music runs at 120 bpm) ----------
 const T = { refs: 4, values: 8, cl: 10, draw: 12, shp: 16, vec: 18, col: 20, comic: 22, lett: 26, lib: 28, vw: 30.5, fv: 32, notes: 34, exp: 36,
-  endless: 38, hid: 46, lk: 48, themes: 50, slams: 52, end: 56, out: 60 };
+  endless: 38, hid: 46, lk: 48, themes: 50, pc: 52, slams: 62, end: 66, out: 70 };
 const tl = gsap.timeline({ paused: true });
 const CUES = []; const cue = (t, k, v = 1) => CUES.push({ t, k, v });
 window.CUES = CUES;
@@ -328,7 +329,7 @@ function cards(scene, names, caps, t0, t1, title, { scale = .39, play: plays = [
 let P = {};
 const NAMES = { refs: 'refs', values: 'refs', crop: 'cl', autolayout: 'cl', adjust: 'cl', draw: 'draw', shapes: 'shp', boolean: 'vec', pattern: 'vec', guides: 'vec',
   mask: 'col', gradient: 'col', picker: 'col', comic: 'comic', title: 'lettering', library: 'lib', viewer: 'vw', pdf: 'fv', model: 'fv', notes: 'notes',
-  export: 'exp', hide: 'hid', lock: 'lk', themes: 'themes' };
+  export: 'exp', hide: 'hid', lock: 'lk', themes: 'themes', photocraft: 'pc' };
 function players() {
   for (const [n, scene] of Object.entries(NAMES)) {
     const s = document.getElementById(scene); P[n] = new Player(n, s);
@@ -594,16 +595,29 @@ function build() {
   labelIn(label($('#lk'), { num: '07 — PRIVACY', h: 'Locked with your password.', sub: 'In the desktop app, hidden files are encrypted on disk.', corner: true }), T.lk + .15, T.themes - .2);
 
   // ---- 9 · make it yours ----
-  show('#themes', T.themes - .1, T.slams + .3);
-  run(P.themes, T.themes - .1, T.slams + .3);
+  show('#themes', T.themes - .1, T.pc + .3);
+  run(P.themes, T.themes - .1, T.pc + .3);
   gsap.set(P.themes.el, { scale: 1.34, borderRadius: 0 });
-  play(P.themes, T.themes - .1, T.slams - .2);
+  play(P.themes, T.themes - .1, T.pc - .2);
+  tl.to('#themes', { autoAlpha: 0, scale: .94, duration: .3, ease: 'power2.in' }, T.pc - .3);
   el('div', 'layer shade', null, $('#themes'));
   labelIn(label($('#themes'), { num: '08 — YOUR WORKSPACE', h: 'Your colours,', big: 'dark or light.', bigCls: 'cav', corner: true }), T.themes + .05);
   const sw = $('#themes .sw');
   // (the swatches are the Theme colour presets: Stone, Viridian, Ultramarine, Violet, Madder, Ochre)
   for (const [k, [h, c]] of [[70, .03], [178, .14], [265, .14], [310, .14], [15, .14], [80, .14]].entries()) { const i = el('i', null, null, sw); i.style.background = `oklch(.68 ${c} ${h})`; tl.from(i, { scale: 0, duration: .35, ease: 'back.out(3)' }, T.themes + .2 + k * .06); }
   tl.fromTo(P.themes, { S: 1.15, fx: 720, fy: 440 }, { S: 1, duration: 2, ease: 'power1.inOut', immediateRender: false }, T.themes - .1);
+
+  // ---- 9b · PhotoCraft, inside: a study opened in it from the canvas, painted over, saved back into its file ----
+  show('#pc', T.pc - .1, T.slams + .3);
+  run(P.photocraft, T.pc - .1, T.slams + .3);
+  gsap.set(P.photocraft.el, { scale: 1.34, borderRadius: 0 });
+  tl.fromTo(P.photocraft.el, { autoAlpha: 0, scale: 1.6 }, { autoAlpha: 1, scale: 1.34, duration: .45, ease: 'expo.out', immediateRender: false }, T.pc - .1);
+  cue(T.pc - .1, 'whoosh', .8);
+  play(P.photocraft, T.pc, T.slams - .3);
+  el('div', 'layer shade', null, $('#pc'));
+  labelIn(label($('#pc'), { num: '09 — INTEGRATION', h: 'PhotoCraft,', big: 'inside.', sub: 'A full photo editor on your files: Save puts the edit back.', corner: true }), T.pc + .2, T.pc + 3.4);
+  tl.fromTo(P.photocraft, { S: 1, fx: 720, fy: 450 }, { S: 1.08, duration: 9, ease: 'none', immediateRender: false }, T.pc);
+  tl.to(P.photocraft.el, { autoAlpha: 0, scale: 1.2, duration: .3, ease: 'power3.in' }, T.slams - .3);
 
   // the "recorded in canvast" chip while the app is on screen
   for (const [a, b] of [[T.refs + .8, T.cl - .3], [T.cl + .3, T.vec - .3], [T.vec + .3, T.comic - .4], [T.comic + .7, T.lib - .4], [T.lib + .6, T.fv - .2], [T.fv + .3, T.endless + .1], [T.endless + .4, T.slams - .3]])

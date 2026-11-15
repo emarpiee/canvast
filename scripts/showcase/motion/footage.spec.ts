@@ -1007,3 +1007,49 @@ test("themes", async ({ scene: s }) => {
   }
   r.save();
 });
+
+// ---------- PhotoCraft, inside: a study opened in it from the canvas, a few strokes over it, saved back into its file ----------
+test("photocraft", async ({ scene: s }) => {
+  test.setTimeout(240_000);
+  await look(s, { theme: "dark", hue: 30 });
+  const [horse] = await s.art("delacroix");
+  await s.canvas("Studies");
+  const [id] = await s.place([horse!]);
+  await s.fit([id!], 0.62);
+  await s.select([id!]);
+  const r = new Rec(s, "photocraft");
+  await r.quiet();
+  await r.hold(2);
+  // Edit in PhotoCraft on the Actions bar
+  await r.at('[data-ctx="photocraft"]');
+  await r.hold(3);
+  r.down = true; await s.p.locator('[data-ctx="photocraft"]').click(); await r.snap({ pop: 1 }); r.down = false;
+  // it starts (a frame every half second while it loads)
+  const started = (): Promise<boolean> => s.p.evaluate(() => {
+    const d = document.querySelector<HTMLIFrameElement>(".photocraft-frame")?.contentDocument;
+    return !!d?.getElementById("photocraft_canvas") && !d.getElementById("photocraft_loading");
+  });
+  for (let i = 0; i < 120 && !(await started()); i++) await r.snap({}, 500);
+  await s.p.waitForTimeout(2500); // (the study opened and drawn in it)
+  await r.hold(6);
+  // its Brush, larger, and strokes over the horse: a line of action and the curve of its back
+  const area = (await s.p.locator(".photocraft-frame").boundingBox())!;
+  const cx = area.x + area.width * 0.45, cy = area.y + area.height * 0.52;
+  await s.p.mouse.click(area.x + area.width * 0.5, area.y + area.height * 0.95);
+  await s.p.keyboard.press("b");
+  for (let i = 0; i < 6; i++) await s.p.keyboard.press("]");
+  await r.hold(2);
+  const sweep = (pts: Pt[]): Pt[] => curve(pts, 8);
+  await r.line(sweep([[cx - 240, cy - 120], [cx - 90, cy - 40], [cx + 60, cy + 10], [cx + 220, cy + 110]]), 2);
+  await r.line(sweep([[cx - 200, cy + 60], [cx - 40, cy + 120], [cx + 140, cy + 140], [cx + 260, cy + 70]]), 2);
+  await r.hold(4);
+  // Save: into the study's own file, in its own kind (a new version of it in the Library and on the canvas)
+  await s.p.keyboard.press("Control+s");
+  await r.hold(8);
+  await r.at('[data-testid="view-canvas"]');
+  await r.hold(2);
+  r.down = true; await s.p.getByTestId("view-canvas").click(); await r.snap({ pop: 1 }); r.down = false;
+  await s.settle(800);
+  await r.hold(10);
+  r.save();
+});

@@ -116,6 +116,19 @@ export const SHOTS: Record<string, ShotSpec> = {
   "thumbnail": { section: "#custom-thumbnail", use: "Choose the picture a card shows: a detail that tells two studies apart.", alt: "The thumbnail choice for de Gheyn's two studies of a saddled horse: upload a picture, choose one from the library, or keep the original" },
   "take-out": { section: "#taking-files-out", use: "Take a reference out of the app: download it or export it.", alt: "The right-click menu of Van Gogh's Wheat Field with Cypresses in the Library: its download, export and other commands" },
 
+  // Integration: PhotoCraft
+  "photocraft": { section: "#photocraft", use: "Paint over a study in a full photo editor without leaving the board: the picture opens in PhotoCraft, and Save puts the edit back into its file.", alt: "PhotoCraft open in canvast on Delacroix's Study of a Horse: its menus, tools, layers and colour panels around the drawing, the PhotoCraft tab and its close button at the top left" },
+  "photocraft-edit": { section: "#photocraft", use: "Open a picture of the board in PhotoCraft from the Actions bar.", alt: "Delacroix's Study of a Horse selected on a canvas, the Edit in PhotoCraft button in the Files group of the Actions bar below it" },
+  "photocraft-layers": { section: "#photocraft", use: "Take two studies into PhotoCraft as layers of one document, placed as they are on the canvas.", alt: "Degas's Dancer Adjusting Her Slipper and Dancer with a Fan selected side by side, the Edit in PhotoCraft menu open on Each in its own document and As layers of one document" },
+  "photocraft-size": { section: "#photocraft", use: "Choose how big the layered document is, as Export chooses a picture's size.", alt: "The dialog that opens the pictures in PhotoCraft: 2 layers, a size rule and its value, the size in pixels, and the Sharpest picture, Cancel and Open in PhotoCraft buttons" },
+  "photocraft-save-type": { section: "#photocraft", use: "Choose what a new document becomes at its first save: a layered PSD, or one picture.", alt: "The Save as type dialog: PSD as PhotoCraft saved it, PNG, JPEG or WebP, with Always this type" },
+  "photocraft-settings": { section: "#photocraft", use: "Set what a new document is saved as, and reset PhotoCraft's own preferences.", alt: "Settings, ArtCraft, PhotoCraft in the light theme: Save as type, and About PhotoCraft with its version, licence and Reset PhotoCraft's own preferences" },
+
+  // The interface
+  "view-buttons": { section: "#the-interface", use: "Go between the Library, the canvas and PhotoCraft from the top left.", alt: "The view buttons at the top left: Library; the canvas, its icon and its name Studies in one pill; PhotoCraft's icon and its close button" },
+  "panel-buttons": { section: "#the-interface", use: "Open the panels from the right edge: they dock beside the column of their buttons.", alt: "The panels' buttons in a column on the right edge under the Settings button, the Layers panel docked beside them listing three Hokusai prints" },
+  "art-pictures": { section: "#art-files", use: "Show a Photoshop file sharp on the canvas: its whole merged picture instead of the small one it keeps.", alt: "The Art file pictures on the canvas row of Settings, Performance: Quick or Full size" },
+
   // canvast tools
   "tools-menu": { section: "#canvast-tools-without-the-app", use: "Open your hidden items, hide files or share a folder on any computer with Node.js, without the app.", alt: "A terminal running node canvast-tools.mjs: its numbered menu in plain words" },
 
