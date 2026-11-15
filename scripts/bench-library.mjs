@@ -6,7 +6,7 @@
 // every item; a second open (from the app's own storage), the same; a file put into library/ from outside, until the Library view shows
 // it; one rename, until it is written. The folder is made again only when it does not hold N items; it is removed at the end unless
 // --keep. Never point --dir inside a synced folder.
-// --scroll: the files are real small pictures, and the Library view is scrolled with the mouse wheel in Thumbnails and List, the
+// --scroll: the window is shown (a hidden one draws a frame a second); the files are real small pictures, and the Library view is scrolled with the mouse wheel in Thumbnails and List, the
 // thumbnail size at its smallest and its largest, each twice (the first time its thumbnails are made, the second they are ready):
 // frames per second, the slowest frames, and how long the cards in view wait for their pictures once the wheel stops.
 import { _electron as electron } from "@playwright/test";
@@ -44,7 +44,7 @@ if (!existsSync(marker) || Number(String(statSync(marker).size)) !== N || readFi
 // ---- the app ----
 async function open(device) {
   const t = performance.now();
-  const app = await electron.launch({ args: [join(build, "desktop"), `--workspace=${dir}`, `--user-data-dir=${dir}-${device}`], env: { ...process.env, CANVAST_HIDDEN: "1", CANVAST_HASH: "#debug" }, timeout: 600_000 });
+  const app = await electron.launch({ args: [join(build, "desktop"), `--workspace=${dir}`, `--user-data-dir=${dir}-${device}`], env: { ...process.env, ...(SCROLL ? {} : { CANVAST_HIDDEN: "1" }), CANVAST_HASH: "#debug" }, timeout: 600_000 });
   const page = await app.firstWindow({ timeout: 600_000 });
   // (one window size for every run: 1400 x 900)
   await app.evaluate(({ BrowserWindow }) => { for (const w of BrowserWindow.getAllWindows()) { w.setContentSize(1400, 900); } });
