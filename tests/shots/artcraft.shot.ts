@@ -71,7 +71,7 @@ test("photocraft-save-type", async ({ scene: s }) => {
 test("photocraft-settings", async ({ scene: s }) => {
   await s.look({ theme: "light", hue: 30 });
   await s.p.getByTestId("view-settings").click();
-  await s.p.getByRole("tab", { name: "PhotoCraft" }).click();
+  await s.p.locator("#set-tab-photocraft").click();
   await s.settle();
   await s.shot("photocraft-settings");
 });
