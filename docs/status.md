@@ -38,6 +38,12 @@ Unverified / Committed / Next bounded task**.
 | 5 | Creative editing, including **arrange selected items in a grid (A–Z, Z–A, by date, size, type), align and distribute** | **done** ([ADR 0036](adr/0036-arrange-align-distribute.md)) |
 | WF | Workspace folder and the desktop app ([ADR 0177](adr/0177-workspace-folder-desktop-app.md)): Electron shell, the workspace as a folder of files, encrypted hidden items, outside changes; Linux packages (AppImage with updates, `.deb`, `.rpm`, `.tar.gz`, x86_64 and aarch64) | **done** (v0.49.0; packages v0.50.33 to 0.50.35) |
 
+## v0.60.0: release (2026-11-15)
+
+- **Implemented:** the release of 0.59.1 to 0.59.17 (PhotoCraft, the top bar in three sets, the panels' buttons on the right edge, Flip for shapes and paths, standard words, art file pictures, the README's Integration area).
+- **Tested:** CI, Tests and Pan and zoom green on v0.59.17 (af5904a8) on GitHub.
+- **Committed:** v0.60.0 on `main`, released by `npm run release`.
+
 ## v0.59.17: README Integration > PhotoCraft, pictures and animation (2026-11-15)
 
 - **Implemented:** README *Integration > PhotoCraft* and the bars that moved; `tests/shots/artcraft.shot.ts` (9 pictures, in the manifest); a PhotoCraft clip in the animation (70 s).
