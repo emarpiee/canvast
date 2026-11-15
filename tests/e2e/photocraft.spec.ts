@@ -88,6 +88,32 @@ test("PhotoCraft opens a selected picture; its File > Open asks the library, and
   await expect(p.locator(".lib-pick .lib-item")).toHaveCount(0);
   await p.keyboard.press("Escape");
   await expect(p.locator(".lib-pick")).toBeHidden();
+  // a picture pasted in it (its page takes only words from a paste) is dropped on it, as a file dragged in: placed on the document open
+  const pasted = await p.evaluate(async (bytes) => {
+    const w = document.querySelector<HTMLIFrameElement>(".photocraft-frame")!.contentWindow! as Window & typeof globalThis;
+    const canvas = w.document.getElementById("photocraft_canvas")!;
+    const dropped = new Promise<string>((ok) => canvas.addEventListener("drop", (e) => ok((e as DragEvent).dataTransfer?.files[0]?.name ?? ""), { once: true }));
+    const dt = new w.DataTransfer();
+    dt.items.add(new w.File([new w.Uint8Array(bytes)], "image.png", { type: "image/png" }));
+    const e = new w.ClipboardEvent("paste", { clipboardData: dt, bubbles: true, cancelable: true });
+    w.document.body.dispatchEvent(e);
+    return { taken: e.defaultPrevented, dropped: await dropped };
+  }, [...makePng(20, 20, () => [10, 200, 10, 255])]);
+  expect(pasted).toEqual({ taken: true, dropped: "image.png" });
+  // a stroke gets every move the browser kept between two frames (its coalesced pointer moves), as on a desktop
+  const moves = await p.evaluate(() => {
+    const w = document.querySelector<HTMLIFrameElement>(".photocraft-frame")!.contentWindow! as Window & typeof globalThis;
+    const seen: number[] = [];
+    const count = (e: Event): void => void seen.push((e as MouseEvent).clientX);
+    w.document.addEventListener("mousemove", count, true);
+    const at = (x: number): PointerEvent => new w.PointerEvent("pointermove", { clientX: x, clientY: 50, buttons: 1, bubbles: true });
+    const e = at(40);
+    Object.defineProperty(e, "getCoalescedEvents", { value: () => [at(10), at(20), at(30), at(40)] });
+    w.document.getElementById("photocraft_canvas")!.dispatchEvent(e);
+    w.document.removeEventListener("mousemove", count, true);
+    return seen;
+  });
+  expect(moves).toEqual([10, 20, 30]);
   // a view of its own: the Library shown, then PhotoCraft again, still running (its frame kept)
   await p.getByTestId("view-assets").click();
   await expect(p.getByTestId("photocraft-view")).toBeHidden();

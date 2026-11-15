@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.59.16 — Pasting pictures and smooth strokes in PhotoCraft (2026-11-15)
+
+- **Fixed:** a picture copied in canvast (or any program) and pasted in PhotoCraft (Ctrl+V) said the clipboard was empty: its web build takes only words from a paste. A pasted picture is now handed to it as a file dropped on it: on the document open it becomes a layer, with none open a document of its own.
+- **Fixed:** strokes drawn in PhotoCraft were made of short straight lines (a circle had corners): a browser gives one pointer move a frame, and it draws from the moves it is given. The moves the browser kept in between are now given too, so a stroke is as smooth as in its desktop app.
+
 ## 0.59.15 — Sharp art file cards on the canvas (2026-11-15)
 
 - **Added:** Settings > Performance > **Art file pictures on the canvas**: **Quick** (the small picture a Photoshop file keeps for previews, about 160 px, enlarged to the card: as before) or **Full size** (the file's whole merged picture: sharp however close you zoom, slower and heavier for a large file). Krita and OpenRaster files show their full-size picture either way. Changing it draws the cards again at once.

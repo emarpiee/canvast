@@ -165,6 +165,24 @@ export function startPhotoCraft(container: HTMLElement, host: PhotoCraftHost, fe
   win.addEventListener("keydown", (e) => {
     if (browserKey(e)) e.preventDefault();
   });
+  // ---- a picture pasted: its page takes only words from a paste (its web build reads no picture from the clipboard), so a picture
+  // pasted is dropped on it, as a file dragged in: on the document open, a layer; with none open, a document of its own. Words go on.
+  win.addEventListener("paste", (e) => {
+    const pictures = [...(e.clipboardData?.files ?? [])].filter((f) => f.type.startsWith("image/"));
+    if (!pictures.length) return;
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    void dropOn(pictures, win.innerWidth / 2, win.innerHeight / 2);
+  }, true);
+
+  // ---- strokes as smooth as on a desktop: it draws from every pointer move it is given, and a browser gives one a frame. The moves
+  // the browser kept in between (a pointer event's coalesced ones) are given too, as the moves its page reads, before the last one.
+  win.addEventListener("pointermove", (e) => {
+    if (!e.buttons || typeof e.getCoalescedEvents !== "function") return;
+    const between = e.getCoalescedEvents().slice(0, -1);
+    for (const c of between) doc.dispatchEvent(new win.MouseEvent("mousemove", { clientX: c.clientX, clientY: c.clientY, screenX: c.screenX, screenY: c.screenY, buttons: e.buttons, ctrlKey: e.ctrlKey, shiftKey: e.shiftKey, altKey: e.altKey, metaKey: e.metaKey, bubbles: true, cancelable: true }));
+  }, true);
+
   // (its page cannot know a download was kept, so a document stays "not saved" after its Save: canvast knows when a file of it came
   // back, and whether anything was done in it since; nothing is done in it without a press or a key)
   // (the keys canvast presses itself, for its theme, are not something done in it)
@@ -223,18 +241,22 @@ export function startPhotoCraft(container: HTMLElement, host: PhotoCraftHost, fe
   }, (e: unknown) => notStarted(new Error(`Its files could not be unpacked: ${String(e)}`)));
 
   const canvas = (): HTMLCanvasElement | null => doc.getElementById("photocraft_canvas") as HTMLCanvasElement | null;
+  /** Files dropped on it at (x, y) of its page, as if dragged there: on a document's canvas placed as layers, elsewhere opened. */
+  async function dropOn(files: readonly File[], x: number, y: number): Promise<void> {
+    const target = canvas();
+    if (!target || !files.length) return;
+    const dt = new win.DataTransfer();
+    for (const f of files) dt.items.add(new win.File([new win.Uint8Array(await f.arrayBuffer())], f.name, { type: f.type, lastModified: f.lastModified }));
+    for (const type of ["dragover", "drop"]) target.dispatchEvent(new win.DragEvent(type, { bubbles: true, cancelable: true, dataTransfer: dt, clientX: x, clientY: y }));
+    iframe.focus();
+  }
   return {
     iframe,
     ready,
     async open(files) {
       await ready;
-      const target = canvas();
-      if (!target || !files.length) return;
-      const dt = new win.DataTransfer();
-      for (const f of files) dt.items.add(new win.File([new win.Uint8Array(await f.arrayBuffer())], f.name, { type: f.type, lastModified: f.lastModified }));
       // (dropped away from a document's canvas, a file opens in a tab of its own; on it, it would be placed as a layer)
-      target.dispatchEvent(new win.DragEvent("drop", { bubbles: true, cancelable: true, dataTransfer: dt, clientX: 1, clientY: 1 }));
-      iframe.focus();
+      await dropOn(files, 1, 1);
     },
     touched: () => lastInput > 0,
     paste(data) {
