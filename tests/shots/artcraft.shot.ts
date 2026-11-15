@@ -34,7 +34,7 @@ test("photocraft", async ({ scene: s }) => {
   await s.fit([id!], 0.6);
   await s.p.evaluate((i) => window.__canvastDebug.select([i]), id!);
   await s.settle();
-  await s.shot("photocraft-edit", await s.around({ objects: [id!], els: ['[data-ctx="photocraft"]'], pad: 20 }));
+  await s.shot("photocraft-edit", await s.around({ objects: [id!], els: [".ctx-wrap"], pad: 16 }));
   await s.p.locator('[data-ctx="photocraft"]').click();
   await running(s.p);
   await s.settle(3000); // (the study opened in it, drawn)
