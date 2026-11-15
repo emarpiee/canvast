@@ -38,6 +38,12 @@ Unverified / Committed / Next bounded task**.
 | 5 | Creative editing, including **arrange selected items in a grid (A–Z, Z–A, by date, size, type), align and distribute** | **done** ([ADR 0036](adr/0036-arrange-align-distribute.md)) |
 | WF | Workspace folder and the desktop app ([ADR 0177](adr/0177-workspace-folder-desktop-app.md)): Electron shell, the workspace as a folder of files, encrypted hidden items, outside changes; Linux packages (AppImage with updates, `.deb`, `.rpm`, `.tar.gz`, x86_64 and aarch64) | **done** (v0.49.0; packages v0.50.33 to 0.50.35) |
 
+## v0.59.17: README Integration > PhotoCraft, pictures and animation (2026-11-15)
+
+- **Implemented:** README *Integration > PhotoCraft* and the bars that moved; `tests/shots/artcraft.shot.ts` (9 pictures, in the manifest); a PhotoCraft clip in the animation (70 s).
+- **Tested:** the `Screenshots` run (all 97 pictures) and the `Showcase GIF` run on GitHub, branch `readme-pass`; every picture under 80 KB and compared with its alt text.
+- **Committed:** v0.59.17 on `main`.
+
 ## v0.59.9: PhotoCraft saves a project file in its place (2026-11-15)
 
 - **Implemented:** a save that is the same kind as the project file it came from (PSD, PSB, ORA, `.pcraft`), or a later save of a document, goes through `session.saveVersion` (the item's new version everywhere, the older in the trash; the desktop build writes over its file); the type is asked only at a new document's first save. Opened pictures (PNG, JPEG…) still make an edited item of their own.

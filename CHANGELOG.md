@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.59.17 — The manual shows PhotoCraft (2026-11-15)
+
+- **Changed:** the README has an **Integration** area with **PhotoCraft**: opening a picture, several pictures as layers of one document and its size, saving into the file it came from and a new document's type, its settings and preferences kept with the workspace, and its limits. The view buttons at the top left, the panels' buttons on the right edge and Settings > Performance > Art file pictures on the canvas are described too.
+- **Changed:** the README's pictures were taken again (the bars moved), with nine new ones, and the animation is 70 seconds, with 10 seconds of a study edited in PhotoCraft and back on its canvas.
+
 ## 0.59.16 — Pasting pictures and smooth strokes in PhotoCraft (2026-11-15)
 
 - **Fixed:** a picture copied in canvast (or any program) and pasted in PhotoCraft (Ctrl+V) said the clipboard was empty: its web build takes only words from a paste. A pasted picture is now handed to it as a file dropped on it: on the document open it becomes a layer, with none open a document of its own.
