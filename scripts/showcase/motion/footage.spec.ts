@@ -1009,47 +1009,77 @@ test("themes", async ({ scene: s }) => {
 });
 
 // ---------- PhotoCraft, inside: a study opened in it from the canvas, a few strokes over it, saved back into its file ----------
-test("photocraft", async ({ scene: s }) => {
-  test.setTimeout(240_000);
-  await look(s, { theme: "dark", hue: 30 });
-  const [horse] = await s.art("delacroix");
-  await s.canvas("Studies");
-  const [id] = await s.place([horse!]);
-  await s.fit([id!], 0.62);
-  await s.select([id!]);
-  const r = new Rec(s, "photocraft");
-  await r.quiet();
-  await r.hold(2);
-  // Edit in PhotoCraft on the Actions bar
-  await r.at('[data-ctx="photocraft"]');
-  await r.hold(3);
-  r.down = true; await s.p.locator('[data-ctx="photocraft"]').click(); await r.snap({ pop: 1 }); r.down = false;
-  // it starts (a frame every half second while it loads)
-  const started = (): Promise<boolean> => s.p.evaluate(() => {
-    const d = document.querySelector<HTMLIFrameElement>(".photocraft-frame")?.contentDocument;
-    return !!d?.getElementById("photocraft_canvas") && !d.getElementById("photocraft_loading");
+// (recorded at a pixel ratio of 1: at 1.5 PhotoCraft's web build put the strokes 1.5 times as far from its canvas's corner as the pointer)
+test.describe(() => {
+  test.use({ deviceScaleFactor: 1 });
+  test("photocraft", async ({ scene: s }) => {
+    test.setTimeout(480_000);
+    await look(s, { theme: "dark", hue: 30 });
+    const [horse] = await s.art("delacroix");
+    await s.canvas("Studies");
+    const [id] = await s.place([horse!]);
+    await s.fit([id!], 0.62);
+    await s.select([id!]);
+    const r = new Rec(s, "photocraft");
+    await r.quiet();
+    await r.hold(2);
+    // Edit in PhotoCraft on the Actions bar
+    await r.at('[data-ctx="photocraft"]');
+    await r.hold(3);
+    r.down = true; await s.p.locator('[data-ctx="photocraft"]').click(); await r.snap({ pop: 1 }); r.down = false;
+    // it starts (a frame every half second while it loads)
+    const started = (): Promise<boolean> => s.p.evaluate(() => {
+      const d = document.querySelector<HTMLIFrameElement>(".photocraft-frame")?.contentDocument;
+      return !!d?.getElementById("photocraft_canvas") && !d.getElementById("photocraft_loading");
+    });
+    // (its loading screen kept short: a frame every second and a half)
+    for (let i = 0; i < 120 && !(await started()); i++) { if (i % 3 === 0) await r.snap({}, 500); else await s.p.waitForTimeout(500); }
+    await s.p.waitForTimeout(2500); // (the study opened and drawn in it)
+    await r.hold(5);
+    // A gesture study over the master's drawing, as an artist studies a pose: thin construction lines, the line of action from the ear
+    // along the neck and back, the barrel of the body, the line of the front leg.
+    const area = (await s.p.locator(".photocraft-frame").boundingBox())!;
+    await s.p.mouse.click(area.x + area.width * 0.5, area.y + area.height - 12); // (its status line: the focus, nothing drawn)
+    await s.p.keyboard.press("Control+0"); // (the study fitted to its window)
+    await s.p.waitForTimeout(1500);
+    await r.hold(3);
+    // (where the study is in it, found on screen: the warm paper and wash, left of its panels)
+    const png = (await s.p.screenshot({ clip: area })).toString("base64");
+    const found = await s.p.evaluate(async (b64) => {
+      const bytes = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
+      const bm = await createImageBitmap(new Blob([bytes], { type: "image/png" }));
+      const g = new OffscreenCanvas(bm.width, bm.height).getContext("2d")!;
+      g.drawImage(bm, 0, 0);
+      const { data: d, width: w, height: h } = g.getImageData(0, 0, bm.width, bm.height);
+      const warm = (x: number, y: number): boolean => { const i = (y * w + x) * 4; return d[i]! > 90 && d[i]! - d[i + 2]! > 20; };
+      const xs = (y: number): number[] => { const o: number[] = []; for (let x = 0; x < w * 0.75; x++) if (warm(x, y)) o.push(x); return o; };
+      const row = xs(Math.round(h * 0.55));
+      const x0 = row[0]!, x1 = row[row.length - 1]!, mid = Math.round((x0 + x1) / 2);
+      const col: number[] = []; for (let y = 0; y < h; y++) if (warm(mid, y)) col.push(y);
+      return { x0: x0 / w, x1: x1 / w, y0: col[0]! / h, y1: col[col.length - 1]! / h };
+    }, png);
+    const L = area.x + found.x0 * area.width, R = area.x + found.x1 * area.width, T = area.y + found.y0 * area.height, B = area.y + found.y1 * area.height;
+    const img = (x: number, y: number): Pt => [L + (x / 599) * (R - L), T + (y / 469) * (B - T)];
+    await s.p.keyboard.press("b");
+    for (let i = 0; i < 5; i++) await s.p.keyboard.press("[");
+    await r.hold(2);
+    const sweep = (pts: Pt[]): Pt[] => curve(pts, 10);
+    await r.line(sweep([img(112, 32), img(150, 62), img(205, 92), img(280, 106), img(345, 150)]), 3);
+    await r.hold(2);
+    const barrel: Pt[] = [];
+    for (let k = 0; k <= 28; k++) { const a = -Math.PI * 0.9 + (k / 28) * Math.PI * 2.05; barrel.push(img(262 + 92 * Math.cos(a), 168 + 58 * Math.sin(a))); }
+    await r.line(barrel, 3);
+    await r.hold(2);
+    await r.line(sweep([img(170, 200), img(178, 270), img(172, 330), img(178, 380)]), 3);
+    await r.hold(5);
+    // Save: into the study's own file, in its own kind (a new version of it in the Library and on the canvas)
+    await s.p.keyboard.press("Control+s");
+    await r.hold(8);
+    await r.at('[data-testid="view-canvas"]');
+    await r.hold(2);
+    r.down = true; await s.p.getByTestId("view-canvas").click(); await r.snap({ pop: 1 }); r.down = false;
+    await s.settle(800);
+    await r.hold(10);
+    r.save();
   });
-  for (let i = 0; i < 120 && !(await started()); i++) await r.snap({}, 500);
-  await s.p.waitForTimeout(2500); // (the study opened and drawn in it)
-  await r.hold(6);
-  // its Brush, larger, and strokes over the horse: a line of action and the curve of its back
-  const area = (await s.p.locator(".photocraft-frame").boundingBox())!;
-  const cx = area.x + area.width * 0.45, cy = area.y + area.height * 0.52;
-  await s.p.mouse.click(area.x + area.width * 0.5, area.y + area.height * 0.95);
-  await s.p.keyboard.press("b");
-  for (let i = 0; i < 6; i++) await s.p.keyboard.press("]");
-  await r.hold(2);
-  const sweep = (pts: Pt[]): Pt[] => curve(pts, 8);
-  await r.line(sweep([[cx - 240, cy - 120], [cx - 90, cy - 40], [cx + 60, cy + 10], [cx + 220, cy + 110]]), 2);
-  await r.line(sweep([[cx - 200, cy + 60], [cx - 40, cy + 120], [cx + 140, cy + 140], [cx + 260, cy + 70]]), 2);
-  await r.hold(4);
-  // Save: into the study's own file, in its own kind (a new version of it in the Library and on the canvas)
-  await s.p.keyboard.press("Control+s");
-  await r.hold(8);
-  await r.at('[data-testid="view-canvas"]');
-  await r.hold(2);
-  r.down = true; await s.p.getByTestId("view-canvas").click(); await r.snap({ pop: 1 }); r.down = false;
-  await s.settle(800);
-  await r.hold(10);
-  r.save();
 });

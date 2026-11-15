@@ -1570,7 +1570,7 @@ Paint over a study in a full photo editor without leaving the board: the picture
 | A view of its own | It keeps running with its documents while you are on the canvas or in the Library. The **×** beside its tab closes it, and asks first when something was done since its last save |
 | Its File › Open and Place | Choose from the Library, or import from this device |
 | Its keys | Its shortcuts stay in it (`Ctrl+=` zooms its document, not the page) |
-| Pasting | A picture copied anywhere and pasted in it (`Ctrl+V`) becomes a layer of the open document, or a document of its own |
+| Pasting | A picture copied on a canvas, in the Library or in another program and pasted in it (`Ctrl+V`) becomes a smart object layer of the open document (a copy kept inside it, not a link), or a document of its own |
 | Drawing | Strokes get every move of the pointer, as smooth as in its desktop app |
 | Offline | It makes no network request: its help links and update check are hidden |
 
@@ -2546,12 +2546,14 @@ These are limits of PhotoCraft's web build, which canvast carries unchanged.
 | --- | --- |
 | Unsaved mark | Its `*` and `•` never clear and its own Close asks to save, as its web build cannot know a saved file was kept. *Save* in its question saves and closes; canvast's **×** does not ask when nothing was done since the last save |
 | Its tab's name | After a save its tab shows the PSD it wrote (`image.psd`); the file in the Library keeps its own name and kind |
-| Edit › Paste | Its menu's *Paste* finds the clipboard empty (its web build reads no picture from it); `Ctrl+V` pastes a picture as a layer |
+| Edit › Paste | Its menu's *Paste* finds the clipboard empty (its web build reads no picture from it); `Ctrl+V` pastes a picture as a smart object layer |
 | Saving back | A file canvast cannot make (TIFF, BMP, GIF…) is saved as a new PSD item beside it. Saving into a PNG, JPEG or WebP needs the PSD's merged picture: keep *Maximize PSD compatibility* on (its default) |
 | ⚠️ What is not kept | Its open documents and undo history end when it closes (its web build has no autosave): save first. Its panel layout is kept only with its *Remember Workspace Changes* on. Presets changed less than a minute before the app is closed abruptly may be lost |
 | Hidden features | Folders, batch, plug-ins, printing, links and updates are hidden. A few items it never lets be hidden stay: Save, Save As, Exit, Edit › Menus, Keyboard Shortcuts and its Preferences pages |
 | Hidden items | Hidden items do not open in it (its own storage would keep their names) |
 | Needs | WebGPU or WebGL2: a browser without either cannot start it |
+| Browsers | Tested in Chromium only: the test machines' Firefox has neither WebGPU nor WebGL2, so its tests are skipped there |
+| Memory | It keeps running in other views, its open documents in memory and on the graphics card: close it with **×** to free them |
 | Size | It adds about 20 MB to `canvast.html` |
 
 ### The browser version

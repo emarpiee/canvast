@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.60.1 — PhotoCraft's part of the animation, its limits completed (2026-11-15)
+
+- **Changed:** the animation's PhotoCraft part is a gesture study: thin lines over Delacroix's horse (its line of action, the barrel of its body, its front leg), saved and back on its canvas.
+- **Changed:** the README says a picture pasted in PhotoCraft (from a canvas, the Library or another program) becomes a smart object layer, a copy kept inside the document; its Limitations add that PhotoCraft is tested in Chromium only and keeps its documents in memory while you are in other views (close it with ×).
+
 ## 0.60.0 — PhotoCraft inside canvast, the top bar in three sets, the panels' buttons on the right edge, Flip for shapes and paths, standard words (2026-11-15)
 
 Everything since 0.59.0 (0.59.1 to 0.59.17).
