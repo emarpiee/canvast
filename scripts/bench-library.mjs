@@ -1,13 +1,16 @@
 #!/usr/bin/env node
 // How the desktop app copes with a big library: a workspace folder of N library files, as another device would have made it (the files
 // in library/<folder>/, a thousand to a folder, and the library index in parts), opened by the desktop build of a test snapshot.
-//   node scripts/bench-library.mjs <N> [--dir <folder>] [--build <test-builds/…>] [--keep]
+//   node scripts/bench-library.mjs <N> [--dir <folder>] [--build <test-builds/…>] [--keep] [--scroll]
 // Times: making the folder; the first open on a new device (the whole library taken from the folder), until the Library view shows
 // every item; a second open (from the app's own storage), the same; a file put into library/ from outside, until the Library view shows
 // it; one rename, until it is written. The folder is made again only when it does not hold N items; it is removed at the end unless
 // --keep. Never point --dir inside a synced folder.
+// --scroll: the files are real small pictures, and the Library view is scrolled with the mouse wheel in Thumbnails and List, the
+// thumbnail size at its smallest and its largest, each twice (the first time its thumbnails are made, the second they are ready):
+// frames per second, the slowest frames, and how long the cards in view wait for their pictures once the wheel stops.
 import { _electron as electron } from "@playwright/test";
-import { existsSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { makeWorkspace } from "./lib/bench-workspace.mjs";
@@ -23,16 +26,18 @@ const dir = resolve(opt("--dir", join(tmpdir(), `canvast-bench-${N}`)));
 const build = resolve(opt("--build", join("test-builds", readdirSync("test-builds").filter((d) => existsSync(join("test-builds", d, "desktop"))).sort().pop() ?? "")));
 if (!existsSync(join(build, "desktop"))) throw new Error(`no desktop build in ${build}: run a test:snap first`);
 const PER_FOLDER = 1000;
+const SCROLL = args.includes("--scroll");
 const ms = (t) => `${((performance.now() - t) / 1000).toFixed(1)} s`;
 const results = [];
 const note = (what, value) => (results.push([what, value]), console.log(`${what}: ${value}`));
 
 // ---- the folder ----
 const marker = join(dir, ".bench-items");
-if (!existsSync(marker) || Number(String(statSync(marker).size)) !== N) {
+const kind = SCROLL ? "p" : "x";
+if (!existsSync(marker) || Number(String(statSync(marker).size)) !== N || readFileSync(marker, "utf8")[0] !== kind) {
   const t = performance.now();
-  makeWorkspace(dir, N, { perFolder: PER_FOLDER });
-  writeFileSync(marker, "x".repeat(N));
+  makeWorkspace(dir, N, { perFolder: PER_FOLDER, pictures: SCROLL });
+  writeFileSync(marker, kind.repeat(N));
   note(`made ${N.toLocaleString()} files`, ms(t));
 }
 
@@ -41,6 +46,8 @@ async function open(device) {
   const t = performance.now();
   const app = await electron.launch({ args: [join(build, "desktop"), `--workspace=${dir}`, `--user-data-dir=${dir}-${device}`], env: { ...process.env, CANVAST_HIDDEN: "1", CANVAST_HASH: "#debug" }, timeout: 600_000 });
   const page = await app.firstWindow({ timeout: 600_000 });
+  // (one window size for every run: 1400 x 900)
+  await app.evaluate(({ BrowserWindow }) => { for (const w of BrowserWindow.getAllWindows()) { w.setContentSize(1400, 900); } });
   if (args.includes("--trace")) page.on("console", (m) => m.text().startsWith("⏱") && console.log(`  ${((performance.now() - t) / 1000).toFixed(1)}s ${m.text()}`));
   page.setDefaultTimeout(1_800_000);
   await page.waitForFunction(() => typeof window.__canvastDebug !== "undefined", null, { timeout: 1_800_000, polling: 500 });
@@ -59,6 +66,57 @@ let s = await open("device-a");
 note("first open, new device: page ready", s.ready);
 note("first open, new device: the Library view shows every item", s.listed);
 note("first open: page heap", await heap(s.page));
+
+// ---- scrolling the Library view (--scroll) ----
+const scrollRows = [];
+async function scrollPass(page, mode, size, pass) {
+  await page.locator(`.assets-view [data-layout="${mode}"], [data-layout="${mode}"]`).first().click();
+  await page.locator(".assets-size input").evaluate((el, v) => { el.value = String(v); el.dispatchEvent(new Event("input", { bubbles: true })); }, size);
+  await page.evaluate(() => { document.querySelector(".assets-scroll").scrollTop = 0; });
+  await page.waitForTimeout(2000);
+  const box = (await page.locator(".assets-scroll").boundingBox());
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await page.evaluate(() => {
+    const w = window; w.__frames = []; w.__on = true; let last = performance.now();
+    const tick = (t) => { w.__frames.push(t - last); last = t; if (w.__on) requestAnimationFrame(tick); };
+    requestAnimationFrame(tick);
+  });
+  const t0 = performance.now();
+  const STEPS = 250, DELTA = 200; // (a wheel notch every 16 ms: a fast, steady scroll of about 50,000 px)
+  for (let i = 0; i < STEPS; i++) { await page.mouse.wheel(0, DELTA); await page.waitForTimeout(16); }
+  const secs = (performance.now() - t0) / 1000;
+  const r = await page.evaluate(() => {
+    const w = window; w.__on = false;
+    const f = w.__frames.slice(1).sort((a, b) => a - b), sum = f.reduce((a, b) => a + b, 0);
+    const sc = document.querySelector(".assets-scroll");
+    return { fps: f.length / (sum / 1000), p95: f[Math.floor(f.length * 0.95)] ?? 0, worst: f[f.length - 1] ?? 0, long: f.filter((x) => x > 50).length, top: sc.scrollTop, height: sc.scrollHeight };
+  });
+  // the cards in view once the wheel stops: how long until each shows its picture
+  const t1 = performance.now();
+  const waiting = () => page.evaluate(() => {
+    const sc = document.querySelector(".assets-scroll").getBoundingClientRect();
+    let n = 0;
+    for (const c of document.querySelectorAll('[data-testid="asset-card"]')) {
+      const b = c.getBoundingClientRect();
+      if (b.bottom < sc.top || b.top > sc.bottom) continue;
+      const img = c.querySelector(".asset-thumb img");
+      if (!img || !img.getAttribute("src") || !img.complete || !img.naturalWidth) n++;
+    }
+    return n;
+  });
+  const atStop = await waiting();
+  let left = atStop;
+  while (left > 0 && performance.now() - t1 < 30_000) { await page.waitForTimeout(100); left = await waiting(); }
+  const filled = left > 0 ? "over 30 s" : `${((performance.now() - t1) / 1000).toFixed(2)} s`;
+  scrollRows.push([`${mode === "grid" ? "Thumbnails" : "List"}, size ${size}`, pass, `${r.fps.toFixed(0)}`, `${r.p95.toFixed(0)} ms`, `${r.worst.toFixed(0)} ms`, String(r.long), `${Math.round(r.top / secs).toLocaleString()} px/s`, `${atStop}`, filled]);
+  console.log(`scroll ${mode} ${size} ${pass}: ${JSON.stringify(r)} cards waiting ${atStop}, all shown ${filled}`);
+}
+if (SCROLL) {
+  for (const pass of ["first time", "again"])
+    for (const mode of ["grid", "list"])
+      for (const size of [96, 240]) await scrollPass(s.page, mode, size, pass);
+  note("after scrolling: page heap", await heap(s.page));
+}
 await s.page.evaluate(() => window.__canvastDebug.flushStorage());
 await s.app.close();
 
@@ -79,4 +137,5 @@ note("one rename, until written to the folder", ms(t));
 await s.app.close();
 
 console.log(`\n| ${N.toLocaleString()} items | time |\n| --- | --- |\n${results.map(([a, b]) => `| ${a} | ${b} |`).join("\n")}`);
+if (scrollRows.length) console.log(`\n| Scrolling ${N.toLocaleString()} items | Pass | FPS | Slowest 5 % | Slowest | Frames over 50 ms | Speed | Cards waiting at stop | Until all shown |\n| --- | --- | --- | --- | --- | --- | --- | --- | --- |\n${scrollRows.map((r) => `| ${r.join(" | ")} |`).join("\n")}`);
 if (!args.includes("--keep")) for (const d of [dir, `${dir}-device-a`]) rmSync(d, { recursive: true, force: true });
