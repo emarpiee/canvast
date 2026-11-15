@@ -32,7 +32,7 @@ import type { SearchWay } from "../search/history";
 import { forget as forgetSaved, moved, parseSaved, renamed, sameSearch, withLook, type SavedLook, type SavedSearch } from "../search/saved";
 import { paintRecent, paintSaveToggle, saveToggleHtml, wireRecent, wireSaveToggle, type SavedStore } from "./search-recent";
 import { evalQuery, parseQuery, type Query } from "../search/query";
-import { concealedUnder, contentOf, countSide as countSideOf, inScope as inScopeOf, libraryPaging, matcher, pickedKeys, propValue, propValues, sortListed, togglePicked, type LibraryQuery, type SideCounts, type SortKey, type UsageFilter } from "../assets/library-match";
+import { concealedUnder, contentOf, countSide as countSideOf, folderScope, inScope as inScopeOf, libraryPaging, matcher, pickedKeys, propValue, propValues, scopeFolders, sortListed, toggleFolder, togglePicked, type LibraryQuery, type SideCounts, type SortKey, type UsageFilter } from "../assets/library-match";
 import { LOOK_SIZE, lookOf, similarGroups, type Look } from "../assets/look";
 import type { AssetLibrary } from "../assets/asset-library";
 import { duplicateNotice } from "../assets/asset-library";
@@ -681,9 +681,17 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   let places: AssetPlace[] = [];
   let generation = 0;
   /** What being put in a place of the sidebar changes on an item. */
-  const scopeChange = (k: string, label: string): MetaChange => (k.startsWith("folder:") ? { addFolders: [k.slice(7)] } : k === "unfiled" ? { clearFolder: true } : k === "favorites" ? { favorite: true } : { addTags: [label] });
+  const scopeChange = (k: string, label: string): MetaChange => (k.startsWith("folder:") ? { addFolders: scopeFolders(k).slice(0, 1) } : k === "unfiled" ? { clearFolder: true } : k === "favorites" ? { favorite: true } : { addTags: [label] });
   /** Sidebar scope: "all", "favorites", "unfiled", "missing", "folder:<id>" or "tag:<lowercased tag>". */
   let scope = ui.filters.scope === "hidden" ? "all" : ui.filters.scope; // (the filters are kept with the library's layout: a restart opens the library as it was left)
+  /** The folder clicked last in the sidebar, where a Shift+click's run of folders starts. */
+  let lastFolder = "";
+  /** Every folder the scope shows: each folder chosen and every folder under it. */
+  const scopeSubtree = (folders: readonly AssetFolder[]): Set<string> => {
+    const out = new Set<string>();
+    for (const id of scopeFolders(scope)) for (const f of folderSubtree(folders, id)) out.add(f);
+    return out;
+  };
   /**
    * Custom thumbnail of `hashes` (their own category: uploaded once, chosen again from Thumbnails; or a picture of the library; or their
    * own again). Normal mode sees and makes normal ones only; hidden mode sees both, and what it uploads is kept as a hidden one.
@@ -2152,7 +2160,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     if (gen !== generation) return;
     listing = l;
     dropStaleThumbs();
-    if (scope.startsWith("folder:") && !l.folders.some((f) => `folder:${f.id}` === scope)) scope = "all";
+    if (scope.startsWith("folder:")) scope = folderScope(scopeFolders(scope).filter((id) => l.folders.some((f) => f.id === id)));
     if (pages && scope === "similar") scope = "all"; // (look-alikes are not grouped over a library listed a page at a time)
     if (!pages) {
       const known = new Set([...l.entries.map((e) => e.hash), ...l.missing.map((m) => m.hash)]);
@@ -2274,7 +2282,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     const usage = usageSel.value as UsageFilter;
     const group = new Map<string, number>();
     if (scope === "similar") similar().forEach((g, i) => g.forEach((h) => group.set(h, i)));
-    const inFolders = scope.startsWith("folder:") ? folderSubtree(listing.folders, scope.slice(7)) : null;
+    const inFolders = scope.startsWith("folder:") ? scopeSubtree(listing.folders) : null;
     const sets = { inFolders, canvasTagged: scope.startsWith("ctag:") ? canvasTagAssets(scope.slice(5)) : null, similar: group, concealed: concealedNow() };
     const inScope = (e: CatalogListing["entries"][number]): boolean => inScopeOf(e, scope, sets, hiddenMode);
     // The library sorted once for this sort (kept until the library or the sort changes); a search or a filter only keeps rows of it, in
@@ -2485,7 +2493,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     if (scope === "unfiled") return "Unfiled";
     if (scope === "missing") return "Missing";
     if (scope === "similar") return "Similar pictures";
-    if (scope.startsWith("folder:")) return listing!.folders.find((f) => `folder:${f.id}` === scope)?.name ?? "Folder";
+    if (scope.startsWith("folder:")) return scopeFolders(scope).map((id) => listing!.folders.find((f) => f.id === id)?.name ?? "Folder").join(", ");
     if (/^(ext|tag):/.test(scope) && /[|&]/.test(scope)) return [...pickedKeys(scope)].map((k) => (k.startsWith("ext:") ? `.${k.slice(4).toUpperCase()}` : `#${tagCounts?.get(k.slice(4))?.label ?? k.slice(4)}`)).join(", ");
     if (scope.startsWith("ext:")) return `File type .${scope.slice(4).toUpperCase()}`;
     if (scope.startsWith("tag:")) return `#${tagCounts?.get(scope.slice(4))?.label ?? scope.slice(4)}`;
@@ -2520,7 +2528,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       reversed,
       used,
       canvasNames,
-      ...(scope.startsWith("folder:") && listing ? { inFolders: [...folderSubtree(listing.folders, scope.slice(7))] } : {}),
+      ...(scope.startsWith("folder:") && listing ? { inFolders: [...scopeSubtree(listing.folders)] } : {}),
       ...(scope.startsWith("ctag:") ? { canvasTagged: [...canvasTagAssets(scope.slice(5))] } : {}),
       ...(hiddenMode ? { hidden: true } : {}),
       ...(concealedIds.length ? { concealed: concealedIds } : {}),
@@ -2578,7 +2586,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     }
     const all = totalOf.n;
     // (a concealed folder opened: its items are not among all the others, so it says what it shows on its own)
-    const hushHere = scope.startsWith("folder:") && !!concealedNow()?.has(scope.slice(7));
+    const hushHere = scopeFolders(scope).some((id) => !!concealedNow()?.has(id));
     count.textContent = hushHere ? `${plural(rows.length, "item")} in a concealed folder` : `${rows.length === all ? "" : `${rows.length} of `}${all} item${all === 1 ? "" : "s"}`;
     // What hides items is said over the grid, with a way back to all of them (a filter left on looked like lost files).
     const why = [usageSel.value !== "all" ? usageSel.selectedOptions[0]?.text ?? "" : "", scope !== "all" ? scopeNameOf() : "", hushHere ? "concealed: listed only here" : "", search.value.trim() ? `“${search.value.trim()}”` : ""].filter(Boolean);
@@ -2708,7 +2716,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     const picked = pickedKeys(scope);
     const item = (key: string, label: string, n: number | null, opts: { depth?: number; icon?: string; /** Before the count (a pinned folder's pin). */ mark?: string; extra?: string; cls?: string; before?: string; title?: string; /** What the row does, in place of choosing a scope. */ attrs?: string; /** A row with rows under it: open or not (a click opens or closes it). */ expanded?: boolean } = {}): string => {
       const current = TRASH_WORD.test(search.value) ? key === "trash" : scope === key || picked.has(key);
-      return `<li class="side-row ${opts.cls ?? ""}${current ? " is-current" : ""}" style="--depth:${opts.depth ?? 0}">${opts.before ?? ""}<button type="button" class="side-item${current ? " is-active" : ""}" ${opts.attrs ?? `data-scope="${esc(key)}" aria-current="${scope === key || picked.has(key)}"`}${opts.expanded === undefined ? "" : ` aria-expanded="${opts.expanded}"`} title="${opts.title ?? label.replace(/<[^>]*>/g, "")}${/^(ext|tag):/.test(key) ? " (Ctrl+click: add to the filter)" : ""}">
+      return `<li class="side-row ${opts.cls ?? ""}${current ? " is-current" : ""}" style="--depth:${opts.depth ?? 0}">${opts.before ?? ""}<button type="button" class="side-item${current ? " is-active" : ""}" ${opts.attrs ?? `data-scope="${esc(key)}" aria-current="${scope === key || picked.has(key)}"`}${opts.expanded === undefined ? "" : ` aria-expanded="${opts.expanded}"`} title="${opts.title ?? label.replace(/<[^>]*>/g, "")}${/^(ext|tag):/.test(key) ? " (Ctrl+click: add to the filter)" : key.startsWith("folder:") ? " (Ctrl+click: show it too; Shift+click: the folders between)" : ""}">
         ${opts.icon ?? ""}<span class="side-label">${label}</span>${opts.mark ?? ""}${opts.expanded === undefined ? "" : `<span class="side-kids" aria-hidden="true"></span>`}${n === null ? "" : `<span class="side-n${opts.before !== undefined ? " layer-count" : ""}">${n}</span>`}</button>${opts.extra ?? ""}</li>`;
     };
     const nameInput = (value: string, label: string): string =>
@@ -2892,7 +2900,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
           (listing.folders.length > 1 ? sortBtn("folders") : "") + foldAll + addBtn('data-folder-action="new" data-id="" data-testid="folder-new"', "New folder"),
           `${listing.folders.length ? findBox("folders", "folders") : ""}<ul class="side-list" data-testid="folder-tree">
             ${naming?.kind === "new" && naming.parent === null ? nameInput("", "Name of the new folder") : ""}
-            ${capped("folders", [...folderSorted(listing.folders.filter((f) => pinnedNow.has(f.id))), ...folderSorted(listing.folders.filter((f) => f.parentId === null && !pinnedNow.has(f.id) && (!foldersKept || foldersKept.has(f.id))))].map((f) => ({ html: `<li class="folder-group${folderKids(f.id).length && (findingFolders || !ui.folded.includes(f.id)) ? " is-open" : ""}"><ul class="folder-group-list">${treeOf(f)}</ul></li>`, active: pinnedNow.has(f.id) || [scope.startsWith("folder:") ? scope.slice(7) : "", naming?.kind === "rename" ? naming.id : "", naming?.kind === "new" ? (naming.parent ?? "") : ""].some((id) => id && folderSubtree(listing!.folders, f.id).has(id)) })), findingFolders) || (naming ? "" : `<li class="side-empty">${findingFolders ? "No folders match." : "No folders yet."}</li>`)}
+            ${capped("folders", [...folderSorted(listing.folders.filter((f) => pinnedNow.has(f.id))), ...folderSorted(listing.folders.filter((f) => f.parentId === null && !pinnedNow.has(f.id) && (!foldersKept || foldersKept.has(f.id))))].map((f) => ({ html: `<li class="folder-group${folderKids(f.id).length && (findingFolders || !ui.folded.includes(f.id)) ? " is-open" : ""}"><ul class="folder-group-list">${treeOf(f)}</ul></li>`, active: pinnedNow.has(f.id) || [...scopeFolders(scope), naming?.kind === "rename" ? naming.id : "", naming?.kind === "new" ? (naming.parent ?? "") : ""].some((id) => id && folderSubtree(listing!.folders, f.id).has(id)) })), findingFolders) || (naming ? "" : `<li class="side-empty">${findingFolders ? "No folders match." : "No folders yet."}</li>`)}
           </ul>`,
         )}
         ${section(
@@ -4555,6 +4563,23 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     if (b.dataset["scope"]) {
       // Choosing the one already chosen lets go of it (back to all assets).
       let next = b.dataset["scope"];
+      // Several folders at once: Ctrl (or ⌘) adds a folder to those shown or takes it out, Shift shows every folder from the last one
+      // clicked to this one, as the sidebar lists them.
+      if (next.startsWith("folder:") && (e.ctrlKey || e.metaKey || (e.shiftKey && lastFolder))) {
+        const id = next.slice(7);
+        if (e.shiftKey && lastFolder) {
+          const order = [...new Set([...side.querySelectorAll<HTMLElement>('[data-scope^="folder:"]')].map((x) => x.dataset["scope"]!.slice(7)))];
+          const [a, z] = [order.indexOf(lastFolder), order.indexOf(id)].sort((x, y) => x - y);
+          const run = a! < 0 ? [id] : order.slice(a, z! + 1);
+          scope = folderScope(e.ctrlKey || e.metaKey ? [...scopeFolders(scope), ...run] : run);
+        } else {
+          scope = toggleFolder(scope, id);
+          lastFolder = id;
+        }
+        render();
+        return;
+      }
+      if (next.startsWith("folder:")) lastFolder = next.slice(7);
       // A folder with subfolders opens on a click and closes on the next, and is the one chosen either way (folders as in a file manager).
       if (next.startsWith("folder:") && b.hasAttribute("aria-expanded")) {
         const id = next.slice(7);
@@ -5569,7 +5594,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     const [hash] = await view.importFiles([newNoteFile(newNoteName(session, settings))]);
     if (!hash) return;
     // (in the open folder; else in the Notes folder of Settings > Notes)
-    if (scope.startsWith("folder:")) await session.organize((c) => c.updateMeta(hash, { addFolders: [scope.slice(7)] }), "File a note");
+    if (scope.startsWith("folder:")) await session.organize((c) => c.updateMeta(hash, { addFolders: scopeFolders(scope).slice(0, 1) }), "File a note");
     else await fileInLibrary(session, hash, settings.get("notes.folder"), []);
     await refresh();
     await showSlide(hash);

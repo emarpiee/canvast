@@ -145,8 +145,26 @@ export function matcher(ctx: MatchContext): (e: ListedEntry, query: Query | null
  * Whether an item is in a scope. Hidden items are listed in hidden mode only, and only they are (`hiddenMode`). `inFolders`: a folder's
  * subtree (scope `folder:`); `canvasTagged`: the items a canvas tag is on (scope `ctag:`); `similar`: the items in a look-alike group.
  */
-/** The file types and tags a quick filter holds (`ext:png|jpg&tag:cat`): each `ext:` or `tag:` key in it. */
+/** The folders a folder scope shows (`folder:a|b|c`: several folders chosen with Ctrl or Shift), each with what is under it. */
+export function scopeFolders(scope: string): string[] {
+  return scope.startsWith("folder:") ? scope.slice(7).split("|").filter(Boolean) : [];
+}
+
+/** A folder scope with these folders, in this order; "all" when none is left. */
+export function folderScope(ids: readonly string[]): string {
+  const kept = [...new Set(ids)];
+  return kept.length ? `folder:${kept.join("|")}` : "all";
+}
+
+/** A folder scope with folder `id` added or taken out (Ctrl+click); a scope of another kind starts from nothing. */
+export function toggleFolder(scope: string, id: string): string {
+  const ids = scopeFolders(scope);
+  return folderScope(ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id]);
+}
+
+/** The file types, tags or folders a quick filter holds (`ext:png|jpg&tag:cat`, `folder:a|b`): each `ext:`, `tag:` or `folder:` key in it. */
 export function pickedKeys(scope: string): Set<string> {
+  if (scope.startsWith("folder:")) return new Set(scopeFolders(scope).map((id) => `folder:${id}`));
   if (!/^(ext|tag):/.test(scope)) return new Set();
   return new Set(scope.split("&").flatMap((part) => part.slice(4).split("|").map((v) => part.slice(0, 4) + v)));
 }
@@ -180,7 +198,7 @@ export function inScope(e: ListedEntry, scope: string, sets: { inFolders?: Has |
   const m = meta(e);
   if (m.hidden !== hiddenMode) return false;
   // (in a concealed folder: nowhere but that folder, or a folder of it, opened; not All items, a search, a type, a tag or a parent folder)
-  if (isConcealed(m.folderIds, sets.concealed) && !(scope.startsWith("folder:") && sets.concealed!.has(scope.slice(7)))) return false;
+  if (isConcealed(m.folderIds, sets.concealed) && !scopeFolders(scope).some((id) => sets.concealed!.has(id))) return false;
   if (scope === "similar") return !!sets.similar?.has(e.hash);
   if (scope === "favorites") return m.favorite;
   if (scope === "unfiled") return m.folderIds.length === 0;

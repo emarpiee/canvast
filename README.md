@@ -949,6 +949,7 @@ Pin the folder you work from most, nest tags by subject and keep the searches yo
 | Sidebar list | What it holds |
 | --- | --- |
 | **Folders** | An item lives in one folder; folders nest. They fold: a click on a folder that has subfolders opens or closes it (a small branch mark before its count says it has some), or Collapse all on the Folders header; remembered on this device |
+| **Several folders** | **Ctrl+click** a folder to show it too (or take it out again), **Shift+click** to show every folder between the last one clicked and this one, as the list shows them; **Ctrl+Shift+click** adds that run. Each comes with its subfolders; the filter chip names them, and a file imported or a note made then goes into the first |
 | **Tags** | Several per item. A tag with a `/` (`reference/anatomy`) is a branch of a tree, with arrows that fold it and a parent that finds and counts what is nested under it, each item once; or all in a row with their whole names, by the button on the Tags header. Renamed in one dialog, from a tag's ⋯ menu in the sidebar or the Tags panel, or a double-click on it in the details |
 | **Favourites**, **File types**, **Canvas tags** | The starred items; each kind of file; the tags of the canvases' objects |
 | **Unfiled**, **Missing** | Items in no folder; the items whose file is gone (as `is:missing`), shown while there are some |

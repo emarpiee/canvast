@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { Library, openLibraryDb } from "../../desktop/library-db";
-import { togglePicked } from "../../src/assets/library-match";
+import { folderScope, pickedKeys, scopeFolders, toggleFolder, togglePicked } from "../../src/assets/library-match";
 import { LibraryIndex } from "../../desktop/library-index";
 import { leanLine, libraryPartText, readItem } from "../../src/storage/library-mirror";
 import type { LibraryItem } from "../../src/storage/library-mirror";
@@ -109,6 +109,14 @@ describe("library database (desktop)", () => {
     expect(togglePicked("ext:png", "tag:cat")).toBe("ext:png&tag:cat");
     expect(togglePicked("ext:png|jpg&tag:cat", "ext:png")).toBe("ext:jpg&tag:cat");
     expect(togglePicked("ext:png", "ext:png")).toBe("all");
+    // Several folders at once (Ctrl or Shift+click on folders in the sidebar)
+    expect(toggleFolder("folder:a", "b")).toBe("folder:a|b");
+    expect(toggleFolder("folder:a|b", "a")).toBe("folder:b");
+    expect(toggleFolder("folder:a", "a")).toBe("all");
+    expect(toggleFolder("tag:cat", "a")).toBe("folder:a");
+    expect(folderScope(["a", "b", "a"])).toBe("folder:a|b");
+    expect(scopeFolders("folder:a|b")).toEqual(["a", "b"]);
+    expect([...pickedKeys("folder:a|b")]).toEqual(["folder:a", "folder:b"]);
     expect(list({ hidden: true })).toEqual([item(3).hash]); // hidden mode: the hidden items only
     expect(list({ hidden: true, scope: "favorites" })).toEqual([]);
     expect(index.counts(true)).toMatchObject({ hidden: 1, shown: 2, favourites: 0, types: [["jpg", 1]] });

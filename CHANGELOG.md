@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.3 — Several folders at once in the Library (2026-11-16)
+
+- **Added:** the Library's sidebar shows several folders at once: **Ctrl+click** a folder to show it too (or take it out), **Shift+click** to show every folder from the last one clicked to this one, **Ctrl+Shift+click** to add that run. Each with its subfolders; the filter chip names them.
+
 ## 0.60.2 — No Tests badge in the README (2026-11-15)
 
 - **Removed:** the Tests badge at the top of the README.
