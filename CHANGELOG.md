@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.2 — No Tests badge in the README (2026-11-15)
+
+- **Removed:** the Tests badge at the top of the README.
+
 ## 0.60.1 — PhotoCraft's part of the animation, its limits completed (2026-11-15)
 
 - **Changed:** the animation's PhotoCraft part is a gesture study: thin lines over Delacroix's horse (its line of action, the barrel of its body, its front leg), saved and back on its canvas.

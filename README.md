@@ -12,7 +12,6 @@
 <p align="center"><a href="https://emarpiee.github.io/canvast/"><b>Try it in your browser</b></a> · <a href="https://github.com/emarpiee/canvast/releases/latest/download/canvast.html">Download canvast.html</a></p>
 
 <p align="center">
-  <a href="https://github.com/emarpiee/canvast/actions/workflows/tests.yml"><img src="https://github.com/emarpiee/canvast/actions/workflows/tests.yml/badge.svg" alt="Tests"></a>
   <a href="https://github.com/emarpiee/canvast/actions/workflows/ci.yml"><img src="https://github.com/emarpiee/canvast/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <a href="https://github.com/emarpiee/canvast/releases/latest"><img src="https://img.shields.io/github/v/release/emarpiee/canvast?label=release&color=71685E" alt="Latest release"></a>
   <a href="LICENSE"><img src="https://img.shields.io/github/license/emarpiee/canvast?color=71685E" alt="Licence: GPL-3.0"></a>
