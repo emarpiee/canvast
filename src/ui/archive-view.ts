@@ -11,6 +11,7 @@ import { viewKindNamed } from "./file-views";
 import { esc, fmtBytes } from "./format";
 import { ICONS } from "./icons";
 import { barButton } from "./view-bar";
+import { pageKey, swipePages } from "./page-turn";
 import { openMoreMenu } from "./more-menu";
 import { keepViewState, markActions, toggledMark, viewStateOf } from "./view-state";
 import type { MarksChange, ViewState } from "./view-state";
@@ -56,8 +57,8 @@ export async function openArchiveView(el: HTMLElement, file: FileFacts, deps: Vi
       ${count ? barButton("pages", ICONS.bookOpen, "Pages", `Read its ${plural(count, "picture")} as pages`, 'aria-pressed="false"') : ""}
       <span class="view-gap"></span>
       <span class="archive-tools" data-in="pages">
-        ${barButton("prev", ICONS.pageUp, "Previous page", "Previous page (Page Up)")}
-        ${barButton("next", ICONS.pageDown, "Next page", "Next page (Page Down, Space)")}
+        ${barButton("prev", ICONS.pageUp, "Previous page", "Previous page (Page Up; the arrows once you click in the page; a swipe or a tap on its left part)")}
+        ${barButton("next", ICONS.pageDown, "Next page", "Next page (Page Down, Space; the arrows once you click in the page; a swipe or a tap)")}
         <label class="view-field">Page <input class="adj-num archive-at" type="number" min="1" max="${count}" step="1" aria-label="Page" data-testid="archive-page" /></label><span class="pdf-count">/ ${count}</span>
         <span class="view-gap"></span>
         ${barButton("out", ICONS.minus, "Zoom out", "Zoom out (Ctrl+-)")}
@@ -328,6 +329,7 @@ export async function openArchiveView(el: HTMLElement, file: FileFacts, deps: Vi
     const r = pagesBox.getBoundingClientRect();
     void showPage(current + (e.clientX - r.left < r.width / 3 ? -1 : 1));
   });
+  swipePages(pagesBox, (dir) => void showPage(current + dir));
   pagesBox.addEventListener("wheel", (e) => {
     if (!e.ctrlKey && !e.metaKey) return;
     e.preventDefault();
@@ -465,12 +467,10 @@ export async function openArchiveView(el: HTMLElement, file: FileFacts, deps: Vi
         return false;
       }
       if (e.ctrlKey || e.metaKey || e.altKey) return false;
-      if (e.key === "PageDown" || (e.key === " " && !e.shiftKey)) void showPage(current + 1);
-      else if (e.key === "PageUp" || (e.key === " " && e.shiftKey)) void showPage(current - 1);
+      const turn = pageKey(e, pagesBox) || (e.key === " " ? (e.shiftKey ? -1 : 1) : 0);
+      if (turn) void showPage(current + turn);
       else if (e.key === "Home") void showPage(1);
       else if (e.key === "End") void showPage(count);
-      else if (e.key === "ArrowDown") pagesBox.scrollTop += pagesBox.clientHeight / 10;
-      else if (e.key === "ArrowUp") pagesBox.scrollTop -= pagesBox.clientHeight / 10;
       else return false;
       return true;
     },

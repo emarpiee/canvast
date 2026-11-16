@@ -22,7 +22,8 @@ import { itemsIn, justifiedLayout, listLayout, nearestInRow, rowOf, squaresLayou
 import { keepFrame, newNoteName } from "../app/frames";
 import { artFullPicture, isArtFile } from "../assets/art-preview";
 import { externalFolder } from "../storage/external-folder";
-import { isModelFile, isPdfFile, AUTO_COPY_NOTE, cardRatio, chipOf, describeFile, extOf, hasThumb, isAutoCopy, isCard, isFontFile } from "../assets/file-kind";
+import { drawnFromBytes } from "../assets/adapters";
+import { isArchiveFile, isPdfFile, AUTO_COPY_NOTE, cardRatio, chipOf, describeFile, extOf, hasThumb, isAutoCopy, isCard, isFontFile } from "../assets/file-kind";
 import { FILE_CARD_NOTE } from "../assets/card";
 import { FONT_SAMPLES, fontSampleHtml, showFont } from "./font-specimen";
 import { downloadOriginal, fileActionsOf, openOriginalInTab } from "./file-actions";
@@ -960,8 +961,8 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
         if (!rec) throw new Error("missing");
         const made = await makeThumb(rec);
         if (made) {
-          // A PDF imported before its pages were drawn: its item takes its first page's shape.
-          if (!made.notKept && isPdfFile(rec) && rec.pixelW === FILE_CARD_W && rec.pixelH === FILE_CARD_H && !session.readOnly) {
+          // A PDF or a comic book imported before its pages were drawn: its item takes its first page's shape.
+          if (!made.notKept && (isPdfFile(rec) || isArchiveFile(rec.name)) && rec.pixelW === FILE_CARD_W && rec.pixelH === FILE_CARD_H && !session.readOnly) {
             const fit = pageFit({ w: made.w, h: made.h }, PDF_CARD_EDGE);
             void session.catalog?.updateMeta(hash, { cardSize: fit }).catch(() => undefined);
           }
@@ -2196,7 +2197,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     const have = new Set(await session.catalog.thumbHashes().catch(() => []));
     for (const e of listing.entries) {
       if (have.has(e.hash) || !e.present || !hasThumb(e) || meta(e).hidden || thumbUrls.has(e.hash)) continue;
-      if (isPdfFile(e) || isModelFile(e.name) || noteKindOf(e.name)) continue; // (each takes reading and drawing a whole file: made when its card comes into view, then kept)
+      if (drawnFromBytes(e.name) && !isFontFile(e)) continue; // (a PDF, a model, an archive, a note: each takes reading and drawing a file, made when its card comes into view, then kept)
       thumbFor(e.hash, always, false).then((url) => keepThumbUrl(e.hash, url), () => undefined);
     }
   };

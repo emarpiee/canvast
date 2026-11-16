@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.60.9 — Page turning in PDFs and comics, archive fixes (2026-11-16)
+
+- **Changed:** in a PDF and a comic book (or a ZIP read as pages), once you click in the pages, the arrow keys turn them (Left and Up back, Right and Down on), as a player keeps Left and Right while it has the focus; elsewhere they still step to the library's next item. On a touch screen a swipe to the side turns the page, and a comic's page also turns with a tap (its left part goes back). One rule for both views.
+- **Fixed:** a ZIP or CBZ had no thumbnail and a broken picture in the details: thumbnails were made only for PDFs and 3D models, so the library showed the archive's bytes as a picture. Every kind of file whose card is drawn from its bytes now gets its thumbnail the same way (a note too long to lay out gets its card, not a broken picture); a comic imported before takes its cover's shape.
+- **Fixed:** archives with a WinZip AES password (7-Zip, WinZip) refused the right password.
+
 ## 0.60.8 — ZIP and comic book viewer (2026-11-16)
 
 - **Added:** a ZIP or a comic book (CBZ) opens in a view of its own, in the library's viewer and in the panel on a canvas. **Files** lists its folders and files (name, size, date, a padlock on one with a password); a double-click opens a folder, shows a picture, a video, a sound or a text inside it, or offers to import a PDF, note or 3D model and open it in its own view. **Import to the library** takes the selected files (all in the folder when none is), into the open folder, hidden in hidden mode. **Pages** reads its pictures one at a time in natural order (page 2 before page 10), with Page Up and Down, Space, a click on the page, zoom, bookmarks and the page it was left at; a CBZ opens there. Its card shows its first picture (a comic's cover), or the page chosen for it on a canvas.

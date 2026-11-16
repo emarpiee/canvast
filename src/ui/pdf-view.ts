@@ -7,6 +7,7 @@ import { promptDialog } from "./confirm";
 import type { CardLook, FileFacts, OpenView, ViewDeps, ViewPlace } from "./file-views";
 import { ICONS } from "./icons";
 import { barButton } from "./view-bar";
+import { pageKey, swipePages } from "./page-turn";
 import { openMoreMenu } from "./more-menu";
 import { keepViewState, markActions, toggledMark, viewStateOf } from "./view-state";
 import type { MarksChange, ViewState } from "./view-state";
@@ -54,8 +55,8 @@ export async function openPdfView(el: HTMLElement, file: FileFacts, deps: ViewDe
   const count = pdf.numPages;
   el.innerHTML = `<div class="pdf-view" data-testid="pdf-view">
     <div class="view-bar">
-      ${barButton("prev", ICONS.pageUp, "Previous page", "Previous page (Page Up)")}
-      ${barButton("next", ICONS.pageDown, "Next page", "Next page (Page Down)")}
+      ${barButton("prev", ICONS.pageUp, "Previous page", "Previous page (Page Up; the arrows once you click in the pages; a swipe)")}
+      ${barButton("next", ICONS.pageDown, "Next page", "Next page (Page Down; the arrows once you click in the pages; a swipe)")}
       <label class="view-field">Page <input class="adj-num pdf-at" type="number" min="1" max="${count}" step="1" aria-label="Page" data-testid="pdf-page" /></label><span class="pdf-count">/ ${count}</span>
       <span class="view-gap"></span>
       ${barButton("out", ICONS.minus, "Zoom out", "Zoom out (Ctrl+-)")}
@@ -420,6 +421,7 @@ export async function openPdfView(el: HTMLElement, file: FileFacts, deps: ViewDe
   const resized = new ResizeObserver(() => {
     if (zoom === "fit") layout();
   });
+  swipePages(pages, (dir) => show(current + dir));
   for (const s of slots) sized(s);
   for (const s of slots) watcher.observe(s.el);
   resized.observe(pages);
@@ -453,8 +455,8 @@ export async function openPdfView(el: HTMLElement, file: FileFacts, deps: ViewDe
         return true;
       }
       if (e.ctrlKey || e.metaKey || e.altKey || (e.target as HTMLElement).closest("input")) return false;
-      if (e.key === "PageDown") show(current + 1);
-      else if (e.key === "PageUp") show(current - 1);
+      const turn = pageKey(e, pages);
+      if (turn) show(current + turn);
       else if (e.key === "Home") show(1);
       else if (e.key === "End") show(count);
       else if (e.key === "ArrowDown") pages.scrollTop += pages.clientHeight / 10;

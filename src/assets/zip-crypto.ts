@@ -141,7 +141,7 @@ const buf = (b: Uint8Array): ArrayBuffer => b.slice().buffer as ArrayBuffer;
 
 /** Decrypts a WinZip AES entry (salt, password check, data, 10-byte authentication code): wrong password and damaged bytes both refused. */
 export async function winZipAesDecrypt(data: Uint8Array, password: string, keyBytes: 16 | 24 | 32): Promise<Uint8Array> {
-  const saltLen = keyBytes / 2 + 4;
+  const saltLen = keyBytes / 2; // (8, 12 or 16 bytes)
   if (data.length < saltLen + 2 + 10) throw new Error("damaged encrypted entry");
   const salt = data.subarray(0, saltLen);
   const check = data.subarray(saltLen, saltLen + 2);

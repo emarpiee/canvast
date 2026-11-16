@@ -8,8 +8,8 @@ import { fillTextCentred, makeCard } from "./card";
 import { externalFolder } from "../storage/external-folder";
 import { artCardPicture, isArtFile } from "./art-preview";
 import { makeFileCard } from "./card";
-import { drawnFromFile } from "./adapters";
-import { NOTE_THUMB_RATIO, chipOf, describeFile, isCard, isFontFile, isModelFile, isPdfFile } from "./file-kind";
+import { drawnFromBytes, drawnFromFile } from "./adapters";
+import { NOTE_THUMB_RATIO, chipOf, describeFile, isCard, isFontFile } from "./file-kind";
 
 /**
  * Where a video too big to be read into the page plays from a part at a time (`OriginalStore.mediaUrl`), set once by the app: its
@@ -35,7 +35,7 @@ export async function makeThumb(rec: AssetRecord): Promise<ThumbRecord | null> {
   if (isFontFile(rec)) return makeFontThumb(rec);
   if (noteKindOf(rec.name) && !tooBigForNote(rec.name, rec.blob.size)) return makeNoteThumb(rec);
   if (isArtFile(rec.name)) return makeArtThumb(rec);
-  if (isPdfFile(rec) || isModelFile(rec.name)) return makePictureThumb(rec);
+  if (drawnFromBytes(rec.name)) return makePictureThumb(rec); // (a PDF, a 3D model, an archive, a note too long to lay out: any kind drawn from its bytes, its plain card when it cannot be)
   if (isCard(rec) && rec.type.startsWith("video/") && mediaAddress) {
     // A video past the import limit (a card): a frame of it, read from where it plays a part at a time; its card when that fails.
     const address = await mediaAddress(rec.hash).catch(() => null);

@@ -70,6 +70,12 @@ test("a PDF: its first page in the library, its shape on a card; it opens in the
     await word.dblclick();
     expect(await p.evaluate(() => getSelection()?.toString() ?? "")).toContain("Alpha");
   }).toPass({ timeout: 10_000 });
+  // With the focus in the pages (a click in them), the arrows turn the pages, not the library's items.
+  await p.keyboard.press("ArrowRight");
+  await expect(p.getByTestId("pdf-page")).toHaveValue("2");
+  await p.keyboard.press("ArrowUp");
+  await expect(p.getByTestId("pdf-page")).toHaveValue("1");
+  await expect(view(p)).toBeVisible();
   // Pages have their own sizes once read.
   await p.getByTestId("pdf-page").fill("2");
   await p.getByTestId("pdf-page").press("Enter");
@@ -493,9 +499,14 @@ test("a comic book (CBZ) opens on its pages in natural order, its cover on the c
   await expect(p.getByTestId("archive-view")).toBeVisible();
   await expect(p.getByTestId("archive-page-img")).toHaveAttribute("data-page", "1");
   expect(await pageColour(p)).toBe("red");
-  await p.getByTestId("view-next").click();
+  // A click on the page turns it and puts the focus there: then the arrows turn the pages, not the library's items.
+  await p.getByTestId("archive-page-img").click();
   await expect(p.getByTestId("archive-page-img")).toHaveAttribute("data-page", "2");
   expect(await pageColour(p)).toBe("green");
+  await p.keyboard.press("ArrowRight");
+  await expect(p.getByTestId("archive-page-img")).toHaveAttribute("data-page", "3");
+  await p.keyboard.press("ArrowLeft");
+  await expect(p.getByTestId("archive-page-img")).toHaveAttribute("data-page", "2");
   await p.getByTestId("view-next").click();
   await expect(p.getByTestId("archive-page-img")).toHaveAttribute("data-page", "3");
   expect(await pageColour(p)).toBe("blue"); // (p10 last, not between p1 and p2)

@@ -59,6 +59,9 @@ const PICTURE_KINDS: ReadonlyArray<{ claims(name: string): boolean; picture(name
   },
 ];
 
+/** Whether a file's picture is drawn from its bytes (a kind above): its thumbnail is made that way too. */
+export const drawnFromBytes = (name: string): boolean => PICTURE_KINDS.some((k) => k.claims(name));
+
 /** What can be drawn of a file from its bytes, null when nothing could be. */
 export async function drawnFromFile(name: string, chip: string, /** Read only by what needs it: a kind may still hold the file open. */ read: () => Promise<Uint8Array>, o: PictureOptions = {}): Promise<ImageBitmap | null> {
   try {
