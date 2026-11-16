@@ -117,7 +117,7 @@ test("a folder folds, stays folded after a reload, and Organize moves to a folde
   await p.getByTestId("asset-organize").click();
   const dlg = p.getByTestId("tree-chooser");
   await expect(dlg).toBeVisible();
-  await expect(dlg.locator(".choice-row")).toHaveCount(4); // (No folder, Art, Ink, Plain)
+  await expect(dlg.locator(".choice-row")).toHaveCount(4); // (Unfiled, Art, Ink, Plain)
   await p.getByTestId("choice-search").fill("ink");
   await expect(dlg.locator(".choice-row")).toHaveCount(2); // (what matches and what leads to it)
   await dlg.getByRole("radio", { name: "Ink" }).check();

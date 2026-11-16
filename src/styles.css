@@ -3257,13 +3257,20 @@ dialog.reset-dialog h3 { margin: var(--s-6) 0 var(--s-4); font-size: var(--text-
 .asset-where { margin: 0 0 var(--s-4); font-size: var(--text-sm); overflow-wrap: anywhere; }
 
 /* The tree chooser (ui/tree-chooser.ts). */
+/* The tree chooser (Organize, Move to): title, tabs, search, the list in a frame, the buttons; each part a step apart, by Density */
 dialog.choice-dialog { width: min(var(--choice-w), calc(100vw - var(--sp-10))); max-width: none; }
-.choice-tabs { display: flex; gap: var(--s-2); margin-bottom: var(--s-4); }
+dialog.choice-dialog h2 { margin-bottom: var(--s-8); overflow-wrap: anywhere; }
+.choice-tabs { display: flex; gap: var(--s-4); margin-bottom: var(--s-6); }
 .choice-tabs [aria-selected="true"], .choice-bar [aria-pressed="true"] { background: var(--hud-accent); color: var(--hud-accent-fg); }
-.choice-bar { display: flex; align-items: center; gap: var(--s-2); margin-bottom: var(--s-4); }
-.choice-search { flex: 1; min-width: 0; }
-.choice-list { height: var(--choice-h); max-height: 50vh; overflow: auto; }
+.choice-bar { display: flex; align-items: stretch; gap: var(--s-4); margin-bottom: var(--s-6); }
+.choice-search { flex: 1; min-width: 0; height: var(--ctl); }
+.choice-bar .assets-btn.is-icon { width: var(--ctl); height: var(--ctl); }
+.choice-list { box-sizing: border-box; height: var(--choice-h); max-height: 50vh; overflow: auto; padding: var(--s-4); border: 1px solid var(--hud-border); border-radius: var(--r-md); }
+dialog.choice-dialog .confirm-actions { margin-top: var(--s-8); }
 .choice-tree { list-style: none; margin: 0; padding: 0; }
+/* the top choice (Unfiled, Top level): a line under it, what it means beside its name */
+.choice-row.is-apart { margin-bottom: var(--s-4); padding-bottom: var(--s-4); border-bottom: 1px solid var(--hud-border); }
+.choice-hint { flex: none; margin-left: var(--s-4); font-size: var(--text-sm); color: var(--hud-muted); white-space: nowrap; }
 .choice-row:hover { background: var(--hud-hover); }
 .choice-name { flex: 1; min-width: 0; display: flex; align-items: center; gap: var(--s-4); cursor: pointer; }
 .choice-name.is-group { cursor: default; color: var(--hud-muted); }

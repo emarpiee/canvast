@@ -14,11 +14,10 @@ import type { MenuItem } from "./more-menu";
 import { mountSettings } from "./setting-rows";
 import type { SettingValue } from "./setting-rows";
 import type { Section, Setting } from "../gen/types";
-import { keepViewState, markActions, toggledMark, viewStateOf } from "./view-state";
+import { markActions, toggledMark, viewKeeper, viewStateOf } from "./view-state";
 import { modelViewInFront, setModelViewInFront } from "./model-front";
 import type { MarksChange, ViewState } from "./view-state";
 
-const KEEP_MS = 600;
 /** The cards of a turnaround. */
 const TURNAROUND = 8;
 /** The most lines placed at once, the longest first. */
@@ -89,6 +88,9 @@ export async function openModelView(el: HTMLElement, file: FileFacts, deps: View
   const hash = file.hash;
   const first = firstLook(file.name);
   let state: ViewState = viewStateOf(await deps.session.catalog?.entry(hash).catch(() => undefined));
+  // (the place is kept when the view closes; bookmarks at once)
+  const keepState = viewKeeper(deps.session, hash, state);
+  const keep = (): void => keepState(state);
   let look: ModelLook = readLook(place.startAt ?? state.at, first);
   let tab = "view";
   let closed = false;
@@ -106,14 +108,10 @@ export async function openModelView(el: HTMLElement, file: FileFacts, deps: View
   };
   // (the lines of the model's edges come a moment after the view: drawn again with them)
   stage.onInk = paint;
-  let keepTimer: ReturnType<typeof setTimeout> | undefined;
-  const keep = (): void => void keepViewState(deps.session, hash, state);
   const changed = (): void => {
     state = { ...state, at: writeLook(look) };
     markBtn.setAttribute("aria-pressed", String(state.marks.some((m) => m.at === state.at)));
     paint();
-    clearTimeout(keepTimer);
-    keepTimer = setTimeout(keep, KEEP_MS);
   };
   const linesOn = (): boolean => look["linesShow"] !== "off";
   const tabOf = (title: string): string => MODEL_TABS.find((t) => t.titles.includes(title))?.id ?? "view";
@@ -379,7 +377,6 @@ export async function openModelView(el: HTMLElement, file: FileFacts, deps: View
       closed = true;
       if (modelViewInFront() === front) setModelViewInFront(null);
       cancelAnimationFrame(frame);
-      clearTimeout(keepTimer);
       clearTimeout(wheelTimer);
       keep();
       resized.disconnect();

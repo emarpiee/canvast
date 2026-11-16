@@ -36,6 +36,20 @@ export async function keepViewState(session: Session, hash: string, s: ViewState
   await session.catalog.updateMeta(hash, { viewer }).catch(() => undefined);
 }
 
+/**
+ * What a view keeps of its file: `keep(state)` writes it only when it changed since the last write. A view calls it when a bookmark changes
+ * and when it closes, never on each page turned or view turned: each write is a library change (on the desktop, a write of its files).
+ */
+export function viewKeeper(session: Session, hash: string, first: ViewState): (s: ViewState) => void {
+  let last = JSON.stringify(first);
+  return (s) => {
+    const now = JSON.stringify(s);
+    if (now === last) return;
+    last = now;
+    void keepViewState(session, hash, s);
+  };
+}
+
 /** A bookmark put at `mark`, or taken off if it has one there; the list stays in file order by `order`. */
 export function toggledMark(s: ViewState, mark: ViewMark, order: (at: string) => number): ViewState {
   const marks = s.marks.some((m) => m.at === mark.at) ? s.marks.filter((m) => m.at !== mark.at) : [...s.marks, mark].sort((a, b) => order(a.at) - order(b.at)).slice(0, MAX_MARKS);

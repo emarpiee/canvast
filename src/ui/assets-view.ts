@@ -38,7 +38,7 @@ import { LOOK_SIZE, lookOf, similarGroups, type Look } from "../assets/look";
 import type { AssetLibrary } from "../assets/asset-library";
 import { duplicateNotice } from "../assets/asset-library";
 import type { AssetField, AssetFolder, CatalogEntry, CatalogListing, MetaChange } from "../assets/asset-catalog";
-import type { LibraryPages } from "../storage/store";
+import type { CatalogStore, LibraryPages } from "../storage/store";
 import { MAX_FIELD_KEY, MAX_FIELD_VALUE, MAX_NOTE, MAX_TAG_TEXT, folderClash, folderName, folderPath, folderSubtree, hiddenModeFolders, meta, usageOf, visibleFolders } from "../assets/asset-catalog";
 import { artTile, THUMB_PX, makeThumb, shrinkPicture } from "../assets/thumb";
 import { typeOfName } from "../storage/workspace-names";
@@ -50,7 +50,7 @@ import { clearRect, MENU_GAP, moreButton, openMoreMenu, pressAs } from "./more-m
 import type { MenuItem } from "./more-menu";
 import { bindContextMenu, grouped as groupedMenu } from "./context-menu";
 import { openTreeChooser } from "./tree-chooser";
-import type { ChoiceNode, ChoiceState, ChooserView } from "./tree-chooser";
+import type { ChoiceNode, ChoiceState, ChoiceTab, ChooserView } from "./tree-chooser";
 import { capList, showMoreButton } from "./show-more";
 import { pathNodes, treeGuides, treeSearch, treeSlot, walkTree } from "./tree";
 import { formatTags } from "../doc/tags";
@@ -2721,9 +2721,9 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       return `<button type="button" class="side-more" data-side-more data-kind="${kind}" data-id="${esc(id)}" aria-haspopup="menu" aria-expanded="false" aria-label="More actions for ${kindWord[kind]} ${esc(name)}" title="More">${ICONS.ellipsis}</button>`;
     };
     const picked = pickedKeys(scope);
-    const item = (key: string, label: string, n: number | null, opts: { depth?: number; icon?: string; /** Before the count (a pinned folder's pin). */ mark?: string; extra?: string; cls?: string; before?: string; title?: string; /** What the row does, in place of choosing a scope. */ attrs?: string; /** A row with rows under it: open or not (a click opens or closes it). */ expanded?: boolean } = {}): string => {
+    const item = (key: string, label: string, n: number | null, opts: { depth?: number; icon?: string; /** Before the count (a pinned folder's pin). */ mark?: string; extra?: string; cls?: string; before?: string; title?: string; /** What the row does, in place of choosing a scope. */ attrs?: string; /** A row with rows under it: open or not (a click opens or closes it). */ expanded?: boolean; /** It can be dragged (a folder, into another). */ drag?: boolean } = {}): string => {
       const current = TRASH_WORD.test(search.value) ? key === "trash" : scope === key || picked.has(key);
-      return `<li class="side-row ${opts.cls ?? ""}${current ? " is-current" : ""}" style="--depth:${opts.depth ?? 0}">${opts.before ?? ""}<button type="button" class="side-item${current ? " is-active" : ""}" ${opts.attrs ?? `data-scope="${esc(key)}" aria-current="${scope === key || picked.has(key)}"`}${opts.expanded === undefined ? "" : ` aria-expanded="${opts.expanded}"`} title="${opts.title ?? label.replace(/<[^>]*>/g, "")}${/^(ext|tag):/.test(key) ? " (Ctrl+click: add to the filter)" : key.startsWith("folder:") ? " (Ctrl+click: show it too; Shift+click: the folders between)" : ""}">
+      return `<li class="side-row ${opts.cls ?? ""}${current ? " is-current" : ""}" style="--depth:${opts.depth ?? 0}">${opts.before ?? ""}<button type="button" class="side-item${current ? " is-active" : ""}" ${opts.attrs ?? `data-scope="${esc(key)}" aria-current="${scope === key || picked.has(key)}"`}${opts.drag ? ' draggable="true"' : ""}${opts.expanded === undefined ? "" : ` aria-expanded="${opts.expanded}"`} title="${opts.title ?? label.replace(/<[^>]*>/g, "")}${/^(ext|tag):/.test(key) ? " (Ctrl+click: add to the filter)" : key.startsWith("folder:") ? " (Ctrl+click: show it too; Shift+click: the folders between)" : ""}">
         ${opts.icon ?? ""}<span class="side-label">${label}</span>${opts.mark ?? ""}${opts.expanded === undefined ? "" : `<span class="side-kids" aria-hidden="true"></span>`}${n === null ? "" : `<span class="side-n${opts.before !== undefined ? " layer-count" : ""}">${n}</span>`}</button>${opts.extra ?? ""}</li>`;
     };
     const nameInput = (value: string, label: string): string =>
@@ -2757,6 +2757,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
           : item(`folder:${f.id}`, esc(f.name), subtreeCount(f.id), {
               depth: at.depth,
               cls: `tree-row${pinnedNow.has(f.id) ? " is-pinned" : ""}`,
+              drag: !ro,
               // (a pinned folder says so before its count, and a concealed one, which it leaves out of every list but its own)
               ...(ui.pinned.includes(f.id) || concealedIds.includes(f.id) ? { mark: `${concealedIds.includes(f.id) ? `<span class="side-pinned side-concealed" aria-hidden="true">${ICONS.conceal}</span>` : ""}${ui.pinned.includes(f.id) ? `<span class="side-pinned" aria-hidden="true">${ICONS.pin}</span>` : ""}` } : {}),
               before: treeGuides(at.depth, at.last, at.conts), // (no arrow: a folder with subfolders opens and closes on its own row)
@@ -2766,6 +2767,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
               extra: (ro ? "" : `<button type="button" class="side-more side-pin" data-folder-action="pin" data-id="${esc(f.id)}" aria-pressed="${ui.pinned.includes(f.id)}" aria-label="${ui.pinned.includes(f.id) ? "Unpin" : "Pin"} folder ${esc(f.name)}" title="${ui.pinned.includes(f.id) ? "Unpin" : "Pin to top"}">${ICONS.pin}</button>`) + more("folder", f.id, f.name, [
                 { attr: "data-folder-action", value: "new", label: "New subfolder", hint: "A folder inside this one", icon: ICONS.folderPlus, aria: `New folder inside ${f.name}` },
                 { attr: "data-folder-action", value: "rename", label: "Rename", hint: "Give it a new name", icon: ICONS.textCursorInput, aria: `Rename folder ${f.name}` },
+                { attr: "data-folder-action", value: "move", label: "Move to…", hint: "Into another folder, or the top", icon: ICONS.folderTree, aria: `Move folder ${f.name}` },
                 ui.pinned.includes(f.id)
                   ? { attr: "data-folder-action", value: "pin", label: "Unpin", hint: "Back in its place in the list", icon: ICONS.pinOff, aria: `Unpin folder ${f.name}` }
                   : { attr: "data-folder-action", value: "pin", label: "Pin to top", hint: "First in the list, on this device", icon: ICONS.pin, aria: `Pin folder ${f.name}` },
@@ -3198,7 +3200,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     // (where they are: the one folder, or each with how many, the fullest first)
     const inFolder = new Map<string, number>();
     for (const e of ents) inFolder.set(meta(e).folderIds[0] ?? "", (inFolder.get(meta(e).folderIds[0] ?? "") ?? 0) + 1);
-    const whereName = (id: string): string => (id ? folderPath(folders, id).join(" › ") : "No folder");
+    const whereName = (id: string): string => (id ? folderPath(folders, id).join(" › ") : UNFILED_CHOICE.name);
     const where = inFolder.size === 1 ? whereName([...inFolder.keys()][0]!) : "";
     // (several folders: a row each, the fullest first, and the long list folded as every other)
     const folderRows = [...inFolder].sort((x, y) => y[1] - x[1]).map(([id, k]) => `<li title="${esc(whereName(id))}: ${k} of ${n}"><span class="asset-place-name">${esc(whereName(id))}</span><span class="layer-count">${k}</span></li>`);
@@ -3230,8 +3232,6 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     if (!n) return;
     const stateOf = (k: number): ChoiceState => (k === 0 ? "off" : k === n ? "on" : "some");
     const counts = countSide(listing);
-    const folders = listing.folders;
-    const folderNode = (f: AssetFolder): ChoiceNode => ({ id: f.id, name: f.name, parent: f.parentId, n: counts.folders.get(f.id) ?? 0, state: stateOf(ents.filter((e) => meta(e).folderIds[0] === f.id).length) });
     const tagLabels = new Map<string, string>([...counts.tags.values()].map((t) => [t.label.toLowerCase(), t.label]));
     for (const e of ents) for (const t of meta(e).tags) if (!tagLabels.has(t.toLowerCase())) tagLabels.set(t.toLowerCase(), t);
     const tagNode = (label: string, on: number, used: number): { id: string; name: string; value: { on: number; used: number } } => ({ id: label.toLowerCase(), name: label, value: { on, used } });
@@ -3247,23 +3247,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
         saveUi();
       },
       tabs: [
-        {
-          id: "folder",
-          title: "Folder",
-          icon: ICONS.folder,
-          openIcon: ICONS.folderOpen,
-          one: true,
-          noun: "folders",
-          nodes: [{ id: "", name: "No folder", parent: null, state: stateOf(ents.filter((e) => !meta(e).folderIds.length).length) }, ...folders.map(folderNode)],
-          make: (words) => {
-            try {
-              const name = folderName(words);
-              return !hiddenMode && folderClash(folders, null, name) ? null : [{ id: `new:${name}`, name, parent: null, state: "on" }];
-            } catch {
-              return null;
-            }
-          },
-        },
+        folderTab({ ...UNFILED_CHOICE, state: stateOf(ents.filter((e) => !meta(e).folderIds.length).length) }, (f) => stateOf(ents.filter((e) => meta(e).folderIds[0] === f.id).length)),
         {
           id: "tags",
           title: "Tags",
@@ -3286,14 +3270,105 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     const made = folder?.made[0]?.slice(4);
     const addTags = (tags?.on ?? []).map((k) => tagLabels.get(k) ?? k);
     const removeTags = (tags?.off ?? []).map((k) => tagLabels.get(k) ?? k);
-    await session.organize(async (c) => {
-      const into = made ? newObjectId() : folder?.on[0];
-      if (made) {
-        await c.createFolder(made, null, into!);
-        if (hiddenMode) await c.hideFolder(into!); // (a folder made in hidden mode is hidden)
-      }
-      await c.updateMetaEach(ents.map((e) => ({ hash: e.hash, change: { ...(into ? { addFolders: [into] } : folder?.on[0] === "" ? { clearFolder: true } : {}), ...(addTags.length ? { addTags } : {}), ...(removeTags.length ? { removeTags } : {}) } })));
-    }, "Organized");
+    const moving = !!folder?.on.length;
+    const work = (): Promise<boolean> =>
+      session.organize(async (c) => {
+        const into = made ? await madeFolder(c, made) : folder?.on[0];
+        await c.updateMetaEach(ents.map((e) => ({ hash: e.hash, change: { ...(into ? { addFolders: [into] } : folder?.on[0] === "" ? { clearFolder: true } : {}), ...(addTags.length ? { addTags } : {}), ...(removeTags.length ? { removeTags } : {}) } })));
+      }, "Organized");
+    // (a move puts their files in another folder: shown as it goes)
+    if (moving) await withFileProgress(`Moving ${plural(n, "item")}`, work, (ok) => (ok ? `Moved ${plural(n, "item")}.` : undefined));
+    else await work();
+  };
+
+  /** The top choice of the Folder tab: out of every folder. For items, Unfiled (the sidebar's word); for a folder, the top of the list. */
+  const UNFILED_CHOICE = { name: "Unfiled", hint: "In no folder, with its kind", icon: ICONS.folderX } as const;
+  const TOP_CHOICE = { name: "Top level", hint: "Inside no other folder", icon: ICONS.folderRoot } as const;
+  /**
+   * The Folder tab of the tree chooser, one for items (Organize) and folders (Move to): the top choice, every folder listed but those in
+   * `except` (a folder moved, and the ones inside it), and a new folder from the words typed.
+   */
+  const folderTab = (top: { name: string; hint: string; icon: string; state: ChoiceState }, stateOf: (f: AssetFolder) => ChoiceState, except: ReadonlySet<string> = new Set()): ChoiceTab => {
+    const counts = countSide(listing!);
+    const folders = listing!.folders;
+    return {
+      id: "folder",
+      title: "Folder",
+      icon: ICONS.folder,
+      openIcon: ICONS.folderOpen,
+      one: true,
+      noun: "folders",
+      nodes: [{ id: "", parent: null, ...top }, ...folders.filter((f) => !except.has(f.id)).map((f): ChoiceNode => ({ id: f.id, name: f.name, parent: f.parentId, n: counts.folders.get(f.id) ?? 0, state: stateOf(f) }))],
+      make: (words) => {
+        try {
+          const name = folderName(words);
+          return !hiddenMode && folderClash(folders, null, name) ? null : [{ id: `new:${name}`, name, parent: null, state: "on" }];
+        } catch {
+          return null;
+        }
+      },
+    };
+  };
+  /** A folder typed in the chooser, made at the top (hidden in hidden mode): its id. */
+  const madeFolder = async (c: CatalogStore, name: string): Promise<string> => {
+    const id = newObjectId();
+    await c.createFolder(name, null, id);
+    if (hiddenMode) await c.hideFolder(id); // (a folder made in hidden mode is hidden)
+    return id;
+  };
+  /**
+   * Work that renames or moves files (a rename, a move to a folder): a notice with a bar from the start, which follows the files as the
+   * workspace folder is written (the desktop app), and says `result` once they are all in place.
+   */
+  const withFileProgress = async <T,>(label: string, work: () => Promise<T>, result: (r: T) => string | undefined): Promise<T> => {
+    const p = beginProgress(session.editor, "library-files", label);
+    const off = session.storage?.folderWriting?.subscribe((done, total) => void (total && p.update(done / total, `${done} of ${plural(total, "file")}`)));
+    try {
+      const r = await work();
+      await session.storage?.flush().catch(() => undefined);
+      p.done(result(r));
+      return r;
+    } catch (e) {
+      p.fail(`It stopped: ${(e as Error).message}`);
+      throw e;
+    } finally {
+      off?.();
+    }
+  };
+  /** Folder Move to: the same chooser as Organize, its own folder and those in it left out, the top of the list first. */
+  const moveFolderDialog = async (id: string): Promise<void> => {
+    const f = listing?.folders.find((x) => x.id === id);
+    if (!f || !listing || session.readOnly) return;
+    const done = await openTreeChooser({
+      title: `Move folder “${f.name}”`,
+      applyLabel: "Move",
+      view: ui.chooser,
+      onView: (v) => {
+        ui.chooser = v;
+        saveUi();
+      },
+      tabs: [folderTab({ ...TOP_CHOICE, state: f.parentId ? "off" : "on" }, (x) => (x.id === f.parentId ? "on" : "off"), folderSubtree(listing.folders, id))],
+    });
+    const to = done?.get("folder");
+    if (!to?.on.length) return; // (cancelled, or where it was)
+    const made = to.made[0]?.slice(4);
+    await moveFolderInto(id, made ? { make: made } : to.on[0] || null);
+  };
+  /** A folder, with what is in it, put inside another (null: at the top; `make`: a new one at the top). */
+  const moveFolderInto = async (id: string, to: string | null | { make: string }): Promise<void> => {
+    const f = listing?.folders.find((x) => x.id === id);
+    if (!f || (typeof to === "string" || to === null ? (f.parentId ?? null) === to : false)) return;
+    let where = "";
+    await withFileProgress(
+      `Moving folder “${f.name}”`,
+      () =>
+        session.organize(async (c) => {
+          const into = to && typeof to === "object" ? await madeFolder(c, to.make) : to;
+          where = to && typeof to === "object" ? to.make : into ? folderPath((await c.list()).folders, into).join(" › ") : TOP_CHOICE.name;
+          await c.moveFolder(id, into);
+        }, "Moved folder"),
+      (ok) => (ok ? `Moved “${f.name}” to ${where}.` : undefined),
+    );
   };
 
   /** Tags and folders of an entry (inspector). */
@@ -3385,12 +3460,14 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     return `<section class="asset-sec" data-testid="asset-copies"><h3>Same file as ${plural(others.length, "other item")}</h3><ul class="asset-places">${rows.join("")}</ul></section>`;
   };
   const marksHtml = (e: CatalogEntry): string => {
-    if (!viewKindNamed(e.name)?.marks) return "";
+    const what = viewKindNamed(e.name)?.marks;
+    if (!what) return "";
     const { marks } = viewStateOf(e);
-    const here = note?.hash === e.hash ? note.here?.() : null;
+    // (one label, not the page in view: the details are not drawn again for each page turned)
+    const here = note?.hash === e.hash && note.here?.();
     const rows = marks.map((m) => `<li><button type="button" class="asset-link-row assets-link" data-action="go-mark" data-at="${esc(m.at)}" title="Go to ${esc(m.label)}">${ICONS.bookmark}<span class="asset-place-name">${esc(m.label)}</span></button>${moreButton(`More actions for bookmark ${m.label}`, `data-action="mark-more" data-at="${esc(m.at)}"`)}</li>`);
     const list = rows.length ? `<ul class="asset-places asset-marks">${rows.join("")}</ul>` : `<p class="asset-note">No bookmarks yet.</p>`;
-    return `<section class="asset-sec" data-testid="asset-bookmarks"><h3>Bookmarks <span class="layer-count">${marks.length}</span></h3>${list}${here ? `<button type="button" class="assets-btn" data-action="add-mark" data-testid="asset-add-bookmark">${ICONS.bookmarkPlus} Bookmark ${esc(here.label.toLowerCase())}</button>` : ""}</section>`;
+    return `<section class="asset-sec" data-testid="asset-bookmarks"><h3>Bookmarks <span class="layer-count">${marks.length}</span></h3>${list}${here ? `<button type="button" class="assets-btn" data-action="add-mark" data-testid="asset-add-bookmark">${ICONS.bookmarkPlus}<span>Bookmark current ${what}</span></button>` : ""}</section>`;
   };
   /** The note (plain text) and the fields the user names (a link, a source, an author...) of one asset. */
   const notesHtml = (e: CatalogListing["entries"][number]): string => {
@@ -4451,11 +4528,57 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     const label = k.startsWith("tag:") ? (sideTagLabels.get(k) ?? k.slice(4)) : (t.querySelector(".side-label")?.textContent ?? "");
     const change = scopeChange(k, label);
     const what = k.startsWith("folder:") ? `Moved to ${label}` : k === "unfiled" ? "Taken out of their folders" : k === "favorites" ? "Added to the favourites" : `Tagged #${label}`;
-    void session.organize((c) => c.updateMetaEach(hashes.map((hash) => ({ hash, change }))), `${what}: ${plural(hashes.length, "item")}`).then((ok) => {
-      if (!ok) return;
-      session.editor.message = `${what}: ${plural(hashes.length, "item")}.`;
-      session.editor.changed();
-    });
+    const work = (): Promise<boolean> => session.organize((c) => c.updateMetaEach(hashes.map((hash) => ({ hash, change }))), `${what}: ${plural(hashes.length, "item")}`);
+    const said = (ok: boolean): string | undefined => (ok ? `${what}: ${plural(hashes.length, "item")}.` : undefined);
+    // (into a folder or out of one: their files move, shown as they go)
+    if (k.startsWith("folder:") || k === "unfiled") void withFileProgress(`Moving ${plural(hashes.length, "item")}`, work, said);
+    else
+      void work().then((ok) => {
+        const text = said(ok);
+        if (!text) return;
+        session.editor.message = text;
+        session.editor.changed();
+      });
+  });
+
+  // ---- a folder dragged onto another goes into it, onto the Folders heading to the top (as Move to… in its menu)
+  const FOLDER_DRAG = "application/x-canvast-folder";
+  let draggedFolder: string | null = null;
+  const folderDrop = (el: HTMLElement): { el: HTMLElement; to: string | null } | null => {
+    if (!draggedFolder || !listing) return null;
+    const row = el.closest<HTMLElement>('[data-scope^="folder:"]');
+    if (row) {
+      const to = row.dataset["scope"]!.slice(7);
+      return folderSubtree(listing.folders, draggedFolder).has(to) ? null : { el: row, to };
+    }
+    const head = el.closest<HTMLElement>('[data-sec="folders"] > .side-head');
+    return head ? { el: head, to: null } : null;
+  };
+  side.addEventListener("dragstart", (e) => {
+    const row = (e.target as HTMLElement).closest<HTMLElement>('.side-item[data-scope^="folder:"]');
+    if (!row || session.readOnly || !e.dataTransfer) return;
+    draggedFolder = row.dataset["scope"]!.slice(7);
+    e.dataTransfer.setData(FOLDER_DRAG, draggedFolder);
+    e.dataTransfer.setData("text/plain", row.querySelector(".side-label")?.textContent ?? "");
+    e.dataTransfer.effectAllowed = "move";
+    for (const t of side.querySelectorAll<HTMLElement>('[data-scope^="folder:"], [data-sec="folders"] > .side-head')) if (folderDrop(t)) t.classList.add("drop-zone");
+  });
+  document.addEventListener("dragend", () => void (draggedFolder = null), true);
+  side.addEventListener("dragover", (e) => {
+    const t = e.dataTransfer?.types.includes(FOLDER_DRAG) ? folderDrop(e.target as HTMLElement) : null;
+    if (!t) return;
+    lightDrop(t.el);
+    e.preventDefault();
+    e.dataTransfer!.dropEffect = "move";
+  });
+  side.addEventListener("drop", (e) => {
+    const t = e.dataTransfer?.types.includes(FOLDER_DRAG) ? folderDrop(e.target as HTMLElement) : null;
+    const id = draggedFolder;
+    draggedFolder = null;
+    if (!t || !id) return;
+    e.preventDefault();
+    lightDrop(null);
+    void moveFolderInto(id, t.to);
   });
 
   side.addEventListener("click", (e) => {
@@ -4627,6 +4750,9 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
         naming = { kind: "rename", id };
         renderSide();
         break;
+      case "move":
+        void moveFolderDialog(id);
+        break;
       case "hide":
         if (!f) break;
         void confirmDialog({
@@ -4797,12 +4923,8 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     if (!items.length) return;
     const result = await openBatchRename(items, { noun: items.length === 1 ? "item" : "items" });
     if (!result) return;
-    const n = await session.renameAssets(result.map((r) => ({ hash: r.id, name: r.name })));
-    if (n) {
-      session.editor.message = n === 1 ? `Renamed to “${result[0]!.name}”.` : `Renamed ${n} items.`;
-      session.editor.changed();
-      for (const r of result.slice(0, 1)) warnName(r.name);
-    }
+    const n = await withFileProgress(`Renaming ${plural(result.length, "item")}`, () => session.renameAssets(result.map((r) => ({ hash: r.id, name: r.name }))), (k) => (k ? (k === 1 ? `Renamed to “${result[0]!.name}”.` : `Renamed ${k} items.`) : undefined));
+    if (n) for (const r of result.slice(0, 1)) warnName(r.name);
     await refresh(true);
     // Keep the keyboard where it was: on the first renamed card (F2 works again).
     mounted.get(items[0]!.id)?.el.querySelector<HTMLElement>(".asset-card")?.focus({ preventScroll: true });

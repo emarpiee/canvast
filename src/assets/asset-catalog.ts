@@ -176,6 +176,22 @@ export function folderName(name: string): string {
 export const folderClash = (folders: readonly AssetFolder[], parentId: string | null, name: string, except?: string): AssetFolder | undefined =>
   folders.find((f) => f.id !== except && !f.hidden && (f.parentId ?? null) === parentId && sameOnDisk(f.name, name));
 
+/**
+ * The folders after folder `id` moved under `parentId` (null: the top), or why it cannot go there: into itself or a folder inside it, a shown
+ * folder into a hidden one (its items would show in a hidden place), next to a folder of the same name on a disk. A folder hidden only by
+ * the one it was in is hidden itself when it leaves it, so nothing hidden ever shows by a move.
+ */
+export function movedFolders(folders: readonly AssetFolder[], id: string, parentId: string | null): AssetFolder[] {
+  const f = folders.find((x) => x.id === id);
+  if (!f) throw new CatalogInputError("that folder no longer exists");
+  if (parentId && !folders.some((x) => x.id === parentId)) throw new CatalogInputError("the folder to move it into no longer exists");
+  if (parentId && folderSubtree(folders, id).has(parentId)) throw new CatalogInputError("a folder cannot go inside itself");
+  const hidden = inHiddenFolder(folders, id);
+  if (parentId && !hidden && inHiddenFolder(folders, parentId)) throw new CatalogInputError("a shown folder cannot go into a hidden one; hide it first");
+  if (!hidden && folderClash(folders, parentId, f.name, id)) throw new CatalogInputError(`there is already a folder named “${f.name}” there`);
+  return folders.map((x) => (x.id === id ? { ...x, parentId, ...(hidden ? { hidden: true as const } : {}) } : x));
+}
+
 /** Ids of `id` and every folder below it. */
 export function folderSubtree(folders: readonly AssetFolder[], id: string): Set<string> {
   const out = new Set([id]);
@@ -644,6 +660,12 @@ export class AssetCatalog implements CatalogStore {
       if (!f) throw new CatalogInputError("that folder no longer exists");
       f.name = folderName(name);
       tx.objectStore("meta").put(folders, FOLDERS_KEY);
+    });
+  }
+
+  async moveFolder(id: string, parentId: string | null): Promise<void> {
+    await this.write(["meta"], async (tx) => {
+      tx.objectStore("meta").put(movedFolders(await this.readFolders(tx), id, parentId), FOLDERS_KEY);
     });
   }
 

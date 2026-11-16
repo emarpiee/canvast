@@ -549,6 +549,20 @@ test("folders nest, an asset is in one folder at a time, and deleting a folder n
   await expect(p.getByTestId("assets-status")).toHaveText("A folder needs a name.");
   await expect(side(p, /^Palms/)).toBeVisible();
 
+  // Move to: the Organize chooser, with Top level first and the folder itself not offered; then dragged back onto Refs.
+  await sideAct(p, "folder", "Palms", "Move folder Palms");
+  const chooser = p.getByTestId("tree-chooser");
+  await expect(chooser.getByRole("radio", { name: "Palms", exact: true })).toHaveCount(0);
+  await expect(chooser.getByRole("radio", { name: "Refs", exact: true })).toBeChecked();
+  await chooser.getByRole("radio", { name: "Top level", exact: true }).check();
+  await p.getByTestId("choice-ok").click();
+  await expect(p.getByTestId("assets-status")).toHaveText("Moved “Palms” to Top level.");
+  await pick(p, HASH);
+  await expect(p.getByTestId("asset-folder-now")).toHaveText("Palms"); // (its item with it)
+  await side(p, /^Palms/).dragTo(side(p, /^Refs/));
+  await expect(p.getByTestId("assets-status")).toHaveText("Moved “Palms” to Refs.");
+  await expect(p.getByTestId("asset-folder-now")).toHaveText("Refs › Palms");
+
   // Hide folder Palms: the folder leaves every list, and its item is hidden with it; showing the item again shows its folder again.
   await sideAct(p, "folder", "Palms", "Hide folder Palms and everything in it");
   await expect(p.getByTestId("confirm-dialog")).toContainText("every item in them are hidden");
@@ -1223,7 +1237,7 @@ test("several picked: each tag with how many have it, removed from all or added 
   await p.keyboard.press("Escape");
   await pick(p, hashes[0]!);
   await card(p, hashes[1]!).click({ modifiers: ["Shift"] });
-  await fileInto(p, "No folder", "bulk-organize");
+  await fileInto(p, "Unfiled", "bulk-organize");
   await p.keyboard.press("Escape");
   await pick(p, hashes[0]!);
   await all();

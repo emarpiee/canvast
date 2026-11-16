@@ -259,6 +259,7 @@ export async function openDesktopStorage(raw: DesktopBridge, opts: OpenHooks): P
     deleteTag: library,
     createFolder: () => some([]), // (a new folder holds nothing: the index and its real folder only)
     renameFolder: library,
+    moveFolder: library,
     deleteFolder: library,
     hideFolder: marked,
     showFolder: marked,

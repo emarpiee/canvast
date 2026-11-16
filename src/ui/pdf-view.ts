@@ -9,7 +9,7 @@ import { ICONS } from "./icons";
 import { barButton } from "./view-bar";
 import { pageKey, swipePages } from "./page-turn";
 import { openMoreMenu } from "./more-menu";
-import { keepViewState, markActions, toggledMark, viewStateOf } from "./view-state";
+import { markActions, toggledMark, viewKeeper, viewStateOf } from "./view-state";
 import type { MarksChange, ViewState } from "./view-state";
 
 const ZOOM_STEP = 1.25;
@@ -17,7 +17,6 @@ const ZOOM_MIN = 0.25;
 const ZOOM_MAX = 6;
 /** The most pixels one page's picture takes: past it the page is a little soft at the highest zooms, rather than the memory gone. */
 const MAX_PAGE_PIXELS = 16e6;
-const KEEP_MS = 600;
 const REDRAW_MS = 150;
 const WHEEL_ZOOM = 0.002;
 /** The most cards one Place pages makes. */
@@ -83,6 +82,9 @@ export async function openPdfView(el: HTMLElement, file: FileFacts, deps: ViewDe
   let zoom: number | "fit" = "fit";
   const hash = file.hash;
   let state: ViewState = viewStateOf(await deps.session.catalog?.entry(hash).catch(() => undefined));
+  // (the place is kept when the view closes; bookmarks at once)
+  const keepState = viewKeeper(deps.session, hash, state);
+  const keep = (): void => keepState(state);
   // (a card showing a page of its own opens there; else where the file was left)
   let current = Math.max(1, Math.min(count, (Number(place.startAt) > 1 ? Number(place.startAt) : Number(state.at)) || 1));
   let closed = false;
@@ -277,8 +279,6 @@ export async function openPdfView(el: HTMLElement, file: FileFacts, deps: ViewDe
     pages.scrollTop = s.el.offsetTop - pages.offsetTop;
     setCurrent(s.n);
   };
-  let keepTimer: ReturnType<typeof setTimeout> | undefined;
-  const keep = (): void => void keepViewState(deps.session, hash, state);
   const paintBar = (): void => {
     if (document.activeElement !== input) input.value = String(current);
     markBtn.setAttribute("aria-pressed", String(state.marks.some((m) => m.at === String(current))));
@@ -287,8 +287,6 @@ export async function openPdfView(el: HTMLElement, file: FileFacts, deps: ViewDe
     current = n;
     paintBar();
     state = { ...state, at: String(n) };
-    clearTimeout(keepTimer);
-    keepTimer = setTimeout(keep, KEEP_MS);
   };
   let scrolling = 0;
   pages.addEventListener("scroll", () => {
@@ -432,7 +430,6 @@ export async function openPdfView(el: HTMLElement, file: FileFacts, deps: ViewDe
     leave: async () => true,
     close: () => {
       closed = true;
-      clearTimeout(keepTimer);
       clearTimeout(redrawTimer);
       keep();
       watcher.disconnect();

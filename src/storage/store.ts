@@ -152,6 +152,8 @@ export interface CatalogStore {
   deleteTag(tag: string): Promise<number>;
   createFolder(name: string, parentId: string | null, id: string): Promise<AssetFolder>;
   renameFolder(id: string, name: string): Promise<void>;
+  /** Puts a folder, with what is in it, inside another (null: at the top). */
+  moveFolder(id: string, parentId: string | null): Promise<void>;
   deleteFolder(id: string): Promise<{ folders: number; unfiled: number }>;
   /** Hide a folder, its subfolders and every item in them; how many items were hidden. */
   hideFolder(id: string): Promise<number>;

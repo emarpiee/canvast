@@ -13,6 +13,10 @@ export interface ChoiceNode {
   /** Only holds others (a tag `art` that exists only as `art/ink`): not a choice itself. */
   group?: boolean;
   n?: number;
+  /** Its own icon, in place of the tab's (the top choice: Unfiled, Top level). */
+  icon?: string;
+  /** A few words after its name, outside it (what the choice means). */
+  hint?: string;
 }
 export interface ChoiceTab {
   id: string;
@@ -83,8 +87,8 @@ export function openTreeChooser(opts: ChooserOptions): Promise<Map<string, Choic
   const choice = (t: ChoiceTab, n: ChoiceNode, label: string, open = false): string =>
     n.group
       ? `<span class="choice-name is-group">${t.icon}<span>${esc(label)}</span></span>`
-      : `<label class="choice-name"><input type="${t.one ? "radio" : "checkbox"}" name="choice-${esc(t.id)}" data-id="${esc(n.id)}" data-some="${n.state === "some"}"${n.state === "on" ? " checked" : ""}>${open ? (t.openIcon ?? t.icon) : t.icon}<span>${esc(label)}</span></label>`;
-  const count = (n: ChoiceNode): string => (n.n ? `<span class="layer-count">${n.n}</span>` : "");
+      : `<label class="choice-name"><input type="${t.one ? "radio" : "checkbox"}" name="choice-${esc(t.id)}" data-id="${esc(n.id)}" data-some="${n.state === "some"}"${n.state === "on" ? " checked" : ""}>${n.icon ?? (open ? (t.openIcon ?? t.icon) : t.icon)}<span>${esc(label)}</span></label>`;
+  const count = (n: ChoiceNode): string => `${n.hint ? `<span class="choice-hint">${esc(n.hint)}</span>` : ""}${n.n ? `<span class="layer-count">${n.n}</span>` : ""}`;
 
   const draw = (): void => {
     const all = nodes.get(tab.id)!;
@@ -100,7 +104,7 @@ export function openTreeChooser(opts: ChooserOptions): Promise<Map<string, Choic
     const shut = closed.get(tab.id)!;
     const body =
       view === "tree"
-        ? `<ul class="choice-tree" role="tree">${walkTree(kids(null), (n) => kids(n.id), (n) => !!q || !shut.has(n.id), (n, at) => `<li class="tree-row choice-row" role="treeitem" style="--depth:${at.depth}">${treeGuides(at.depth, at.last, at.conts)}${treeSlot(at, `data-twist="${esc(n.id)}"`)}${choice(tab, n, n.name, at.open)}${count(n)}</li>`)}</ul>`
+        ? `<ul class="choice-tree" role="tree">${walkTree(kids(null), (n) => kids(n.id), (n) => !!q || !shut.has(n.id), (n, at) => `<li class="tree-row choice-row${n.id === "" ? " is-apart" : ""}" role="treeitem" style="--depth:${at.depth}">${treeGuides(at.depth, at.last, at.conts)}${treeSlot(at, `data-twist="${esc(n.id)}"`)}${choice(tab, n, n.name, at.open)}${count(n)}</li>`)}</ul>`
         : `<div class="choice-chips">${hits.filter((n) => !n.group).sort((a, b) => pathOf(all, a).localeCompare(pathOf(all, b))).map((n) => `<span class="choice-chip">${choice(tab, n, pathOf(all, n))}${count(n)}</span>`).join("")}</div>`;
     const words = search.value.trim();
     const could = words && tab.make && !all.some((n) => typed(n) === words.toLowerCase()) ? tab.make(words) : null;
@@ -124,7 +128,7 @@ export function openTreeChooser(opts: ChooserOptions): Promise<Map<string, Choic
     let answer: Map<string, ChoiceDone> | null = null;
     dlg.addEventListener("change", (e) => {
       const box = e.target as HTMLInputElement;
-      if (box.dataset["id"] === undefined) return; // ("No folder" is the empty one)
+      if (box.dataset["id"] === undefined) return; // (the top choice, Unfiled or Top level, is the empty one)
       const all = nodes.get(tab.id)!;
       for (const n of all) {
         if (n.id === box.dataset["id"]) n.state = box.checked ? "on" : "off";

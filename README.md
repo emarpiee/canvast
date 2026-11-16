@@ -968,10 +968,12 @@ Pin the folder you work from most, nest tags by subject and keep the searches yo
 | **Conceal a folder** | **Conceal folder** in a folder's ⋯ menu: a view filter. Its items, and its subfolders', are listed only when that folder (or one in it) is opened: not in All items, a search, a file type, a tag, another folder, Similar pictures, the pickers of the Library and of notes, or a note's link and tag suggestions. Nothing of the folder or its items changes, and they stay on the canvases they are placed on, in exports and on the disk. The folder shows a fog mark; **Reveal folder** lists its items everywhere again. Kept in the workspace, for every device; Settings > Privacy counts them and lists them |
 | **Quick filters** | A file type or a tag in the sidebar lists only those items; `Ctrl`+click (`⌘` on a Mac) adds another type or tag to the filter, or takes it out: any of the types chosen and any of the tags chosen |
 | **File by dragging** | Drop items onto a folder to move them into it, onto *Unfiled* to take them out of their folders, onto a tag to tag them, onto *Favourites* to mark them; a selected item carries the whole selection |
+| **Move a folder** | **Move to…** in a folder's ⋯ menu opens the Organize dialog: choose another folder, a new one typed, or **Top level** (the folder itself and those inside it are not offered). Or drag the folder onto another folder, or onto the Folders heading for the top. Its subfolders and items go with it. A shown folder cannot go into a hidden one, and a folder that was hidden by the one it leaves stays hidden |
+| **Progress** | A rename or a move shows a notice with a bar until it is done; in the desktop app, until the files are in their new places |
 
 #### Organize
 
-**Organize…** (`O`, the right-click menu, or the details panel) moves what is selected to a folder and sets its tags from one dialog, with a search, as a tree or in a row. Nothing changes until Apply.
+**Organize…** (`O`, the right-click menu, or the details panel) moves what is selected to a folder and sets its tags from one dialog, with a search, as a tree or in a row. **Unfiled**, first in the Folder tab, takes them out of every folder (in the desktop app their files go back to the folder of their kind). Nothing changes until Apply.
 
 File a reference and tag it in one dialog.
 
@@ -1012,9 +1014,9 @@ Turn a simple 3D object under a light, as the start of a still-life lighting stu
 | --- | --- | --- |
 | In the library and details | Its first page | Its first view |
 | Moving around | Page buttons, a page number, Page Up and Down, Home, End; zoom with its buttons, Ctrl+wheel or Ctrl and + or - | Drag to turn, Shift or right drag to slide, wheel to zoom, double-click for the first view; on a touch screen, two fingers pinch to zoom and move together to slide |
-| Remembered | The page it was left at | The view it was left at, with its lights |
+| Remembered | The page it was left at, kept as the view closes | The view it was left at, with its lights, kept as the view closes |
 | Opened from a card | At the page that card shows | At the view that card shows |
-| Bookmarks | Pages, and the contents the PDF carries | Views |
+| Bookmarks | Pages, and the contents the PDF carries; **Bookmark current page** in the details | Views; **Bookmark current view** in the details |
 | On a card on a canvas | Its page's shape; **Show this page on the card** | **Show this view on the card** |
 | Placed from the view (**Place**) | The page in sight | The view in sight |
 | Several cards at once | **Place pages**: a card for each page typed, such as `1-4, 9` | **Place a turnaround**: eight cards, from all around |
@@ -2451,6 +2453,7 @@ What canvast does not do today, for both versions, then each. **The limits that 
 | PDF | Forms are shown but not filled; links to the web are not opened; a password is asked each time and a card shows no picture of such a PDF; a font a PDF does not carry comes from the system, and East Asian text that needs one may not show |
 | 3D | GLB, glTF, STL, OBJ and PLY only, one file each: what lies in another file (an OBJ's materials, a glTF's textures) and compressed glTF are not read; a model over 1 GB does not open, and over 512 MB has a plain card |
 | 3D line art | On a model of millions of triangles, lines from its edges come a moment after the view; placed lines are paths only, without the model's surface |
+| Place in a file | A PDF's page, a comic's page or a model's view is kept when its view closes, not at each turn |
 | Text | No Indic shaping; other computers can wrap missing characters differently |
 | Partial backups | ⚠️ An Advanced export can only be added, never used to update a workspace. Links in notes to items left out find nothing until those items are there |
 | Concealed folders | A view filter, not privacy: no password, nothing encrypted, the files stay readable on the disk. The canvas's font list and texture picker still offer their items |
@@ -2484,6 +2487,7 @@ What canvast does not do today, for both versions, then each. **The limits that 
 | PDF | Forms are shown but not filled, and links to the web are not opened (links inside a PDF are followed). A PDF's password is asked each time it opens and kept nowhere, and its card shows no picture. A font a PDF does not carry comes from the system, and East Asian text that needs one may not show. The library's search reads PDFs up to 128 MB and 2000 pages |
 | 3D | Only GLB, glTF, STL, OBJ and PLY are read, one file each: an OBJ's materials, a glTF's textures in other files and compressed glTF are not. A model over 1 GB does not open, and one over 512 MB has a plain card. Without 3D graphics in the browser or machine a model stays a card |
 | 3D line art | Lines from a model's edges are worked out off the page, a view at a time: on a model of millions of triangles they come a moment after the view, and coarser while it turns (*The picture* keeps up with any model). Placed lines are paths only: the model's own surface is not placed, and an SVG holds it as a picture only when the lines are over the model. Hidden edges, shading and hand-drawn lines come only from the model's edges |
+| Place in a file | The page or view a file was left at is written to the library when its view closes, not at each page turned: each write is a change of the library, and in the desktop app a write of its files, which made turning pages lag. Bookmarks are written at once |
 | Text | Complex scripts that need Indic shaping are not supported; OpenType positioning goes no further than kerning. Characters missing from the interface font fall back to a system font: their width then comes from the browser, so such text can wrap differently on another computer and pixelates at extreme depth |
 | Vector networks | One fill for the whole network (no fill per region) |
 | Note zoom | Only a note's text grows; pictures keep their size |

@@ -1078,7 +1078,7 @@ test("picking several: Ctrl and Shift click, Select several (no checkboxes), sel
   await p.getByTestId("folder-name-input").fill("Batch");
   await p.keyboard.press("Enter");
   await expect(p.getByTestId("assets-side").getByRole("button", { name: /^Batch/ })).toBeVisible();
-  // "Move all": the choices are No folder and Batch; one folder for each asset.
+  // "Move all": the choices are Unfiled and Batch; one folder for each asset.
   await p.getByTestId("bulk-organize").click();
   await expect(p.getByTestId("tree-chooser").getByRole("radio")).toHaveCount(2);
   await p.getByTestId("tree-chooser").getByRole("radio", { name: "Batch" }).check();

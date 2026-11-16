@@ -67,8 +67,8 @@ export interface FileViewKind {
   readonly id: "note" | "pdf" | "model" | "archive";
   /** What the interface calls it. */
   readonly noun: string;
-  /** Whether it has bookmarks, listed in the details. */
-  readonly marks: boolean;
+  /** What its bookmarks mark (listed in the details: "Bookmark current page"), or false when it has none. */
+  readonly marks: false | "page" | "view";
   /** By name, for what needs no reading (a menu, the details). */
   named(name: string): boolean;
   /** Whether this file opens here. */
@@ -96,7 +96,7 @@ const KINDS: readonly FileViewKind[] = [
   {
     id: "pdf",
     noun: "PDF",
-    marks: true,
+    marks: "page",
     named: (name) => isPdfFile({ name }),
     claims: (f) => isPdfFile(f),
     words: async (blob) => (await import("../assets/pdf-engine")).pdfWords(new Uint8Array(await blob.arrayBuffer())),
@@ -106,7 +106,7 @@ const KINDS: readonly FileViewKind[] = [
   {
     id: "model",
     noun: "3D model",
-    marks: true,
+    marks: "view",
     named: isModelFile,
     claims: (f) => isModelFile(f.name),
     open: async (el, f, deps, place) => (await import("./model-view")).openModelView(el, f, deps, place),
@@ -115,7 +115,7 @@ const KINDS: readonly FileViewKind[] = [
     // A ZIP, or a comic book (CBZ): found by the names of the files in it.
     id: "archive",
     noun: "archive",
-    marks: true,
+    marks: "page",
     named: isArchiveFile,
     claims: (f) => isArchiveFile(f.name),
     words: async (blob) => (await import("../assets/archive")).archiveWords(blob),

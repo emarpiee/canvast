@@ -6,7 +6,7 @@
 import { ITEM_KEY_RE } from "../assets/library-match";
 import { isFontFile } from "../assets/file-kind";
 import type { AssetFolder, AssetLocation, CatalogEntry, CatalogListing, GcReport, MetaChange, MetaSnapshot, PasswordKind, ThumbRecord } from "../assets/asset-catalog";
-import { AssetInUseError, CatalogInputError, FOLDERS_KEY, entryFromRecord, folderName, folderSubtree, meta, normalizeFields, normalizeNote, normalizeTags, usageOf, listedFolders, inHiddenFolder, unhiddenFolders } from "../assets/asset-catalog";
+import { AssetInUseError, CatalogInputError, FOLDERS_KEY, entryFromRecord, folderName, folderSubtree, meta, normalizeFields, normalizeNote, normalizeTags, usageOf, listedFolders, inHiddenFolder, movedFolders, unhiddenFolders } from "../assets/asset-catalog";
 import type { AssetRecord } from "../assets/asset-library";
 import { ImportError, MAX_IMPORT_BYTES, storedStub } from "../assets/asset-library";
 import { isHiddenFile } from "./hidden-vault";
@@ -423,6 +423,12 @@ export class DesktopCatalog implements CatalogStore {
       if (!f) throw new CatalogInputError("that folder no longer exists");
       f.name = folderName(name);
       await this.lib.apply([putFolders(folders)]);
+    });
+  }
+
+  moveFolder(id: string, parentId: string | null): Promise<void> {
+    return this.lib.serial(async () => {
+      await this.lib.apply([putFolders(movedFolders(await this.lib.folders(), id, parentId))]);
     });
   }
 

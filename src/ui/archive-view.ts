@@ -13,12 +13,11 @@ import { ICONS } from "./icons";
 import { barButton } from "./view-bar";
 import { pageKey, swipePages } from "./page-turn";
 import { openMoreMenu } from "./more-menu";
-import { keepViewState, markActions, toggledMark, viewStateOf } from "./view-state";
+import { markActions, toggledMark, viewKeeper, viewStateOf } from "./view-state";
 import type { MarksChange, ViewState } from "./view-state";
 
 /** A page's longer side on a new card, in pixels (as a PDF's). */
 export const ARCHIVE_CARD_EDGE = 1600;
-const KEEP_MS = 600;
 const ZOOM_STEP = 1.25;
 const ZOOM_MIN = 0.1;
 const ZOOM_MAX = 8;
@@ -39,6 +38,9 @@ export async function openArchiveView(el: HTMLElement, file: FileFacts, deps: Vi
   const { pages } = archive;
   const hash = file.hash;
   let state: ViewState = viewStateOf(await deps.session.catalog?.entry(hash).catch(() => undefined));
+  // (the place is kept when the view closes; bookmarks at once)
+  const keepState = viewKeeper(deps.session, hash, state);
+  const keep = (): void => keepState(state);
   const startPage = Number(place.startAt) > 1 ? Number(place.startAt) : Number(state.at) || 1;
   let current = Math.max(1, Math.min(pages.length, startPage));
   let mode: Mode = pages.length && (isComicFile(file.name) || Number(place.startAt) > 1) ? "pages" : "files";
@@ -118,14 +120,6 @@ export async function openArchiveView(el: HTMLElement, file: FileFacts, deps: Vi
     }
   };
   const failed = (e: ArchiveEntry, err: unknown): void => say(`“${e.name}” could not be opened: ${err instanceof Error ? err.message : String(err)}`);
-
-  // ---- the view's state: where it was left, its bookmarks (pages)
-  let keepTimer: ReturnType<typeof setTimeout> | undefined;
-  const keep = (): void => void keepViewState(deps.session, hash, state);
-  const keepSoon = (): void => {
-    clearTimeout(keepTimer);
-    keepTimer = setTimeout(keep, KEEP_MS);
-  };
 
   // ---- modes
   const paintMode = (): void => {
@@ -303,7 +297,6 @@ export async function openArchiveView(el: HTMLElement, file: FileFacts, deps: Vi
     current = Math.max(1, Math.min(count, n));
     paintBar();
     state = { ...state, at: String(current) };
-    keepSoon();
     const t = ++turn;
     let blob: Blob | null;
     try {
@@ -452,7 +445,6 @@ export async function openArchiveView(el: HTMLElement, file: FileFacts, deps: Vi
     close: () => {
       closed = true;
       turn++;
-      clearTimeout(keepTimer);
       keep();
       resized.disconnect();
       clearFile();

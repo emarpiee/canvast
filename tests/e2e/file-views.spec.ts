@@ -112,6 +112,7 @@ test("a PDF: its first page in the library, its shape on a card; it opens in the
   await expect(p.getByTestId("view-mark")).toHaveAttribute("aria-pressed", "true");
   await detailsShown(p);
   await expect(p.getByTestId("asset-bookmarks")).toContainText("Page 2");
+  await expect(p.getByTestId("asset-add-bookmark")).toHaveText("Bookmark current page"); // (one label: the details are not drawn again for each page)
   // Renamed and deleted by its ⋯, in the view's own list and in the details: one list.
   await p.getByTestId("view-marks").click();
   await p.locator(".pop-menu .more-btn").first().click();
@@ -137,8 +138,7 @@ test("a PDF: its first page in the library, its shape on a card; it opens in the
   await expect(p.getByTestId("pdf-page")).toHaveValue("1");
   await p.getByTestId("asset-bookmarks").locator('[data-action="go-mark"]', { hasText: "Page 2" }).click();
   await expect(p.getByTestId("pdf-page")).toHaveValue("2");
-  // Left and opened again: where it was.
-  await p.waitForTimeout(800);
+  // Left and opened again: where it was (kept as the view closes).
   await p.keyboard.press("Escape");
   await expect(view(p)).toBeHidden();
   await card(p).dblclick();
@@ -327,8 +327,7 @@ test("a 3D model: a picture in the library, a view that turns, is lit and keeps 
   await p.getByTestId("view-mark").click();
   await detailsShown(p);
   await expect(p.getByTestId("asset-bookmarks")).toContainText("View 1");
-  // Left and opened again: as it was. (The arrows stay the viewer's: no second item here, so it stays.)
-  await p.waitForTimeout(800);
+  // Left and opened again: as it was, kept as the view closes. (The arrows stay the viewer's: no second item here, so it stays.)
   await p.keyboard.press("Escape");
   await expect(modelView(p)).toBeHidden();
   await c.dblclick();
