@@ -141,12 +141,7 @@ const SEARCH_PAUSE_MS = 250;
  * Cards kept beyond the view on each side, in screens (the grid) and in items (the filmstrip): scrolling back a little finds them still
  * there, their pictures shown, instead of new cards waiting for their pictures to be decoded again.
  */
-/** How many screens of cards above and below the view are kept in the page: one (three put 7 screens of cards in the page, ~46,000 elements
- * at the smallest thumbnails, and styling them took half of each scrolled frame). */
-const GRID_OVERSCAN = 1;
-/** At most this many cards made in one go show a picture already loaded at once (decoded before they are painted, as a key's step); more,
- * as a fast scroll makes, decode it off the page's thread, so the scroll does not wait for them. */
-const SYNC_DECODE_MAX = 12;
+const GRID_OVERSCAN = 3;
 const FILM_OVERSCAN = 12;
 /**
  * Make `parent`'s children exactly `els`, in order, moving as few as possible (a kept element stays in the page, so its picture is not
@@ -154,6 +149,14 @@ const FILM_OVERSCAN = 12;
  */
 function syncChildren(parent: HTMLElement, els: readonly HTMLElement[]): void {
   const focused = document.activeElement instanceof HTMLElement && parent.contains(document.activeElement) ? document.activeElement : null;
+  // Those leaving go first: else, scrolling down, the first card kept was put before the row that left, and so was every card after it,
+  // each step: all the cards in the page moved, styled and laid out again (at the smallest thumbnails, under 30 frames a second).
+  const wanted = new Set<Element>(els);
+  for (let c = parent.firstElementChild; c; ) {
+    const next = c.nextElementSibling;
+    if (!wanted.has(c)) c.remove();
+    c = next;
+  }
   let ref = parent.firstElementChild;
   for (const el of els) {
     if (el === ref) ref = ref.nextElementSibling;
@@ -1117,13 +1120,12 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     return groups;
   };
   /** Show a card's picture: at once when it was loaded before, else once it is read or made (if the card is still in the page then). */
-  const loadThumb = (img: HTMLImageElement, many = false): void => {
+  const loadThumb = (img: HTMLImageElement): void => {
     const hash = img.dataset["hash"]!;
     const known = thumbUrls.get(hash);
     if (known) {
-      // Loaded before: decoded before the card is painted, so it shows at once (no blank card, no shimmer, while it decodes); among many
-      // cards made at once (a fast scroll), off the page's thread.
-      img.decoding = many ? "async" : "sync";
+      // Loaded before: decoded before the card is painted, so it shows at once (no blank card, no shimmer, while it decodes).
+      img.decoding = "sync";
       img.src = known;
       if (img.parentElement?.classList.contains("thumb-slot")) img.classList.add("is-loaded");
       return;
@@ -2328,7 +2330,8 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   let layoutW = 0;
   /** The cards changed while the grid could not be laid out (the library was not on screen): it is laid out when it can be. */
   let layoutDirty = false;
-  const mounted = new Map<string, { el: HTMLElement; html: string }>();
+  /** The cards in the page: their element, the markup it was made from, and the place last written on it. */
+  const mounted = new Map<string, { el: HTMLElement; html: string; box?: GridLayout["boxes"][number]; at?: number; of?: number }>();
   let dragCell: string | null = null;
   let gridRange: [number, number] = [0, 0];
   let gridEmpty = "";
@@ -2428,7 +2431,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     const ae = document.activeElement as HTMLElement | null;
     const focused = ae && grid.contains(ae) ? { el: ae, hash: ae.dataset["hash"] } : null;
     const els: HTMLElement[] = [];
-    const keep = new Map<string, { el: HTMLElement; html: string }>();
+    const keep = new Map<string, { el: HTMLElement; html: string; box?: GridLayout["boxes"][number]; at?: number; of?: number }>();
     const made: HTMLElement[] = [];
     for (let i = a; i < b; i++) {
       const it = shown[i]!;
@@ -2438,15 +2441,21 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
         m = { el: makeCell(html), html };
         made.push(m.el);
       }
+      // (a card already in its place is not touched: a scroll writes only the cards it brings)
       const box = layout.boxes[i]!;
-      const st = m.el.style;
-      st.setProperty("--x", `${box.x}px`);
-      st.setProperty("--y", `${box.y}px`);
-      st.setProperty("--w", `${box.w}px`);
-      st.setProperty("--h", `${box.h}px`);
-      m.el.classList.toggle("is-even", i % 2 === 1);
-      m.el.setAttribute("aria-posinset", String(i + 1));
-      m.el.setAttribute("aria-setsize", String(shown.length));
+      if (m.box !== box || m.at !== i || m.of !== shown.length) {
+        const st = m.el.style;
+        st.setProperty("--x", `${box.x}px`);
+        st.setProperty("--y", `${box.y}px`);
+        st.setProperty("--w", `${box.w}px`);
+        st.setProperty("--h", `${box.h}px`);
+        m.el.classList.toggle("is-even", i % 2 === 1);
+        m.el.setAttribute("aria-posinset", String(i + 1));
+        m.el.setAttribute("aria-setsize", String(shown.length));
+        m.box = box;
+        m.at = i;
+        m.of = shown.length;
+      }
       keep.set(it.hash, m);
       els.push(m.el);
     }
@@ -2461,7 +2470,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     for (const [h, m] of keep) mounted.set(h, m);
     for (const el of made) {
       const img = el.querySelector<HTMLImageElement>("img[data-hash]");
-      if (img) loadThumb(img, made.length > SYNC_DECODE_MAX);
+      if (img) loadThumb(img);
     }
     // A card drawn again (its tags changed, say) keeps the keyboard.
     if (focused?.hash && !focused.el.isConnected) mounted.get(focused.hash)?.el.querySelector<HTMLElement>(".asset-card")?.focus({ preventScroll: true });
