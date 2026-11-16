@@ -83,6 +83,7 @@ export function mountFilePanel(
     el.innerHTML = panelHtml({ title: esc(name0), tools, body: `<div class="viewer-note"${k.id === "note" ? ' data-testid="note-editor"' : ""}><div></div></div>` });
     el.setAttribute("aria-label", `${label(k)}: ${name0}`);
     el.querySelector(".panel-head h2")?.setAttribute("title", name0);
+    // view-state: (closes the panel)
     el.querySelector("[data-close]")!.addEventListener("click", () => void leave());
     el.querySelector("[data-rename]")?.addEventListener("click", () => void rename());
     el.hidden = false;

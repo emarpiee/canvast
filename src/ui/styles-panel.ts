@@ -27,6 +27,8 @@ import { ICONS } from "./icons";
 import { panelHtml } from "./panel";
 import { moreButton, openMoreMenu } from "./more-menu";
 import type { MenuItem } from "./more-menu";
+import { commands, pressCommand, runCommand } from "../commands/registry";
+import type { Command, Options, OptionSpec, Result, Risk, RunContext } from "../commands/types";
 
 /**
  * Floating Styles panel (ADR 0120, 0122): everything the person saves to use again, in one place. One folding section per kind, a search box,
@@ -303,6 +305,7 @@ export function mountStylesPanel(host: HTMLElement, editor: EditorState, styles:
     const said = [gradients ? `${gradients} gradient${gradients === 1 ? "" : "s"}` : "", palettes ? `${palettes} palette${palettes === 1 ? "" : "s"}` : ""].filter(Boolean).join(" and ");
     deps.notify(said ? `Imported ${said}${skipped ? `; ${skipped} file${skipped === 1 ? " was" : "s were"} not a gradient or palette file` : ""}${notes.size ? ` (${[...notes].join("; ")})` : ""}.` : "Nothing imported: choose GIMP gradient (.ggr), GIMP palette (.gpl), Adobe swatch (.ase) or Adobe colour (.aco) files.");
   };
+  // view-state: (the file picker of styles.import)
   fileInput.addEventListener("change", () => {
     const files = [...(fileInput.files ?? [])];
     fileInput.value = "";
@@ -322,65 +325,164 @@ export function mountStylesPanel(host: HTMLElement, editor: EditorState, styles:
   const editColour = (anchor: HTMLElement, name: string, value: string, change: (hex: string) => void): void =>
     openColourPopover(anchor, { name, value, alpha: true, onInput: () => undefined, onChange: change });
   const remove = (item: StyleItem): void => void confirmDialog({ title: `Delete “${item.name}”?`, lines: ["It is removed from the saved styles. What it was used on keeps its look."], confirmLabel: "Delete" }).then((ok) => { if (ok) void styles.remove(item.id); });
+  // The Styles panel's commands (ADR 0205): its rows, menus and buttons run them by id, as the palette, a macro and an outside caller do.
+  const STYLE: OptionSpec = { name: "style", type: "id", doc: "the saved style", required: true };
+  const TO: OptionSpec = { name: "to", type: "choice", doc: "the fill or the outline (default: the panel's choice)", choices: ["fill", "stroke"] };
+  const styleCmd = (id: string, title: string, hint: string, risk: Risk, options: readonly OptionSpec[], exec: (item: StyleItem, o: Options, ctx: RunContext) => Result | void | Promise<Result | void>): Command => ({
+    id, group: "Styles", kind: "styles", title, hint, risk, options: [STYLE, ...options], why: () => null,
+    exec: (o, ctx) => {
+      const item = find(String(o["style"]));
+      return item ? exec(item, o, ctx) : { ok: false, error: `There is no saved style "${String(o["style"])}".` };
+    },
+  });
+  const applyItem = (item: StyleItem, to?: "fill" | "stroke"): Result | void => {
+    if (!canApply(item.kind)) return { ok: false, error: "Select what it applies to first." };
+    if (to && (item.kind === "colour" || item.kind === "gradient")) return void deps.paint.apply(item.data as Paint, item.name, to, false, item.id);
+    if (item.kind === "adjustment") deps.adjustment.apply(item);
+    else if (item.kind === "text") deps.text.apply(item.data as TextLook, item.name);
+    else if (item.kind === "pattern") deps.pattern.apply(item.data as PatternData, item.name);
+    else if (item.kind === "balloon") deps.balloon.apply(item.data as BalloonLook);
+    else if (item.kind === "lines3d") deps.lines3d.apply(item.data, item.name);
+    else if (item.kind === "layout") deps.layout.apply(item.data as SheetLayout, item.name);
+    else if (item.kind === "ratio") deps.ratio.apply(item.data as number, item.name);
+    else if (item.kind === "export") deps.ratio.say(`Choose “${item.name}” in the Preset list of Export….`);
+    else applyPaint(item);
+  };
+  /** What a style's value may be set to: a colour (#rrggbb), a ratio, a palette's colours, a gradient's stops. */
+  const fits = (item: StyleItem, v: unknown): boolean =>
+    item.kind === "colour" ? typeof v === "string" && /^#[0-9a-f]{3,8}$/i.test(v)
+      : item.kind === "ratio" ? typeof v === "number" && v > 0 && v < 1000
+        : item.kind === "palette" ? !!v && Array.isArray((v as PaletteData).colours) && (v as PaletteData).colours.length <= MAX_PALETTE && (v as PaletteData).colours.every((c) => typeof c?.c === "string" && /^#[0-9a-f]{3,8}$/i.test(c.c))
+          : item.kind === "gradient" ? !!v && Array.isArray((v as Gradient).stops) && (v as Gradient).stops.length >= 2
+            : false;
+  commands.setProvider("styles", () => [
+    styleCmd("style.apply", "Apply a style", "On what is selected", "edit", [TO], (item, o) => applyItem(item, o["to"] as "fill" | "stroke" | undefined)),
+    styleCmd("style.applyColour", "Apply a palette's colour", "One colour of a palette, on what is selected", "edit", [{ name: "index", type: "number", doc: "which colour, from 0", required: true, min: 0, max: MAX_PALETTE }, TO], (item, o) => {
+      const c = item.kind === "palette" ? paletteOf(item)[Number(o["index"])] : undefined;
+      if (!c) return { ok: false, error: "No such colour in that palette." };
+      if (!deps.paint.count()) return { ok: false, error: "Select what it applies to first." };
+      deps.paint.apply(c.c, c.name || c.c.toUpperCase(), (o["to"] as "fill" | "stroke" | undefined) ?? target, true);
+    }),
+    styleCmd("style.copy", "Copy a style", "As CSS or a colour code", "edit", [], (item) => (copyItem(item) ? { ok: true } : { ok: false, error: "This kind of style has no text to copy." })),
+    styleCmd("style.rename", "Rename a style", "Give it a new name", "edit", [{ name: "name", type: "text", doc: "the new name", required: true }], async (item, o) => void (await styles.rename(item.id, String(o["name"])), render())),
+    styleCmd("style.duplicate", "Duplicate a style", "Make a copy", "edit", [], (item) => void styles.duplicate(item.id)),
+    styleCmd("style.delete", "Delete a style", "What used it keeps its look", "confirm", [], (item, _o, ctx) => (ctx.caller === "agent" ? void styles.remove(item.id) : remove(item))),
+    styleCmd("style.export", "Export a style", "As a GIMP or Adobe file", "confirm", [{ name: "format", type: "choice", doc: "ggr for a gradient; gpl, ase or aco for a palette", choices: ["ggr", "gpl", "ase", "aco"] }], (item, o) => {
+      if (item.kind !== "gradient" && item.kind !== "palette") return { ok: false, error: "Only gradients and palettes are exported as files." };
+      const f = o["format"] as "gpl" | "ase" | "aco" | "ggr" | undefined;
+      void exportItems(item.kind, [item], f === "ase" || f === "aco" ? f : "gpl");
+    }),
+    styleCmd("style.set", "Change a style", "Its colour, ratio, palette colours or gradient", "edit", [{ name: "value", type: "json", doc: "a colour (#rrggbb), a ratio, { colours: [{ c, name? }] } or a gradient", required: true }], async (item, o) => {
+      if (!fits(item, o["value"])) return { ok: false, error: `That is not a value for a ${item.kind} style.` };
+      await styles.update(item.id, o["value"] as never);
+    }),
+    styleCmd("style.updateFrom", "Update a style from the selection", "Its adjustments, ratio or the Pattern panel", "edit", [], async (item) => {
+      const v = item.kind === "adjustment" ? deps.adjustment.current() : item.kind === "ratio" ? deps.ratio.current() : item.kind === "pattern" ? deps.pattern.current() : null;
+      if (v === null || v === undefined) return { ok: false, error: "Nothing selected to take it from." };
+      if (!(await styles.update(item.id, v as never))) return { ok: false, error: "It could not be updated from that." };
+    }),
+    styleCmd("palette.sort", "Sort a palette", "By hue, or by lightness", "edit", [{ name: "by", type: "choice", doc: "hue or lightness", required: true, choices: ["hue", "lightness"] }], (item, o) => {
+      if (item.kind !== "palette") return { ok: false, error: "That is not a palette." };
+      const by = o["by"] === "hue" ? 0 : 1;
+      void setPalette(item, paletteOf(item).sort((a, b) => hueLightness(a.c)[by] - hueLightness(b.c)[by]));
+    }),
+    styleCmd("palette.addSelection", "Add the selection's colours", "To the palette", "edit", [], (item) => {
+      const cols = paletteOf(item);
+      const fromSel = deps.selectionColours();
+      if (item.kind !== "palette" || !fromSel.length) return { ok: false, error: "Select shapes with colours, and a palette." };
+      void setPalette(item, [...cols, ...fromSel.filter((c) => !cols.some((x) => x.c === c)).map((c) => ({ c }))].slice(0, MAX_PALETTE));
+    }),
+    { id: "styles.new", group: "Styles", kind: "styles", title: "New style", hint: "A colour, gradient, palette or text style", risk: "edit", why: () => null,
+      options: [{ name: "kind", type: "choice", doc: "what to make", required: true, choices: ["colour", "gradient", "palette", "text"] }, { name: "from", type: "choice", doc: "a palette: empty, the selection's colours or the selected picture's", choices: ["empty", "selection", "picture"] }, { name: "value", type: "colour", doc: "a colour's value" }],
+      exec: async (o) => {
+        const kind = o["kind"];
+        if (kind === "colour") {
+          const hex = typeof o["value"] === "string" ? o["value"] : "#2563eb";
+          await styles.add("colour", "", hex);
+          return { ok: true, note: `Saved ${hex.toUpperCase()}.` };
+        }
+        if (kind === "gradient") return void (await styles.add("gradient", "", { type: "linear", x0: 0, y0: 0.5, x1: 1, y1: 0.5, stops: [{ o: 0, c: "#2563eb" }, { o: 1, c: "#f59e0b" }] }));
+        if (kind === "text") {
+          const look = deps.text.current();
+          if (!look) return { ok: false, error: "Select a text first." };
+          return void (await styles.add("text", "", look));
+        }
+        const from = o["from"] ?? "empty";
+        if (from === "selection") {
+          const sel = deps.selectionColours();
+          return sel.length ? void (await addPalette(styles.nextName("palette"), sel)) : { ok: false, error: "Select shapes with colours first." };
+        }
+        if (from === "picture") {
+          const c = await deps.picturePalette();
+          return c ? void (await addPalette(styles.nextName("palette"), c)) : { ok: false, error: "Select one picture first." };
+        }
+        await addPalette(styles.nextName("palette"), ["#808080"], (m) => { editing = m.id; render(); });
+      } },
+    { id: "styles.exportAll", group: "Styles", kind: "styles", title: "Export every gradient or palette", hint: "As GIMP files", risk: "confirm", why: () => null, options: [{ name: "kind", type: "choice", doc: "gradient or palette", required: true, choices: ["gradient", "palette"] }],
+      exec: (o) => { const kind = o["kind"] as "gradient" | "palette"; const items = styles.of(kind); if (!items.length) return { ok: false, error: `There are no saved ${kind}s.` }; void exportItems(kind, items); } },
+    { id: "styles.import", group: "Styles", kind: "styles", title: "Import style files", hint: "GIMP palettes and gradients, Adobe swatches", risk: "edit", why: () => null, exec: () => fileInput.click() },
+    { id: "styles.harmony", group: "Styles", kind: "styles", title: "Palette from a colour", hint: "Colours that go together", risk: "edit", why: () => null, exec: () => harmonyPalette(panel.querySelector<HTMLElement>("[data-new]") ?? panel) },
+  ]);
+  const press = (id: string, o: Options = {}): boolean => pressCommand(id, o);
   const common = (item: StyleItem): MenuItem[] => [
-    { label: "Rename", hint: "Give it a new name", icon: ICONS.textCursorInput, aria: `Rename style ${item.name}`, run: () => { renaming = item.id; render(); panel.querySelector<HTMLInputElement>("[data-rename]")?.select(); } },
-    { label: "Duplicate", hint: "Make a copy", icon: ICONS.copy, aria: `Duplicate style ${item.name}`, run: () => void styles.duplicate(item.id) },
+    { label: "Rename", hint: "Give it a new name", icon: ICONS.textCursorInput, aria: `Rename style ${item.name}`, command: "style.rename", run: () => { renaming = item.id; render(); panel.querySelector<HTMLInputElement>("[data-rename]")?.select(); } },
+    { label: "Duplicate", hint: "Make a copy", icon: ICONS.copy, aria: `Duplicate style ${item.name}`, command: "style.duplicate", run: () => void press("style.duplicate", { style: item.id }) },
   ];
   const menuFor = (item: StyleItem): MenuItem[] => {
     const can = canApply(item.kind);
-    const del: MenuItem = { label: "Delete", hint: "Remove it permanently", icon: ICONS.trash2, danger: true, aria: `Delete style ${item.name}`, run: () => remove(item) };
+    const del: MenuItem = { label: "Delete", hint: "Remove it permanently", icon: ICONS.trash2, danger: true, aria: `Delete style ${item.name}`, command: "style.delete", run: () => void press("style.delete", { style: item.id }) };
+    const S = { style: item.id };
     if (item.kind === "gradient")
       return [
-        { label: "Apply to the fill", hint: "On what is selected", icon: ICONS.pointer, disabled: deps.paint.count() === 0, aria: `Apply ${item.name} to the fill`, run: () => deps.paint.apply(item.data as Paint, item.name, "fill", false, item.id) },
-        { label: "Apply to the outline", hint: "On what is selected", icon: ICONS.pointer, disabled: deps.paint.count() === 0, aria: `Apply ${item.name} to the outline`, run: () => deps.paint.apply(item.data as Paint, item.name, "stroke", false, item.id) },
-        { label: "Edit the gradient", hint: "Change its colours", icon: ICONS.blend, aria: `Edit the gradient ${item.name}`, run: () => openGradientPopover(panel.querySelector<HTMLElement>(`[data-more="${item.id}"]`)!, { name: `Gradient ${item.name}`, gradient: item.data as Gradient, onChange: (g) => void styles.update(item.id, g) }) },
-        { label: "Copy as CSS", hint: "As text for a stylesheet", icon: ICONS.clipboardCopy, aria: `Copy the gradient ${item.name} as CSS`, run: () => copyItem(item) },
+        { label: "Apply to the fill", hint: "On what is selected", icon: ICONS.pointer, disabled: deps.paint.count() === 0, aria: `Apply ${item.name} to the fill`, command: "style.apply", run: () => void press("style.apply", { ...S, to: "fill" }) },
+        { label: "Apply to the outline", hint: "On what is selected", icon: ICONS.pointer, disabled: deps.paint.count() === 0, aria: `Apply ${item.name} to the outline`, command: "style.apply", run: () => void press("style.apply", { ...S, to: "stroke" }) },
+        { label: "Edit the gradient", hint: "Change its colours", icon: ICONS.blend, aria: `Edit the gradient ${item.name}`, command: "style.set", run: () => openGradientPopover(panel.querySelector<HTMLElement>(`[data-more="${item.id}"]`)!, { name: `Gradient ${item.name}`, gradient: item.data as Gradient, onChange: (g) => void press("style.set", { ...S, value: g }) }) },
+        { label: "Copy as CSS", hint: "As text for a stylesheet", icon: ICONS.clipboardCopy, aria: `Copy the gradient ${item.name} as CSS`, command: "style.copy", run: () => void press("style.copy", S) },
         ...common(item),
-        { label: "Export as .ggr", hint: "A GIMP gradient file", icon: ICONS.download, aria: `Export ${item.name} as a GIMP gradient`, run: () => void exportItems("gradient", [item]) },
+        { label: "Export as .ggr", hint: "A GIMP gradient file", icon: ICONS.download, aria: `Export ${item.name} as a GIMP gradient`, command: "style.export", run: () => void press("style.export", { ...S, format: "ggr" }) },
         del,
       ];
     if (item.kind === "colour")
       return [
-        { label: "Apply to the fill", hint: "On what is selected", icon: ICONS.pointer, disabled: deps.paint.count() === 0, aria: `Apply ${item.name} to the fill`, run: () => deps.paint.apply(item.data as Paint, item.name, "fill", false, item.id) },
-        { label: "Apply to the outline", hint: "On what is selected", icon: ICONS.pointer, disabled: deps.paint.count() === 0, aria: `Apply ${item.name} to the outline`, run: () => deps.paint.apply(item.data as Paint, item.name, "stroke", false, item.id) },
-        { label: "Change colour", hint: "Choose another colour", icon: ICONS.droplets, aria: `Change the colour of ${item.name}`, run: () => editColour(panel.querySelector<HTMLElement>(`[data-more="${item.id}"]`)!, `Colour ${item.name}`, String(item.data), (hex) => void styles.update(item.id, hex)) },
-        { label: "Copy hex", hint: "As a colour code", icon: ICONS.clipboardCopy, aria: `Copy the hex of ${item.name}`, run: () => copyItem(item) },
+        { label: "Apply to the fill", hint: "On what is selected", icon: ICONS.pointer, disabled: deps.paint.count() === 0, aria: `Apply ${item.name} to the fill`, command: "style.apply", run: () => void press("style.apply", { ...S, to: "fill" }) },
+        { label: "Apply to the outline", hint: "On what is selected", icon: ICONS.pointer, disabled: deps.paint.count() === 0, aria: `Apply ${item.name} to the outline`, command: "style.apply", run: () => void press("style.apply", { ...S, to: "stroke" }) },
+        { label: "Change colour", hint: "Choose another colour", icon: ICONS.droplets, aria: `Change the colour of ${item.name}`, command: "style.set", run: () => editColour(panel.querySelector<HTMLElement>(`[data-more="${item.id}"]`)!, `Colour ${item.name}`, String(item.data), (hex) => void press("style.set", { ...S, value: hex })) },
+        { label: "Copy hex", hint: "As a colour code", icon: ICONS.clipboardCopy, aria: `Copy the hex of ${item.name}`, command: "style.copy", run: () => void press("style.copy", S) },
         ...common(item),
         del,
       ];
     if (item.kind === "palette") {
       const cols = paletteOf(item);
-      const sorted = (by: "hue" | "light"): PaletteColour[] => [...cols].sort((a, b) => (by === "hue" ? hueLightness(a.c)[0] - hueLightness(b.c)[0] : hueLightness(a.c)[1] - hueLightness(b.c)[1]));
       const fromSel = deps.selectionColours();
       return [
-        { label: editing === item.id ? "Finish editing" : "Edit colours", hint: "Add, change or remove colours", icon: ICONS.pencilLine, aria: `Edit the colours of ${item.name}`, run: () => { editing = editing === item.id ? null : item.id; opened.add(item.id); render(); } },
-        { label: "Add the selection's colours", hint: "Colours of what is selected", icon: ICONS.listPlus, disabled: fromSel.length === 0, aria: `Add the colours of the selection to ${item.name}`, run: () => void setPalette(item, [...cols, ...fromSel.filter((c) => !cols.some((x) => x.c === c)).map((c) => ({ c }))].slice(0, MAX_PALETTE)) },
-        { label: "Sort by hue", hint: "Red through violet", icon: ICONS.arrowUpDown, aria: `Sort ${item.name} by hue`, run: () => void setPalette(item, sorted("hue")) },
-        { label: "Sort by lightness", hint: "Dark to light", icon: ICONS.arrowUpDown, aria: `Sort ${item.name} by lightness`, run: () => void setPalette(item, sorted("light")) },
-        { label: "Copy as CSS variables", hint: "As text for a stylesheet", icon: ICONS.clipboardCopy, aria: `Copy ${item.name} as CSS variables`, run: () => copyItem(item) },
+        { label: editing === item.id ? "Finish editing" : "Edit colours", hint: "Add, change or remove colours", icon: ICONS.pencilLine, aria: `Edit the colours of ${item.name}`, command: "style.set", run: () => { editing = editing === item.id ? null : item.id; opened.add(item.id); render(); } },
+        { label: "Add the selection's colours", hint: "Colours of what is selected", icon: ICONS.listPlus, disabled: fromSel.length === 0, aria: `Add the colours of the selection to ${item.name}`, command: "palette.addSelection", run: () => void press("palette.addSelection", S) },
+        { label: "Sort by hue", hint: "Red through violet", icon: ICONS.arrowUpDown, aria: `Sort ${item.name} by hue`, command: "palette.sort", run: () => void press("palette.sort", { ...S, by: "hue" }) },
+        { label: "Sort by lightness", hint: "Dark to light", icon: ICONS.arrowUpDown, aria: `Sort ${item.name} by lightness`, command: "palette.sort", run: () => void press("palette.sort", { ...S, by: "lightness" }) },
+        { label: "Copy as CSS variables", hint: "As text for a stylesheet", icon: ICONS.clipboardCopy, aria: `Copy ${item.name} as CSS variables`, command: "style.copy", run: () => void press("style.copy", S) },
         ...common(item),
-        { label: "Export as .gpl", hint: "A GIMP palette file", icon: ICONS.download, aria: `Export ${item.name} as a GIMP palette`, run: () => void exportItems("palette", [item]) },
-        { label: "Export as .ase", hint: "An Adobe swatch file", icon: ICONS.download, aria: `Export ${item.name} as an Adobe swatch file`, run: () => void exportItems("palette", [item], "ase") },
-        { label: "Export as .aco", hint: "An Adobe colour file", icon: ICONS.download, aria: `Export ${item.name} as an Adobe colour file`, run: () => void exportItems("palette", [item], "aco") },
+        { label: "Export as .gpl", hint: "A GIMP palette file", icon: ICONS.download, aria: `Export ${item.name} as a GIMP palette`, command: "style.export", run: () => void press("style.export", { ...S, format: "gpl" }) },
+        { label: "Export as .ase", hint: "An Adobe swatch file", icon: ICONS.download, aria: `Export ${item.name} as an Adobe swatch file`, command: "style.export", run: () => void press("style.export", { ...S, format: "ase" }) },
+        { label: "Export as .aco", hint: "An Adobe colour file", icon: ICONS.download, aria: `Export ${item.name} as an Adobe colour file`, command: "style.export", run: () => void press("style.export", { ...S, format: "aco" }) },
         del,
       ];
     }
     if (item.kind === "adjustment")
       return [
-        { label: "Update from the selected picture", hint: "Take its adjustments", icon: ICONS.refresh, disabled: !deps.adjustment.can(), aria: `Replace ${item.name} with the adjustments of the selected picture: the pictures that follow it change too`, run: () => { const a = deps.adjustment.current(); if (a) void styles.update(item.id, a); } },
+        { label: "Update from the selected picture", hint: "Take its adjustments", icon: ICONS.refresh, disabled: !deps.adjustment.can(), aria: `Replace ${item.name} with the adjustments of the selected picture: the pictures that follow it change too`, command: "style.updateFrom", run: () => void press("style.updateFrom", S) },
         ...common(item),
         del,
       ];
     if (item.kind === "ratio")
       return [
-        { label: "Change the ratio", hint: "Type a ratio or a size in px", icon: ICONS.rulerDimension, aria: `Change the ratio of ${item.name}`, run: () => void deps.ratio.ask(`Change “${item.name}”`, item.data as number).then((r) => r !== null && styles.update(item.id, r)) },
-        { label: "Update from the selection", hint: "Take its ratio", icon: ICONS.refresh, disabled: deps.ratio.current() === null, aria: `Replace ${item.name} with the ratio of the selected sheet or shape`, run: () => { const r = deps.ratio.current(); if (r !== null) void styles.update(item.id, r); } },
+        { label: "Change the ratio", hint: "Type a ratio or a size in px", icon: ICONS.rulerDimension, aria: `Change the ratio of ${item.name}`, command: "style.set", run: () => void deps.ratio.ask(`Change “${item.name}”`, item.data as number).then((r) => r !== null && press("style.set", { ...S, value: r })) },
+        { label: "Update from the selection", hint: "Take its ratio", icon: ICONS.refresh, disabled: deps.ratio.current() === null, aria: `Replace ${item.name} with the ratio of the selected sheet or shape`, command: "style.updateFrom", run: () => void press("style.updateFrom", S) },
         ...common(item),
         del,
       ];
     if (item.kind === "pattern")
       return [
-        { label: "Update from the Pattern panel", hint: "Take its current settings", icon: ICONS.refresh, aria: `Replace ${item.name} with the generator, settings and seed in the Pattern panel`, run: () => { void styles.update(item.id, deps.pattern.current()).then((ok) => deps.notify(ok ? `Updated “${item.name}” from the Pattern panel.` : "The Pattern panel holds nothing that can be saved.")); } },
+        { label: "Update from the Pattern panel", hint: "Take its current settings", icon: ICONS.refresh, aria: `Replace ${item.name} with the generator, settings and seed in the Pattern panel`, command: "style.updateFrom", run: () => void press("style.updateFrom", S) },
         ...common(item),
         del,
       ];
@@ -451,7 +553,7 @@ export function mountStylesPanel(host: HTMLElement, editor: EditorState, styles:
       editor.changed();
       return;
     }
-    if (t.closest("[data-import]")) return fileInput.click();
+    if (t.closest("[data-import]")) return void press("styles.import");
     const kindBtn = t.closest<HTMLElement>("[data-kind-pick]");
     if (kindBtn) {
       const q = filter.trim().toLowerCase();
@@ -462,7 +564,8 @@ export function mountStylesPanel(host: HTMLElement, editor: EditorState, styles:
         hint: KIND_HINT[kd.id] ?? kd.label,
         count: styles.of(kd.id).filter((s) => !q || s.name.toLowerCase().includes(q)).length,
         checked: kd.id === tab,
-        run: () => {
+        command: "panel.styles",
+        run: () => { // (which kind the panel lists: what it shows)
           tab = kd.id;
           render();
           panel.querySelector<HTMLElement>("[data-kind-pick]")?.focus();
@@ -479,26 +582,18 @@ export function mountStylesPanel(host: HTMLElement, editor: EditorState, styles:
     }
     const addColour1 = t.closest<HTMLElement>("[data-add-style-colour]");
     if (addColour1) {
-      let hex = "#2563eb";
-      return editColour(addColour1, "A colour to keep", hex, (h) => {
-        hex = h;
-        void styles.add("colour", "", h);
+      return editColour(addColour1, "A colour to keep", "#2563eb", (h) => {
+        void press("styles.new", { kind: "colour", value: h });
         deps.notify(`Saved ${h.toUpperCase()}.`);
       });
     }
-    if (t.closest("[data-open-pattern]")) {
-      editor.patternOpen = true;
-      editor.changed();
-      return;
-    }
-    if (t.closest("[data-save-text]")) {
-      const look = deps.text.current();
-      if (look) void styles.add("text", "", look).then((made) => made && deps.notify(`Saved the text style “${made.name}”.`));
-      return;
-    }
+    if (t.closest("[data-open-pattern]")) return void press("panel.pattern");
+    if (t.closest("[data-save-text]")) return void press("styles.new", { kind: "text" });
     const newGradient = t.closest<HTMLElement>("[data-new-gradient]");
     if (newGradient) {
-      void styles.add("gradient", "", { type: "linear", x0: 0, y0: 0.5, x1: 1, y1: 0.5, stops: [{ o: 0, c: "#2563eb" }, { o: 1, c: "#f59e0b" }] }).then((made) => {
+      const had = new Set(styles.of("gradient").map((x) => x.id));
+      void runCommand("styles.new", { kind: "gradient" }).then(() => {
+        const made = styles.of("gradient").find((x) => !had.has(x.id));
         if (!made) return;
         requestAnimationFrame(() => requestAnimationFrame(() => panel.querySelector<HTMLElement>(`[data-more="${made.id}"]`)?.click()));
         deps.notify(`Made “${made.name}”: open its ⋯ menu and choose Edit the gradient to change it.`);
@@ -508,11 +603,8 @@ export function mountStylesPanel(host: HTMLElement, editor: EditorState, styles:
     const from = t.closest<HTMLElement>("[data-new-from]");
     if (from) {
       const how = from.dataset["newFrom"]!;
-      const sel = deps.selectionColours();
-      if (how === "selection") void (sel.length ? addPalette(styles.nextName("palette"), sel) : Promise.resolve(deps.notify("Select shapes with colours first.")));
-      else if (how === "picture") void deps.picturePalette().then((c) => (c ? addPalette(styles.nextName("palette"), c) : deps.notify("Select one picture first.")));
-      else if (how === "colour") void harmonyPalette(from);
-      else void addPalette(styles.nextName("palette"), ["#808080"], (m) => { editing = m.id; render(); });
+      if (how === "colour") return void press("styles.harmony");
+      void runCommand("styles.new", { kind: "palette", from: how === "selection" || how === "picture" ? how : "empty" }).then((r) => !r.ok && deps.notify(r.error));
       return;
     }
     const add = t.closest<HTMLElement>("[data-new]");
@@ -521,10 +613,10 @@ export function mountStylesPanel(host: HTMLElement, editor: EditorState, styles:
       openMoreMenu(
         add,
         [
-          { label: "Empty palette", hint: "Start with one grey", icon: ICONS.palette, aria: "New empty palette", run: () => void addPalette(styles.nextName("palette"), ["#808080"], (m) => { editing = m.id; render(); }) },
-          { label: "From the selection's colours", hint: "Colours of what is selected", icon: ICONS.pointer, disabled: sel.length === 0, aria: "New palette from the selection", run: () => void addPalette(styles.nextName("palette"), sel) },
-          { label: "From the selected picture", hint: "Its main colours", icon: ICONS.imagePlus, aria: "New palette from the selected picture", run: () => void deps.picturePalette().then((c) => (c ? addPalette(styles.nextName("palette"), c) : deps.notify("Select one picture first."))) },
-          { label: "From a colour (harmony)", hint: "Colours that go together", icon: ICONS.rainbow, aria: "New palette from a colour", run: () => void harmonyPalette(add) },
+          { label: "Empty palette", hint: "Start with one grey", icon: ICONS.palette, aria: "New empty palette", command: "styles.new", run: () => void press("styles.new", { kind: "palette", from: "empty" }) },
+          { label: "From the selection's colours", hint: "Colours of what is selected", icon: ICONS.pointer, disabled: sel.length === 0, aria: "New palette from the selection", command: "styles.new", run: () => void press("styles.new", { kind: "palette", from: "selection" }) },
+          { label: "From the selected picture", hint: "Its main colours", icon: ICONS.imagePlus, aria: "New palette from the selected picture", command: "styles.new", run: () => void press("styles.new", { kind: "palette", from: "picture" }) },
+          { label: "From a colour (harmony)", hint: "Colours that go together", icon: ICONS.rainbow, aria: "New palette from a colour", command: "styles.harmony", run: () => void press("styles.harmony") },
         ],
         "New style",
       );
@@ -537,8 +629,8 @@ export function mountStylesPanel(host: HTMLElement, editor: EditorState, styles:
       openMoreMenu(
         kindMore,
         [
-          { label: `Export all as ${kind === "gradient" ? ".ggr" : ".gpl"}`, hint: "Every one, as GIMP files", icon: ICONS.download, disabled: items.length === 0, aria: `Export all ${kind === "gradient" ? "gradients" : "palettes"}`, run: () => void exportItems(kind, items) },
-          { label: "Import files", hint: "GIMP palettes and gradients", icon: ICONS.arrowDownToLine, aria: "Import GIMP files", run: () => fileInput.click() },
+          { label: `Export all as ${kind === "gradient" ? ".ggr" : ".gpl"}`, hint: "Every one, as GIMP files", icon: ICONS.download, disabled: items.length === 0, aria: `Export all ${kind === "gradient" ? "gradients" : "palettes"}`, command: "styles.exportAll", run: () => void press("styles.exportAll", { kind }) },
+          { label: "Import files", hint: "GIMP palettes and gradients", icon: ICONS.arrowDownToLine, aria: "Import GIMP files", command: "styles.import", run: () => void press("styles.import") },
         ],
         `Actions for ${kind === "gradient" ? "gradients" : "palettes"}`,
       );
@@ -569,7 +661,7 @@ export function mountStylesPanel(host: HTMLElement, editor: EditorState, styles:
     if (chip) {
       const owner = find(chip.closest<HTMLElement>(".style-palette")?.querySelector<HTMLElement>("[data-toggle]")?.dataset["toggle"]);
       const c = owner ? paletteOf(owner)[Number(chip.dataset["chip"])] : undefined;
-      if (c && deps.paint.count()) deps.paint.apply(c.c, c.name || c.c.toUpperCase(), target, true);
+      if (owner && c && deps.paint.count()) press("style.applyColour", { style: owner.id, index: Number(chip.dataset["chip"]) });
       return;
     }
     // palette editing
@@ -579,13 +671,13 @@ export function mountStylesPanel(host: HTMLElement, editor: EditorState, styles:
       const owner = ownerOf(editBtn);
       const i = Number(editBtn.dataset["editColour"]);
       const cur = owner ? paletteOf(owner)[i] : undefined;
-      if (owner && cur) editColour(editBtn, `Colour ${i + 1} of ${owner.name}`, cur.c, (hex) => { const list = paletteOf(owner); list[i] = { ...list[i]!, c: hex.toLowerCase() }; void setPalette(owner, list); });
+      if (owner && cur) editColour(editBtn, `Colour ${i + 1} of ${owner.name}`, cur.c, (hex) => { const list = paletteOf(owner); list[i] = { ...list[i]!, c: hex.toLowerCase() }; press("style.set", { style: owner.id, value: { colours: list } }); });
       return;
     }
     const rm = t.closest<HTMLElement>("[data-remove-colour]");
     if (rm) {
       const owner = ownerOf(rm);
-      if (owner) void setPalette(owner, paletteOf(owner).filter((_, i) => i !== Number(rm.dataset["removeColour"])));
+      if (owner) press("style.set", { style: owner.id, value: { colours: paletteOf(owner).filter((_, i) => i !== Number(rm.dataset["removeColour"])) } });
       return;
     }
     const addColour = t.closest<HTMLElement>("[data-add-colour]");
@@ -594,7 +686,7 @@ export function mountStylesPanel(host: HTMLElement, editor: EditorState, styles:
       if (!owner) return;
       const list = paletteOf(owner);
       list.push({ c: list.at(-1)?.c ?? "#808080" });
-      void setPalette(owner, list).then(() => requestAnimationFrame(() => requestAnimationFrame(() => panel.querySelectorAll<HTMLElement>("[data-edit-colour]")[list.length - 1]?.click())));
+      void runCommand("style.set", { style: owner.id, value: { colours: list } }).then(() => requestAnimationFrame(() => requestAnimationFrame(() => panel.querySelectorAll<HTMLElement>("[data-edit-colour]")[list.length - 1]?.click())));
       return;
     }
     if (t.closest("[data-done]")) {
@@ -605,16 +697,9 @@ export function mountStylesPanel(host: HTMLElement, editor: EditorState, styles:
     const row = t.closest<HTMLElement>("[data-style]");
     const item = find(row?.dataset["style"]);
     if (!item || !canApply(item.kind)) return;
-    if (item.kind === "adjustment") deps.adjustment.apply(item);
-    else if (item.kind === "text") deps.text.apply(item.data as TextLook, item.name);
-    else if (item.kind === "pattern") deps.pattern.apply(item.data as PatternData, item.name);
-    else if (item.kind === "balloon") deps.balloon.apply(item.data as BalloonLook);
-    else if (item.kind === "lines3d") deps.lines3d.apply(item.data, item.name);
-    else if (item.kind === "layout") deps.layout.apply(item.data as SheetLayout, item.name);
-    else if (item.kind === "ratio") deps.ratio.apply(item.data as number, item.name);
-    else if (item.kind === "export") deps.ratio.say(`Choose “${item.name}” in the Preset list of Export….`);
-    else applyPaint(item);
+    press("style.apply", { style: item.id });
   });
+  // view-state: (typing the filter)
   panel.addEventListener("input", (e) => {
     const t = e.target as HTMLInputElement;
     if (!t.matches("[data-styles-filter]")) return;
@@ -630,7 +715,7 @@ export function mountStylesPanel(host: HTMLElement, editor: EditorState, styles:
     const i = Number(t.dataset["colourName"]);
     const name = t.value.trim().slice(0, MAX_NAME);
     list[i] = { c: list[i]!.c, ...(name ? { name } : {}) };
-    void setPalette(owner, list);
+    pressCommand("style.set", { style: owner.id, value: { colours: list } });
   });
   panel.addEventListener("keydown", (e) => {
     const t = e.target as HTMLInputElement;
@@ -642,7 +727,7 @@ export function mountStylesPanel(host: HTMLElement, editor: EditorState, styles:
         renaming = null;
         const name = t.value;
         t.blur(); // (a box that has the focus is not redrawn)
-        void styles.rename(id, name).then(render);
+        void runCommand("style.rename", { style: id, name }).then(render);
       } else if (e.key === "Escape") {
         renaming = null;
         t.blur();

@@ -48,6 +48,9 @@ import { ICONS } from "./icons";
 import { editableInPhotoCraft } from "../artcraft/photocraft/app";
 import { clearRect, MENU_GAP, moreButton, openMoreMenu, pressAs } from "./more-menu";
 import type { MenuItem } from "./more-menu";
+import { commands, pressCommand } from "../commands/registry";
+import { REASON } from "../commands/types";
+import type { Command, Options, OptionSpec, Risk } from "../commands/types";
 import { bindContextMenu, grouped as groupedMenu } from "./context-menu";
 import { openTreeChooser } from "./tree-chooser";
 import type { ChoiceNode, ChoiceState, ChoiceTab, ChooserView } from "./tree-chooser";
@@ -763,7 +766,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
         const input = document.createElement("input");
         input.type = "file";
         input.accept = "image/*";
-        input.addEventListener("change", () => ok(input.files?.[0] ?? null));
+        input.addEventListener("change", () => ok(input.files?.[0] ?? null)); // view-state: (a file picker: it gives the file chosen to what asked)
         input.addEventListener("cancel", () => ok(null));
         input.click();
       });
@@ -1685,10 +1688,12 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   };
   stage.addEventListener("pointerup", endPointer);
   stage.addEventListener("pointercancel", endPointer);
+  // view-state: (the viewer's zoom)
   stage.addEventListener("dblclick", (e) => {
     if ((e.target as HTMLElement).closest("button, .viewer-zoom")) return;
     toggleActual(e.clientX, e.clientY);
   });
+  // view-state: (the viewer's zoom)
   viewer.querySelector<HTMLElement>(".viewer-zoom")!.addEventListener("click", (e) => {
     const b = (e.target as HTMLElement).closest<HTMLElement>("[data-zoom]");
     if (!b) return;
@@ -1941,6 +1946,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   const applyEdge = (): void => void viewer.style.setProperty("--edge-w", String(settings.get("assets.edgeWidth")));
   applyEdge();
   for (const edge of viewer.querySelectorAll<HTMLElement>(".viewer-edge")) {
+    // view-state: (the viewer's previous and next)
     edge.addEventListener("click", (e) => {
       e.stopPropagation();
       stepSlide(edge.dataset["edge"] === "prev" ? -1 : 1);
@@ -3692,6 +3698,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   };
 
   // ---- events
+  // view-state: (picking cards: what is selected)
   grid.addEventListener("click", (e) => {
     const t = e.target as HTMLElement;
     const card = t.closest<HTMLElement>(".asset-card");
@@ -3719,6 +3726,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     slideSet = null;
     void showSlide(card.dataset["hash"]!);
   };
+  // view-state: (opens the item in the viewer)
   grid.addEventListener("dblclick", (e) => {
     const card = (e.target as HTMLElement).closest<HTMLElement>(".asset-card");
     if (!card || e.shiftKey || e.ctrlKey || e.metaKey) return;
@@ -3787,20 +3795,18 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     if (ok && scope === `tag:${label.toLowerCase()}`) scope = `tag:${name.replace(/\s+/g, " ").trim().replace(/^#+/, "").toLowerCase()}`;
     renderSide();
   };
+  // view-state: (opens the rename dialog, which runs library.rename)
   inspector.addEventListener("dblclick", (e) => {
     const target = e.target as HTMLElement;
     const chip = target.closest<HTMLElement>(".tag-chip[data-tag-label]");
     if (chip && !target.closest("button") && !session.readOnly) return void renameTagDialog(chip.dataset["tagLabel"]!);
     if (selected && !session.readOnly && (e.target as HTMLElement).closest(".asset-insp-head h2") && entryOf(selected)) void renameAssetsDialog([selected]);
   });
-  inspector.addEventListener("click", (e) => {
-    const b = (e.target as HTMLElement).closest<HTMLButtonElement>("button");
-    if (!b || b.disabled || !selected) return;
-    const hash = selected;
-    const group = [...picked];
-    // (listed a page at a time: the details of picked items not drawn yet are fetched first, then the button does what it does)
-    if (pagesNow() && [hash, ...group].some((h) => !pagedCache.has(h))) return void ensure([hash, ...group]).then(() => b.isConnected && b.click());
-    const action = b.dataset["action"];
+  /** What a button of the details panel works on (ADR 0205): the same whether it is clicked or run by id. */
+  interface PanelCtx { hash: string; group: string[]; data: Readonly<Record<string, string | undefined>>; pressed: boolean; anchor: HTMLElement }
+  const panelAct = (action: string, c: PanelCtx): void => {
+    const { hash, group } = c;
+    const b = c.anchor; // (the button, or the panel when it runs by id: where a menu or a dialog opens)
     /** What the panel is about: every picked asset, or the one shown. */
     const pickedGroup = (): string[] => (picked.size > 1 ? group : [hash]);
     switch (action) {
@@ -3820,7 +3826,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
         break;
       }
       case "favorite-all": {
-        const on = b.getAttribute("aria-pressed") !== "true";
+        const on = !c.pressed;
         void session.organize((c) => c.updateMetaEach(group.map((hash) => ({ hash, change: { favorite: on } }))), on ? "Favourites" : "Not favourites");
         break;
       }
@@ -3852,7 +3858,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
         void showSlide(hash);
         break;
       case "show": {
-        const p = places.find((x) => x.canvasId === b.dataset["canvas"]);
+        const p = places.find((x) => x.canvasId === c.data["canvas"]);
         if (p) {
           showCanvas();
           void session.reveal(p.canvasId, p.ids);
@@ -3872,7 +3878,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
         openPlaceMenu(b, [hash]);
         break;
       case "hide-all": {
-        const on = b.getAttribute("aria-pressed") !== "true";
+        const on = !c.pressed;
         void readyForHidden(session, on).then((ready) => void (ready && session.organize((c) => c.updateMetaEach(group.map((h) => ({ hash: h, change: { hidden: on } }))), on ? "Hidden" : "Not hidden").then((ok) => {
           if (ok) void moveThumbs(group, on);
           if (ok) void select(null); // (they leave the list, hidden or shown: nothing stays picked)
@@ -3880,7 +3886,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
         break;
       }
       case "hide": {
-        const on = b.getAttribute("aria-pressed") !== "true";
+        const on = !c.pressed;
         void readyForHidden(session, on).then((ready) => void (ready && session.organize((c) => c.updateMeta(hash, { hidden: on }), on ? "Hidden" : "Not hidden").then((ok) => {
           if (ok) void moveThumbs([hash], on);
           if (ok) void select(null);
@@ -3889,7 +3895,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       }
       case "favorite": {
         // The button shows the stored state it would change; set the opposite explicitly.
-        const on = b.getAttribute("aria-pressed") !== "true";
+        const on = !c.pressed;
         void session.organize((c) => c.updateMeta(hash, { favorite: on }));
         break;
       }
@@ -3902,18 +3908,18 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
         break;
       }
       case "go-copy":
-        void view.reveal([b.dataset["hash"]!]);
+        void view.reveal([c.data["hash"]!]);
         break;
       case "go-mark": {
         // Opens at it, when it is not open.
-        const hash = inspector.dataset["hash"], at = b.dataset["at"]!;
+        const hash = inspector.dataset["hash"], at = c.data["at"]!;
         if (!hash) break;
         if (note?.hash === hash) (note.goTo?.(at), viewer.focus());
         else void keepViewState(session, hash, { ...viewStateOf(entryOf(hash)), at }).then(() => showSlide(hash));
         break;
       }
       case "mark-more": {
-        const hash = inspector.dataset["hash"], at = b.dataset["at"]!, e = hash ? entryOf(hash) : undefined;
+        const hash = inspector.dataset["hash"], at = c.data["at"]!, e = hash ? entryOf(hash) : undefined;
         const mark = e && viewStateOf(e).marks.find((m) => m.at === at);
         if (!hash || !mark) break;
         // (an open view holds the list; else it is written here)
@@ -3928,7 +3934,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
         void note?.toggleMark?.();
         break;
       case "field-type": {
-        const now = notesNow().fields[Number(b.dataset["index"])];
+        const now = notesNow().fields[Number(c.data["index"])];
         if (!now?.key.trim()) break;
         const type = propType(now.key, now.value);
         openMoreMenu(b, PROP_TYPES.map((t) => ({ label: t.label, hint: t.expects, icon: PROP_ICON[t.id], checked: t.id === type, id: `prop-type-${t.id}`, run: () => pinType(now.key, t.id) })), "Property type");
@@ -3943,19 +3949,19 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       }
       case "field-remove": {
         const now = notesNow();
-        now.fields.splice(Number(b.dataset["index"]), 1);
+        now.fields.splice(Number(c.data["index"]), 1);
         saveNotes(hash, now, "Removed a property");
         break;
       }
       case "adopt-tag": {
-        const tag = b.dataset["tag"]!;
+        const tag = c.data["tag"]!;
         void session.organize((c) => c.updateMeta(hash, { addTags: [tag] }));
         break;
       }
       case "untag":
       case "tag-all": {
         // one asset, or every picked one (the panel is about all of them), in one write
-        const tag = b.dataset["tag"]!;
+        const tag = c.data["tag"]!;
         const change = action === "untag" ? { removeTags: [tag] } : { addTags: [tag] };
         void session.organize((c) => c.updateMetaEach(pickedGroup().map((h) => ({ hash: h, change }))), `${action === "untag" ? "Removed" : "Added"} #${tag}`);
         break;
@@ -3981,7 +3987,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
         void renameAssetsDialog(filtered().filter((h) => picked.has(h)));
         break;
       case "open-linked":
-        void showSlide(b.dataset["hash"]!);
+        void showSlide(c.data["hash"]!);
         break;
       case "open-tab":
         void openOriginalInTab(assets, hash);
@@ -4023,7 +4029,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
         void runExport(session, { kind: "assets", hashes: [hash] });
         break;
       case "show-more": {
-        const list = b.dataset["list"]!;
+        const list = c.data["list"]!;
         if (!openLists.delete(list)) openLists.add(list);
         renderInspector();
         break;
@@ -4053,6 +4059,62 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
         break;
       }
     }
+  };
+  /** The details panel's buttons that are commands (the others only show something, or edit the form in place). */
+  const PANEL_COMMANDS: Readonly<Record<string, readonly [id: string, title: string, hint: string, risk: Risk]>> = {
+    "place": ["library.place", "Place on the canvas", "The item, on the open canvas", "edit"],
+    "place-all": ["library.placeAll", "Place them on the canvas", "The selected items, in a grid", "edit"],
+    "favorite": ["library.favorite", "Favourite", "Add it to the favourites, or take it out", "edit"],
+    "favorite-all": ["library.favoriteAll", "Favourites", "Add them to the favourites, or take them out", "edit"],
+    "hide": ["library.hide", "Hide", "Into the hidden items, or back out", "confirm"],
+    "hide-all": ["library.hideAll", "Hide them", "Into the hidden items, or back out", "confirm"],
+    "export-files-all": ["library.exportFiles", "Export the files as ZIP", "A plain ZIP of the selected items' files", "confirm"],
+    "export-all": ["library.exportArchive", "Export as archive", "A .canvast archive of the selected items", "confirm"],
+    "export": ["library.export", "Export the item", "A .canvast archive of this item", "confirm"],
+    "slideshow-all": ["library.slideshow", "Slideshow of these", "The selected items one after another", "edit"],
+    "delete-all": ["library.deleteUnused", "Delete the unused", "The selected that no canvas uses", "confirm"],
+    "delete-everywhere": ["library.deleteEverywhere", "Delete everywhere", "The items and every use of them", "confirm"],
+    "delete": ["library.delete", "Delete the item", "From the library, when nothing uses it", "confirm"],
+    "show": ["library.showOnCanvas", "Show where it is used", "The canvas with it, at it", "edit"],
+    "adopt-tag": ["library.adoptTag", "Add the suggested tag", "A tag it has on a canvas, on the item", "edit"],
+    "tag-all": ["library.tag", "Tag them", "One tag on every selected item", "edit"],
+    "untag": ["library.untag", "Remove the tag", "From every selected item", "edit"],
+    "field-remove": ["library.removeProperty", "Remove the property", "One property of its note", "edit"],
+    "organize": ["library.organize", "Organize", "Folders and tags of the selected items", "edit"],
+    "download": ["library.download", "Download the file", "Its file, to this device", "confirm"],
+    "rename": ["library.rename", "Rename the item", "Give it a new name", "edit"],
+    "rename-all": ["library.renameAll", "Rename them", "Enumerate, replace or add text", "edit"],
+    "open-tab": ["library.openTab", "Open in a new tab", "The file, as the browser shows it", "edit"],
+    "photocraft": ["library.photocraft", "Edit in PhotoCraft", "The picture in the photo editor", "edit"],
+    "thumb": ["library.thumbnail", "Choose a thumbnail", "A picture of your own for its card", "edit"],
+    "thumb-all": ["library.thumbnailAll", "Choose a thumbnail for them", "One picture for every selected card", "edit"],
+    "open-app": ["library.openApp", "Open in its app", "The file, in this computer's app for it", "confirm"],
+    "show-file": ["library.showFile", "Show the file", "In this computer's file manager", "edit"],
+    "add-mark": ["library.addBookmark", "Bookmark this page or view", "In the file's view", "edit"],
+  };
+  const panelData: OptionSpec = { name: "data", type: "json", doc: "what the button carries: canvas (an id), tag, index" };
+  commands.setProvider("library-panel", () => Object.entries(PANEL_COMMANDS).map(([action, [id, title, hint, risk]]): Command => ({
+    id, group: "Library", kind: "library", title, hint, risk,
+    options: [{ name: "hash", type: "id", doc: "the item (default: the one shown in the details)" }, { name: "hashes", type: "ids", doc: "the items (default: the selected)" }, panelData, { name: "on", type: "boolean", doc: "on or off (default: the other of what it is now)" }],
+    why: () => (!visible ? "This works in the Library." : session.readOnly && risk !== "read" && action !== "download" && action !== "show" ? REASON.readOnly : !selected ? REASON.noSelection : null),
+    exec: (o) => {
+      const hash = (o["hash"] as string | undefined) ?? selected!;
+      const anchor = inspector.querySelector<HTMLElement>(`[data-action="${action}"]`) ?? inspector;
+      const pressed = o["on"] === undefined ? anchor.getAttribute("aria-pressed") === "true" : o["on"] !== true;
+      panelAct(action, { hash, group: (o["hashes"] as string[] | undefined) ?? [...picked], data: { ...anchor.dataset, ...((o["data"] as Record<string, string>) ?? {}) }, pressed, anchor });
+    },
+  })));
+  inspector.addEventListener("click", (e) => {
+    const b = (e.target as HTMLElement).closest<HTMLButtonElement>("button");
+    if (!b || b.disabled || !selected) return;
+    const hash = selected;
+    const group = [...picked];
+    // (listed a page at a time: the details of picked items not drawn yet are fetched first, then the button does what it does)
+    if (pagesNow() && [hash, ...group].some((h) => !pagedCache.has(h))) return void ensure([hash, ...group]).then(() => b.isConnected && b.click());
+    const action = b.dataset["action"] ?? "";
+    const id = PANEL_COMMANDS[action]?.[0];
+    if (id) return void pressCommand(id, { hash, hashes: group, data: { ...b.dataset } as Record<string, string>, on: b.getAttribute("aria-pressed") !== "true" });
+    panelAct(action, { hash, group, data: { ...b.dataset }, pressed: b.getAttribute("aria-pressed") === "true", anchor: b }); // view-state: (what only shows something or edits the form in place)
   });
   /** Counts presses and clicks anywhere: a field that would take the focus back after a write first checks that none came in between. */
   let inputs = 0;
@@ -4139,6 +4201,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     draggedItem = null;
   });
   // A value that does not fit its type says so while it is typed.
+  // typing: (the note's properties, written as they are typed)
   inspector.addEventListener("input", (e) => {
     const box = e.target as HTMLInputElement;
     // (a suggestion chosen is an item at once)
@@ -4171,6 +4234,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       if (box.isConnected && inspector.dataset["hash"] === hash) saveNotes(hash);
     }, 0);
   });
+  // typing: (the note's properties, written as they are typed)
   inspector.addEventListener("change", (e) => {
     const box = e.target as HTMLInputElement;
     if (box.classList.contains("field-item-input")) return;
@@ -4261,7 +4325,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     grip.addEventListener("pointerup", up);
     grip.addEventListener("pointercancel", up);
   });
-  grip.addEventListener("dblclick", () => setSheet(null, true));
+  grip.addEventListener("dblclick", () => setSheet(null, true)); // view-state: (the panel's size)
   // On a phone the sheet sits on the bottom edge and the grip on its top: keep the grip where the sheet really is, whatever its content.
   if (typeof ResizeObserver !== "undefined") new ResizeObserver(() => body.style.setProperty("--sheet-now", `${inspector.offsetHeight}px`)).observe(inspector);
   grip.addEventListener("keydown", (e) => {
@@ -4327,7 +4391,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       g.addEventListener("pointerup", up);
       g.addEventListener("pointercancel", up);
     });
-    g.addEventListener("dblclick", () => set(null, true));
+    g.addEventListener("dblclick", () => set(null, true)); // view-state: (a panel's width)
     g.addEventListener("keydown", (e) => {
       if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
       set(panel.offsetWidth + (e.key === "ArrowRight" ? 1 : -1) * (isSide ? 1 : -1) * 16, true);
@@ -4378,20 +4442,23 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     placeMenu.style.top = `${Math.max(8, Math.min(window.innerHeight - h - 8, r.bottom + MENU_GAP))}px`;
     placeMenu.querySelector<HTMLElement>("button")?.focus();
   };
+  // commands: (each choice runs library.placeOn)
   placeMenu.addEventListener("click", (e) => {
     const b = (e.target as HTMLElement).closest<HTMLElement>("[data-pm]");
     if (!b) return;
-    const hashes = placing;
-    const card = hashes.length === 1 ? cardInView(hashes[0]!) : undefined;
+    const hashes = [...placing]; // (closing the menu forgets what it was for)
     closePlaceMenu();
-    const kind = b.dataset["pm"];
-    const target = kind === "canvas" ? { canvasId: b.dataset["id"]! } : kind === "new-canvas" ? { newCanvasIn: b.dataset["id"]! } : ({ newBoard: true } as const);
+    pressCommand("library.placeOn", { hashes, where: b.dataset["pm"]!, id: b.dataset["id"] ?? "" });
+  });
+  const placeOn = (hashes: string[], kind: string, id: string): void => {
+    const card = hashes.length === 1 ? cardInView(hashes[0]!) : undefined;
+    const target = kind === "canvas" ? { canvasId: id } : kind === "new-canvas" ? { newCanvasIn: id } : ({ newBoard: true } as const);
     void askPlaceTags(hashes).then((withTags) => {
       if (withTags === null) return;
       showCanvas();
       void session.placeAssetsOn(hashes, target, withTags, card);
     });
-  });
+  };
   document.addEventListener("pointerdown", (e) => {
     if (!placeMenu.hidden && !(e.target as HTMLElement).closest?.(".place-menu, [data-action$='-menu']")) closePlaceMenu();
   });
@@ -4635,6 +4702,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     savedSearches.set(JSON.stringify(rest));
   });
 
+  // commands: (the sidebar: what it lists is a filter of the view; its rows' menus are commands)
   side.addEventListener("click", (e) => {
     const b = (e.target as HTMLElement).closest<HTMLButtonElement>("button");
     if (!b) return;
@@ -4785,9 +4853,13 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       render();
       return;
     }
-    const id = b.dataset["id"] ?? "";
+    const action = b.dataset["folderAction"];
+    if (action && FOLDER_COMMANDS[action]) pressCommand(FOLDER_COMMANDS[action]![0], { id: b.dataset["id"] ?? "" });
+  });
+  /** A folder's actions (ADR 0205): its menu's rows, the palette and an outside caller run them by id. "" is the top, for a new folder. */
+  const folderAct = (action: string, id: string): void => {
     const f = listing?.folders.find((x) => x.id === id);
-    switch (b.dataset["folderAction"]) {
+    switch (action) {
       case "conceal":
         // (only the list of concealed folders changes: the folder and its items are left as they are)
         settings.set("library.concealed", JSON.stringify(concealedIds.includes(id) ? concealedIds.filter((x) => x !== id) : [...concealedIds, id]));
@@ -4859,7 +4931,30 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
         });
         break;
     }
-  });
+  };
+  const FOLDER_COMMANDS: Readonly<Record<string, readonly [id: string, title: string, hint: string, risk: Risk]>> = {
+    conceal: ["folder.conceal", "Conceal the folder", "Out of the lists of this view, or back", "edit"],
+    pin: ["folder.pin", "Pin the folder", "At the top of the folders, or not", "edit"],
+    new: ["folder.new", "New folder", "Inside this one (\"\": at the top)", "edit"],
+    rename: ["folder.rename", "Rename the folder", "Type its new name", "edit"],
+    move: ["folder.move", "Move the folder", "Into another folder, or to the top", "edit"],
+    hide: ["folder.hide", "Hide the folder", "It and all in it, into the hidden items", "confirm"],
+    show: ["folder.unhide", "Unhide the folder", "It and everything in it, shown again", "confirm"],
+    export: ["folder.export", "Export the folder", "Its items as a .canvast archive", "confirm"],
+    delete: ["folder.delete", "Delete the folder", "Its items stay in the library", "confirm"],
+  };
+  commands.setProvider("library-folders", () => Object.entries(FOLDER_COMMANDS).map(([action, [id, title, hint, risk]]): Command => ({
+    id, group: "Library", kind: "library", title, hint, risk,
+    options: [{ name: "id", type: "id", doc: "the folder", required: action !== "new" }],
+    why: () => (!listing ? "The Library is not open yet." : session.readOnly && action !== "conceal" && action !== "pin" && action !== "export" ? REASON.readOnly : null),
+    exec: (o) => {
+      const fid = String(o["id"] ?? "");
+      if (fid && !listing?.folders.some((x) => x.id === fid)) return { ok: false, error: `There is no folder "${fid}".` };
+      folderAct(action, fid);
+      return { ok: true };
+    },
+  })));
+  // view-state: (the sidebar's filter)
   narrow.addEventListener("change", () => {
     sideOpen = !narrow.matches;
     renderSide();
@@ -4871,7 +4966,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     sideFind[id] = box.value;
     renderSide();
   };
-  side.addEventListener("input", findTyped);
+  side.addEventListener("input", findTyped); // view-state: (typing a filter)
   side.addEventListener("compositionend", findTyped);
   side.addEventListener("keydown", (e) => {
     const input = e.target as HTMLInputElement;
@@ -4998,7 +5093,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       e.preventDefault();
     }
   });
-  root.querySelector<HTMLElement>('.assets-bar [data-action="details"]')!.addEventListener("click", () => toggleDetails());
+  root.querySelector<HTMLElement>('.assets-bar [data-action="details"]')!.addEventListener("click", () => toggleDetails()); // view-state: (shows or hides the details panel)
   // Keys that work anywhere in the library while it is open, whatever has the focus (a click can leave it on the page, not in the library):
   // Esc clears the selection, Ctrl+A picks everything shown, Enter opens the one selected item in the viewer, the arrow keys, Home and End
   // move through the items in either layout.
@@ -5128,25 +5223,25 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   const clipboardGroup = (hashes: readonly string[]): MenuItem[] => [
     ...(hashes.length
       ? [
-          { id: "copy", label: "Copy", hint: "To paste elsewhere", icon: ICONS.clipboardCopy, run: () => void copyItems(hashes) },
-          { id: "copy-name", label: hashes.length > 1 ? "Copy names" : "Copy file name", hint: "As text", icon: ICONS.fileText, run: () => void copyItems(hashes, "name") },
-          ...(desktopBridge() ? [{ id: "copy-file", label: hashes.length > 1 ? "Copy files" : "Copy file", hint: "The real file, to paste in a file manager", icon: ICONS.files, run: () => void entriesOf(hashes).then((ents) => copyItemsAsFiles(copyDeps, ents)) }] : []),
+          { id: "copy", label: "Copy", hint: "To paste elsewhere", icon: ICONS.clipboardCopy, command: "library.copy", run: () => void pressCommand("library.copy", { hashes: [...hashes] }) },
+          { id: "copy-name", label: hashes.length > 1 ? "Copy names" : "Copy file name", hint: "As text", icon: ICONS.fileText, command: "library.copyNames", run: () => void pressCommand("library.copyNames", { hashes: [...hashes] }) },
+          ...(desktopBridge() ? [{ id: "copy-file", label: hashes.length > 1 ? "Copy files" : "Copy file", hint: "The real file, to paste in a file manager", icon: ICONS.files, command: "library.copyFiles", run: () => void pressCommand("library.copyFiles", { hashes: [...hashes] }) }] : []),
         ]
       : []),
-    { id: "paste", label: "Paste", hint: "From the clipboard", icon: ICONS.paste, run: () => void pasteFromClipboard() },
+    { id: "paste", label: "Paste", hint: "From the clipboard", icon: ICONS.paste, command: "library.paste", run: () => void pressCommand("library.paste") },
   ];
   const emptyItems = (): MenuItem[] => {
-    const press = (sel: string) => (): void => root.querySelector<HTMLElement>(sel)?.click();
+    const row = (id: string, command: string, label: string, hint: string, icon: string, options: Options = {}): MenuItem => ({ id, label, hint, icon, command, run: () => void pressCommand(command, options) });
     return groupedMenu([
-      [{ id: "select-all", label: "Select everything", hint: "All that is listed", icon: ICONS.selectAll, run: selectAll }, ...clipboardGroup([])],
+      [row("select-all", "library.selectAll", "Select everything", "All that is listed", ICONS.selectAll), ...clipboardGroup([])],
       [
-        { id: "import-files", label: "Import files", hint: "From this device", icon: ICONS.arrowDownToLine, run: press('[data-action="import"]') },
-        { id: "import-folder", label: "Import a folder", hint: "With its subfolders", icon: ICONS.arrowDownToLine, run: () => root.querySelector<HTMLInputElement>('[data-testid="assets-import-folder-input"]')?.click() },
-        { id: "new-folder", label: "New folder", hint: "To file items in", icon: ICONS.folderPlus, run: press('[data-folder-action="new"][data-id=""]') },
+        row("import-files", "library.import", "Import files", "From this device", ICONS.arrowDownToLine),
+        row("import-folder", "library.importFolder", "Import a folder", "With its subfolders", ICONS.arrowDownToLine),
+        row("new-folder", "folder.new", "New folder", "To file items in", ICONS.folderPlus, { id: "" }),
       ],
       [
-        { id: "slideshow", label: "Slideshow", hint: "One after another", icon: ICONS.play, run: press('[data-action="slideshow"]') },
-        { id: "details", label: "Details panel", hint: "Show or hide it", icon: ICONS.panelRight, run: toggleDetails },
+        row("slideshow", "library.slideshowShown", "Slideshow", "One after another", ICONS.play),
+        row("details", "library.details", "Details panel", "Show or hide it", ICONS.panelRight),
       ],
     ]);
   };
@@ -5160,12 +5255,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       if (hash && !picked.has(hash)) await select(hash); // (a card outside the pick is picked alone; one inside it keeps the whole pick)
       const g = panelGroups();
       // Select several: from now on a tap (or a click) adds a card or takes it away, the way to pick several on a touch screen.
-      const several: MenuItem = { id: "select-several", label: "Select several", hint: "Tap to add or remove", icon: ICONS.squareCheckBig, run: () => {
-          selecting = severalOn = true;
-          markPicked();
-          session.editor.message = "Selecting several: tap or click items to add or remove them. Esc ends it.";
-          session.editor.changed();
-        } };
+      const several: MenuItem = { id: "select-several", label: "Select several", hint: "Tap to add or remove", icon: ICONS.squareCheckBig, command: "library.selectSeveral", run: () => void pressCommand("library.selectSeveral") };
       return groupedMenu([[...(severalOn ? [] : [several]), ...g[0]!], clipboardGroup(picked.size ? [...picked] : hash ? [hash] : []), g[1]!, g[2]!]);
     },
   });
@@ -5193,6 +5283,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   // ---- the list's columns: drag a header onto another to move it
   let dragCol: ColumnId | null = null;
   // A click on a header sorts by it; another click reverses it, as in a table.
+  // view-state: (sorting by a column)
   listHead.addEventListener("click", (e) => {
     const h = (e.target as HTMLElement).closest<HTMLElement>("[data-col]");
     if (!h || (e.target as HTMLElement).closest("[data-resize]") || performance.now() - resizedAt < 300) return; // (a resize is not a sort)
@@ -5274,7 +5365,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     colBtn.setAttribute("aria-expanded", "true");
     colPop.querySelector<HTMLElement>("input:not(:disabled), button")?.focus();
   };
-  colBtn.addEventListener("click", () => (colPop.hidden ? openColumns() : closeColumns()));
+  colBtn.addEventListener("click", () => (colPop.hidden ? openColumns() : closeColumns())); // view-state: (the list's columns)
   /** The cards were made for other columns of properties, or another sort is offered. */
   const columnsChanged = (): void => {
     cardsAgain();
@@ -5295,6 +5386,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     renderColumns();
     colPop.querySelector<HTMLElement>("[data-col-prop]")?.focus();
   };
+  // view-state: (the list's columns)
   colPop.addEventListener("click", (e) => {
     const b = (e.target as HTMLElement).closest<HTMLButtonElement>("button");
     if (!b) return;
@@ -5315,6 +5407,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     renderColumns();
     colPop.querySelector<HTMLElement>(`[data-col="${b.dataset["col"]}"][data-col-move="${b.dataset["colMove"]}"]:not(:disabled)`)?.focus();
   });
+  // view-state: (the list's columns)
   colPop.addEventListener("change", (e) => {
     const box = e.target as HTMLInputElement;
     const id = box.dataset["colShow"] as ColumnId | undefined;
@@ -5347,6 +5440,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     }
   });
   for (const b of root.querySelectorAll<HTMLElement>(".assets-controls [data-layout]")) {
+    // view-state: (cards or a list)
     b.addEventListener("click", () => {
       ui.layout = b.dataset["layout"] === "list" ? "list" : "grid";
       saveUi();
@@ -5355,15 +5449,17 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     });
   }
   // Slideshow from the library: the picked assets if several are picked, else everything shown, from the selected one (or the first).
-  root.querySelector<HTMLElement>('.assets-bar [data-action="slideshow"]')!.addEventListener("click", () => {
+  const slideshow = (): void => {
     const list = filtered();
     if (!list.length) return;
     const group = picked.size > 1 ? list.filter((h) => picked.has(h)) : list;
     const first = group.find((h) => h === selected) ?? group[0]!;
     startShow(first, picked.size > 1 ? new Set(group) : undefined);
-  });
+  };
+  root.querySelector<HTMLElement>('.assets-bar [data-action="slideshow"]')!.addEventListener("click", () => void pressCommand("library.slideshowShown"));
   // (Show all items over the grid and the reset button are one action: the search goes too)
-  filteredChip.querySelector("button")!.addEventListener("click", () => resetFiltersBtn.click());
+  filteredChip.querySelector("button")!.addEventListener("click", () => resetFiltersBtn.click()); // view-state: (the filters)
+  // view-state: (the filters)
   resetFiltersBtn.addEventListener("click", () => {
     search.value = "";
     paintSearchUi();
@@ -5375,11 +5471,13 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     renderSide();
     render();
   });
+  // view-state: (the order)
   sortSel.addEventListener("change", () => {
     reversed = false; // a new order starts from its usual direction
     showSort();
     render();
   });
+  // view-state: (the order)
   sortDirBtn.addEventListener("click", () => {
     reversed = !reversed;
     showSort();
@@ -5458,7 +5556,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     search.value = search.value.replace(TRASH_WORD, " ").trim();
     paintSearchUi();
   };
-  for (const menu of [usageSel, sortSel]) menu.addEventListener("change", () => (leaveTrash(), render()));
+  for (const menu of [usageSel, sortSel]) menu.addEventListener("change", () => (leaveTrash(), render())); // view-state: (the filters)
   /** Search again, as it was saved; its look with it. */
   const useSearch = (m: string, q: string): void => {
     const view = savedNow().find((s) => sameSearch(s, q, m as SearchWay))?.look ?? ui.views[viewKey(m, q)];
@@ -5554,12 +5652,42 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     listing = null;
     void refresh().then(() => was && visible && (scroller.scrollTop = was.top));
   };
-  hiddenBar.querySelector('[data-action="exit-hidden"]')!.addEventListener("click", exitHidden);
-  hiddenBar.querySelector('[data-action="lock-hidden"]')!.addEventListener("click", () => void lockHidden(session)); // (hidden mode ends with it: below)
-  stayBtn.addEventListener("click", () => {
-    settings.set("library.hiddenStay", !settings.get("library.hiddenStay"));
-    paintHiddenMode();
-  });
+  hiddenBar.querySelector('[data-action="exit-hidden"]')!.addEventListener("click", () => void pressCommand("hidden.exit"));
+  hiddenBar.querySelector('[data-action="lock-hidden"]')!.addEventListener("click", () => void pressCommand("hidden.lock")); // (hidden mode ends with it: below)
+  stayBtn.addEventListener("click", () => void pressCommand("hidden.stay"));
+  // The Library's own commands (ADR 0205): its bar, its menus, the palette and an outside caller run them by id.
+  const inLibrary = (): string | null => (visible ? null : "This works in the Library.");
+  const writable = (): string | null => inLibrary() ?? (session.readOnly ? REASON.readOnly : null);
+  const HASHES: OptionSpec = { name: "hashes", type: "ids", doc: "the items (default: the selected)" };
+  const itemsOf = (o: Options): string[] => (o["hashes"] as string[] | undefined) ?? (picked.size ? [...picked] : selected ? [selected] : []);
+  const lib = (id: string, title: string, hint: string, risk: Risk, exec: NonNullable<Command["exec"]>, why: () => string | null = inLibrary, extra: Partial<Command> = {}): Command => ({ id, group: "Library", kind: "library", title, hint, risk, why, exec, ...extra });
+  commands.setProvider("library", () => [
+    lib("library.import", "Import files", "Pictures, video, audio and other files", "edit", () => fileInput.click(), writable),
+    lib("library.importFolder", "Import a folder", "With its subfolders", "edit", () => folderInput.click(), writable),
+    lib("library.newNote", "New note", "A markdown note, opened to write in", "edit", () => newNote(), writable),
+    lib("library.slideshowShown", "Slideshow", "The selected items, or everything listed", "edit", () => slideshow(), () => inLibrary() ?? (filtered().length ? null : "Nothing is listed.")),
+    lib("library.reload", "Reload the library", "Read it again and draw every card anew", "read", () => { relistAll = true; void refresh(); }),
+    lib("library.placeOn", "Place on a canvas", "On a canvas, or a new canvas or board", "edit", (o) => {
+      const hashes = itemsOf(o);
+      if (!hashes.length) return { ok: false, error: REASON.noSelection };
+      placeOn(hashes, String(o["where"]), String(o["id"] ?? ""));
+      return { ok: true };
+    }, writable, { options: [HASHES, { name: "where", type: "choice", doc: "a canvas, a new canvas on a board, or a new board", required: true, choices: ["canvas", "new-canvas", "new-board"] }, { name: "id", type: "id", doc: "the canvas, or the board of the new canvas" }] }),
+    lib("library.copy", "Copy", "To paste elsewhere", "edit", (o) => copyItems(itemsOf(o)), () => inLibrary() ?? (picked.size || selected ? null : REASON.noSelection), { options: [HASHES]}),
+    lib("library.copyNames", "Copy names", "The file names, as text", "read", (o) => copyItems(itemsOf(o), "name"), () => inLibrary() ?? (picked.size || selected ? null : REASON.noSelection), { options: [HASHES] }),
+    ...(desktopBridge() ? [lib("library.copyFiles", "Copy files", "The real files, to paste in a file manager", "edit", (o) => entriesOf(itemsOf(o)).then((ents) => copyItemsAsFiles(copyDeps, ents)), () => inLibrary() ?? (picked.size || selected ? null : REASON.noSelection), { options: [HASHES]})] : []),
+    lib("library.paste", "Paste", "From the clipboard, into the library", "edit", () => pasteFromClipboard(), writable),
+    lib("library.selectAll", "Select everything", "All that is listed", "edit", () => selectAll(), inLibrary),
+    lib("library.selectSeveral", "Select several", "Tap to add or remove", "edit", () => {
+      selecting = severalOn = true;
+      markPicked();
+      session.editor.message = "Selecting several: tap or click items to add or remove them. Esc ends it.";
+      session.editor.changed();
+    }, inLibrary),
+    lib("library.details", "Details panel", "Show or hide it", "edit", () => toggleDetails(), inLibrary),
+    lib("hidden.exit", "Exit hidden mode", "They leave the screen, still unlocked", "edit", () => exitHidden(), () => (hiddenMode ? null : "Hidden mode is not on.")),
+    lib("hidden.stay", "Stay in hidden mode", "When leaving the library, or not", "edit", () => { settings.set("library.hiddenStay", !settings.get("library.hiddenStay")); paintHiddenMode(); }, () => (hiddenMode ? null : "Hidden mode is not on.")),
+  ]);
   setWay("all");
   let suggestFor: CatalogListing | null = null;
   let suggestSources: SuggestSources = { tags: [], types: [] };
@@ -5585,6 +5713,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     suggestFor = listing;
     return (suggestSources = { tags: [...tags.values()], types: [...types].map(([ext, n]) => ({ ext, n })) });
   });
+  // view-state: (typing the search)
   search.addEventListener("input", () => {
     // A first "/" chooses Name and is not part of the search; a "#" stays (it is a search word).
     if (search.value[0] === "/") {
@@ -5607,6 +5736,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       searchChanged();
     }
   });
+  // view-state: (how the search looks)
   pop.querySelector(".cs-modes")!.addEventListener("click", (e) => {
     const t = (e.target as HTMLElement).closest<HTMLElement>("[data-m]");
     if (!t) return;
@@ -5614,6 +5744,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     searchChanged();
     search.focus();
   });
+  // view-state: (clears the search)
   clearBtn.addEventListener("click", () => {
     search.value = "";
     searchChanged();
@@ -5634,14 +5765,15 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     },
     savedSearches,
   );
-  grid.addEventListener("click", rememberNow);
-  for (const el of [usageSel, sortSel]) el.addEventListener("input", () => render());
+  grid.addEventListener("click", rememberNow); // view-state: (where the list is)
+  for (const el of [usageSel, sortSel]) el.addEventListener("input", () => render()); // view-state: (the filters)
   // Typing redraws the results once the typing pauses, not on every letter (a large library would make each key wait for the whole grid).
   let typingTimer = 0;
   search.addEventListener("input", () => {
     clearTimeout(typingTimer);
     typingTimer = window.setTimeout(render, SEARCH_PAUSE_MS);
   });
+  // view-state: (the size of the cards)
   sizeInput.addEventListener("input", () => {
     if (ui.layout === "list") ui.listThumb = Number(sizeInput.value);
     else ui.thumb = Number(sizeInput.value);
@@ -5681,6 +5813,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     grip.addEventListener("pointerup", up);
     grip.addEventListener("pointercancel", up);
   });
+  // view-state: (a column's width)
   listHead.addEventListener("dblclick", (e) => {
     const grip = (e.target as HTMLElement).closest<HTMLElement>("[data-resize]");
     if (!grip) return;
@@ -5717,16 +5850,14 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       })),
     { passive: true },
   );
-  grid.addEventListener("click", () => requestAnimationFrame(remember));
+  grid.addEventListener("click", () => requestAnimationFrame(remember)); // view-state: (where the list is)
   // Back to top: shown once the list has been scrolled a screen down, in grid and list alike.
   const toTop = root.querySelector<HTMLButtonElement>('[data-testid="assets-to-top"]')!;
   function showToTop(): void {
     toTop.hidden = scroller.scrollTop < scroller.clientHeight;
   }
-  root.querySelector<HTMLButtonElement>('[data-testid="assets-reload"]')!.addEventListener("click", () => {
-    relistAll = true;
-    void refresh();
-  });
+  root.querySelector<HTMLButtonElement>('[data-testid="assets-reload"]')!.addEventListener("click", () => void pressCommand("library.reload"));
+  // view-state: (back to the top of the list)
   toTop.addEventListener("click", () => {
     scroller.scrollTop = 0;
     showToTop();
@@ -5762,14 +5893,14 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   else if (ui.pinned.length) settings.set("library.pinned", JSON.stringify(ui.pinned));
   // The gaps between cards follow the density setting.
   settings.subscribe(() => relayout());
-  importBtn.addEventListener("click", () => fileInput.click());
+  importBtn.addEventListener("click", () => void pressCommand("library.import"));
   const folderInput = root.querySelector<HTMLInputElement>('[data-testid="assets-import-folder-input"]')!;
   const importMenu = root.querySelector<HTMLElement>('[data-action="import-menu"]')!;
   importMenu.addEventListener("click", () =>
     openMoreMenu(importMenu, [
-      { label: "Import files", icon: ICONS.arrowDownToLine, hint: "Pictures, video, audio and other files", run: () => fileInput.click() },
-      { label: "A folder", icon: ICONS.folderInput, hint: "With its subfolders", run: () => folderInput.click() },
-      { label: "New note", icon: ICONS.notebookPen, hint: "A markdown note, opened to write in", run: () => void newNote() },
+      { label: "Import files", icon: ICONS.arrowDownToLine, hint: "Pictures, video, audio and other files", command: "library.import", run: () => void pressCommand("library.import") },
+      { label: "A folder", icon: ICONS.folderInput, hint: "With its subfolders", command: "library.importFolder", run: () => void pressCommand("library.importFolder") },
+      { label: "New note", icon: ICONS.notebookPen, hint: "A markdown note, opened to write in", command: "library.newNote", run: () => void pressCommand("library.newNote") },
     ], "Import"),
   );
   /** A new markdown note (its first line says when it was made, so no two are the same file), in the folder open in the sidebar. */
@@ -5782,11 +5913,13 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     await refresh();
     await showSlide(hash);
   };
+  // view-state: (the folder picker of library.importFolder)
   folderInput.addEventListener("change", () => {
     const files = filesOfPicker(folderInput.files);
     folderInput.value = "";
     void view.importFiles(files);
   });
+  // view-state: (the file picker of library.import)
   fileInput.addEventListener("change", () => {
     const files = [...(fileInput.files ?? [])];
     fileInput.value = "";
@@ -5823,6 +5956,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   });
 
   session.fontSample = FONT_SAMPLES[ui.fontSample]!;
+  // view-state: (the viewer's own controls)
   viewer.addEventListener("input", (e) => {
     const box = e.target as HTMLElement;
     if (!box.matches(".font-sample-try")) return;

@@ -1,4 +1,5 @@
 import { canvasShortcutsActive } from "./shortcut-scope";
+import { pressCommand } from "../commands/registry";
 import { panBy, zoomAt } from "../core/camera";
 import { MAX_FRAME_JUMP, depthOf } from "../core/frames";
 import type { ScreenPoint } from "../core/camera";
@@ -20,7 +21,7 @@ const PINCH_ZOOM_PER_PX = 1 / 100;
  * for page-mode wheel deltas, not a zoom range limit.
  */
 const MAX_DZ_PER_EVENT = 2;
-const KEY_ZOOM_STEP = 0.5;
+export const KEY_ZOOM_STEP = 0.5;
 const LINE_HEIGHT_PX = 16;
 
 export function zoomByStep(view: ViewState, dz: number): void {
@@ -94,33 +95,34 @@ export function attachNavigation(el: HTMLElement, view: ViewState): () => void {
   const onKeyDown = (e: KeyboardEvent): void => {
     if (!canvasShortcutsActive(e)) return;
     if (e.ctrlKey || e.metaKey || e.altKey) return;
-    const vp = view.viewport;
-    const panStep = (e.shiftKey ? 0.5 : 0.125) * Math.min(vp.width, vp.height);
-    const zoomStep = e.shiftKey ? KEY_ZOOM_STEP * 4 : KEY_ZOOM_STEP;
+    // (each key runs its command, ADR 0205; Shift goes four times as far)
+    const levels = e.shiftKey ? KEY_ZOOM_STEP * 4 : KEY_ZOOM_STEP;
+    const far = e.shiftKey;
+    const press = (id: string, o: Record<string, unknown> = {}): boolean => pressCommand(id, o, "key");
     switch (e.key) {
       case "+":
       case "=":
-        zoomByStep(view, zoomStep);
+        press("view.zoomIn", { levels });
         break;
       case "-":
       case "_":
-        zoomByStep(view, -zoomStep);
+        press("view.zoomOut", { levels });
         break;
       case "ArrowLeft":
-        view.setCamera(panBy(view.camera, panStep, 0));
+        press("view.panLeft", { far });
         break;
       case "ArrowRight":
-        view.setCamera(panBy(view.camera, -panStep, 0));
+        press("view.panRight", { far });
         break;
       case "ArrowUp":
-        view.setCamera(panBy(view.camera, 0, panStep));
+        press("view.panUp", { far });
         break;
       case "ArrowDown":
-        view.setCamera(panBy(view.camera, 0, -panStep));
+        press("view.panDown", { far });
         break;
       case "0":
       case "Home":
-        goHome(view);
+        press("view.home");
         break;
       default:
         return;
@@ -190,4 +192,12 @@ export class PanGesture {
     for (const p of this.pointers.values()) spread += Math.hypot(p.x - centroid.x, p.y - centroid.y);
     return { centroid, spread: spread / n };
   }
+}
+
+/** Pan the view by an eighth of its smaller side (`far`: half of it), as the arrow keys do. */
+export function panStep(view: ViewState, dir: "left" | "right" | "up" | "down", far = false): void {
+  const vp = view.viewport;
+  const step = (far ? 0.5 : 0.125) * Math.min(vp.width, vp.height);
+  const [dx, dy] = dir === "left" ? [step, 0] : dir === "right" ? [-step, 0] : dir === "up" ? [0, step] : [0, -step];
+  view.setCamera(panBy(view.camera, dx, dy));
 }

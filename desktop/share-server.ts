@@ -162,8 +162,9 @@ export function withoutHidden(op: string, args: readonly unknown[], out: unknown
  * (the file as downloaded connects nowhere: `check:offline`). Null when the policy is not the one expected (nothing is served).
  */
 export function guestPage(html: string): string | null {
-  if (!/connect-src 'none'/.test(html)) return null;
-  return html.replace("connect-src 'none'", "connect-src 'self'").replace(/<head>/i, '<head><meta name="canvast-guest" content="1">');
+  if (!/connect-src [^;"]+/.test(html)) return null;
+  // (a guest connects to this host only: not to the agents' address either, ADR 0205)
+  return html.replace(/connect-src [^;"]+/, "connect-src 'self'").replace(/<head>/i, '<head><meta name="canvast-guest" content="1">');
 }
 
 export const newCode = (): string => String(randomInt(0, 1_000_000)).padStart(6, "0");

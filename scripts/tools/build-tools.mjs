@@ -14,6 +14,7 @@ await build({
   outfile: out,
   // (the entry's own #! line is kept by esbuild)
   banner: { js: `// canvast tools ${version}: built from the canvast repository (scripts/tools/tools-source.mjs). GPL-3.0-or-later.` },
+  define: { __TOOLS_VERSION__: JSON.stringify(version) },
   logLevel: "warning",
 });
 chmodSync(out, 0o755);

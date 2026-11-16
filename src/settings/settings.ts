@@ -69,6 +69,8 @@ export function decodedMbFor(gb: number | undefined): "128" | "256" | "384" {
 
 /** The privacy settings that stay out of a backup unless the person chooses to include them when exporting. */
 export const PRIVACY_KEYS: readonly string[] = ["library.hiddenWord", "library.hiddenRemember", "library.hiddenStay", "search.saved.hidden"];
+/** Settings no outside caller may change (ADR 0205): the agents' own, and what opens or shows hidden items. */
+export const refusedToAgents = (key: string): boolean => key.startsWith("agents.") || key.startsWith("library.hidden") || PRIVACY_KEYS.includes(key);
 
 export const SETTINGS = {
   "dev.tools": { scope: "device", default: false, validate: (v: unknown) => (typeof v === "boolean" ? v : undefined), effect: "restart" } as Def<boolean>,
@@ -77,6 +79,12 @@ export const SETTINGS = {
   /** Hidden mode stays on when the library is left (it still ends with Exit, the word deleted, locking, or closing the app). */
   "library.hiddenCopySeconds": { scope: "device", default: 30, validate: range(0, 3600), effect: "immediate" } as Def<number>,
   "library.hiddenStay": { scope: "device", default: false, validate: bool, effect: "immediate" } as Def<boolean>,
+  /** AI agents (ADR 0205): an MCP client may run canvast's commands through the canvas tools on this computer. Off until the person turns it on. */
+  "agents.on": { scope: "device", default: false, validate: bool, effect: "immediate" } as Def<boolean>,
+  /** The pairing code the canvas tools show: only a program that knows it is answered. */
+  "agents.code": { scope: "device", default: "", validate: text(32), effect: "immediate" } as Def<string>,
+  /** Agents may only read (list, search, look): every other command is refused to them. */
+  "agents.readOnly": { scope: "device", default: false, validate: bool, effect: "immediate" } as Def<boolean>,
   /** The desktop build (ADR 0177): where a file the app deletes from the workspace folder goes. */
   "storage.deleteTo": { scope: "workspace", default: "trash", validate: oneOf("trash", "system", "erase"), effect: "immediate" } as Def<"trash" | "system" | "erase">,
   // The desktop app: a file deleted from the library leaves the folder at once, even while undo on the open canvas could still bring an instance back.

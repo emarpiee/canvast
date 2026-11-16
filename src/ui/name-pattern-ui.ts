@@ -13,6 +13,7 @@ export function patternChipsHtml(extra: ReadonlyArray<{ token: string; what: str
 
 /** A press on a chip puts its token in the field where the cursor is (the field's input event follows). */
 export function wirePatternChips(root: HTMLElement, field: HTMLInputElement): void {
+  // view-state: (a dialog's or chooser's own control: what it gives goes to the command that opened it)
   root.querySelector("[data-np-tokens]")?.addEventListener("click", (e) => {
     const b = (e.target as HTMLElement).closest<HTMLElement>("[data-token]");
     if (!b) return;
@@ -46,6 +47,7 @@ export function wireDateRow(root: HTMLElement, choice: DateChoice, changed: () =
     for (const b of row.querySelectorAll<HTMLElement>("[data-np-date]")) b.setAttribute("aria-checked", String(b.dataset["npDate"] === choice.source));
     day.hidden = choice.source !== "fixed";
   };
+  // view-state: (a dialog's or chooser's own control: what it gives goes to the command that opened it)
   row.addEventListener("click", (e) => {
     const b = (e.target as HTMLElement).closest<HTMLElement>("[data-np-date]");
     if (!b) return;
@@ -58,6 +60,7 @@ export function wireDateRow(root: HTMLElement, choice: DateChoice, changed: () =
     show();
     changed();
   });
+  // view-state: (a dialog's or chooser's own control: what it gives goes to the command that opened it)
   day.addEventListener("input", () => {
     choice.fixed = day.value;
     changed();

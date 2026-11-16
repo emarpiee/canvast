@@ -4,6 +4,8 @@ import { esc } from "./format";
 import { ICONS } from "./icons";
 import { panelHtml } from "./panel";
 import { moreButton, openMoreMenu } from "./more-menu";
+import { commands, pressCommand } from "../commands/registry";
+import type { Command, Options, OptionSpec, Result, Risk } from "../commands/types";
 
 /**
  * Floating Bookmarks panel (ADR 0025, 0065): named places on the canvas, each a card with its picture. Add saves the current view with
@@ -83,7 +85,7 @@ export function mountBookmarksPanel(host: HTMLElement, editor: EditorState, list
     const done = (save: boolean): void => {
       if (finished) return;
       finished = true;
-      if (save) void list.rename(li.dataset["id"]!, input.value);
+      if (save) pressCommand("bookmark.rename", { bookmark: li.dataset["id"]!, name: input.value });
       input.remove();
       schedule();
     };
@@ -93,39 +95,56 @@ export function mountBookmarksPanel(host: HTMLElement, editor: EditorState, list
       else if (k.key === "Escape") done(false);
     });
     input.addEventListener("blur", () => done(true));
-    input.addEventListener("click", (c) => c.stopPropagation());
+    input.addEventListener("click", (c) => c.stopPropagation()); // view-state: (a click in the name box stays there)
   };
-  const go = (li: HTMLElement): void => {
-    if (!list.go(li.dataset["id"]!)) {
-      editor.message = "That bookmark's place no longer exists.";
-      editor.changed();
-    }
-  };
+  // The bookmarks' commands (ADR 0205): the panel's buttons and menus run them by id, as the palette, a macro and an outside caller do.
+  const BM: OptionSpec = { name: "bookmark", type: "id", doc: "the bookmark", required: true };
+  const bm = (id: string, title: string, hint: string, options: readonly OptionSpec[], exec: (o: Options) => Result | void | Promise<Result | void>, risk: Risk = "edit"): Command => ({ id, group: "Bookmarks", kind: "bookmark", title, hint, risk, options, why: () => null, exec });
+  const known = (o: Options): string | null => (list.items.some((b) => b.id === o["bookmark"]) ? null : `There is no bookmark "${String(o["bookmark"])}".`);
+  const withBm = (fn: (id: string, o: Options) => Result | void | Promise<Result | void>) => (o: Options): Result | void | Promise<Result | void> => { const no = known(o); return no ? { ok: false, error: no } : fn(String(o["bookmark"]), o); };
+  commands.setProvider("bookmarks", () => [
+    bm("bookmark.add", "Bookmark this view", "Where you are now", [{ name: "name", type: "text", doc: "its name (default: one made for it)" }], async (o) => {
+      const before = new Set(list.items.map((b) => b.id));
+      await list.add(capture());
+      const made = list.items.find((b) => !before.has(b.id));
+      if (made && typeof o["name"] === "string") await list.rename(made.id, o["name"]);
+      return made ? { ok: true, made: [made.id] } : { ok: true };
+    }),
+    bm("bookmark.go", "Go to a bookmark", "Its place and zoom", [BM], withBm((id) => (list.go(id) ? { ok: true } : { ok: false, error: "That bookmark's place no longer exists." }))),
+    bm("bookmark.rename", "Rename a bookmark", "Give it a new name", [BM, { name: "name", type: "text", doc: "the new name", required: true }], withBm((id, o) => void list.rename(id, String(o["name"])))),
+    bm("bookmark.update", "Update a bookmark to this view", "Where you are now", [BM], withBm((id) => void list.update(id, capture()).then(() => { editor.message = "Bookmark updated to this view."; editor.changed(); }))),
+    bm("bookmark.move", "Move a bookmark", "Its place in the list and the tour", [BM, { name: "to", type: "number", doc: "its new place, from 0", required: true, min: 0, max: 100000 }], withBm((id, o) => void list.move(id, Number(o["to"])))),
+    bm("bookmark.delete", "Delete a bookmark", "Remove it from the list", [BM], withBm((id) => void list.remove(id))),
+    bm("bookmark.pictures", "Update the bookmarks' pictures", "Draw them again, or only the missing", [{ name: "bookmarks", type: "ids", doc: "which (default: all)" }, { name: "missing", type: "boolean", doc: "only those with no picture" }], (o) => {
+      const ids = (o["bookmarks"] as string[] | undefined) ?? (o["missing"] === true ? list.items.filter((b) => !b.thumb).map((b) => b.id) : undefined);
+      thumbs.update(ids);
+    }),
+  ]);
+  const go = (li: HTMLElement): void => void pressCommand("bookmark.go", { bookmark: li.dataset["id"]! });
 
   panel.addEventListener("click", (e) => {
     const t = e.target as HTMLElement;
     const li = t.closest<HTMLElement>("li.bookmark");
     if (t.closest("[data-close]")) {
-      editor.bookmarksOpen = false;
-      editor.changed();
+      pressCommand("panel.bookmarks");
     } else if (t.closest("[data-tour]")) {
-      tour();
+      pressCommand("view.tour");
     } else if (t.closest("[data-fill]")) {
-      thumbs.update(list.items.filter((b) => !b.thumb).map((b) => b.id));
+      pressCommand("bookmark.pictures", { missing: true });
     } else if (t.closest("[data-thumbs]")) {
       const missing = list.items.filter((b) => !b.thumb);
       openMoreMenu(
         t.closest<HTMLElement>("[data-thumbs]")!,
         [
-          { label: list.items.length === 1 ? "Update the picture" : `Update all ${list.items.length} pictures`, hint: "Draw them again", icon: ICONS.refresh, aria: "Update the pictures of all bookmarks", run: () => thumbs.update() },
-          { label: missing.length ? `Fill in the ${missing.length} missing` : "None are missing", hint: "Only those with no picture", icon: ICONS.imagePlus, disabled: missing.length === 0, aria: "Fill in the missing bookmark pictures", run: () => thumbs.update(missing.map((b) => b.id)) },
+          { label: list.items.length === 1 ? "Update the picture" : `Update all ${list.items.length} pictures`, hint: "Draw them again", icon: ICONS.refresh, aria: "Update the pictures of all bookmarks", command: "bookmark.pictures", run: () => void pressCommand("bookmark.pictures") },
+          { label: missing.length ? `Fill in the ${missing.length} missing` : "None are missing", hint: "Only those with no picture", icon: ICONS.imagePlus, disabled: missing.length === 0, aria: "Fill in the missing bookmark pictures", command: "bookmark.pictures", run: () => void pressCommand("bookmark.pictures", { missing: true }) },
         ],
         "Update the bookmark pictures",
       );
     } else if (t.closest("[data-add-sel]")) {
-      addSelection();
+      pressCommand("bookmark.selection"); // (the canvas's command: src/app/canvas-commands.ts)
     } else if (t.closest("[data-add]")) {
-      void list.add(capture());
+      pressCommand("bookmark.add");
     } else if (li && t.closest("[data-bm-more]")) {
       const id = li.dataset["id"]!;
       const name = li.querySelector(".bookmark-name")?.textContent ?? "bookmark";
@@ -133,22 +152,19 @@ export function mountBookmarksPanel(host: HTMLElement, editor: EditorState, list
       openMoreMenu(
         t.closest<HTMLElement>("[data-bm-more]")!,
         [
-          { label: "Rename", hint: "Give it a new name", icon: ICONS.textCursorInput, aria: `Rename ${name}`, run: () => startRename(li) },
+          { label: "Rename", hint: "Give it a new name", icon: ICONS.textCursorInput, aria: `Rename ${name}`, command: "bookmark.rename", run: () => startRename(li) },
           {
             label: "Update to the current view",
             hint: "Where you are now",
             icon: ICONS.refresh,
             aria: `Update ${name} to the current view`,
-            run: () =>
-              void list.update(id, capture()).then(() => {
-                editor.message = "Bookmark updated to this view.";
-                editor.changed();
-              }),
+            command: "bookmark.update",
+            run: () => void pressCommand("bookmark.update", { bookmark: id }),
           },
-          { label: "Update its picture", hint: "From the current view", icon: ICONS.refresh, aria: `Update the picture of ${name}`, run: () => thumbs.update([id]) },
-          { label: "Move up", hint: "Earlier in the list", icon: ICONS.arrowUp, disabled: at <= 0, aria: `Move ${name} up`, run: () => void list.move(id, at - 1) },
-          { label: "Move down", hint: "Later in the list", icon: ICONS.arrowDown, disabled: at >= list.items.length - 1, aria: `Move ${name} down`, run: () => void list.move(id, at + 1) },
-          { label: "Delete", hint: "Remove this bookmark", icon: ICONS.trash2, danger: true, aria: `Delete ${name}`, run: () => void list.remove(id) },
+          { label: "Update its picture", hint: "From the current view", icon: ICONS.refresh, aria: `Update the picture of ${name}`, command: "bookmark.pictures", run: () => void pressCommand("bookmark.pictures", { bookmarks: [id] }) },
+          { label: "Move up", hint: "Earlier in the list", icon: ICONS.arrowUp, disabled: at <= 0, aria: `Move ${name} up`, command: "bookmark.move", run: () => void pressCommand("bookmark.move", { bookmark: id, to: at - 1 }) },
+          { label: "Move down", hint: "Later in the list", icon: ICONS.arrowDown, disabled: at >= list.items.length - 1, aria: `Move ${name} down`, command: "bookmark.move", run: () => void pressCommand("bookmark.move", { bookmark: id, to: at + 1 }) },
+          { label: "Delete", hint: "Remove this bookmark", icon: ICONS.trash2, danger: true, aria: `Delete ${name}`, command: "bookmark.delete", run: () => void pressCommand("bookmark.delete", { bookmark: id }) },
         ],
         `Actions for bookmark ${name}`,
       );
@@ -164,6 +180,7 @@ export function mountBookmarksPanel(host: HTMLElement, editor: EditorState, list
       go(go_.closest<HTMLElement>("li.bookmark")!);
     } else if (go_ && e.key === "F2") startRename(go_.closest<HTMLElement>("li.bookmark")!);
   });
+  // view-state: (opens the name box; what is typed runs bookmark.rename)
   panel.addEventListener("dblclick", (e) => {
     const name = (e.target as HTMLElement).closest<HTMLElement>(".bookmark-name");
     const li = name?.closest<HTMLElement>("li.bookmark");
@@ -186,7 +203,7 @@ export function mountBookmarksPanel(host: HTMLElement, editor: EditorState, list
     dragged = "";
     if (!li || !from || li.dataset["id"] === from) return;
     e.preventDefault();
-    void list.move(from, list.items.findIndex((b) => b.id === li.dataset["id"]));
+    pressCommand("bookmark.move", { bookmark: from, to: list.items.findIndex((b) => b.id === li.dataset["id"]) });
   });
   panel.addEventListener("dragend", () => (dragged = ""));
 }

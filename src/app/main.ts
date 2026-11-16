@@ -43,10 +43,11 @@ import { mountHud } from "./hud";
 import { installDebugHook } from "./debug-hook";
 import { EditorState } from "./editor-state";
 import type { LayoutCommand } from "./actions";
+import { flattenSelection } from "./actions";
 import { applyBalloonStyle, balloonStyle, balloonsToPaths, canConnectBalloons, connectBalloons, selectedBalloon, selectedLink, selectedShapeText, setBalloonLink, setShapeText } from "./actions";
 import { backdropState, setBackdrop, canSplitPaths, splitPaths, placeCardViews, placeLinesBeside, imageAt, pasteCssPaint, copiedText, setCopiedText, renderedStill, isPlaceholderText, markCopiedPicture, isCopiedPicture, forgetCopiedPicture, applyRotation, showReplaced, arrangeSelection, copySelection, cutSelection, duplicateSelection, pasteObjects, layoutSelection, clearFlag, deleteSelection, groupSelection, importImages, moveAbove, moveLayers, setStackOrder, tagObjects, resetRotation, resetProportions, resettable, resetSize, sizeResets, recolourOldInk, svgWarningOfTargets, svgWarningOfSelection, extractFrame, placePictureBeside, applyLayoutStyle, canTakeLayoutStyle, laidOutSheetOfSelection, arrangeAsLayout, pruneSelection, redo, setFlag, setMedia, setFlagOn, setOpacityOn, setBlendOn, renameLayer, ungroupSelection, undo, selectedPaint, previewPaint, commitPaint, combineSelection, canCombine, selectedOutline, commitOutline, selectedDashNumbers, commitDashNumbers, selectedArrows, commitArrows, selectedMiterAngle, commitMiterAngle, selectedShape, commitShape, selectedCorners, commitCorners, selectedSmoothing, commitSmoothing, selectionPaints, recolour, initialShapeState, setInitialShape, resetToInitialShape, groupJoinMode, addToBooleanGroup, takeOutOfBooleanGroup, convertTextToPath, simplifySelection, canSimplify, outlineStroke, setWidthProfile, canOutlineStroke, makeMask, makeClippingMask, canMakeMask, changeMask, selectTheMask, canReleaseMask, selectedMask, startBrushMask, paintMask, divide, startShapeBuilder, finishShapeBuilder, canDivide, canFillGaps, fillAllGaps, startGapFill, finishGapFill, makeNetwork, releaseNetwork, canMakeNetwork, canReleaseNetwork, strokeToPath, canStrokeToPath, setTextOnPath, canSetOnPath, canSetInShape, setTextInShape, takeTextOffPath, canTakeOffPath, canOutline, booleanSelection, releaseBoolean, flattenBoolean, canExportSvg, exportTarget, buildTarget, exportTargets, exportEachTargets, canSheetEach, sheetEach, svgOfTarget, pdfVectorOfTarget, svgOfSelection, importSvg, setSheetClip, sheetSelection, releaseSheets, selectedPin, setPin, canFitSheet, fitSheet, autoLayoutOf, autoLayoutState, setAutoLayout, autoLayoutShortcut, patchAutoLayout, setSheetLayout, selectedInLayout, setInLayout, sheetRatio, ratioOfSheet, setSheetRatio, sheetScalesContents, setSheetScale, boxOnSheet, moveOnSheet, resizeOnSheet, canDetach, detachSelection, selectedTextStyle, setTextStyle, croppablePicture, isCropped, uncropPicture, selectedFlip, flipSelection, unflipPictures, selectedAdjust, pictureCount, applyGradientMap, paintTargetCount, selectionColours, previewAdjust, commitAdjust, copyAdjustments, pasteAdjustments, canPasteAdjustments, copyRenderedPicture, bakePicture, sizeResetBlock, matchSize, sizable } from "./actions";
 import { attachNavigation } from "../interaction/navigation";
-import { attachTools } from "../interaction/tools";
+import { attachTools, selectEverything } from "../interaction/tools";
 import { createFocusCycle, focusObjects, stepToNeighbour } from "../interaction/item-navigation";
 import { renderFrame, gridStep, setGridLook } from "../render/canvas2d-renderer";
 import type { Theme } from "../render/canvas2d-renderer";
@@ -113,7 +114,7 @@ import { updateThumbs } from "./bookmark-thumbs";
 import { mountDevPanel } from "../ui/dev-panel";
 import { mountAssetsView } from "../ui/assets-view";
 import { SETTINGS_TABS, mountSettingsView } from "../ui/settings-view";
-import { goHome, zoomByStep } from "../interaction/navigation";
+import { goHome, panStep, zoomByStep } from "../interaction/navigation";
 import { mountHintLine } from "../ui/hint-line";
 import { closeMoreMenu, openMoreMenu, setMenuAvoid } from "../ui/more-menu";
 import type { MenuItem } from "../ui/more-menu";
@@ -179,7 +180,10 @@ import { hasShadow, needsNeighbours } from "../doc/adjust";
 import type { Adjust } from "../doc/adjust";
 import { downloadSelection, pickedFiles } from "./download";
 import { mountCommandPalette } from "../ui/command-palette";
-import { CommandRegistry } from "../commands/registry";
+import { commands, pressCommand } from "../commands/registry";
+import { REASON } from "../commands/types";
+import { canvasCommands, OLD_CANVAS_IDS, type CanvasActions } from "./canvas-commands";
+import { mountAgentLink } from "./agent-link";
 import { Macros } from "../commands/macros";
 import { barCommands } from "../commands/from-bars";
 import { settingCommands } from "../commands/settings-commands";
@@ -188,7 +192,7 @@ import { AssetNames } from "./asset-names";
 import { isLabelled, itemLabels, itemName } from "../render/item-label";
 import { drawReveal, drawRevealOutlines, revealWords } from "../render/reveal";
 import type { ItemLabel } from "../render/item-label";
-import { PRIVACY_KEYS, SETTINGS, SettingsStore } from "../settings/settings";
+import { PRIVACY_KEYS, SETTINGS, SettingsStore, refusedToAgents } from "../settings/settings";
 import { DEFAULT_INK, newInk, setCanvasInk } from "../render/ink";
 import { paintFromText, paintToText } from "../doc/paint";
 
@@ -606,7 +610,7 @@ async function start(): Promise<void> {
   settings.subscribe((key) => {
     if (key === "notes.cardProps" && setShownProps(settings.get("notes.cardProps"))) redrawNoteCards();
   });
-  matchMedia("(prefers-color-scheme: dark)").addEventListener("change", applyNoteLook);
+  matchMedia("(prefers-color-scheme: dark)").addEventListener("change", applyNoteLook); // view-state: (the system's light or dark)
   const autoDatesNow = (): void => setAutoDates({ on: settings.get("notes.autoDates"), created: settings.get("notes.createdKey"), modified: settings.get("notes.modifiedKey"), format: settings.get("notes.dateFormat"), title: settings.get("notes.titleKey"), titleFrom: settings.get("notes.titleFrom"), rename: settings.get("notes.renameOnSave"), nameFrom: settings.get("notes.nameFrom"), nameStyle: settings.get("notes.nameStyle") });
   autoDatesNow();
   settings.subscribe((key) => AUTO_NOTE_SETTINGS.includes(key) && autoDatesNow());
@@ -1136,6 +1140,7 @@ async function start(): Promise<void> {
     invalidate();
   };
   new ResizeObserver(resize).observe(host);
+  // view-state: (the system's light or dark)
   matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => {
     theme = readTheme(document.documentElement);
     setCanvasInk(theme.ink);
@@ -1207,7 +1212,7 @@ async function start(): Promise<void> {
     },
   });
   document.addEventListener("click", (e) => {
-    if ((e.target as HTMLElement).closest?.("[data-photocraft-close]")) void photoCraft.close();
+    if ((e.target as HTMLElement).closest?.("[data-photocraft-close]")) pressCommand("artcraft.photocraft.close");
   });
   const textEditor = mountTextEditor(host, view, doc, editor, libraryFonts, () => settings.get("ui.properties"));
   textFollow = textEditor.follow;
@@ -1333,20 +1338,20 @@ async function start(): Promise<void> {
       let add = opts.add ?? false;
       const HINT: Record<RevealWhy, string> = { hidden: "Hidden: click to show it", locked: "Locked: click to unlock it", mask: "Part of a mask" };
       const items = (): MenuItem[] => [
-        { id: "reveal-add", label: "Add to the selection", hint: "Click to add or remove; click outside to end", icon: ICONS.listChecks, checked: add, run: () => { add = !add; } },
+        { id: "reveal-add", label: "Add to the selection", hint: "Click to add or remove; click outside to end", icon: ICONS.listChecks, checked: add, command: "select.items", run: () => { add = !add; } }, // (how the rows below select: they run select.items)
         ...rows.map((r, i): MenuItem => {
           const on = r.ids.every((id) => editor.selection.has(id));
           return { id: `reveal:${r.key ?? r.ids[0]}`, label: `${"\u2003".repeat(r.depth ?? 0)}${r.label}`, hint: r.why ? HINT[r.why] : r.from === "selection" ? "In the selection: select this one" : "Select this one", icon: r.icon, checked: on, disabled: r.why === "mask", ...(r.sep && i > 0 ? { sep: true } : {}), run: () => {
             if (r.why === "hidden" || r.why === "locked") {
-              setFlagOn(doc, editor, r.ids, r.why, false);
+              pressCommand(r.why === "hidden" ? "item.unhide" : "item.unlock", { ids: r.ids });
               return void closeMoreMenu();
             }
-            if (add && on) editor.select([...editor.selection].filter((x) => !r.ids.includes(x)));
+            if (add && on) pressCommand("select.items", { ids: [...editor.selection].filter((x) => !r.ids.includes(x)) });
             else pick(r.ids, r.enter, add);
             if (!add) closeMoreMenu();
           } };
         }),
-        ...(opts.touch ? canvasItems(registry, true).map((it, i): MenuItem => ({ ...it, ...(i === 0 ? { sep: true } : {}), run: () => { closeMoreMenu(); it.run(); } })) : []),
+        ...(opts.touch ? canvasItems(registry, true).map((it, i): MenuItem => ({ ...it, ...(i === 0 ? { sep: true } : {}), run: () => { closeMoreMenu(); it.run(); } })) : []), // (canvasItems' rows carry their command)
       ];
       openMoreMenu(anchor, items(), opts.touch ? "Under your finger" : "Choose what to select", {
         keepOpen: true,
@@ -1879,7 +1884,7 @@ async function start(): Promise<void> {
         const { record } = await assets.importFileDetailed(file, false);
         const where = await fileInLibraryAs(record.hash, targets.some((t) => holdsPattern(t.ids)) ? "pattern" : "export");
         editor.message = `Exported “${file.name}” in ${where}.`;
-        editor.messageAction = { label: "View", run: () => { setView("assets"); void assetsView.reveal([record.hash]); } };
+        editor.messageAction = { label: "View", command: "library.reveal", run: () => void pressCommand("library.reveal", { hashes: [record.hash] }) };
         editor.changed();
       },
     });
@@ -1973,7 +1978,7 @@ async function start(): Promise<void> {
         if (png && (await writeSystemClipboard({ image: png })) === "image") forgetCopiedPicture();
       }
       editor.message = `Screenshot saved: “${fileName}” in ${where}.`;
-      editor.messageAction = { label: "View", run: () => { setView("assets"); void assetsView.reveal([record.hash]); } };
+      editor.messageAction = { label: "View", command: "library.reveal", run: () => void pressCommand("library.reveal", { hashes: [record.hash] }) };
       editor.changed();
     } catch (e) {
       editor.message = `Could not save the screenshot: ${(e as Error).message}`;
@@ -2161,7 +2166,7 @@ async function start(): Promise<void> {
       const { record } = await assets.importFileDetailed(new File([text], name, { type: "image/svg+xml" }), false);
       const where = await fileInLibraryAs(record.hash, holdsPattern([...editor.selection, ...descendantsOf(doc.all(), editor.selection)]) ? "pattern" : "svg");
       editor.message = `Saved “${name}” in ${where}.${svgWarningOfSelection(doc, editor) ? ` ${svgWarningOfSelection(doc, editor)}` : ""}`;
-      editor.messageAction = { label: "View", run: () => { setView("assets"); void assetsView.reveal([record.hash]); } };
+      editor.messageAction = { label: "View", command: "library.reveal", run: () => void pressCommand("library.reveal", { hashes: [record.hash] }) };
     } catch (e) {
       editor.message = `Could not save to the library: ${(e as Error).message}`;
     }
@@ -2696,8 +2701,7 @@ async function start(): Promise<void> {
     if (!e.altKey || !e.shiftKey || e.ctrlKey || e.metaKey || (e.key !== "ArrowLeft" && e.key !== "ArrowRight")) return;
     if (document.body.dataset["view"] !== "canvas" || typing(e.target) || (e.target as HTMLElement | null)?.closest?.("dialog")) return;
     e.preventDefault(); // (not the browser's Back and Forward)
-    if (e.key === "ArrowLeft") history.back();
-    else history.forward();
+    pressCommand(e.key === "ArrowLeft" ? "view.back" : "view.forward", {}, "key");
   });
   // Bookmark keys (Settings > Shortcuts): previous and next, and the first nine by number.
   window.addEventListener("keydown", (e) => {
@@ -2706,16 +2710,18 @@ async function start(): Promise<void> {
     const n = c === "[" ? -1 : c === "]" ? 1 : /^Alt\+[1-9]$/.test(c ?? "") ? 0 : null;
     if (n === null) return;
     e.preventDefault();
-    if (n === 0 ? bookmarkList.goTo(Number(c!.slice(4)) - 1) : bookmarkList.step(n)) return;
-    editor.message = bookmarkList.items.length ? "That bookmark's place no longer exists." : "No bookmarks yet.";
-    editor.changed();
+    if (n !== 0) {
+      if (!pressCommand(n < 0 ? "bookmark.prev" : "bookmark.next", {}, "key")) { editor.message = "No bookmarks yet."; editor.changed(); }
+      return;
+    }
+    if (!pressCommand(`bookmark.${c!.slice(4)}`, {}, "key")) { editor.message = bookmarkList.items.length ? "That bookmark's place no longer exists." : "No bookmarks yet."; editor.changed(); }
   });
   // The Zen key (Settings > Shortcuts, Z at first) fades the floating bars and panels out and back, on the canvas.
   window.addEventListener("keydown", (e) => {
     if (e.ctrlKey || e.metaKey || e.altKey || e.repeat || e.key.toLowerCase() !== "z") return;
     if (document.body.dataset["view"] !== "canvas" || typing(e.target) || (e.target as HTMLElement | null)?.closest?.("dialog")) return;
     e.preventDefault();
-    settings.set("ui.zen", !settings.get("ui.zen"));
+    pressCommand("view.zen", {}, "key");
   });
   // Ctrl+F searches what you are looking at (the canvas, or the library in the Assets view); Ctrl+Shift+F goes to the library's search
   // from anywhere. The browser's own find is not used for these.
@@ -2723,10 +2729,7 @@ async function start(): Promise<void> {
     if (!(e.ctrlKey || e.metaKey) || e.altKey || e.key.toLowerCase() !== "f") return;
     if (document.querySelector("dialog[open]") || appView === "settings") return;
     e.preventDefault();
-    if (e.shiftKey || appView === "assets") {
-      setView("assets");
-      assetsView.focusSearch();
-    } else canvasSearch.open("");
+    pressCommand(e.shiftKey || appView === "assets" ? "find.library" : "find.canvas", {}, "key");
   });
   // Tool buttons say which key picks them (the keys can be changed in Settings).
   const updateToolTitles = (): void => {
@@ -3002,11 +3005,11 @@ async function start(): Promise<void> {
     editor.changed();
   });
   // The save indicator opens Settings > Storage, the one place for space, the library folder, saving and backups.
-  document.querySelector<HTMLElement>('[data-testid="save-status"]')!.addEventListener("click", () => { setView("settings"); settingsView.show("storage"); });
+  document.querySelector<HTMLElement>('[data-testid="save-status"]')!.addEventListener("click", () => void pressCommand("settings.tab:storage"));
 
   // The command palette (ADR 0117, 0129): Ctrl+K or Ctrl+Shift+P finds any command by words, and `@kind` narrows it to a kind. The commands come
   // from the registry (src/commands): each part of the app adds its own, so a new feature or a macro has one place to put them.
-  const registry = new CommandRegistry();
+  const registry = commands;
   /** Settings of the two checks of the library's files (desktop): the full one reads every file, the quick one looks at sizes. */
   const checkLibraryFiles = (quick: boolean): void => {
     const p = busyProgress(editor, quick ? "Checking the library file sizes" : "Checking the library files", [quick ? "Each file is looked for and its size compared with the library's. Nothing is read." : "Each file is read and compared with what the library knows of it. Hidden items are left out."]);
@@ -3020,100 +3023,144 @@ async function start(): Promise<void> {
       (e: unknown) => p.fail(`The check stopped: ${(e as Error).message}`),
     );
   };
-  registry.setProvider("app", () => {
-    const sel = editor.selection.size > 0;
-    const onCanvas = appView === "canvas";
-    const key = (k: string): string => k.toUpperCase();
-    const list: Command[] = [
-      ...TOOL_ORDER.map((t): Command => ({ group: "Tool", title: TOOL_NAME[t], keys: key(keymap.display(TOOL_COMMAND[t])), enabled: () => onCanvas, run: () => editor.setTool(t) })),
-      { group: "Edit", title: "Undo", keys: "Ctrl+Z", words: "back revert", enabled: () => onCanvas, run: () => undo(doc, editor) },
-      { group: "Edit", title: "Change the old default ink to the canvas ink", words: "recolour near-black dark outline theme light old drawings readable", enabled: () => onCanvas && newInk(DEFAULT_INK) !== DEFAULT_INK, run: () => void recolourOldInk(doc, editor) },
-      { group: "Edit", title: "Redo", keys: "Ctrl+Shift+Z", words: "again", enabled: () => onCanvas, run: () => redo(doc, editor) },
-      { group: "Edit", title: "Copy", keys: "Ctrl+C", enabled: () => onCanvas && sel, run: () => { if (!document.execCommand("copy")) copySelection(doc, editor, view); } }, // (as the keys do: the copy event below puts it on the system clipboard too)
-      ...(desktopBridge() ? [{ group: "Edit", title: "Copy file", words: "real file clipboard file manager", enabled: () => onCanvas && sel && selectedHashes().length > 0, run: () => void selectedFiles().then((ents) => (forgetCopiedPicture(), copyItemsAsFiles(copyOnCanvas, ents))) }] : []),
-      { group: "Edit", title: "Cut", keys: "Ctrl+X", enabled: () => onCanvas && sel, run: () => { if (!document.execCommand("cut")) cutSelection(doc, editor, view); } }, // (as Copy: the cut event below puts it on the system clipboard)
-      { group: "Edit", title: "Paste", keys: "Ctrl+V", enabled: () => onCanvas, run: () => void pasteObjects(doc, editor, view, null) },
-      { group: "Edit", title: "Duplicate", keys: "Ctrl+D", words: "copy", enabled: () => onCanvas && sel, run: () => duplicateSelection(doc, editor, view) },
-      { group: "Edit", title: "Rename", words: "file name picture image library layer", enabled: () => onCanvas && !session.readOnly && selectedPictures().length > 0, run: () => void renamePictures() },
-      { group: "Edit", title: "Delete everywhere", words: "remove erase library every canvas file", enabled: () => onCanvas && sel && !session.readOnly && selectedHashes().length > 0, run: () => void deleteSelectedEverywhere() },
-      { group: "Edit", title: "Delete the selection", keys: "Delete", words: "remove erase", enabled: () => onCanvas && sel, run: () => deleteSelection(doc, editor) },
-      { group: "Edit", title: "Show all hidden", words: "unhide reveal eye", enabled: () => onCanvas && [...doc.all()].some((o) => o.hidden), run: () => clearFlag(doc, editor, "hidden") },
-      { group: "Edit", title: "Unlock all", words: "unlock locked", enabled: () => onCanvas && [...doc.all()].some((o) => o.locked), run: () => clearFlag(doc, editor, "locked") },
-      { group: "Edit", title: "Select everything", keys: "Ctrl+A", words: "all", enabled: () => onCanvas, run: () => editor.select(doc.ordered().filter((o) => !o.hidden && !o.locked).map((o) => o.id)) },
-      { group: "Arrange", title: "Group", keys: "Ctrl+G", enabled: () => onCanvas && sel, run: () => groupSelection(doc, editor) },
-      { group: "Arrange", title: "Ungroup", keys: "Ctrl+Shift+G", enabled: () => onCanvas && sel, run: () => ungroupSelection(doc, editor) },
-      { group: "Arrange", title: "Put the selection on a sheet", keys: "Ctrl+Alt+G", words: "frame wrap", enabled: () => onCanvas && sel, run: () => sheetSelection(doc, editor) },
-      { group: "Arrange", title: "Auto layout", keys: "Shift+A", words: "flow row column wrap grid hug gap padding flex", enabled: () => onCanvas && sel, run: () => autoLayoutShortcut(doc, editor) },
-      { group: "Arrange", title: "Release the sheet", words: "unframe", enabled: () => onCanvas && [...editor.selection].some((id) => isContainer(doc.get(id))), run: () => releaseSheets(doc, editor) },
-      { group: "Arrange", title: "Flip horizontally", keys: "Shift+H", words: "mirror reverse", enabled: () => onCanvas && !!selectedFlip(doc, editor), run: () => flipSelection(doc, editor, "x") },
-      { group: "Arrange", title: "Flip vertically", keys: "Shift+V", words: "mirror upside down", enabled: () => onCanvas && !!selectedFlip(doc, editor), run: () => flipSelection(doc, editor, "y") },
-      { group: "Arrange", title: "Bring to front", keys: "Ctrl+]", enabled: () => onCanvas && sel, run: () => arrangeSelection(doc, editor, "front") },
-      { group: "Arrange", title: "Send to back", keys: "Ctrl+[", enabled: () => onCanvas && sel, run: () => arrangeSelection(doc, editor, "back") },
-      { group: "Arrange", title: "Detach from what it follows", enabled: () => onCanvas && canDetach(doc, editor), run: () => detachSelection(doc, editor) },
-      { group: "Shape", title: "Vector network", words: "join paths regions graph", enabled: () => onCanvas && canMakeNetwork(doc, editor), run: () => makeNetwork(doc, editor) },
-      { group: "Shape", title: "Release the network", words: "paths edges", enabled: () => onCanvas && canReleaseNetwork(doc, editor), run: () => releaseNetwork(doc, editor) },
-      { group: "Shape", title: "Divide into regions", words: "pathfinder cut overlap", enabled: () => onCanvas && canDivide(doc, editor) && !editor.builder, run: () => divide(doc, editor) },
-      { group: "Shape", title: "Shape builder", words: "merge regions overlap unite delete", enabled: () => onCanvas && canDivide(doc, editor) && !editor.builder, run: () => startShapeBuilder(doc, editor) },
-      { group: "Shape", title: "Fill gaps", words: "holes empty space between enclosed paint bucket", enabled: () => onCanvas && canFillGaps(doc, editor) && !editor.builder && !editor.gapFill, run: () => fillAllGaps(doc, editor, view, settings.get("shape.gapClosePx")) },
-      { group: "Shape", title: "Fill a gap", words: "hole empty space between enclosed paint bucket click", enabled: () => onCanvas && canFillGaps(doc, editor) && !editor.builder && !editor.gapFill, run: () => startGapFill(doc, editor, view, settings.get("shape.gapClosePx")) },
-      { group: "Mask", title: "Clipping mask", words: "clip cut shape", enabled: () => onCanvas && canMakeMask(doc, editor), run: () => makeClippingMask(doc, editor) },
-      { group: "Mask", title: "Mask by opacity", words: "alpha cut transparent", enabled: () => onCanvas && canMakeMask(doc, editor), run: () => makeMask(doc, editor, "alpha") },
-      { group: "Mask", title: "Mask by brightness", words: "luminance greyscale light dark cut", enabled: () => onCanvas && canMakeMask(doc, editor), run: () => makeMask(doc, editor, "luminance") },
-      { group: "Mask", title: "Painted mask: show everything, paint black to hide", words: "paint erase reveal", enabled: () => onCanvas && sel && !editor.maskEdit, run: () => startBrushMask(doc, editor, true) },
-      { group: "Mask", title: "Painted mask: hide everything, paint white to show", words: "paint reveal", enabled: () => onCanvas && sel && !editor.maskEdit, run: () => startBrushMask(doc, editor, false) },
-      { group: "Mask", title: "Paint the mask in white", words: "show reveal", enabled: () => onCanvas && editor.maskEdit !== null, run: () => paintMask(editor, "show") },
-      { group: "Mask", title: "Paint the mask in black", words: "hide", enabled: () => onCanvas && editor.maskEdit !== null, run: () => paintMask(editor, "hide") },
-      { group: "Mask", title: "Done painting the mask", words: "finish stop", enabled: () => onCanvas && editor.maskEdit !== null, run: () => paintMask(editor, "done") },
-      { group: "Mask", title: "Select the mask", words: "select edit move", enabled: () => onCanvas && canReleaseMask(doc, editor), run: () => selectTheMask(doc, editor) },
-      { group: "Mask", title: "Invert the mask", words: "swap show hide", enabled: () => onCanvas && canReleaseMask(doc, editor), run: () => changeMask(doc, editor, { invert: !(selectedMask(doc, editor)?.invert ?? false) }) },
-      { group: "Mask", title: "Release the mask", words: "remove unmask", enabled: () => onCanvas && canReleaseMask(doc, editor), run: () => changeMask(doc, editor, { release: true }) },
-      { group: "Path", title: "Outline stroke", words: "stroke to shape expand", enabled: () => onCanvas && canOutlineStroke(doc, editor), run: () => outlineStroke(doc, editor) },
-      ...(["taper", "taper-start", "taper-end", "swell"] as const).map((profile): Command => ({ group: "Path", title: `Width: ${profile.replace("-", " ")}`, words: "variable width thin thick shape", enabled: () => onCanvas && canOutlineStroke(doc, editor), run: () => setWidthProfile(doc, editor, profile) })),
-      { group: "Path", title: "Width: even", words: "variable width taper remove", enabled: () => onCanvas && canOutlineStroke(doc, editor), run: () => setWidthProfile(doc, editor, null) },
-      { group: "Export", title: "Copy the selection as SVG", words: "vector clipboard text", enabled: () => onCanvas && canExportSvg(doc, editor), run: () => { const t = svgOfSelection(doc, editor); if (t) void copyText(t).then(() => { editor.message = `Copied the shapes as SVG text.${svgWarningOfSelection(doc, editor) ? ` ${svgWarningOfSelection(doc, editor)}` : ""}`; editor.changed(); }); } },
-      { group: "Export", title: "Export… (choose a size)", words: "picture png jpeg webp size dpi print sheet image save", enabled: () => onCanvas && exportTarget(doc, editor) !== null, run: () => openExport() },
-      { group: "Export", title: "Save the selection to the library as SVG", words: "vector assets", enabled: () => onCanvas && canExportSvg(doc, editor), run: () => void saveSvgToLibrary() },
-      { group: "View", title: "Zoom in", keys: "+", enabled: () => onCanvas, run: () => zoomByStep(view, 1) },
-      { group: "View", title: "Zoom out", keys: "−", enabled: () => onCanvas, run: () => zoomByStep(view, -1) },
-      { group: "View", title: "Return to the origin", keys: "0", words: "home reset", enabled: () => onCanvas, run: () => goHome(view) },
-      { group: "View", title: "Fit the selection in view", keys: "F", enabled: () => onCanvas && sel, run: () => focusCycle.fit("selection") },
-      { group: "View", title: "Fit everything in view", enabled: () => onCanvas, run: () => focusCycle.fit("all") },
-      { group: "View", title: "Previous view", keys: "Alt+Shift+Left", words: "back camera", enabled: () => onCanvas && history.canBack(), run: () => history.back() },
-      { group: "View", title: "Next view", keys: "Alt+Shift+Right", words: "forward camera", enabled: () => onCanvas && history.canForward(), run: () => history.forward() },
-      { group: "View", title: "Go to a random empty view", words: "dice random far away", enabled: () => onCanvas, run: () => goRandomView() },
-      { group: "View", title: "Zen mode", keys: key(keymap.display("view.zen")), words: "focus hide bars", run: () => void settings.set("ui.zen", !settings.get("ui.zen")) },
-      { group: "View", title: "Take a screenshot", words: "picture capture", enabled: () => onCanvas, run: () => void takeScreenshot() },
-      { group: "View", title: "Play the bookmarks as a tour", words: "present", enabled: () => onCanvas && bookmarkList.items.length > 0, run: () => bookmarkTour.start() },
-      { group: "Panel", title: "Adjust", words: "toggle show hide adjustments picture exposure contrast", enabled: () => onCanvas, run: () => { editor.adjustOpen = !editor.adjustOpen; editor.changed(); } },
-      { group: "Panel", title: "Layers", words: "toggle show hide", enabled: () => onCanvas, run: () => { editor.layersOpen = !editor.layersOpen; editor.changed(); } },
-      { group: "View", title: "Bookmark the selected objects", words: "save view selection", enabled: () => onCanvas && editor.selection.size > 0, run: bookmarkPicked },
-      { group: "Panel", title: "Bookmarks", words: "toggle show hide", enabled: () => onCanvas, run: () => { editor.bookmarksOpen = !editor.bookmarksOpen; editor.changed(); } },
-      { group: "Panel", title: "Pattern", words: "toggle show hide generator wave blob background random tiles", enabled: () => onCanvas, run: () => { editor.patternOpen = !editor.patternOpen; editor.changed(); } },
-      { group: "Panel", title: "Styles", words: "toggle show hide adjustments saved", enabled: () => onCanvas, run: () => { editor.stylesOpen = !editor.stylesOpen; editor.changed(); } },
-      { group: "Panel", title: "Tags", words: "toggle show hide", enabled: () => onCanvas, run: () => { editor.tagsOpen = !editor.tagsOpen; editor.changed(); } },
-      { group: "Go to", title: "Canvas view", run: () => setView("canvas") },
-      { group: "Go to", title: "Library", words: "assets files pictures", run: () => setView("assets") },
-      { group: "Go to", title: "Shortcuts", keys: "?", words: "keys keyboard help", run: () => { setView("settings"); settingsView.show("shortcuts"); } },
-      { group: "Workspace", title: "New canvas", words: "add", run: () => { const b = session.current?.boardId; if (b) void session.newCanvas(b); } },
-      { group: "Workspace", title: "New board", words: "add", run: () => void session.newBoard() },
-      { group: "Workspace", title: "Export a backup (.canvast)", words: "save archive", run: () => void runExport(session, { kind: "workspace" }) },
-      ...(canSwitchWorkspace() ? [{ group: "Workspace", title: "Switch workspace…", words: "open folder new recent workspace change", run: () => void openWorkspaceSwitcher(document.querySelector<HTMLElement>('[data-testid="workspace-chevron"]') ?? document.body) }] : []),
-      ...(storage?.folderSync
-        ? [
-            { group: "Workspace", title: "Check library files", words: "verify damaged corrupt missing integrity hash folder", run: () => checkLibraryFiles(false) },
-            { group: "Workspace", title: "Check library files (quick)", words: "verify damaged missing size fast folder", run: () => checkLibraryFiles(true) },
-          ]
-        : []),
-      ...(storage?.hidden ? [{ group: "Workspace", title: "Lock hidden items", words: "encrypt password hide close", enabled: () => !!storage.hidden?.isOpen(), run: () => void lockHidden(session).then(() => { editor.message = HIDDEN_LOCKED; editor.changed(); }) }] : []),
-    ];
-    // the keys shown are the ones in use now (Settings > Shortcuts)
-    const TITLE_COMMAND: Record<string, string> = { Undo: "edit.undo", Redo: "edit.redo", Duplicate: "edit.duplicate", "Delete the selection": "edit.delete", "Select everything": "edit.selectAll", Group: "edit.group", Ungroup: "edit.ungroup", "Auto layout": "edit.autoLayout", "Flip horizontally": "edit.flipH", "Flip vertically": "edit.flipV", "Bring to front": "edit.front", "Send to back": "edit.back", "Zoom in": "view.zoomIn", "Zoom out": "view.zoomOut", "Return to the origin": "view.home", "Fit the selection in view": "view.focus", "Previous view": "view.back", "Next view": "view.forward", Shortcuts: "find.help" };
-    for (const c of list) {
-      const id = TITLE_COMMAND[c.title];
-      if (id) c.keys = keymap.bindings(id).map(displayCombo).join(", ");
-    }
-    return list;
+  // The canvas's own commands (src/app/canvas-commands.ts): what each does is reached through these actions, so the commands draw nothing.
+  const keysOf = (id: string): string => keymap.bindings(id).map(displayCombo).join(", ");
+  const canvasActions: CanvasActions = {
+    onCanvas: () => appView === "canvas",
+    selectionSize: () => editor.selection.size,
+    readOnly: () => session.readOnly,
+    select: (ids) => editor.select([...ids]),
+    selectItems: (ids, add) => editor.select(add ? [...new Set([...editor.selection, ...ids])] : [...ids]),
+    clearFlagOn: (ids, flag) => setFlagOn(doc, editor, [...ids], flag, false),
+    revealInLibrary: (hashes) => { setView("assets"); void assetsView.reveal([...hashes]); },
+    itemIds: () => new Set([...doc.all()].map((o) => o.id)),
+    keys: keysOf,
+    tools: TOOL_ORDER.map((t) => ({ id: TOOL_COMMAND[t], title: TOOL_NAME[t], use: () => editor.setTool(t) })),
+    undo: () => undo(doc, editor),
+    redo: () => redo(doc, editor),
+    copy: () => { if (!document.execCommand("copy")) copySelection(doc, editor, view); }, // (as the keys do: the copy event below puts it on the system clipboard too)
+    copyFile: desktopBridge() ? () => selectedFiles().then((ents) => (forgetCopiedPicture(), copyItemsAsFiles(copyOnCanvas, ents))) : null,
+    canCopyFile: () => selectedHashes().length > 0,
+    cut: () => { if (!document.execCommand("cut")) cutSelection(doc, editor, view); }, // (as Copy: the cut event below puts it on the system clipboard)
+    paste: async () => void (await pasteObjects(doc, editor, view, null)),
+    duplicate: () => duplicateSelection(doc, editor, view),
+    canRename: () => selectedPictures().length > 0,
+    rename: () => renamePictures(),
+    canDeleteEverywhere: () => selectedHashes().length > 0,
+    deleteEverywhere: () => deleteSelectedEverywhere(),
+    deleteSelection: () => deleteSelection(doc, editor),
+    anyHidden: () => [...doc.all()].some((o) => o.hidden),
+    showHidden: () => clearFlag(doc, editor, "hidden"),
+    anyLocked: () => [...doc.all()].some((o) => o.locked),
+    unlockAll: () => clearFlag(doc, editor, "locked"),
+    selectAll: () => selectEverything(doc, editor),
+    canRecolour: () => newInk(DEFAULT_INK) !== DEFAULT_INK,
+    recolour: async () => void (await recolourOldInk(doc, editor)),
+    group: () => groupSelection(doc, editor),
+    ungroup: () => ungroupSelection(doc, editor),
+    sheet: () => sheetSelection(doc, editor),
+    autoLayout: () => autoLayoutShortcut(doc, editor),
+    canReleaseSheet: () => [...editor.selection].some((id) => isContainer(doc.get(id))),
+    releaseSheet: () => releaseSheets(doc, editor),
+    canFlip: () => !!selectedFlip(doc, editor),
+    flip: (axis) => flipSelection(doc, editor, axis),
+    arrange: (to) => arrangeSelection(doc, editor, to),
+    canDetach: () => canDetach(doc, editor),
+    detach: () => detachSelection(doc, editor),
+    canNetwork: () => canMakeNetwork(doc, editor),
+    network: () => makeNetwork(doc, editor),
+    canReleaseNetwork: () => canReleaseNetwork(doc, editor),
+    releaseNetwork: () => releaseNetwork(doc, editor),
+    canDivide: () => canDivide(doc, editor) && !editor.builder,
+    divide: () => divide(doc, editor),
+    shapeBuilder: () => startShapeBuilder(doc, editor),
+    canFillGaps: () => canFillGaps(doc, editor) && !editor.builder && !editor.gapFill,
+    fillGaps: () => fillAllGaps(doc, editor, view, settings.get("shape.gapClosePx")),
+    fillGap: () => startGapFill(doc, editor, view, settings.get("shape.gapClosePx")),
+    canMask: () => canMakeMask(doc, editor),
+    clippingMask: () => makeClippingMask(doc, editor),
+    mask: (kind) => makeMask(doc, editor, kind),
+    maskEditing: () => editor.maskEdit !== null,
+    startPaintedMask: (showAll) => startBrushMask(doc, editor, showAll),
+    paintMask: (mode) => paintMask(editor, mode),
+    canReleaseMask: () => canReleaseMask(doc, editor),
+    selectMask: () => selectTheMask(doc, editor),
+    invertMask: () => changeMask(doc, editor, { invert: !(selectedMask(doc, editor)?.invert ?? false) }),
+    releaseMask: () => changeMask(doc, editor, { release: true }),
+    canOutline: () => canOutlineStroke(doc, editor),
+    outline: () => outlineStroke(doc, editor),
+    widthProfile: (profile) => setWidthProfile(doc, editor, profile),
+    canSvg: () => canExportSvg(doc, editor),
+    copySvg: async () => {
+      const t = svgOfSelection(doc, editor);
+      if (!t) return;
+      await copyText(t);
+      const warn = svgWarningOfSelection(doc, editor);
+      editor.message = `Copied the shapes as SVG text.${warn ? ` ${warn}` : ""}`;
+      editor.changed();
+    },
+    canExport: () => exportTarget(doc, editor) !== null,
+    openExport: () => openExport(),
+    svgToLibrary: () => saveSvgToLibrary(),
+    zoom: (levels) => zoomByStep(view, levels),
+    pan: (dir, far) => panStep(view, dir, far),
+    step: (dir) =>
+      void stepToNeighbour(doc, view, editor, dir, settings.get("nav.mode"), settings.get("nav.arrive") === "focus", (o, unit) => {
+        const gid = unit.length > 1 ? o.groups?.[editor.entered.length] : undefined;
+        return gid ? (o.groupNames?.[gid] ?? "Group") : labelOf(o, assetNames.map).text;
+      }),
+    focus: () => focusCycle.tap(),
+    flatten: () => flattenSelection(doc, editor),
+    search: (prefix) => canvasSearch.open(prefix),
+    searchLibrary: () => { setView("assets"); assetsView.focusSearch(); },
+    palette: () => palette.open(),
+    bookmarkStep: (by) => bookmarkList.step(by),
+    bookmarkGo: (i) => bookmarkList.goTo(i),
+    home: () => goHome(view),
+    fit: (what) => focusCycle.fit(what),
+    canBack: () => history.canBack(),
+    back: () => history.back(),
+    canForward: () => history.canForward(),
+    forward: () => history.forward(),
+    randomView: () => goRandomView(),
+    toggleZen: () => void settings.set("ui.zen", !settings.get("ui.zen")),
+    screenshot: () => takeScreenshot(),
+    bookmarkCount: () => bookmarkList.items.length,
+    tour: () => bookmarkTour.start(),
+    bookmarkSelection: () => bookmarkPicked(),
+    togglePanel: (p) => {
+      const key = `${p}Open` as "adjustOpen" | "layersOpen" | "bookmarksOpen" | "patternOpen" | "stylesOpen" | "tagsOpen";
+      editor[key] = !editor[key];
+      editor.changed();
+    },
+    goTo: (v) => setView(v),
+    showShortcuts: () => { setView("settings"); settingsView.show("shortcuts"); },
+    canvasOpen: () => !!session.current,
+    newCanvas: async () => { const b = session.current?.boardId; if (b) await session.newCanvas(b); },
+    newBoard: async () => void (await session.newBoard()),
+    backup: async () => void (await runExport(session, { kind: "workspace" })),
+    switchWorkspace: canSwitchWorkspace() ? () => void openWorkspaceSwitcher(document.querySelector<HTMLElement>('[data-testid="workspace-chevron"]') ?? document.body) : null,
+    checkLibraryFiles: storage?.folderSync ? (quick) => checkLibraryFiles(quick) : null,
+    hidden: storage?.hidden ? { isOpen: () => !!storage.hidden?.isOpen(), lock: () => lockHidden(session).then(() => { editor.message = HIDDEN_LOCKED; editor.changed(); }) } : null,
+  };
+  registry.setProvider("app", () => canvasCommands(canvasActions));
+  for (const [old, now] of Object.entries(OLD_CANVAS_IDS)) registry.alias(old, now);
+  registry.onFail((_c, error) => { editor.message = error; editor.changed(); });
+  // An outside caller's risky run asks the person here (ADR 0205); only the person answers. The link to AI agents opens while it is on.
+  registry.setConfirmer((c, options) => confirmDialog({
+    title: `An AI agent wants to: ${c.title}`,
+    lines: [c.hint ?? "", ...(Object.keys(options).length ? [`With: ${JSON.stringify(options).slice(0, 300)}`] : []), "Allow it only if you asked the agent for this."],
+    confirmLabel: "Allow",
+    danger: true,
+  }));
+  const agentLink = mountAgentLink({
+    registry,
+    on: () => settings.get("agents.on"),
+    code: () => settings.get("agents.code"),
+    readOnly: () => settings.get("agents.readOnly"),
+    say: (text) => { editor.message = text; editor.changed(); },
   });
+  settings.subscribe(() => agentLink.sync());
   // The context menu (right click, or the menu key): the commands that fit what is under the pointer and what is picked, from the same registry.
   mountContextMenu(canvas, registry, {
     active: () => appView === "canvas" && !textEditor.isOpen && performance.now() - editor.fingerListAt > 1500,
@@ -3123,51 +3170,57 @@ async function start(): Promise<void> {
       return !!hit; // (empty canvas: the menu of the canvas, whatever is picked)
     },
   });
-  registry.setProvider("panels", () => dock.commands().map((c): Command => ({ ...c, enabled: () => appView === "canvas" && (c.enabled?.() ?? true) })));
+  registry.setProvider("panels", () => dock.commands().map((c): Command => ({ ...c, why: () => (appView === "canvas" ? (c.why?.() ?? null) : REASON.notOnCanvas) })));
   registry.setProvider("settings", () => [
-    ...SETTINGS_TABS.map((t): Command => ({ group: "Settings", kind: "settings", title: t.label, words: "preferences options", run: () => { setView("settings"); settingsView.show(t.id); } })),
-    ...settingCommands(SETTINGS_TABS, settings, (tab) => { setView("settings"); settingsView.show(tab); }),
+    ...SETTINGS_TABS.map((t): Command => ({ id: `settings.tab:${t.id}`, group: "Settings", kind: "settings", title: t.label, hint: "Open this page of Settings", risk: "read", words: "preferences options", exec: () => { setView("settings"); settingsView.show(t.id); } })),
+    ...settingCommands(SETTINGS_TABS, settings, (tab) => { setView("settings"); settingsView.show(tab); }, refusedToAgents),
   ]);
   registry.setProvider("bars", () => (appView === "canvas" ? barCommands() : []));
-  registry.setProvider("artcraft", () =>
-    PHOTOCRAFT_FEATURES.entry.newDocument && photoCraft.available
-      ? [{ id: "artcraft.photocraft.open", group: "ArtCraft", kind: "artcraft", title: "Open PhotoCraft", words: "photo editor new document image edit layers", run: () => void photoCraft.openBlank() }]
-      : []);
+  registry.setProvider("artcraft", () => [
+    ...(PHOTOCRAFT_FEATURES.entry.newDocument && photoCraft.available ? [{ id: "artcraft.photocraft.open", group: "ArtCraft", kind: "artcraft", title: "Open PhotoCraft", hint: "A new document in the photo editor", risk: "edit" as const, words: "photo editor new document image edit layers", exec: () => photoCraft.openBlank() }] : []),
+    { id: "artcraft.photocraft.close", group: "ArtCraft", kind: "artcraft", title: "Close PhotoCraft", hint: "It asks first when something is not saved", risk: "edit", words: "photo editor quit", why: () => null, exec: () => photoCraft.close() },
+  ]);
   // Boards and canvases of the navigator, and the fixed shortcuts of Settings > Shortcuts (choosing one opens that list).
   registry.setProvider("navigator", () => {
     const tree = session.tree;
     if (!tree) return [];
     const out: Command[] = [];
     for (const { board, canvases } of tree.boards) {
-      for (const c of canvases) out.push({ id: `canvas:${c.id}`, group: "Canvas", kind: "canvas", title: `${board.name} / ${c.name}`, words: "open go switch board", enabled: () => session.current?.canvasId !== c.id, run: () => { setView("canvas"); void session.openCanvas(c.id); } });
+      for (const c of canvases) registry.alias(`canvas:${c.id}`, `canvas.open:${c.id}`); // (the id old macros have)
+      for (const c of canvases) out.push({ id: `canvas.open:${c.id}`, group: "Canvas", kind: "canvas", title: `${board.name} / ${c.name}`, hint: "Open this canvas", risk: "edit", record: false, words: "open go switch board", why: () => (session.current?.canvasId !== c.id ? null : "It is open."), exec: async () => { setView("canvas"); await session.openCanvas(c.id); } });
     }
-    out.push({ group: "Canvas", kind: "canvas", title: "Rename this canvas", words: "name", enabled: () => !!session.current, takes: { prompt: "New name of the canvas", run: (n) => void session.renameCanvas(session.current!.canvasId, n) }, run: () => undefined });
-    out.push({ group: "Canvas", kind: "canvas", title: "Rename this board", words: "name", enabled: () => !!session.current, takes: { prompt: "New name of the board", run: (n) => void session.renameBoard(session.current!.boardId, n) }, run: () => undefined });
+    const named = { name: "name", type: "text", doc: "the new name", required: true } as const;
+    out.push({ id: "canvas.rename", group: "Canvas", kind: "canvas", title: "Rename this canvas", hint: "Give the open canvas a new name", risk: "edit", words: "name", why: () => (session.current ? null : REASON.noCanvas), options: [named], takes: { prompt: "New name of the canvas", option: "name", run: (n) => void session.renameCanvas(session.current!.canvasId, n) } });
+    out.push({ id: "board.rename", group: "Canvas", kind: "canvas", title: "Rename this board", hint: "Give the open board a new name", risk: "edit", words: "name", why: () => (session.current ? null : REASON.noCanvas), options: [named], takes: { prompt: "New name of the board", option: "name", run: (n) => void session.renameBoard(session.current!.boardId, n) } });
     return out;
   });
-  registry.setProvider("shortcuts", () => [...KEY_COMMANDS.map((c): Command => ({ group: "Shortcut", kind: "shortcut", quiet: true, title: c.name, keys: keymap.bindings(c.id).map(displayCombo).join(", ") || "none", words: c.group, run: () => { setView("settings"); settingsView.show("shortcuts"); } })), ...FIXED_SHORTCUTS.flatMap((g) => g.items.map((i): Command => ({ group: "Shortcut", kind: "shortcut", quiet: true, title: i.does, keys: i.keys, words: g.group, run: () => { setView("settings"); settingsView.show("shortcuts"); } })))]);
+  // (a shortcut row is where to read and change a key: choosing one opens the shortcut list)
+  const showKeys = (): void => { setView("settings"); settingsView.show("shortcuts"); };
+  registry.setProvider("shortcuts", () => [
+    ...KEY_COMMANDS.map((c): Command => ({ id: `shortcut.show:${c.id}`, group: "Shortcut", kind: "shortcut", quiet: true, title: c.name, hint: "See or change its key", risk: "read", record: false, keys: keymap.bindings(c.id).map(displayCombo).join(", ") || "none", words: c.group, exec: showKeys })),
+    ...FIXED_SHORTCUTS.flatMap((g, gi) => g.items.map((i, ii): Command => ({ id: `shortcut.fixed:${gi}.${ii}`, group: "Shortcut", kind: "shortcut", quiet: true, title: i.does, hint: "A key that is always this one", risk: "read", record: false, keys: i.keys, words: g.group, exec: showKeys }))),
+  ]);
   const macros = new Macros(registry, (text) => { editor.message = text; editor.changed(); });
   const palette = mountCommandPalette(registry);
   window.addEventListener("keydown", (e) => {
     if (!(e.ctrlKey || e.metaKey) || e.altKey || (e.key.toLowerCase() !== "k" && !(e.shiftKey && e.key.toLowerCase() === "p"))) return;
     if ((e.target as HTMLElement | null)?.closest?.("dialog")) return;
     e.preventDefault();
-    palette.open();
+    pressCommand("find.palette", {}, "key");
   }, true);
 
   // "/" opens the command palette (not while typing).
   window.addEventListener("keydown", (e) => {
     if (e.key !== "/" || appView !== "canvas" || e.ctrlKey || e.metaKey || e.altKey || typing(e.target) || (e.target as HTMLElement | null)?.closest?.("dialog")) return;
     e.preventDefault();
-    palette.open();
+    pressCommand("find.palette", {}, "key");
   });
 
   // "?" opens the shortcut list (not while typing).
   window.addEventListener("keydown", (e) => {
     if (e.key !== "?" || e.ctrlKey || e.metaKey || e.altKey || typing(e.target) || (e.target as HTMLElement | null)?.closest?.("dialog")) return;
     e.preventDefault();
-    if (appView !== "settings") setView("settings");
-    settingsView.show("shortcuts");
+    pressCommand("find.help", {}, "key");
   });
 
   // Drag-and-drop and paste import.

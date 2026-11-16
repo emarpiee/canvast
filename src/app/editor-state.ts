@@ -248,7 +248,7 @@ export class EditorState {
   /** Where the pointer is on the canvas (CSS px from its corner), or null when it is elsewhere: pasted things land there. Not a change: nothing redraws for it. */
   pointerAt: { x: number; y: number } | null = null;
   /** A button for the notice that takes `message` (its label and what it does); the notice stack takes it with the message. */
-  messageAction: { label: string; run(): void } | null = null;
+  messageAction: { label: string; /** The command it runs (ADR 0205). */ command?: string; run(): void } | null = null;
   /** Work in progress (app/progress.ts): the notice stack shows it as a progress notice that stays until the work ends. */
   progressNow: { channel: string; text: string; fraction: number | null } | null = null;
   /** Work that has finished: the progress notices of these channels ("import", "index") are closed (ui/notices.ts). */

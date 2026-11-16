@@ -301,7 +301,9 @@ export function createGradientEditor(options: GradientEditorOptions = {}): Gradi
     options.onInput?.(snapshot());
     change();
   }
+  // view-state: (a chooser's own control: what it picks goes to the command of what opened it)
   removeBtn.addEventListener("click", () => removeStop(sel));
+  // view-state: (a chooser's own control: what it picks goes to the command of what opened it)
   q("[data-reverse]").addEventListener("click", () => {
     const was = 1 - sel.offset;
     v.stops = v.stops.map((s) => ({ offset: 1 - s.offset, colour: s.colour })).reverse();
@@ -312,6 +314,7 @@ export function createGradientEditor(options: GradientEditorOptions = {}): Gradi
 
   // Randomize: any colours (no fixed hue, brightness or contrast; always fully opaque), positions drawn for as many stops as there
   // are (the first at 0 and the last at 100 %), and a new angle, or centre and radius.
+  // view-state: (a chooser's own control: what it picks goes to the command of what opened it)
   q("[data-random]").addEventListener("click", () => {
     const n = v.stops.length;
     const cuts = Array.from({ length: n }, () => Math.random()).sort((a, b) => a - b);
@@ -330,12 +333,14 @@ export function createGradientEditor(options: GradientEditorOptions = {}): Gradi
 
   // ---- fields
   const field = (el: HTMLInputElement, set: (n: number) => void): void => {
+    // view-state: (a chooser's own control: what it picks goes to the command of what opened it)
     el.addEventListener("input", () => {
       const n = Number(el.value);
       if (el.value === "" || !Number.isFinite(n)) return;
       set(n);
       input();
     });
+    // view-state: (a chooser's own control: what it picks goes to the command of what opened it)
     el.addEventListener("change", () => {
       show();
       change();
@@ -349,6 +354,7 @@ export function createGradientEditor(options: GradientEditorOptions = {}): Gradi
   field(cx, (n) => (v.cx = n / 100));
   field(cy, (n) => (v.cy = n / 100));
   field(rad, (n) => (v.r = Math.max(0.01, n / 100)));
+  // view-state: (a chooser's own control: what it picks goes to the command of what opened it)
   root.addEventListener("click", (e) => {
     const b = (e.target as HTMLElement).closest<HTMLElement>("[data-gtype]");
     if (!b || b.dataset["gtype"] === v.type) return;

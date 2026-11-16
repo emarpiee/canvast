@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.60.14 — Every action a command, and a link to AI agents (2026-11-16)
+
+- **Added:** **Settings > AI agents** (off until you turn it on): an AI agent on this computer (a program that speaks MCP, such as Claude Desktop or Claude Code) can list and run canvast's commands through the canvas tools (`canvast-tools mcp`), once you type the pairing code the tools show. Deleting, hidden items, replacing the workspace and writing files ask you first, in canvast; the password, these settings and what opens hidden items are never the agent's; **Agents may only look** lets it read and change nothing (B25).
+- **Changed:** the keys run the same commands as the buttons, the menus and the command palette, and a macro records whatever ran a command (a button, a menu row, a key), not only the palette; a step dragged live (a slider) is left out, the value it ends on is kept.
+
+### For developers
+
+- **Added:** every action of the app is a command (ADR 0205): a fixed id (`area.action`), a title and hint, typed options (targets as `ids`), a risk (`read`, `edit`, `confirm`, `refused`), a reason when it cannot run, and `exec`, which never throws. `commands.execute(id, options, { caller })` gives its result; `press` runs it at once for a button or a key; `batch`; `list` is what an agent reads; an unknown id gets close matches; renamed ids keep aliases. The rule is in CLAUDE.md (B25).
+- **Added:** the audits: `npm run check:commands` (CI) fails on a click, change or input listener that runs no command and is not marked as view state, a menu row without `command:`, a command without the rule's parts, and a command file that imports the interface; `tests/e2e/commands.spec.ts` (Tests) fails on a command that breaks the rule, a key without a command, a command that takes wrong options or changes anything when given them, an agent running what only the person may, and controls on the canvas, in the Library and in Settings without a command. What was there before the rule is counted in `scripts/lib/commands-todo.json`, which only shrinks: 465 actions at the start, 131 left (B25).
+- **Added:** `canvast-tools mcp` and **Connect an AI agent** in the tools' menu (`scripts/tools/agent-bridge.mjs`): an MCP server on the standard input and output (command_list, command_run, command_batch) that passes the agent's calls to canvast over a WebSocket on 127.0.0.1:47380, answering only a page (never a website) with the pairing code (B25).
+- **Changed:** the page's security policy allows one connection: `connect-src ws://127.0.0.1:47380` (it was `'none'`), opened only while Settings > AI agents is on; `check:offline` holds it to that address. A LAN guest's page is still opened to its host only.
+- **Changed:** the canvas commands (`src/app/canvas-commands.ts`), the keys, the Actions bar, the Properties bar, the Library (its bar, details, folders, menus), the Styles panel, the settings, the panels and the boards and canvases are commands; the colour choosers' own controls are view state (what they pick goes to the command of what opened them).
+
 ## 0.60.13 — Smoother Library scrolling, clearer release notes (2026-11-16)
 
 - **Fixed:** scrolling the Library with small thumbnails stuttered: each step put every card already on the screen back in the page, so all of them were styled and laid out again. Only the cards a scroll brings are added now: at the smallest thumbnails, about 40 frames a second instead of under 30, and almost no frame over 50 ms (B2). The waiting shimmer on a card moves without repainting it. ([The Library](README.md#the-library))

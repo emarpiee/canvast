@@ -7,6 +7,10 @@ import { afterAll, describe, expect, it } from "vitest";
 import { makePng } from "../e2e/png";
 // @ts-expect-error (plain JavaScript, no types)
 import { cleanPath, cleanPaths, shareFolder } from "../../scripts/tools/tools-source.mjs";
+// @ts-expect-error (a build script, plain JavaScript)
+import { decodeFrames, encodeFrame, handleMcp, newCode, pageOrigin, startBridge } from "../../scripts/tools/agent-bridge.mjs";
+import { PassThrough } from "node:stream";
+import { connect as netConnect, type Socket } from "node:net";
 // @ts-expect-error (plain JavaScript, no types)
 import { encryptHidden, hiddenFolder } from "../../scripts/hidden-items.mjs";
 
@@ -113,5 +117,86 @@ describe("canvast tools: a workspace's hidden items shared, decrypted only as th
     } finally {
       await plain.close();
     }
+  });
+});
+
+describe("canvas tools: the link to AI agents (mcp, ADR 0205)", () => {
+  it("answers MCP: initialize, the tools, and calls passed on to canvast", async () => {
+    const calls: Array<[string, unknown]> = [];
+    const app = async (method: string, params: unknown): Promise<unknown> => {
+      calls.push([method, params]);
+      if (method === "list") return [{ id: "edit.undo" }];
+      if (method === "run") return (params as { id: string }).id === "edit.undo" ? { ok: true } : { ok: false, error: "nope" };
+      return { ok: true, completed: 2, results: [] };
+    };
+    const init = await handleMcp({ jsonrpc: "2.0", id: 1, method: "initialize", params: { protocolVersion: "2025-03-26" } }, app);
+    expect(init?.result.protocolVersion).toBe("2025-03-26");
+    expect(init?.result.capabilities).toEqual({ tools: {} });
+    expect(await handleMcp({ jsonrpc: "2.0", method: "notifications/initialized" }, app)).toBeNull();
+    expect((await handleMcp({ jsonrpc: "2.0", id: 2, method: "tools/list" }, app))?.result.tools.map((t: { name: string }) => t.name)).toEqual(["command_list", "command_run", "command_batch"]);
+    const list = await handleMcp({ jsonrpc: "2.0", id: 3, method: "tools/call", params: { name: "command_list", arguments: {} } }, app);
+    expect(JSON.parse(list?.result.content[0].text)).toEqual([{ id: "edit.undo" }]);
+    expect((await handleMcp({ jsonrpc: "2.0", id: 4, method: "tools/call", params: { name: "command_run", arguments: { id: "edit.undo" } } }, app))?.result.isError).toBe(false);
+    expect((await handleMcp({ jsonrpc: "2.0", id: 5, method: "tools/call", params: { name: "command_run", arguments: { id: "x" } } }, app))?.result.isError).toBe(true);
+    expect((await handleMcp({ jsonrpc: "2.0", id: 6, method: "tools/call", params: { name: "command_batch", arguments: { steps: [{ id: "a" }], stop_on_error: false } } }, app))?.result.isError).toBe(false);
+    expect(calls.at(-1)).toEqual(["batch", { steps: [{ id: "a" }], stopOnError: false }]);
+    expect((await handleMcp({ jsonrpc: "2.0", id: 7, method: "tools/call", params: { name: "command_run", arguments: { id: "a", evil: 1 } } }, app))?.error.code).toBe(-32602);
+    expect((await handleMcp({ jsonrpc: "2.0", id: 8, method: "tools/call", params: { name: "nope" } }, app))?.error.code).toBe(-32602);
+    expect((await handleMcp({ jsonrpc: "2.0", id: 9, method: "nope" }, app))?.error.code).toBe(-32601);
+  });
+
+  it("reads and writes WebSocket frames, and lets only a page with the code connect", () => {
+    for (const text of ["hi", "x".repeat(300), "y".repeat(70000)]) {
+      const frame = encodeFrame(text);
+      // (a client's frame is masked)
+      const mask = Buffer.from([1, 2, 3, 4]);
+      const head = frame.subarray(0, frame.length - Buffer.byteLength(text));
+      const body = Buffer.from(text).map((b, i) => b ^ mask[i & 3]!);
+      const masked = Buffer.concat([Buffer.from([head[0]!, head[1]! | 128]), head.subarray(2), mask, body]);
+      const { frames, rest } = decodeFrames(Buffer.concat([masked, masked.subarray(0, 3)]));
+      expect(frames.map((f: { data: Buffer }) => f.data.toString())).toEqual([text]);
+      expect(rest.length).toBe(3);
+    }
+    expect(pageOrigin("null")).toBe(true);
+    expect(pageOrigin("app://canvast")).toBe(true);
+    expect(pageOrigin(undefined)).toBe(true);
+    expect(pageOrigin("https://example.com")).toBe(false);
+    expect(newCode()).toMatch(/^[A-Z2-9]{4}-[A-Z2-9]{4}-[A-Z2-9]{4}$/);
+  });
+
+  it("passes an agent's call to the page connected with the code, and refuses one without it", async () => {
+    const input = new PassThrough();
+    const output = new PassThrough();
+    const lines: unknown[] = [];
+    output.on("data", (b: Buffer) => b.toString().split("\n").filter(Boolean).forEach((l) => lines.push(JSON.parse(l))));
+    const bridge = await startBridge({ code: "ABCD-EFGH-JKLM", port: 0, input, output, log: () => undefined });
+    const connect = (path: string, origin = "null"): Promise<Socket> => new Promise((ok) => {
+      const s = netConnect(bridge.port, "127.0.0.1", () => {
+        s.write(`GET ${path} HTTP/1.1\r\nHost: 127.0.0.1\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Key: ${randomBytes(16).toString("base64")}\r\nSec-WebSocket-Version: 13\r\nOrigin: ${origin}\r\n\r\n`);
+        ok(s);
+      });
+    });
+    const firstLine = (s: Socket): Promise<string> => new Promise((ok) => s.once("data", (d: Buffer) => ok(d.toString().split("\r\n")[0]!)));
+    const bad = await connect("/canvast?code=WRONG");
+    expect(await firstLine(bad)).toContain("403");
+    const site = await connect("/canvast?code=ABCD-EFGH-JKLM", "https://example.com");
+    expect(await firstLine(site)).toContain("403");
+    const page = await connect("/canvast?code=ABCD-EFGH-JKLM");
+    expect(await firstLine(page)).toContain("101");
+    // the page answers what the tools pass on
+    page.on("data", (d: Buffer) => {
+      const { frames } = decodeFrames(d);
+      for (const f of frames) {
+        const req = JSON.parse(f.data.toString()) as { id: number; method: string };
+        const reply = Buffer.from(JSON.stringify({ id: req.id, result: { ok: true, value: req.method } }));
+        const mask = Buffer.from([9, 8, 7, 6]);
+        page.write(Buffer.concat([Buffer.from([0x81, 0x80 | reply.length]), mask, reply.map((b, i) => b ^ mask[i & 3]!)]));
+      }
+    });
+    input.write(`${JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/call", params: { name: "command_run", arguments: { id: "edit.undo" } } })}\n`);
+    await expect.poll(() => lines.length).toBe(1);
+    expect(JSON.parse((lines[0] as { result: { content: Array<{ text: string }> } }).result.content[0]!.text)).toEqual({ ok: true, value: "run" });
+    page.destroy();
+    bridge.close();
   });
 });

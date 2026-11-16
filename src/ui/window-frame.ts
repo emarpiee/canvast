@@ -37,6 +37,7 @@ export async function mountWindowRow(): Promise<void> {
     <button type="button" data-win="maximize" data-testid="win-maximize" aria-label="Maximize or restore the window" title="Maximize or restore">${ICONS.squareIcon}</button>
     <button type="button" data-win="close" data-testid="win-close" aria-label="Close the window" title="Close">${ICONS.x}</button>`;
   row.querySelector(".win-title")!.textContent = `${workspace?.name ?? ""} — canvast ${__CANVAST_VERSION__}`;
+  // view-state: (the window's own buttons)
   row.addEventListener("click", (e) => {
     const act = (e.target as HTMLElement).closest<HTMLElement>("[data-win]")?.dataset["win"];
     if (act === "minimize" || act === "maximize" || act === "close") bridge.windowAct(act);

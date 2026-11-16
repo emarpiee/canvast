@@ -13,6 +13,7 @@ export function wireSecretFields(root: HTMLElement): void {
     const input = field.querySelector<HTMLInputElement>("input")!;
     const btn = field.querySelector<HTMLButtonElement>(".secret-reveal")!;
     btn.addEventListener("pointerdown", (e) => e.preventDefault()); // (the input keeps the focus)
+    // view-state: (a dialog's or chooser's own control: what it gives goes to the command that opened it)
     btn.addEventListener("click", () => {
       const show = input.type === "password";
       input.type = show ? "text" : "password";
@@ -75,6 +76,7 @@ export function confirmDialog(opts: ConfirmOptions): Promise<boolean> {
   });
   return new Promise((resolve) => {
     let answer = false;
+    // view-state: (a dialog's or chooser's own control: what it gives goes to the command that opened it)
     dlg.addEventListener("click", (e) => {
       const b = (e.target as HTMLElement).closest("button");
       if (!b) return;
@@ -118,11 +120,13 @@ export function listDialog(o: ListDialogOptions): { refresh: () => void; close: 
   let open = true;
   const refresh = (): void => void (open && (body.innerHTML = o.body()));
   const close = (): void => dlg.close();
+  // view-state: (a dialog's or chooser's own control: what it gives goes to the command that opened it)
   dlg.addEventListener("click", (e) => {
     const t = e.target as HTMLElement;
     if (t.closest("[data-list-close]")) return close();
     o.onClick?.(t, refresh, close);
   });
+  // view-state: (a dialog's or chooser's own control: what it gives goes to the command that opened it)
   dlg.addEventListener("change", (e) => o.onChange?.(e.target as HTMLInputElement, refresh));
   refresh();
   showModal(dlg, () => void (open = false));
@@ -163,6 +167,7 @@ export function chooseDialog(opts: ChooseOptions): Promise<string | null> {
   });
   return new Promise((resolve) => {
     let answer: string | null = null;
+    // view-state: (a dialog's or chooser's own control: what it gives goes to the command that opened it)
     dlg.addEventListener("click", (e) => {
       const b = (e.target as HTMLElement).closest("button");
       if (!b) return;
@@ -207,6 +212,7 @@ export function promptDialog(opts: PromptOptions): Promise<string | null> {
   wireSecretFields(dlg);
   return new Promise((resolve) => {
     let answer: string | null = null;
+    // view-state: (a dialog's or chooser's own control: what it gives goes to the command that opened it)
     dlg.addEventListener("click", (e) => {
       const b = (e.target as HTMLElement).closest("button");
       if (!b || b.classList.contains("secret-reveal")) return;

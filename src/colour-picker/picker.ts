@@ -557,16 +557,20 @@ export function createColourPicker(options: PickerOptions = {}): ColourPicker {
   }
 
   sliders.forEach((s, i) => {
+    // view-state: (a chooser's own control: what it picks goes to the command of what opened it)
     s.addEventListener("input", () => setTriple(i === 0 ? { h: Number(s.value) } : i === 1 ? { s: Number(s.value) / cScale() } : { x: Number(s.value) / 100 }));
+    // view-state: (a chooser's own control: what it picks goes to the command of what opened it)
     s.addEventListener("change", commit);
   });
   [rowNums, stripNums].forEach((set) =>
     set.forEach((n, i) => {
+      // view-state: (a chooser's own control: what it picks goes to the command of what opened it)
       n.addEventListener("input", () => {
         const v = Number(n.value);
         if (n.value === "" || !Number.isFinite(v)) return;
         setTriple(i === 0 ? { h: v % 360 } : i === 1 ? { s: v / cScale() } : { x: v / 100 }, n);
       });
+      // view-state: (a chooser's own control: what it picks goes to the command of what opened it)
       n.addEventListener("change", () => {
         show();
         commit();
@@ -574,16 +578,21 @@ export function createColourPicker(options: PickerOptions = {}): ColourPicker {
       n.addEventListener("blur", () => show());
     }),
   );
+  // view-state: (a chooser's own control: what it picks goes to the command of what opened it)
   alphaSlider.addEventListener("input", () => setAlpha(Number(alphaSlider.value) / 100));
+  // view-state: (a chooser's own control: what it picks goes to the command of what opened it)
   alphaSlider.addEventListener("change", commit);
+  // view-state: (a chooser's own control: what it picks goes to the command of what opened it)
   alphaNum.addEventListener("input", () => {
     if (alphaNum.value !== "" && Number.isFinite(Number(alphaNum.value))) setAlpha(Number(alphaNum.value) / 100, alphaNum);
   });
+  // view-state: (a chooser's own control: what it picks goes to the command of what opened it)
   alphaNum.addEventListener("change", () => {
     show();
     commit();
   });
 
+  // view-state: (a chooser's own control: what it picks goes to the command of what opened it)
   hexInput.addEventListener("input", () => {
     const v = hexInput.value.trim();
     if (v && parseColour(format === "hex" && /^[0-9a-f]+$/i.test(v) ? `#${v}` : v)) setText(v, hexInput);
@@ -623,6 +632,7 @@ export function createColourPicker(options: PickerOptions = {}): ColourPicker {
     hash.hidden = format !== "hex";
     hexInput.classList.toggle("is-long", format !== "hex");
   };
+  // view-state: (a chooser's own control: what it picks goes to the command of what opened it)
   formatSel.addEventListener("change", () => {
     format = formatSel.value as TextFormat;
     syncFormat();
@@ -630,6 +640,7 @@ export function createColourPicker(options: PickerOptions = {}): ColourPicker {
     options.onFormat?.(format);
   });
 
+  // view-state: (a chooser's own control: what it picks goes to the command of what opened it)
   beforeBtn.addEventListener("click", () => {
     if (setText(original)) commit();
   });
@@ -647,8 +658,11 @@ export function createColourPicker(options: PickerOptions = {}): ColourPicker {
         options.onCopy?.(text);
       });
     });
+  // view-state: (a chooser's own control: what it picks goes to the command of what opened it)
   groupsEl.addEventListener("click", pickSwatch);
+  // view-state: (a chooser's own control: what it picks goes to the command of what opened it)
   harmonyEl.addEventListener("click", pickSwatch);
+  // view-state: (a chooser's own control: what it picks goes to the command of what opened it)
   root.querySelector("[data-eye]")?.addEventListener("click", async () => {
     try {
       const r = await new (window as unknown as { EyeDropper: new () => { open(): Promise<{ sRGBHex: string }> } }).EyeDropper().open();
@@ -677,7 +691,9 @@ export function createColourPicker(options: PickerOptions = {}): ColourPicker {
     show();
     if (notify) options.onView?.(v);
   };
+  // view-state: (a chooser's own control: what it picks goes to the command of what opened it)
   viewSel.addEventListener("change", () => setView(viewSel.value as View, true));
+  // view-state: (a chooser's own control: what it picks goes to the command of what opened it)
   root.addEventListener("click", (e) => {
     const b = (e.target as HTMLElement).closest<HTMLElement>("[data-model]");
     if (b) setModel(b.dataset["model"] as Model, true);

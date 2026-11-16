@@ -639,6 +639,7 @@ export async function mountNoteEditor(el: HTMLElement, opts: { kind: NoteKind; t
   /** How many times the person has changed the words (`current` notes it: what is typed while a save runs is told from what was saved). */
   let edits = 0;
   let editsAtCurrent = 0;
+  // typing: (writing the note: it is saved as it is typed)
   el.addEventListener("input", () => void edits++, true);
   const holder = document.createElement("div");
   el.classList.toggle("is-plain-note", opts.kind === "txt"); // (its spaces and tabs are shown and kept)
@@ -831,6 +832,7 @@ export async function mountNoteEditor(el: HTMLElement, opts: { kind: NoteKind; t
   });
   // A list's, a quote's or a heading's mark typed at the start of a line, then a space, makes that format, as markdown would read it
   // (Settings, off by default: it changes what is typed). The editor's own `1.` and `---` do so already, on or off.
+  // typing: (writing the note: it is saved as it is typed)
   el.querySelector(".sun-editor-editable")?.addEventListener("input", (ev) => {
     const e = ev as InputEvent, sel = window.getSelection();
     if (!opts.typedMarks || opts.kind === "txt" || e.inputType !== "insertText" || e.isComposing || !/^[  ]$/.test(e.data ?? "") || !sel?.isCollapsed || !sel.anchorNode) return;
@@ -864,6 +866,7 @@ export async function mountNoteEditor(el: HTMLElement, opts: { kind: NoteKind; t
     const href = a.getAttribute("href")!;
     host.open(links.get(href) ?? href);
   };
+  // typing: (writing the note: it is saved as it is typed)
   el.addEventListener("click", follow, true);
   // The small card on a link in the words: a button goes where it points, and so does the link's text on it (a browser's new window goes nowhere here).
   // (the editor makes that card only after it has started, in the wrapper that carries its floating parts: the button is added when it comes)
@@ -872,6 +875,7 @@ export async function mountNoteEditor(el: HTMLElement, opts: { kind: NoteKind; t
     const linkCard = carrier.querySelector<HTMLElement>('.se-controller-link:has([data-command="unlink"])'); // (an anchor's and a formula's cards have that class too)
     if (!linkCard || linkCard.querySelector("[data-go-link]")) return;
     linkCard.querySelector(".se-btn-group")?.insertAdjacentHTML("afterbegin", `<button type="button" class="se-btn se-tooltip note-go-link" data-go-link data-testid="note-go-link" tabindex="-1" aria-label="Go to link">${ICONS.goToLink}<span class="se-tooltip-inner"><span class="se-tooltip-text">Go to link</span></span></button>`);
+    // typing: (writing the note: it is saved as it is typed)
     linkCard.addEventListener("click", (e) => {
       const on = e.target as HTMLElement;
       if (!on.closest("[data-go-link]") && !on.closest("a")) return;
@@ -923,6 +927,7 @@ export async function mountNoteEditor(el: HTMLElement, opts: { kind: NoteKind; t
     dirty = true;
     editor.$.history.push(false);
   };
+  // typing: (writing the note: it is saved as it is typed)
   el.addEventListener("click", tick, true);
   // Content that comes in with temporary addresses that are not this note's (pasted or dropped from another note): each gets this note's own, and its real link.
   const page = (): Element | null => el.querySelector(".sun-editor-editable");
@@ -947,10 +952,12 @@ export async function mountNoteEditor(el: HTMLElement, opts: { kind: NoteKind; t
   // Drag a size or the font size left or right to change it, as every number of the app (SunEditor's are text, to take a unit). A dragged
   // size keeps the picture's proportion as a typed one does (it is worked out on keyup); a dragged font size is applied on release.
   scrubNumbers(el, undefined, { units: "._se_size_x, ._se_size_y, .__se__font_size" });
+  // typing: (writing the note: it is saved as it is typed)
   el.addEventListener("input", (e) => {
     const t = e.target as HTMLElement;
     if (!e.isTrusted && t.matches("._se_size_x, ._se_size_y")) t.dispatchEvent(new KeyboardEvent("keyup", { bubbles: true }));
   });
+  // typing: (writing the note: it is saved as it is typed)
   el.addEventListener("change", (e) => {
     const t = e.target as HTMLInputElement;
     if (!e.isTrusted && t.matches(".__se__font_size")) (editor.$.plugins as Record<string, { toolbarInputChange?(a: object): void }>)["fontSize"]?.toolbarInputChange?.({ target: t, value: t.value.trim(), event: e });
@@ -1095,6 +1102,7 @@ export async function mountNoteEditor(el: HTMLElement, opts: { kind: NoteKind; t
     dirty = true;
   }, true);
   // (its toolbar's Copy button, which writes the clipboard itself)
+  // typing: (writing the note: it is saved as it is typed)
   el.addEventListener("click", (e) => {
     if (!(e.target as HTMLElement).closest?.('[data-command="copy"]')) return;
     const whole = wholeNow();

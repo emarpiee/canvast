@@ -1,3 +1,4 @@
+import type { Command } from "../commands/types";
 /**
  * The panel dock (ADR 0123): one system for every panel that floats over the canvas. A panel is any element with a `<header>` as its title
  * bar; `dock.add(el, spec)` wraps it in an item and the dock does the rest, so a new panel is one `add` call:
@@ -225,16 +226,16 @@ export class PanelDock {
     this.save();
   }
 
-  /** The same moves as the mouse gives, as commands for the command palette. */
-  commands(): Array<{ group: string; title: string; words: string; enabled?: () => boolean; run: () => void }> {
-    const out: Array<{ group: string; title: string; words: string; enabled?: () => boolean; run: () => void }> = [];
+  /** The same moves as the mouse gives, as commands (ADR 0205). */
+  commands(): Command[] {
+    const out: Command[] = [];
     for (const [id, it] of this.items) {
-      const shown = (): boolean => !it.el.hidden;
+      const shown = (): string | null => (it.el.hidden ? `The ${it.spec.title} panel is not open.` : null);
       for (const side of ["left", "right", "float"] as const)
-        out.push({ group: "Panel", title: `${it.spec.title}: ${side === "float" ? "float" : `dock on the ${side}`}`, words: "move place stack side", enabled: () => shown() && this.where(id) !== side, run: () => this.move(id, side) });
-      out.push({ group: "Panel", title: `${it.spec.title}: fold or unfold`, words: "collapse expand title bar", enabled: shown, run: () => this.fold(id, !this.state.get(id)!.c) });
+        out.push({ id: `panel.move:${id}=${side}`, group: "Panel", title: `${it.spec.title}: ${side === "float" ? "float" : `dock on the ${side}`}`, hint: side === "float" ? "Over the canvas, where you put it" : `In the stack on the ${side}`, risk: "edit", words: "move place stack side", why: () => shown() ?? (this.where(id) === side ? "It is there already." : null), exec: () => this.move(id, side) });
+      out.push({ id: `panel.fold:${id}`, group: "Panel", title: `${it.spec.title}: fold or unfold`, hint: "Only its title bar, or all of it", risk: "edit", words: "collapse expand title bar", why: shown, exec: () => this.fold(id, !this.state.get(id)!.c) });
     }
-    out.push({ group: "Panel", title: "Reset the panel layout", words: "panels dock stack float default", run: () => this.reset() });
+    out.push({ id: "panel.resetLayout", group: "Panel", title: "Reset the panel layout", hint: "Every panel back where it started", risk: "edit", words: "panels dock stack float default", exec: () => this.reset() });
     return out;
   }
 

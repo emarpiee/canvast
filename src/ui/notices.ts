@@ -97,6 +97,7 @@ export function mountNotices(host: HTMLElement, editor: EditorState): { push(n: 
     const el = document.createElement("div");
     const s: Shown = { el, notice: n, timer: null };
     fill(s, n);
+    // commands: (a notice's button runs its action's command)
     el.addEventListener("click", (e) => {
       const t = e.target as HTMLElement;
       if (t.closest(".notice-close")) remove(s);

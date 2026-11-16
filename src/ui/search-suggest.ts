@@ -27,11 +27,14 @@ export function mountSuggest(box: HTMLElement, input: HTMLInputElement, sources:
   };
   // The press must not take the focus from the box, or the pop that holds the chips would close.
   box.addEventListener("pointerdown", (e) => e.preventDefault());
+  // view-state: (a dialog's or chooser's own control: what it gives goes to the command that opened it)
   box.addEventListener("click", (e) => {
     const b = (e.target as HTMLElement).closest<HTMLElement>("[data-sg]");
     if (b) accept(Number(b.dataset["sg"]));
   });
+  // view-state: (a dialog's or chooser's own control: what it gives goes to the command that opened it)
   input.addEventListener("input", refresh);
+  // view-state: (a dialog's or chooser's own control: what it gives goes to the command that opened it)
   input.addEventListener("click", refresh);
   input.addEventListener("focus", refresh);
   input.addEventListener("keyup", (e) => {

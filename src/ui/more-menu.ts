@@ -1,4 +1,5 @@
 import { popHost } from "./modal";
+import { commands } from "../commands/registry";
 import { esc } from "./format";
 import { ICONS } from "./icons";
 
@@ -29,8 +30,28 @@ export interface MenuItem {
   more?: readonly MenuItem[];
   /** Names the item for tests and scripts (`data-id`). */
   id?: string;
+  /** The id of the command it runs (ADR 0205): every menu row runs one. */
+  command?: string;
   run(): void;
 }
+
+/**
+ * A menu row made from a command (ADR 0205): its name, hint and icon are the command's (`over` may change them, or tick it), it is off with
+ * the reason when the command cannot run, and choosing it runs the command. Null when there is no such command.
+ */
+export function commandRow(id: string, over: Partial<MenuItem> = {}): MenuItem | null {
+  const c = commands.get(id);
+  if (!c) return null;
+  const reason = commands.reasonOf(c);
+  return { label: c.title, hint: c.hint ?? "", icon: c.icon ?? "", ...(reason ? { disabled: true, hint: `Not now: ${reason}` } : {}), ...over, id: over.id ?? id, command: id, run: () => void commands.press(id) };
+}
+
+/** The rows of these commands that can be listed now (a command that is not there is left out). */
+export const commandRows = (ids: ReadonlyArray<string | readonly [string, Partial<MenuItem>]>): MenuItem[] =>
+  ids.flatMap((x) => {
+    const r = typeof x === "string" ? commandRow(x) : commandRow(x[0], x[1]);
+    return r ? [r] : [];
+  });
 
 /**
  * A row's choice done by the host's own click handler: a button with these attributes is pressed inside `host` and gone again. For lists whose
@@ -64,7 +85,7 @@ const closeChild = (refocus = false): void => {
 };
 
 /** A menu row's markup: its icon, label and hint. */
-const rowHtml = (it: MenuItem, i: number): string => `<button type="button" role="${it.checked === undefined ? "menuitem" : "menuitemradio"}"${it.checked === undefined ? "" : ` aria-checked="${it.checked}"`} data-i="${i}"${it.id ? ` data-id="${esc(it.id)}"` : ""} class="${it.danger ? "is-danger" : ""}${it.checked ? " is-checked" : ""}${it.sep && i > 0 ? " has-sep" : ""}"${it.disabled ? " disabled" : ""} aria-label="${esc(it.aria ?? it.label)}">${it.icon ?? ""}${it.hint ? `<span class="menu-text"><span>${esc(it.label)}</span><span class="menu-hint">${esc(it.hint)}</span></span>` : `<span>${esc(it.label)}</span>`}${it.count !== undefined ? `<span class="menu-count">${it.count}</span>` : ""}${it.checked ? `<span class="menu-tick" aria-hidden="true">${ICONS.check}</span>` : ""}</button>`;
+const rowHtml = (it: MenuItem, i: number): string => `<button type="button" role="${it.checked === undefined ? "menuitem" : "menuitemradio"}"${it.checked === undefined ? "" : ` aria-checked="${it.checked}"`} data-i="${i}"${it.id ? ` data-id="${esc(it.id)}"` : ""}${it.command ? ` data-command="${esc(it.command)}"` : ""} class="${it.danger ? "is-danger" : ""}${it.checked ? " is-checked" : ""}${it.sep && i > 0 ? " has-sep" : ""}"${it.disabled ? " disabled" : ""} aria-label="${esc(it.aria ?? it.label)}">${it.icon ?? ""}${it.hint ? `<span class="menu-text"><span>${esc(it.label)}</span><span class="menu-hint">${esc(it.hint)}</span></span>` : `<span>${esc(it.label)}</span>`}${it.count !== undefined ? `<span class="menu-count">${it.count}</span>` : ""}${it.checked ? `<span class="menu-tick" aria-hidden="true">${ICONS.check}</span>` : ""}</button>`;
 
 export function closeMoreMenu(refocus = false): void {
   closeChild();
@@ -192,6 +213,7 @@ export function openMoreMenu(anchor: HTMLElement, items: readonly MenuItem[], la
   }
   let armed = !opts.needPress;
   menu.addEventListener("pointerdown", () => { armed = true; });
+  // commands: (a row runs its command)
   menu.addEventListener("click", (e) => {
     if (!armed) return;
     const moreOf = (e.target as HTMLElement).closest<HTMLElement>("[data-more-i]");
@@ -205,6 +227,7 @@ export function openMoreMenu(anchor: HTMLElement, items: readonly MenuItem[], la
       sub.setAttribute("role", "menu");
       sub.setAttribute("aria-label", `What to do with ${it.label}`);
       sub.innerHTML = it.more!.map(rowHtml).join("");
+      // commands: (a row runs its command)
       sub.addEventListener("click", (ev) => {
         const b = (ev.target as HTMLElement).closest<HTMLButtonElement>("[data-i]");
         if (!b || b.disabled) return;

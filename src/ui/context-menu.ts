@@ -51,10 +51,10 @@ export function grouped(groups: ReadonlyArray<readonly MenuItem[]>): MenuItem[] 
 export function commandItems(registry: CommandRegistry, titles: readonly string[]): MenuItem[] {
   const all = registry.all();
   return titles.flatMap((title): MenuItem[] => {
-    const c = all.find((x) => x.title === title && x.group !== "Tool");
+    const c = all.find((x) => x.title === title && x.group !== "Tool" && x.source === "app"); // (the canvas's own command: other parts may have one of the same name)
     const row = ROWS[title];
-    if (!c || !row || (c.enabled && !c.enabled())) return [];
-    return [{ label: title, ...row, danger: title.startsWith("Delete"), run: () => void registry.run(c.id) }];
+    if (!c || !row || registry.reasonOf(c) !== null) return [];
+    return [{ label: title, ...row, danger: title.startsWith("Delete"), command: c.id, run: () => void registry.press(c.id) }];
   });
 }
 

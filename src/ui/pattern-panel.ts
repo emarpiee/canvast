@@ -123,6 +123,7 @@ export function mountPatternPanel(host: HTMLElement, editor: EditorState, action
   const locks = (): Set<string> => frozen.get(gen.id) ?? frozen.set(gen.id, new Set()).get(gen.id)!;
 
   const settingRows = mountSettings(body, {
+    command: { id: "pattern.set", title: "Set a pattern setting", group: "Pattern" },
     sections: () => sectionsOf(gen),
     get: (k) => values[k]!,
     set,

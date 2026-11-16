@@ -1,6 +1,8 @@
 import { lookFromChoices } from "../doc/stroke-look";
 import type { NavDir } from "./item-navigation";
 import { canvasShortcutsActive } from "./shortcut-scope";
+import { pressCommand } from "../commands/registry";
+import { TOOL_COMMAND } from "../settings/shortcuts";
 import * as D from "../core/dyadic";
 import type { ScreenPoint, WorldPoint } from "../core/camera";
 import { screenToWorld } from "../core/camera";
@@ -58,7 +60,7 @@ import type { SelectionFrame } from "../render/selection-frame";
 import { TURN, angleFromRadians, cosSin, normAngle, radiansFromAngle } from "../core/angle";
 import { formatRatio } from "../app/export-size";
 import { PanGesture } from "./navigation";
-import { autoLayoutOf, patchAutoLayout, drawSheetOver, finishShapeBuilder, fillGapAt, finishGapFill, attachSelection, sheetSelection, arrangeSelection, commitCornerAt, commitCornerSet, commitCorners, commitShape as commitShapeNumbers, balloonText, setShapeText, setTextStyle, setBalloonLink, commitPaint, deleteSelection, flattenSelection, duplicateSelection, flipSelection, groupSelection, previewPaint, redo, ungroupSelection, undo } from "../app/actions";
+import { autoLayoutOf, patchAutoLayout, drawSheetOver, finishShapeBuilder, fillGapAt, finishGapFill, attachSelection, commitCornerAt, commitCornerSet, commitCorners, commitShape as commitShapeNumbers, balloonText, setShapeText, setTextStyle, setBalloonLink, commitPaint, deleteSelection, duplicateSelection, previewPaint, redo, undo } from "../app/actions";
 import { expandToUnits, groupObjects, isInside, unitsWithin } from "../doc/groups";
 import { boolGroupsOf, isResult } from "../doc/boolean-group";
 
@@ -2820,45 +2822,43 @@ export function attachTools(
       e.preventDefault();
       return;
     }
+    // (each key runs its command, ADR 0205: the same action as its button, its menu row and an outside caller's)
+    const press = (id: string): boolean => pressCommand(id, {}, "key");
     if (mod && key === "z") {
       if (g.kind !== "none") return;
-      if (e.shiftKey) redo(doc, editor);
-      else undo(doc, editor);
+      press(e.shiftKey ? "edit.redo" : "edit.undo");
     } else if (mod && key === "y") {
-      if (g.kind === "none") redo(doc, editor);
+      if (g.kind === "none") press("edit.redo");
     } else if (mod && key === "a") {
       e.preventDefault(); // (not the browser's select-all of the page's text: in Firefox a copy then goes to that text, not to the objects)
-      // everything that shows (the members of a boolean group are what its result is made of: they go with it, and are shown only inside it)
-      const shown = doc.ordered().filter((o) => !o.hidden && !o.locked && boolGroupsOf(o).every((g) => g.own || editor.entered.includes(g.gid)));
-      editor.select(expandToUnits(doc.ordered(), shown, editor.entered));
+      press("edit.selectAll");
     } else if (mod && key === "d") {
       e.preventDefault(); // not the browser's bookmark
-      duplicateSelection(doc, editor, view);
+      press("edit.duplicate");
     } else if (mod && e.altKey && key === "g") {
       e.preventDefault();
-      sheetSelection(doc, editor);
+      press("edit.sheet");
     } else if (!mod && e.shiftKey && !e.altKey && key === "a") {
       e.preventDefault();
-      hooks.autoLayout();
+      press("edit.autoLayout");
     } else if (!mod && e.shiftKey && !e.altKey && (key === "h" || key === "v") && editor.selection.size && g.kind === "none") {
       e.preventDefault(); // (Shift+H, Shift+V: mirror the selection, ADR 0203)
-      flipSelection(doc, editor, key === "h" ? "x" : "y");
+      press(key === "h" ? "edit.flipH" : "edit.flipV");
     } else if (mod && key === "g") {
-      if (e.shiftKey) ungroupSelection(doc, editor);
-      else groupSelection(doc, editor);
+      press(e.shiftKey ? "edit.ungroup" : "edit.group");
     } else if (mod && key === "e") {
       e.preventDefault(); // not the browser's search
-      flattenSelection(doc, editor);
+      press("edit.flatten");
     } else if (mod && (e.key === "]" || e.key === "[")) {
-      arrangeSelection(doc, editor, e.key === "]" ? "front" : "back");
+      press(e.key === "]" ? "edit.front" : "edit.back");
     } else if (mod && e.key === " ") {
       // The focus key (the keymap sends F here as Ctrl+Space) brings the selection into view; again: everything visible at this zoom (the cycle is in item-navigation.ts)
       e.preventDefault();
-      if (!e.repeat && g.kind === "none") hooks.focusSelection();
+      if (!e.repeat && g.kind === "none") press("view.focus");
     } else if (mod || e.altKey) {
       return;
     } else if (e.key === "#" || e.key === "@") {
-      hooks.openSearch(e.key);
+      press(e.key === "#" ? "find.tag" : "find.bookmark");
     } else if (e.key === " ") {
       spaceAt = performance.now();
       if (e.repeat) spaceRepeats = true;
@@ -2866,8 +2866,8 @@ export function attachTools(
         spaceDown = true;
         el.classList.add("is-hand");
       }
-    } else if (hooks.navForKey(key)) hooks.navigate(hooks.navForKey(key)!);
-    else if (hooks.toolForKey(key)) editor.setTool(hooks.toolForKey(key)!);
+    } else if (hooks.navForKey(key)) press(`nav.${hooks.navForKey(key)!}`);
+    else if (hooks.toolForKey(key)) press(TOOL_COMMAND[hooks.toolForKey(key)!]);
     else if (e.key === "Enter" && editor.pathDraft) {
       commitPath(false);
     } else if (e.key === "Enter" && e.shiftKey && editor.tool === "select" && g.kind === "none" && outOfSheet()) {
@@ -2906,7 +2906,7 @@ export function attachTools(
         d.n.splice(d.n.length - NODE, NODE);
         if (!d.n.length) editor.pathDraft = null;
         editor.changed();
-      } else if (!(editor.tool === "node" && deleteNode())) deleteSelection(doc, editor);
+      } else if (!(editor.tool === "node" && deleteNode())) press("edit.delete");
     } else {
       return;
     }
@@ -2976,4 +2976,10 @@ export function attachTools(
     document.removeEventListener("visibilitychange", releaseSpace);
     unsubscribe();
   };
+}
+
+/** Select everything that shows (the members of a boolean group are what its result is made of: they go with it, and are shown only inside it). */
+export function selectEverything(doc: DocumentStore, editor: EditorState): void {
+  const shown = doc.ordered().filter((o) => !o.hidden && !o.locked && boolGroupsOf(o).every((g) => g.own || editor.entered.includes(g.gid)));
+  editor.select(expandToUnits(doc.ordered(), shown, editor.entered));
 }

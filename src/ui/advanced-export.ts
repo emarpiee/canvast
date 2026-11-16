@@ -77,6 +77,7 @@ export function chooseExport(items: readonly ExportItem[], folders: readonly Ass
     q("[data-ax-found]").innerHTML = cap.shown.join("") || `<li><span>Nothing found.</span></li>`;
     q("[data-ax-more]").innerHTML = cap.long ? showMoreButton({ open: more, hidden: cap.hidden, attrs: "data-ax-showmore" }) : "";
   };
+  // view-state: (a dialog's or chooser's own control: what it gives goes to the command that opened it)
   dlg.addEventListener("input", (e) => {
     if ((e.target as HTMLElement).matches("[data-ax-search]")) {
       query = (e.target as HTMLInputElement).value;
@@ -84,6 +85,7 @@ export function chooseExport(items: readonly ExportItem[], folders: readonly Ass
       found();
     }
   });
+  // view-state: (a dialog's or chooser's own control: what it gives goes to the command that opened it)
   dlg.addEventListener("change", (e) => {
     const t = e.target as HTMLInputElement;
     const toggle = (set: Set<string>, id: string): void => void (t.checked ? set.add(id) : set.delete(id));
@@ -94,6 +96,7 @@ export function chooseExport(items: readonly ExportItem[], folders: readonly Ass
   });
   return new Promise((resolve) => {
     let answer: ExportChoice | null = null;
+    // view-state: (a dialog's or chooser's own control: what it gives goes to the command that opened it)
     dlg.addEventListener("click", (e) => {
       const t = e.target as HTMLElement;
       if (t.closest("[data-ax-showmore]")) {
