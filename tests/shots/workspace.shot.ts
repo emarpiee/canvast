@@ -139,6 +139,20 @@ test("settings", async ({ scene: s }) => {
   await s.shot("settings");
 });
 
+test("ai-agents", async ({ scene: s }) => {
+  await s.look({ theme: "light", hue: 260 });
+  await s.p.getByTestId("view-settings").click();
+  await s.p.getByRole("tab", { name: "AI agents" }).click();
+  // (the code the canvast tools showed, typed; then the switch: it looks for the tools on this computer, which are not running here)
+  const code = s.p.locator('[data-row="agents.code"] input');
+  await code.fill("K7QM-3XPA-9TRB");
+  await code.press("Tab");
+  await s.p.locator('[data-row="agents.on"] input').check();
+  await expect(s.p.locator('[data-row="agents.on"] input')).toBeChecked();
+  await s.settle();
+  await s.shot("ai-agents", await s.around({ els: ['[data-panel="agents"]'] }));
+});
+
 test("paste-name", async ({ scene: s }) => {
   await s.look({ theme: "light", hue: 40 });
   await s.p.getByTestId("view-settings").click();

@@ -280,7 +280,7 @@ Bring a whole folder of references in at once.
 | Where they go | Into the Library, once, and onto the open canvas. In the Library, new files go into the folder, tag or favourites open in the sidebar |
 | Size | Files up to 256 MiB are accepted and decoded before being stored; in the desktop app a bigger file is copied into `library/` a part at a time and comes in as a card (a video's card shows a frame of it) |
 | A file the library has | Not stored again. Imported into the Library under another name, the app lists the old and new names and offers to rename (in hidden mode, for hidden items only). Importing your originals again this way brings back names that were cut short; Undo puts the old names back |
-| What each kind becomes | Pictures, video, audio and GIFs show as themselves; PDFs and 3D models as their pictures, opening in a [view of their own](#pdfs-and-3d-models); notes as their pages; any other file as a card with its extension, which can be downloaded again |
+| What each kind becomes | Pictures, video, audio and GIFs show as themselves; PDFs and 3D models as their pictures, opening in a [view of their own](#pdfs-and-3d-models); ZIPs and comic books open on their files or pages ([ZIPs and comic books](#zips-and-comic-books)); notes as their pages; any other file as a card with its extension, which can be downloaded again |
 | File details | Type, size, pixels, time of import, place on disk and hash, with EXIF, colour profile and codec information when the file has them |
 
 ### Pictures
@@ -873,6 +873,7 @@ Keep every reference once, in folders by subject, and see a print's details besi
 | [Folders and tags](#folders-and-tags) | The sidebar's trees, Organize, quick filters |
 | [The viewer](#the-viewer) | Filmstrip, zoom, slideshow, players |
 | [PDFs and 3D models](#pdfs-and-3d-models) | A reader for PDFs, a lit view of 3D models and their line art |
+| [ZIPs and comic books](#zips-and-comic-books) | Look inside a ZIP, read a comic book (CBZ) page by page |
 | [Art files](#art-files) | Pictures from `.kra`, `.psd`, `.procreate` and others |
 | [Fonts](#fonts) | Samples of the library's fonts |
 | [Similar pictures](#similar-pictures) | Duplicates and near-duplicates |
@@ -1085,6 +1086,24 @@ Give a model the look of a blueprint or a comic in one choice, and keep your own
 Check a figure's pose on a phone: the model above, its settings below.
 
 ![The 3D view on a phone: the vase in ink lines above, the Lines tab as a sheet under it, and the bar's other buttons folded into its ⋯ button](docs/screenshots/model-narrow.webp)
+
+### ZIPs and comic books
+
+A ZIP or a comic book (`.cbz`) opens in a view of its own, in the viewer and in the panel on a canvas, without unzipping it first: look through a downloaded reference pack, take only the pictures you want, or read a comic page by page.
+
+Look through a reference pack you downloaded, and take only the studies you want into the library.
+
+![A ZIP of Degas's dancer studies open in the Library's ZIP view: its files listed, one picture open beside them, and Import in the bar](docs/screenshots/zip-view.webp)
+
+| | |
+| --- | --- |
+| **Files** | Its folders and files as a list (open a folder, go back by the path above it); a picture, a video, a sound or a text opens inside the view |
+| **Pages** | Its pictures one at a time, in natural order (page 2 before page 10), as a comic is read; a `.cbz` opens here, at its cover |
+| Moving around | Page buttons, a click on the page, the page number; zoom with its buttons |
+| **Import** | Into the library: the page in sight, the files selected (Ctrl and Shift pick several) or the folder; **Import and open** for one file |
+| Bookmarks | Pages, as in a PDF: **Bookmark current page** in the details, renamed or deleted from their ⋯ |
+| On a card on a canvas | Its cover; **Show this page on the card** |
+| A password | Asked once when a file inside needs it, kept in this view only, never stored |
 
 ### Art files
 
@@ -2401,12 +2420,15 @@ Make the app yours: theme, theme colour, density and the canvas.
 | ArtCraft › PhotoCraft | Save as type of a new document; its version and licence; reset its own preferences (see [PhotoCraft](#photocraft)) |
 | Storage | Space used and whether the browser keeps the data; the library folder (choose it, move files in and out, the library index and its automatic saving); how saving is going; backups (export, Advanced export, changes only, files as ZIP, import); in the desktop app, where deleted files go and when `.trash` is emptied; *Start from scratch* (delete all data, after a warning with a backup offered first) |
 | Privacy | The word that begins hidden mode, remembering the Hidden password until the tab closes, the passwords of the workspace and of the Hidden items, Lock now and New key; what stays on your machine |
+| AI agents | Whether an AI agent on this computer may use canvast, its pairing code, and whether it may only look ([AI agents](#ai-agents)) |
 | About and diagnostics | Version and diagnostics |
 | Develop | Developer tools (see [Building from source](#building-from-source)) |
 
 ### AI agents
 
 Let an AI agent (a program that speaks MCP, such as Claude Desktop or Claude Code) arrange a board, tag a folder of references or export pictures for you, while you watch and allow what matters.
+
+![Settings, AI agents: Let AI agents use canvast turned on, a pairing code typed, and Agents may only look off](docs/screenshots/ai-agents.webp)
 
 | | |
 | --- | --- |
@@ -2485,6 +2507,7 @@ What canvast does not do today, for both versions, then each. **The limits that 
 | 3D | GLB, glTF, STL, OBJ and PLY only, one file each: what lies in another file (an OBJ's materials, a glTF's textures) and compressed glTF are not read; a model over 1 GB does not open, and over 512 MB has a plain card |
 | 3D line art | On a model of millions of triangles, lines from its edges come a moment after the view; placed lines are paths only, without the model's surface |
 | Place in a file | A PDF's page, a comic's page or a model's view is kept when its view closes, not at each turn |
+| ZIPs | A text inside is shown up to 2 MB (a bigger one is imported to be read); one import takes at most 5,000 files; comic books as `.cbr` or `.cb7` are not read (a card says to open them in a comic reader) |
 | Text | No Indic shaping; other computers can wrap missing characters differently |
 | Partial backups | ⚠️ An Advanced export can only be added, never used to update a workspace. Links in notes to items left out find nothing until those items are there |
 | AI agents | The canvast tools need Node.js 20 or later; one agent at a time; a command that waits for you times out for the agent after two minutes |
