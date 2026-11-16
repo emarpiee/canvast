@@ -190,6 +190,12 @@ test("a folder folds, stays folded after a reload, and Organize moves to a folde
   }
   await p.getByTestId("assets-search").fill("");
   await expect(p.getByTestId("side-saved").locator(".side-label")).toHaveText(["kind:picture", "#alpha"]);
+  // In your order a saved search is dragged to its place: onto the upper part of a row, before it.
+  const savedRow = (t: string) => p.getByTestId("side-saved").locator(".side-item", { hasText: t });
+  await savedRow("#alpha").dragTo(savedRow("kind:picture"), { targetPosition: { x: 20, y: 2 } });
+  await expect(p.getByTestId("side-saved").locator(".side-label")).toHaveText(["#alpha", "kind:picture"]);
+  await savedRow("#alpha").dragTo(savedRow("kind:picture"), { targetPosition: { x: 20, y: (await savedRow("kind:picture").boundingBox())!.height - 2 } }); // (its lower part: after it)
+  await expect(p.getByTestId("side-saved").locator(".side-label")).toHaveText(["kind:picture", "#alpha"]);
   await p.getByTestId("side-sort-saved").click();
   await expect(p.getByTestId("side-saved").locator(".side-label")).toHaveText(["#alpha", "kind:picture"]);
   // Every list of the sidebar is a folder's list: a sort button once it has two rows, a count chip on each row, its ⋯ only under the pointer (a new list fails here).

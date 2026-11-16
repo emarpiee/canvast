@@ -2887,7 +2887,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       const look = s.look ? ` · opens as ${s.look.layout === "list" ? "a list" : "thumbnails"}` : "";
       return {
         active: false,
-        html: item(`saved:${id}`, esc(label), savedCount(s.q, s.m), { icon: ICONS.savedSearch, cls: "tree-row", attrs: `data-saved-search="${esc(s.q)}" data-saved-way="${s.m}"`, title: `${s.n ? `${esc(s.n)}: ` : ""}Search for ${esc(s.q)}${look}`, extra: more("saved", id, label, rows) }),
+        html: item(`saved:${id}`, esc(label), savedCount(s.q, s.m), { icon: ICONS.savedSearch, cls: "tree-row", drag: savedWay === "own" && savedList.length > 1, attrs: `data-saved-search="${esc(s.q)}" data-saved-way="${s.m}"`, title: `${s.n ? `${esc(s.n)}: ` : ""}Search for ${esc(s.q)}${look}`, extra: more("saved", id, label, rows) }),
       };
     });
     const scopeName = scopeNameOf(tagCounts);
@@ -4579,6 +4579,43 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     e.preventDefault();
     lightDrop(null);
     void moveFolderInto(id, t.to);
+  });
+  // ---- in your order, a saved search is dragged to its place among the others: above a row's middle before it, below after it
+  const SAVED_DRAG = "application/x-canvast-saved-search";
+  let draggedSaved: { q: string; m: SearchWay } | null = null;
+  const savedRowAt = (el: HTMLElement): HTMLElement | null => (draggedSaved ? el.closest<HTMLElement>(".side-item[data-saved-search]") : null);
+  side.addEventListener("dragstart", (e) => {
+    const row = (e.target as HTMLElement).closest<HTMLElement>('.side-item[data-saved-search][draggable="true"]');
+    if (!row || !e.dataTransfer) return;
+    draggedSaved = { q: row.dataset["savedSearch"]!, m: (row.dataset["savedWay"] ?? "all") as SearchWay };
+    e.dataTransfer.setData(SAVED_DRAG, draggedSaved.q);
+    e.dataTransfer.setData("text/plain", row.querySelector(".side-label")?.textContent ?? "");
+    e.dataTransfer.effectAllowed = "move";
+    for (const t of side.querySelectorAll<HTMLElement>(".side-item[data-saved-search]")) if (t !== row) t.classList.add("drop-zone");
+  });
+  document.addEventListener("dragend", () => void (draggedSaved = null), true);
+  side.addEventListener("dragover", (e) => {
+    const t = e.dataTransfer?.types.includes(SAVED_DRAG) ? savedRowAt(e.target as HTMLElement) : null;
+    if (!t) return;
+    lightDrop(t);
+    e.preventDefault();
+    e.dataTransfer!.dropEffect = "move";
+  });
+  side.addEventListener("drop", (e) => {
+    const t = e.dataTransfer?.types.includes(SAVED_DRAG) ? savedRowAt(e.target as HTMLElement) : null;
+    const from = draggedSaved;
+    draggedSaved = null;
+    if (!t || !from) return;
+    e.preventDefault();
+    lightDrop(null);
+    const list = parseSaved(savedSearches.get()) ?? [];
+    const it = list.find((x) => sameSearch(x, from.q, from.m));
+    const rest = list.filter((x) => x !== it);
+    const onto = rest.findIndex((x) => sameSearch(x, t.dataset["savedSearch"]!, (t.dataset["savedWay"] ?? "all") as SearchWay));
+    if (!it || onto < 0) return;
+    const box = t.getBoundingClientRect();
+    rest.splice(onto + (e.clientY > box.top + box.height / 2 ? 1 : 0), 0, it);
+    savedSearches.set(JSON.stringify(rest));
   });
 
   side.addEventListener("click", (e) => {

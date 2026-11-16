@@ -5,6 +5,7 @@
 - **Added:** **Move to…** in a folder's ⋯ menu moves it, with its subfolders and items, into another folder or to **Top level**, in the Organize dialog (the folder itself and those inside it are not offered); a folder can also be dragged onto another, or onto the Folders heading for the top. A shown folder cannot go into a hidden one, and a folder hidden by the one it leaves stays hidden.
 - **Changed:** the Organize dialog's first folder choice is **Unfiled** (it was *No folder*), with its own icon, a line under it and what it does beside it; the dialog has more room between its parts, its list in a frame, all from the Density setting.
 - **Changed:** a rename (one item or many), Organize to a folder and items dropped on a folder show a notice with a bar from the start until the files are in their new places; before, nothing showed until it ended.
+- **Added:** with **Saved searches** sorted in your order, a saved search can be dragged to its place among the others (the ⋯ menu's Move up and Move down stay).
 - **Changed:** the details' bookmark button says **Bookmark current page** (or **view**) instead of the page in sight.
 - **Fixed:** turning pages in a PDF or a comic, or turning a 3D model, lagged: the place was written to the library after each turn, which in the desktop app also wrote the library's files and drew the whole library again. The place is now kept when the view closes; bookmarks are still written at once.
 

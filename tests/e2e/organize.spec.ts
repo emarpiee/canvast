@@ -817,7 +817,7 @@ test("sidebar: one More menu per row (Escape closes only it, one click elsewhere
   await pick(p, HASH);
   const more = p.getByRole("button", { name: "More actions for folder Refs", exact: true });
   await more.click();
-  await expect(p.getByRole("menuitem")).toHaveCount(7); // New subfolder, Rename, Pin to top, Conceal folder, Hide folder, Export folder, Delete
+  await expect(p.getByRole("menuitem")).toHaveCount(8); // New subfolder, Rename, Move to, Pin to top, Conceal folder, Hide folder, Export folder, Delete
   await p.keyboard.press("Escape");
   await expect(p.getByRole("menu")).toHaveCount(0);
   await expect(card(p, HASH), "Escape closed the menu only").toHaveAttribute("aria-pressed", "true");
