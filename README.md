@@ -968,7 +968,7 @@ Pin the folder you work from most, nest tags by subject and keep the searches yo
 | **Conceal a folder** | **Conceal folder** in a folder's ⋯ menu: a view filter. Its items, and its subfolders', are listed only when that folder (or one in it) is opened: not in All items, a search, a file type, a tag, another folder, Similar pictures, the pickers of the Library and of notes, or a note's link and tag suggestions. Nothing of the folder or its items changes, and they stay on the canvases they are placed on, in exports and on the disk. The folder shows a fog mark; **Reveal folder** lists its items everywhere again. Kept in the workspace, for every device; Settings > Privacy counts them and lists them |
 | **Quick filters** | A file type or a tag in the sidebar lists only those items; `Ctrl`+click (`⌘` on a Mac) adds another type or tag to the filter, or takes it out: any of the types chosen and any of the tags chosen |
 | **File by dragging** | Drop items onto a folder to move them into it, onto *Unfiled* to take them out of their folders, onto a tag to tag them, onto *Favourites* to mark them; a selected item carries the whole selection |
-| **Move a folder** | **Move to…** in a folder's ⋯ menu opens the Organize dialog: choose another folder, a new one typed, or **Top level** (the folder itself and those inside it are not offered). Or drag the folder onto another folder, or onto the Folders heading for the top. Its subfolders and items go with it. A shown folder cannot go into a hidden one, and a folder that was hidden by the one it leaves stays hidden |
+| **Move a folder** | **Move to…** in its ⋯ menu, or a drag onto another folder (see [Move a folder](#move-a-folder)): a new folder can be typed there, and the folder itself and those inside it are not offered. A shown folder cannot go into a hidden one, and a folder that was hidden by the one it leaves stays hidden |
 | **Progress** | A rename or a move shows a notice with a bar until it is done; in the desktop app, until the files are in their new places |
 
 #### Organize
@@ -978,6 +978,14 @@ Pin the folder you work from most, nest tags by subject and keep the searches yo
 File a reference and tag it in one dialog.
 
 ![The Organize dialog for Mary Delany's Botanical Study: the folders as a tree with Botanical chosen, and the Tags tab](docs/screenshots/organize.webp)
+
+#### Move a folder
+
+**Move to…** in a folder's ⋯ menu puts it, with its subfolders and items, inside another folder or at the **Top level**, in the Organize dialog. Dragging the folder onto another, or onto the Folders heading, does the same.
+
+Gather the horse studies under a folder of animals as the collection grows.
+
+![Move folder Horses: the folder list with Top level first, Animals chosen, and Horses itself not offered](docs/screenshots/folder-move.webp)
 
 ### The viewer
 
@@ -1233,6 +1241,12 @@ Take a reference out of the app: download it or export it.
 | **Show in file manager** | Desktop app; in the details of one item, and its right-click menu: opens the item's folder with its file selected |
 | **Export folder…** | Writes the folder's files and those of its subfolders, under their names in the library: as a ZIP, or in the desktop app as a folder where you choose (outside the workspace), either keeping its folders (from the folder itself down) or with all the files together (two of the same name are numbered). Each file written to a folder is read back and checked against its SHA-256. In hidden mode it exports the hidden items in it, written readable after you confirm; outside hidden mode, only the shown ones |
 | **Hidden items** | No *Show in file manager*; *Open in default app* (in hidden mode, after asking once per session) opens a readable copy written to the app's own temporary folder, deleted when the hidden items are locked or canvast closes. Copying one to the system's clipboard, or **Copy file**, asks first, once a session: other programs can see and keep what is there. They cannot be dragged out. Outside hidden mode, hidden items' property names and values are never offered as suggestions, columns or sorts |
+
+A picture pasted with no file name of its own (copied in a browser or another app) takes **Pasted picture name** (Settings > Saving to the library), with the same words in braces as a screenshot's name.
+
+Name the references you paste after the canvas they are for.
+
+![Settings, Saving to the library: Pasted picture name set to ref-{canvas}-{yyyymmdd}-{hhmmss}](docs/screenshots/paste-name.webp)
 
 ### Deleting and Trash
 

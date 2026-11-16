@@ -142,6 +142,19 @@ test("organize", async ({ scene: s }) => {
   await s.shot("organize");
 });
 
+test("folder-move", async ({ scene: s }) => {
+  await s.look({ theme: "dark", hue: 150 });
+  await collection(s);
+  // (the collection grows: the horse studies go under a folder of animals)
+  await s.p.evaluate(() => window.__canvastDebug.libraryOp("createFolder", "f-animals", "Animals", ""));
+  await s.p.getByRole("button", { name: "More actions for folder Horses", exact: true }).click();
+  await s.p.getByRole("menuitem", { name: "Move folder Horses", exact: true }).click();
+  const chooser = s.p.getByTestId("tree-chooser");
+  await chooser.getByRole("radio", { name: "Animals", exact: true }).check();
+  await s.settle();
+  await s.shot("folder-move", await s.around({ els: ['[data-testid="tree-chooser"]'], pad: 30 }));
+});
+
 test("bulk", async ({ scene: s }) => {
   await s.look({ theme: "dark", hue: 300 });
   const c = await collection(s);
