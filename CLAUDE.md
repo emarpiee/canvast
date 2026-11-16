@@ -195,7 +195,7 @@ Tools that work without the app (decrypting, encrypting, sharing a folder) are *
 | Priority | `high`, `medium` or `low`. The owner sets it; a new item proposed by an agent is marked `medium` and the reply asks the owner to confirm it |
 | Status | `open` (still to do, including waiting for the owner), `closed` (done: Notes names the version that did it) or `removed` (dropped, or found done before it was tracked: Notes says why). Only the owner removes an item or changes a priority |
 | Notes | One short line: what it waits for (the owner's go, a decision, a test), the version that closed it, or why it was removed. Details live in an issue, an ADR or `docs/`, linked here |
-| Order | Open rows first, high to low priority, then closed, then removed; within a group by ID |
+| Order | Open rows first, high to low priority, then closed, then removed; within a group by ID, unless the owner puts one before another (its Notes say so) |
 | Kept | A closed or removed row stays: the file is also the record of what became of each item. Never delete a row |
 | Same commit | The change that finishes an item sets it `closed` in the same commit as its CHANGELOG bullet, which names it (`(B7)`); new work found while working is added as a row in the same commit |
 | Never in it | The owner's files, paths, machine, screen or interests (write the general case); plans and task lists while work runs (Claude's memory, see *Task list and handoffs*); history beyond one line (that is `CHANGELOG.md`) |
