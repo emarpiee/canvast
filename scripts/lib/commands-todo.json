@@ -42,12 +42,12 @@
     "src/ui/workspace-switch.ts": 6
   },
   "live": {
-    "rule": 427,
+    "rule": 193,
     "keys": 0,
     "screens": {
-      "canvas": 77,
-      "library": 20,
-      "settings": 49
+      "canvas": 65,
+      "library": 11,
+      "settings": 35
     }
   },
   "//live": "Counted by tests/e2e/commands.spec.ts on GitHub (the Tests run): commands not following the rule yet, keys without a command, controls without a command per view. They only go down."
