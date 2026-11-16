@@ -1,14 +1,17 @@
 import type { CommandRegistry } from "./registry";
-import type { Command } from "./types";
+import type { Caller, Command, Options } from "./types";
 
 /**
- * Macros (ADR 0129): a macro is a list of commands run in order, recorded from what is run through the registry (the palette). It is a
+ * Macros (ADR 0129, ADR 0205): a macro is a list of commands run in order, recorded from every command that runs (a button, a menu, a key,
+ * the palette; reads and commands marked `record: false` are left out). It is a
  * provider of its own whose commands run others by id, so the registry knows nothing about macros. Kept on this device in `localStorage`
  * (the workspace has no store for settings yet; a macro refers to commands by id, which are the same on every device).
  */
 export interface MacroStep {
   id: string;
-  /** The value of a command that takes one (a name, a number). */
+  /** The options it ran with. */
+  options?: Options;
+  /** (Old macros) the value of a command that takes one. */
   arg?: string;
 }
 export interface Macro {
@@ -43,8 +46,9 @@ export class Macros {
   private playing = false;
 
   constructor(private readonly registry: CommandRegistry, private readonly tell: (text: string) => void) {
-    registry.onRun((c, arg) => {
-      if (this.steps && !this.playing && c.kind !== "macro") this.steps.push(arg === undefined ? { id: c.id } : { id: c.id, arg });
+    registry.onRun((c, options) => {
+      if (!this.steps || this.playing || c.kind === "macro" || c.record === false || (c.risk === "read" && c.record !== true)) return;
+      this.steps.push(Object.keys(options).length ? { id: c.id, options } : { id: c.id });
     });
     registry.setProvider("macros", () => this.commands());
   }
@@ -68,14 +72,17 @@ export class Macros {
   }
 
   /** Run a macro: its commands in order, one turn apart so each sees the result of the one before. Returns how many could run. */
-  async play(name: string): Promise<number> {
+  async play(name: string, caller: Caller = "macro"): Promise<number> {
     const m = this.list.find((x) => x.name === name);
     if (!m) return 0;
     this.playing = true;
     let done = 0;
     try {
       for (const s of m.steps) {
-        if (this.registry.run(s.id, s.arg)) done++;
+        // (each step is checked as a command of its own: a macro an outside caller runs cannot skip what asks the person)
+        const c = this.registry.get(s.id);
+        const options = s.options ?? (s.arg !== undefined && c ? { [c.takes?.option ?? "value"]: s.arg } : {});
+        if ((await this.registry.execute(s.id, options, { caller })).ok) done++;
         await new Promise((r) => setTimeout(r, 0));
       }
     } finally {
@@ -92,17 +99,17 @@ export class Macros {
 
   private commands(): Command[] {
     const out: Command[] = [];
-    if (this.steps === null) out.push({ group: "Macro", kind: "macro", title: "Record a macro", words: "start recording", run: () => { this.steps = []; this.tell("Recording: run commands from the palette, then Save the macro."); } });
+    if (this.steps === null) out.push({ id: "macro.record", group: "Macro", kind: "macro", title: "Record a macro", hint: "Start recording what you do", risk: "edit", words: "start recording", exec: () => { this.steps = []; this.tell("Recording: do what the macro should do, then Save the macro."); } });
     else {
       out.push({
-        group: "Macro", kind: "macro", title: "Save the macro", words: "stop recording", run: () => undefined,
-        takes: { prompt: "Name the macro", run: (name) => this.tell(this.stop(name) ? `Macro "${name.trim()}" saved.` : "Nothing was recorded.") },
+        id: "macro.save", group: "Macro", kind: "macro", title: "Save the macro", hint: "Stop recording and keep it", risk: "edit", words: "stop recording",
+        takes: { prompt: "Name the macro", option: "name", run: (name) => this.tell(this.stop(name) ? `Macro "${name.trim()}" saved.` : "Nothing was recorded.") },
       });
-      out.push({ group: "Macro", kind: "macro", title: "Cancel the recording", run: () => { this.steps = null; } });
+      out.push({ id: "macro.cancel", group: "Macro", kind: "macro", title: "Cancel the recording", hint: "Stop without keeping it", risk: "edit", exec: () => { this.steps = null; } });
     }
     for (const m of this.list) {
-      out.push({ id: `macro:run:${m.name}`, group: "Macro", kind: "macro", title: `Run ${m.name}`, words: "play", enabled: () => !this.playing, run: () => void this.play(m.name) });
-      out.push({ id: `macro:delete:${m.name}`, group: "Macro", kind: "macro", title: `Delete the macro ${m.name}`, words: "remove", run: () => this.remove(m.name) });
+      out.push({ id: `macro:run:${m.name}`, group: "Macro", kind: "macro", title: `Run ${m.name}`, hint: `Its ${m.steps.length} steps in order`, risk: "edit", words: "play", why: () => (this.playing ? "A macro is running." : null), exec: async (_o, ctx) => { await this.play(m.name, ctx.caller === "agent" ? "agent" : "macro"); } });
+      out.push({ id: `macro:delete:${m.name}`, group: "Macro", kind: "macro", title: `Delete the macro ${m.name}`, hint: "Remove it from this device", risk: "confirm", words: "remove", exec: () => this.remove(m.name) });
     }
     return out;
   }

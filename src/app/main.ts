@@ -179,7 +179,7 @@ import { hasShadow, needsNeighbours } from "../doc/adjust";
 import type { Adjust } from "../doc/adjust";
 import { downloadSelection, pickedFiles } from "./download";
 import { mountCommandPalette } from "../ui/command-palette";
-import { CommandRegistry } from "../commands/registry";
+import { commands } from "../commands/registry";
 import { Macros } from "../commands/macros";
 import { barCommands } from "../commands/from-bars";
 import { settingCommands } from "../commands/settings-commands";
@@ -3006,7 +3006,7 @@ async function start(): Promise<void> {
 
   // The command palette (ADR 0117, 0129): Ctrl+K or Ctrl+Shift+P finds any command by words, and `@kind` narrows it to a kind. The commands come
   // from the registry (src/commands): each part of the app adds its own, so a new feature or a macro has one place to put them.
-  const registry = new CommandRegistry();
+  const registry = commands;
   /** Settings of the two checks of the library's files (desktop): the full one reads every file, the quick one looks at sizes. */
   const checkLibraryFiles = (quick: boolean): void => {
     const p = busyProgress(editor, quick ? "Checking the library file sizes" : "Checking the library files", [quick ? "Each file is looked for and its size compared with the library's. Nothing is read." : "Each file is read and compared with what the library knows of it. Hidden items are left out."]);

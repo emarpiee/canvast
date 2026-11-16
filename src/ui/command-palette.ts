@@ -103,7 +103,7 @@ export function mountCommandPalette(registry: CommandRegistry): { open(): void; 
       return;
     }
     close();
-    if (!registry.run(c.id)) c.run(); // run by id so the recents and a macro recorder hear of it
+    registry.run(c.id, undefined, "palette"); // by id, so the recents and a macro recorder hear of it
     rememberCommand(c.id);
   };
   input.addEventListener("input", () => {
@@ -121,7 +121,7 @@ export function mountCommandPalette(registry: CommandRegistry): { open(): void; 
       const value = input.value.trim();
       if (!value) return void e.preventDefault();
       close();
-      registry.run(c.id, value);
+      registry.run(c.id, value, "palette");
       rememberCommand(c.id);
     } else if (e.key === "Enter") run(shown[active]);
     else if (e.key === "Escape" || (e.key.toLowerCase() === "k" && (e.ctrlKey || e.metaKey))) close();

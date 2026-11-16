@@ -1,4 +1,7 @@
 import { clipboardState } from "./actions";
+import { commands } from "../commands/registry";
+import { ruleProblems } from "../commands/rule";
+import type { Caller, CommandRow, Options, Result } from "../commands/types";
 import { openBackupKey } from "../storage/sealed-open";
 import { openNotesAsText } from "../ui/note-session";
 import type { DesktopCatalog, DesktopLibrary } from "../storage/desktop-library";
@@ -102,6 +105,12 @@ import { visibleObjects } from "../render/scene-view";
  * strings so tests never see a rounded value.
  */
 export interface DebugHook {
+  /** Every command now (ADR 0205): what an outside caller reads. */
+  commandList(filter?: string): CommandRow[];
+  /** Run a command by id as this caller, with its result. */
+  runCommand(id: string, options?: Options, caller?: Caller): Promise<Result>;
+  /** The commands that do not follow the rule yet, each with what it lacks (the live audit). */
+  commandRuleProblems(): Array<{ id: string; source: string; missing: string[] }>;
   camera(): SerializedCamera;
   /** The box of the selected things on the screen (client px), as menus and popovers keep clear of it; null: nothing selected. */
   selectionBox(): { left: number; top: number; right: number; bottom: number } | null;
@@ -395,6 +404,9 @@ export function installDebugHook(
   /** The camera in an object's frame, or null when the object cannot be on screen. */
   const camFor = (o: CanvasObject) => cameraIn(view.frameCamera, o.frame ?? doc.space.world);
   const hook: DebugHook = {
+    commandList: (filter) => commands.list(filter),
+    runCommand: (id, options = {}, caller = "test") => commands.execute(id, options, { caller }),
+    commandRuleProblems: () => ruleProblems(commands.all()),
     camera: () => serializeCamera(view.worldCamera()),
     selectionBox: () => menuAvoid(),
     jump: (levels) => view.zoomBy(levels),
