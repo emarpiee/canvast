@@ -2745,7 +2745,7 @@ test("a folder of files an earlier version named: opening it, twice, renames and
   await app.close();
 });
 
-test("Keep file names: two items of one name are two names in the app too, as on the disk; a name taken in the app comes back to its file's", async () => {
+test("an item's name is its file's on disk, one to one: two items of one name are two names in the app too (-2), with Keep file names on or off (tidy names); a name taken in the app comes back to its file's", async () => {
   const ws = tempDir("cv-same-name-");
   const { app, page } = await launch(ws, "userdata", true);
   try {
@@ -2762,6 +2762,15 @@ test("Keep file names: two items of one name are two names in the app too, as on
     await page.evaluate((h) => window.__canvastDebug.libraryOp("rename", h, "image.png"), hash);
     await expect.poll(() => page.evaluate((h) => window.__canvastDebug.assetListing().then((l) => l.entries.find((e) => e.hash === h)!.name), hash), { timeout: 15_000 }).toBe("image-2.png");
     expect(files(ws).filter((f) => f.startsWith("library/")).sort()).toEqual(["library/images/image-2.png", "library/images/image.png"]);
+    // Keep file names off: the files take tidy names, and the items those names (a pasted picture renamed twice to one name, as people do).
+    await page.evaluate(() => window.__canvastDebug.setSetting("library.keepFileNames", false));
+    await page.getByTestId("assets-import-input").setInputFiles([pic("Jason Image.png", 30)]);
+    await page.getByTestId("assets-import-input").setInputFiles([pic("Jason Image.png", 120)]);
+    const shown = () => page.evaluate(() => window.__canvastDebug.assetListing().then((l) => l.entries.map((e) => e.name).filter((n) => /jason/i.test(n)).sort()));
+    const onDisk = () => files(ws).filter((f) => /jason/i.test(f)).map((f) => f.slice(f.lastIndexOf("/") + 1)).sort();
+    await expect.poll(() => onDisk().length, { timeout: 15_000 }).toBe(2);
+    await expect.poll(shown, { timeout: 15_000 }).toEqual(onDisk());
+    expect(new Set(onDisk()).size).toBe(2);
   } finally {
     await app.close();
   }

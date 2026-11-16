@@ -1,5 +1,19 @@
 import { dateWords } from "../doc/date-words";
 import { cleanName, replaceInvalid } from "../doc/file-names";
+
+/** Where the work is: the workspace, its boards and canvases, and the one open (what `Session` has; no more, so this file needs no app). */
+interface WorkPlace {
+  readonly tree: { readonly workspace: { readonly displayName: string }; readonly boards: ReadonlyArray<{ readonly board: { readonly id: string; readonly name: string }; readonly canvases: ReadonlyArray<{ readonly id: string; readonly name: string }> }> } | null | undefined;
+  readonly current: { readonly boardId: string; readonly canvasId: string } | null | undefined;
+}
+
+/** The words a name pattern's {workspace} {board} {canvas} stand for: where the work is now (a screenshot's name, a pasted picture's). */
+export function nameWords(session: WorkPlace): { workspace: string; board: string; canvas: string } {
+  const tree = session.tree;
+  const cur = session.current;
+  const boardRec = tree?.boards.find((b) => b.board.id === cur?.boardId);
+  return { workspace: tree?.workspace.displayName ?? "workspace", board: boardRec?.board.name ?? "board", canvas: boardRec?.canvases.find((c) => c.id === cur?.canvasId)?.name ?? "canvas" };
+}
 /**
  * Screenshots (ADR 0080): what the canvas shows, stored in the library like any picture. This file holds the pure parts (the file name, the
  * tags, the formats) and the parts that make the picture (the interface laid over it, the encoding).

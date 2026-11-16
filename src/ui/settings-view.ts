@@ -78,6 +78,7 @@ const CARD_STARTS: Partial<Record<SettingKey, string>> = {
   "notes.writeProps": "Properties",
   "notes.renameOnSave": "File names",
   "library.keepFileNames": "Files in the workspace",
+  "library.pasteName": "Pasted pictures",
   "nav.edgePanOn": "Dragging",
   "select.listAutoScroll": "Ctrl list",
   "nav.mode": "Step keys",
@@ -206,10 +207,11 @@ export const SETTINGS_TABS: readonly Tab[] = [
     rows: [
       ...(DESKTOP
         ? [
-            { key: "library.keepFileNames", label: "Keep file names", help: "On: files keep their names. Off: tidy names.", more: "On (the default): a file in the workspace folder keeps its name (capitals, spaces, brackets; only characters a system forbids are replaced), no extension is added, and its folders keep their names. Off: tidy names (lowercase, an underscore between words, a dash between parts). Turning it on renames no file already there.", control: { kind: "toggle" } } as const,
+            { key: "library.keepFileNames", label: "Keep file names", help: "On: files keep their names. Off: tidy names.", more: "On (the default): a file in the workspace folder keeps its name (capitals, spaces, brackets; only characters a system forbids are replaced), no extension is added, and its folders keep their names. Off: tidy names (lowercase, an underscore between words, a dash between parts). Turning it on renames no file already there. Either way the library lists each file by its name on disk, the same one to one (two of one name: the second with -2).", control: { kind: "toggle" } } as const,
             { key: "library.sortFiles", label: "Sort files by kind", help: "On: a file in no library folder moves into the folder of its kind.", more: "On: a file in no library folder moves into the folder of its kind (images, notes, fonts…), keeping its name. Off (the default): one at the top of the library folder stays there. Either way new files go in their kind's folder, and a file in a library folder stays in it.", control: { kind: "toggle" } } as const,
           ]
         : []),
+      { key: "library.pasteName", label: "Pasted picture name", help: "A picture pasted with no file name of its own. Words in braces are replaced.", more: "A picture pasted from another app comes with no file name (browsers call it image.png): it is named by this instead. Words in braces are replaced: {board} {canvas} {workspace} {ddmmyyyy} {yyyymmdd} {hhmmss} {hhmm} {yyyy} {mm} {dd} {hh} {min} {ss}. The extension is added. A file copied in a file manager keeps its own name.", control: { kind: "text", max: 120, placeholder: "pasted-{yyyy}-{mm}-{dd}-{hhmmss}" } },
       { key: "frame.format", label: "Extracted frame format", help: "The picture file made by Extract frame and Extract this page. PNG is lossless; WebP and JPEG are smaller.", more: "The picture file made by Extract frame (a video or GIF) and Extract this page (a PDF). PNG is lossless; WebP and JPEG are smaller (JPEG has no transparency).", control: { kind: "select", options: [["png", "PNG"], ["webp", "WebP"], ["jpeg", "JPEG"]] } },
       { key: "frame.quality", label: "Extracted frame quality", help: "For WebP and JPEG.", control: { kind: "range", min: 10, max: 100, step: 1, unit: "%" } },
       { key: "frame.pageDpi", label: "Extracted PDF pages: resolution", help: "Dots an inch a PDF's page is drawn at.", more: "Dots an inch a PDF's page is drawn at by Extract this page: 300 is print quality, 150 is smaller, 600 is for fine line work (the longer side stays at most 10 000 pixels).", control: { kind: "select", options: [["150", "150 dpi"], ["300", "300 dpi"], ["600", "600 dpi"]] } },

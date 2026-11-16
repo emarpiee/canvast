@@ -22,8 +22,8 @@ import type { NameKeys } from "./hidden-vault";
 import { sha256Hex } from "../assets/sha256";
 import { done, idbGet, req } from "./idb";
 import { noteKindOf } from "../notes/note-file";
-import { MAX_BASE, UNFINISHED_FILE, cutBytes, isClashOf, numberedName, splitName } from "../doc/file-names";
-import { KIND_FOLDERS, MAX_LIBRARY_DIR, extOfBytes, fileExt, fitsPlace, tidyName, freePath, isFolderOf, isSafeRelativePath, keptBase, keptFile, keptFits, keptPart, libraryDir, nameBase, safeBase } from "./workspace-names";
+import { UNFINISHED_FILE, numberedName, splitName } from "../doc/file-names";
+import { KIND_FOLDERS, MAX_LIBRARY_DIR, extOfBytes, fileExt, fitsPlace, tidyName, freePath, isFolderOf, isSafeRelativePath, keptFile, keptFits, keptPart, libraryDir, safeBase } from "./workspace-names";
 import type { FolderFile, TrashFile } from "./store";
 import { ITEM_KEY_RE, contentOf, copyKey } from "../assets/library-match";
 
@@ -129,6 +129,17 @@ interface LibraryRead {
   folders: AssetFolder[];
 }
 /** A file worth looking at: not hidden, not a file being written (the app's own temporary files, a sync tool's or a browser's partial ones). */
+/**
+ * The name an item takes from its file, null when it has it already: the library lists a file as it is named on disk, one to one (its tidy
+ * name with Keep file names off, a "-2" when two had one name), so what is shown is what is found and what another app sees. A hidden item
+ * keeps its own: its file's name on disk is sealed.
+ */
+export function nameOnDisk(entry: CatalogEntry, file: string): string | null {
+  if (isHiddenFile(file) || meta(entry).hidden) return null;
+  const base = file.slice(file.lastIndexOf("/") + 1);
+  return base && base !== entry.name ? base : null;
+}
+
 /** How long a changed file's size must stay still before it is taken (a program may still be saving it). */
 const SETTLE_MS = 1500;
 
@@ -571,6 +582,8 @@ export class LibraryMirror {
     const activeHashes = new Set(active.map((e) => e.hash));
     for (const r of recs.values()) if (r.ext && r.file && !activeHashes.has(r.hash)) taken.add(r.file.toLowerCase());
     const toSeal: string[] = [];
+    /** Items whose file fits and is named otherwise: they take its name, in one write after the loop. */
+    const toName: Array<{ hash: string; file: string }> = [];
     // Keep file names: a library folder's place on disk: as it is there, written either way; a new one as its name is written.
     const seenDirs = new Map<string, string>();
     const diskDir = async (names: readonly string[], tidy: string): Promise<string> => {
@@ -621,9 +634,10 @@ export class LibraryMirror {
       if (fits && !taken.has(rec.file!.toLowerCase())) {
         taken.add(rec.file!.toLowerCase());
         // (looked at in this name first: a full pass of a big library asks the library nothing for an item that fits)
-        if (!sealed && rec.file!.slice(rec.file!.lastIndexOf("/") + 1) !== e.name) await this.nameFollowsFile(e.hash, rec.file!);
+        if (!sealed && rec.file!.slice(rec.file!.lastIndexOf("/") + 1) !== e.name) toName.push({ hash: e.hash, file: rec.file! });
       } else moves.push({ hash: e.hash, from: rec.ext ? rec.file! : null, dir, base, ext });
     }
+    await this.namesFollowFiles(toName);
     // A file that moves keeps its old place until it has moved, so no two items ever pass through one name.
     for (const m of moves) if (m.from) taken.add(m.from.toLowerCase());
     const emptied = new Set<string>();
@@ -1164,9 +1178,8 @@ export class LibraryMirror {
       if (cur?.ext && cur.file === from) ops.push({ t: "rec", hash, v: { ...cur, file: to } });
       const entry = e && (await this.lib.entry(hash));
       if (entry) {
-        const base = to.slice(to.lastIndexOf("/") + 1);
-        const renamed = this.keepNames() ? base !== entry.name : nameBase(base) !== nameBase(entry.name);
-        ops.push({ t: "entry", hash, v: { ...entry, ...(renamed ? { name: base } : {}), folderIds: folderId ? [folderId] : [] } satisfies CatalogEntry });
+        const name = nameOnDisk(entry, to);
+        ops.push({ t: "entry", hash, v: { ...entry, ...(name ? { name } : {}), folderIds: folderId ? [folderId] : [] } satisfies CatalogEntry });
       }
       await this.lib.apply(ops);
     });
@@ -1767,24 +1780,26 @@ export class LibraryMirror {
    * Keep file names: two items of one name in one place, and the file of the later one is `name-2`: the item takes that name, so the app says
    * what the disk says. (Links in notes stay: `[[name]]` now names the other, as it does in any other app reading the folder.)
    */
-  private async nameFollowsFile(hash: string, file: string): Promise<void> {
-    if (isHiddenFile(file)) return;
-    const base = file.slice(file.lastIndexOf("/") + 1);
-    const stem = base.replace(/\.[A-Za-z0-9]{1,8}$/, "");
+  private nameFollowsFile(hash: string, file: string): Promise<void> {
+    return this.namesFollowFiles([{ hash, file }]);
+  }
+
+  /** Items take their files' names (`nameOnDisk`), all in one write: a library from before, whose names differ from its files' tidy names, changes in one step. */
+  private async namesFollowFiles(files: ReadonlyArray<{ hash: string; file: string }>): Promise<void> {
+    const shown = files.filter((f) => !isHiddenFile(f.file));
+    if (!shown.length) return;
     await this.lib.serial(async () => {
-      const entry = await this.lib.entry(hash);
-      if (!entry) return;
-      // (a note named clean: its name is its file's, -2 and all. Another file with Keep file names off keeps a name of its own.)
-      const clean = !!noteKindOf(entry.name) && this.noteFileKeep() === false;
-      if (!clean && !this.keepsName(entry.name)) return;
-      const kept = clean ? nameBase(entry.name) : keptBase(entry.name);
-      // (a name too long for a file is cut there: the item keeps it whole)
-      if (cutBytes(entry.name, MAX_BASE) === entry.name && isClashOf(stem, kept, 999)) {
-        await this.lib.apply([{ t: "entry", hash, v: { ...entry, name: base } }]);
-        // (many at once, in a library from before: one redraw)
-        if (this.namesTimer) clearTimeout(this.namesTimer);
-        this.namesTimer = setTimeout(() => this.onNamesChanged?.(), 150);
+      const ops: LibraryOp[] = [];
+      for (const { hash, file } of shown) {
+        const entry = await this.lib.entry(hash);
+        const name = entry && nameOnDisk(entry, file);
+        if (name) ops.push({ t: "entry", hash, v: { ...entry, name } });
       }
+      if (!ops.length) return;
+      await this.lib.apply(ops);
+      // (many at once: one redraw)
+      if (this.namesTimer) clearTimeout(this.namesTimer);
+      this.namesTimer = setTimeout(() => this.onNamesChanged?.(), 150);
     });
   }
 

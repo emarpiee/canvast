@@ -83,6 +83,7 @@ export const SETTINGS = {
   "storage.trashDays": { scope: "workspace", default: "0", validate: oneOf("0", "30", "90", "365"), effect: "immediate" } as Def<"0" | "30" | "90" | "365">,
   "library.keepFileNames": { scope: "workspace", default: true, validate: bool, effect: "immediate" } as Def<boolean>,
   "library.sortFiles": { scope: "workspace", default: false, validate: bool, effect: "immediate" } as Def<boolean>,
+  "library.pasteName": { scope: "workspace", default: "pasted-{yyyy}-{mm}-{dd}-{hhmmss}", validate: text(120), effect: "immediate" } as Def<string>,
   "library.hiddenNamesOff": { scope: "device", default: false, validate: bool, effect: "immediate" } as Def<boolean>,
   "storage.autoIndex": { scope: "device", default: true, validate: (v: unknown) => (typeof v === "boolean" ? v : undefined), effect: "immediate" } as Def<boolean>,
   "ui.patternTab": { scope: "device", default: "patterns", validate: oneOf("patterns", "guides"), effect: "immediate" } as Def<"patterns" | "guides">,

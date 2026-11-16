@@ -2644,6 +2644,8 @@ test("a picture on the system clipboard (a screenshot) pastes onto the canvas as
   }, [...png]);
   await expect.poll(async () => ((await p.evaluate(() => window.__canvastDebug.objects())) as Array<{ kind: string }>).filter((o) => o.kind === "image").length).toBe(1);
   expect(await p.evaluate(() => window.__canvastDebug.storedAssetHashes())).toEqual([createHash("sha256").update(png).digest("hex")]);
+  // Browsers call such a picture image.png: it takes the pasted picture name instead (Settings: Pasted picture name).
+  expect((await p.evaluate(() => window.__canvastDebug.assetListing())).entries.map((e) => e.name)).toEqual([expect.stringMatching(/^pasted-\d{4}-\d{2}-\d{2}-\d{6}\.png$/)]);
   expect(app.consoleErrors).toEqual([]);
 });
 
@@ -2765,7 +2767,7 @@ test("library Copy of an SVG puts the SVG itself beside its PNG, and Paste keeps
   expect(app.consoleErrors).toEqual([]);
 });
 
-test("library Copy puts the picture on the system clipboard and Copy file name its name; Paste brings a clipboard picture in, named by the text beside it, else \"image\"", async ({ app, browserName }) => {
+test("library Copy puts the picture on the system clipboard and Copy file name its name; Paste brings a clipboard picture in, named by the text beside it, else by the pasted picture name", async ({ app, browserName }) => {
   test.skip(browserName !== "chromium", "reading and writing the clipboard in the test harness is Chromium's");
   const p = app.page;
   await p.context().grantPermissions(["clipboard-read", "clipboard-write"]);
@@ -2792,7 +2794,7 @@ test("library Copy puts the picture on the system clipboard and Copy file name i
   await put(null, "#0a0"); // (another picture: the same bytes would be the same original)
   await empty();
   await p.getByRole("menu", { name: "Library actions" }).getByRole("menuitem", { name: "Paste" }).click();
-  await expect.poll(names).toEqual(["image.png", "snap-shot.png"]);
+  await expect.poll(names).toEqual([expect.stringMatching(/^pasted-\d{4}-\d{2}-\d{2}-\d{6}\.png$/), "snap-shot.png"]); // (no name of its own: Settings, Pasted picture name)
   // Copy: the picture as a PNG (the name goes beside it as text, which the headless clipboard does not hand back when a picture is there)
   await p.locator('[data-testid="asset-card"][aria-label^="snap-shot.png"]').click({ button: "right" });
   await p.getByRole("menu", { name: "Library actions" }).getByRole("menuitem", { name: "Copy", exact: true }).click();

@@ -56,7 +56,8 @@ import { pathNodes, treeGuides, treeSearch, treeSlot, walkTree } from "./tree";
 import { formatTags } from "../doc/tags";
 import { cleanFileName, splitName } from "../doc/rename-rules";
 import { copyBytes, copyItemsAsFiles, copyItemsToClipboard, sayingProgress, type CopyDeps } from "../app/copy-items";
-import { readClipboardPictures } from "../app/system-clipboard";
+import { namePasted, readClipboardPictures } from "../app/system-clipboard";
+import { nameWords } from "../app/screenshot";
 import { forgetCopiedPicture } from "../app/actions";
 import { esc, fmtBytes } from "./format";
 import { confirmDialog } from "./confirm";
@@ -4921,7 +4922,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
         files.push(new File([it.blob], name, { type }));
       }
       if (!files.length) return say("No picture on the clipboard.");
-      await view.importFiles(files, true);
+      await view.importFiles(namePasted(files, [], settings.get("library.pasteName"), nameWords(session)), true);
     } catch {
       say("The browser did not let canvast read the clipboard: press Ctrl+V to paste.");
     }

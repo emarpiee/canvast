@@ -31,7 +31,7 @@ import type { AssetRecord } from "../assets/asset-library";
 import type { Gradient, GradientStop } from "../doc/paint";
 import type { PathObject } from "../doc/model";
 import type { JoinChoice } from "../doc/stroke-look";
-import { SHOT_FORMATS, encodeShot, shotFileName, shotTags, withInterface } from "./screenshot";
+import { SHOT_FORMATS, encodeShot, nameWords, shotFileName, shotTags, withInterface } from "./screenshot";
 import { isCard, isFontFile, isPdfFile } from "../assets/file-kind";
 import { FILE_CARD_H, FILE_CARD_W } from "../assets/card";
 import { pdfCardShape } from "../assets/pdf-engine";
@@ -74,7 +74,7 @@ import { typeOfName } from "../storage/workspace-names";
 import { openLockScreen } from "../ui/lock-screen";
 import { renderedPicture } from "../render/adjust-image";
 import { freeNameIn } from "../doc/file-names";
-import { MAX_COPIED_SVG, onHiddenCopyNotice, onePerPicture, setHiddenCopySeconds, svgCopy, writeSystemClipboard, type ClipboardFiles } from "./system-clipboard";
+import { MAX_COPIED_SVG, namePasted, onHiddenCopyNotice, onePerPicture, setHiddenCopySeconds, svgCopy, writeSystemClipboard, type ClipboardFiles } from "./system-clipboard";
 import { LANDMARKS } from "../scene/landmarks";
 import { DocumentStore } from "../doc/document-store";
 import { syncIndex } from "../scene/spatial-index";
@@ -1959,13 +1959,10 @@ async function start(): Promise<void> {
         pic = flat;
       }
       const { blob, format } = await encodeShot(pic, cfg.format, cfg.quality);
-      const tree = session.tree;
-      const cur = session.current;
-      const boardRec = tree?.boards.find((b) => b.board.id === cur?.boardId);
-      const canvasRec = boardRec?.canvases.find((c) => c.id === cur?.canvasId);
-      const board = boardRec?.board.name ?? "board";
-      const canvasName = canvasRec?.name ?? "canvas";
-      const fileName = `${shotFileName(cfg.name, { workspace: tree?.workspace.displayName ?? "workspace", board, canvas: canvasName, at: new Date() }, cfg.style)}.${SHOT_FORMATS[format].ext}`;
+      const words = nameWords(session);
+      const board = words.board;
+      const canvasName = words.canvas;
+      const fileName = `${shotFileName(cfg.name, { ...words, at: new Date() }, cfg.style)}.${SHOT_FORMATS[format].ext}`;
       const itemTags = [...new Set(inShot.flatMap((po) => po.obj.tags ?? []))];
       const tags = shotTags({ screenshot: settings.get("shot.tagShot"), board: settings.get("shot.tagBoard"), canvas: settings.get("shot.tagCanvas"), items: settings.get("shot.tagItems"), custom: settings.get("shot.tagsCustom") }, board, canvasName, itemTags);
       const { record } = await assets.importFileDetailed(new File([blob], fileName, { type: SHOT_FORMATS[format].mime }), false);
@@ -3272,7 +3269,7 @@ async function start(): Promise<void> {
     if (typing(at) || (at as HTMLElement | null)?.closest?.("dialog, [popover], .note-dock") || document.querySelector("dialog:modal")) return;
     // (the system's paste of a middle click can come a good while after the button, on a busy machine; a paste key pressed since is a real paste)
     if (performance.now() - middleUpAt < 3000 && middleUpAt > pasteKeyAt) return void e.preventDefault();
-    const files = onePerPicture([...(e.clipboardData?.files ?? [])]);
+    const files = namePasted(onePerPicture([...(e.clipboardData?.files ?? [])]), [...(e.clipboardData?.types ?? [])], settings.get("library.pasteName"), nameWords(session));
     // What canvast copied comes back as the objects, even though the clipboard also holds its picture and SVG for other apps.
     const own = e.clipboardData?.getData("text/plain") ?? "";
     if (appView === "canvas" && !textEditor.isOpen && (!files.length || own !== "" || isCopiedPicture()) && pasteObjects(doc, editor, view, own || null)) {

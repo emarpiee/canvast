@@ -5,6 +5,8 @@
  * fallback when the picture cannot be written. Best effort: the browser may refuse; the result says what landed.
  */
 import { plural } from "../doc/plural";
+import { shotFileName } from "./screenshot";
+import type { NameParts } from "./screenshot";
 import { desktopBridge } from "../storage/desktop-bridge";
 
 export type ClipboardResult = "image" | "files" | "text" | "failed";
@@ -141,6 +143,22 @@ export async function copyTextAndPage(text: string, html: string): Promise<boole
 }
 
 /** One picture on the clipboard as two types is one file: its vectors, when there are both. */
+/** The name a browser gives a picture pasted from another app, which has none of its own (Chromium and Firefox: image.png). */
+const NAMELESS = /^image\.(png|jpe?g|gif|webp|bmp|tiff?|avif|svg)$/i;
+
+/**
+ * Pictures pasted with no name of their own named by the pattern (Settings: Pasted picture name, the words of the screenshot's name). Files
+ * copied in a file manager (their list of addresses is on the clipboard too) keep theirs, as does any other file.
+ */
+export function namePasted(files: readonly File[], clipboardTypes: readonly string[], pattern: string, parts: Omit<NameParts, "at">, at = new Date()): File[] {
+  if (clipboardTypes.includes("text/uri-list") || !pattern.trim()) return [...files];
+  return files.map((f) => {
+    const ext = NAMELESS.exec(f.name)?.[1];
+    if (!ext || !f.type.startsWith("image/")) return f;
+    return new File([f], `${shotFileName(pattern, { ...parts, at }, "keep")}.${ext.toLowerCase()}`, { type: f.type, lastModified: f.lastModified });
+  });
+}
+
 export const onePerPicture = (files: readonly File[]): File[] => {
   const svg = files.filter((f) => f.type === SVG_TYPE);
   return svg.length === 1 && files.length === 2 && files.every((f) => f.type.startsWith("image/")) ? svg : [...files];
