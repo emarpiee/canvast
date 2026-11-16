@@ -7,7 +7,7 @@ import { createHash, randomInt } from "node:crypto";
 import { createServer } from "node:http";
 
 export const AGENT_PORT = 47380;
-const GUID = "258EAFA5-E914-47DA-95CA-C5AB0DC11B65";
+const GUID = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
 const PROTOCOL = "2025-06-18";
 const WAIT_FOR_APP_MS = 15000;
 const ANSWER_MS = 120000;
@@ -183,6 +183,7 @@ export function startBridge({ code, port = AGENT_PORT, input = process.stdin, ou
         waiting.clear();
       }
     });
+    socket.on("end", () => socket.destroy()); // (the page went away without a close frame: free the link at once)
     socket.on("error", () => undefined);
   });
   const app = async (method, params) => {

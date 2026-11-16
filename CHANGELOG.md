@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.18 — AI agents connect (2026-11-17)
+
+- **Fixed:** canvast could never connect to the canvast tools' AI agent link: the tools answered its connection with a wrong key, which every browser refuses. ([AI agents](README.md#ai-agents))
+
 ## 0.60.17 — AI agents in the desktop app (2026-11-17)
 
 - **Fixed:** the desktop app could not connect to an AI agent: it blocked the link to the canvast tools on this computer. ([AI agents](README.md#ai-agents))

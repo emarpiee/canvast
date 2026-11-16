@@ -172,7 +172,7 @@ describe("canvast tools: the link to AI agents (mcp, ADR 0205)", () => {
     const bridge = await startBridge({ code: "ABCD-EFGH-JKLM", port: 0, input, output, log: () => undefined });
     const connect = (path: string, origin = "null"): Promise<Socket> => new Promise((ok) => {
       const s = netConnect(bridge.port, "127.0.0.1", () => {
-        s.write(`GET ${path} HTTP/1.1\r\nHost: 127.0.0.1\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Key: ${randomBytes(16).toString("base64")}\r\nSec-WebSocket-Version: 13\r\nOrigin: ${origin}\r\n\r\n`);
+        s.write(`GET ${path} HTTP/1.1\r\nHost: 127.0.0.1\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\nSec-WebSocket-Version: 13\r\nOrigin: ${origin}\r\n\r\n`);
         ok(s);
       });
     });
@@ -182,7 +182,8 @@ describe("canvast tools: the link to AI agents (mcp, ADR 0205)", () => {
     const site = await connect("/canvast?code=ABCD-EFGH-JKLM", "https://example.com");
     expect(await firstLine(site)).toContain("403");
     const page = await connect("/canvast?code=ABCD-EFGH-JKLM");
-    expect(await firstLine(page)).toContain("101");
+    // (the accept value of RFC 6455's own example key: a browser refuses any other)
+    expect(await new Promise<string>((ok) => page.once("data", (d: Buffer) => ok(d.toString())))).toMatch(/^HTTP\/1\.1 101[^]*\r\nSec-WebSocket-Accept: s3pPLMBiTxaQ9kYGzzhZRbK\+xOo=\r\n/);
     // the page answers what the tools pass on
     page.on("data", (d: Buffer) => {
       const { frames } = decodeFrames(d);
