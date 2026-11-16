@@ -109,6 +109,9 @@ export const test = base.extend<{ app: App }>({
     });
     // (a drag in a test goes by the pixels it says: the grid catching it is tested on its own)
     await page.evaluate(() => window.__canvastDebug.setSetting("snap.grid", false));
+    // (the text font loads after the start, and when it is ready every tile is drawn again: on a slow machine that came in the middle of a
+    // test counting the tiles built, which saw a whole set built twice. A test starts once it is in)
+    await page.evaluate(() => document.fonts.ready.then(() => undefined));
     await page.evaluate(() => window.__canvastDebug.nextFrame());
 
     const app: App = {

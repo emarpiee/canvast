@@ -1333,9 +1333,13 @@ body:has(.assets-place-zone:not([hidden])) :is(#nav, .view-settings, .assets-bar
 .thumb-slot > img:not(.is-loaded) { visibility: hidden; }
 /* One soft light sweeps across the whole view (fixed to the window), so every waiting place takes part in the same wave instead of each
    flickering on its own; with reduced motion the places stay still. */
-.thumb-slot:has(> img:not(.is-loaded):not(.is-broken)) { background-image: linear-gradient(105deg, transparent 40%, var(--thumb-glint) 50%, transparent 60%); background-size: 300% 100%; background-repeat: no-repeat; background-attachment: fixed; animation: thumb-wait var(--dur-wait) var(--ease-out) infinite; }
-@keyframes thumb-wait { from { background-position: 100% 0; } to { background-position: 0% 0; } }
-@media (prefers-reduced-motion: reduce) { .thumb-slot:has(> img:not(.is-loaded):not(.is-broken)) { animation: none; background-image: none; } }
+/* a thumbnail still loading: a light passing over its place, moved on the compositor (a transform), so a grid full of them scrolls without
+   painting each again every frame (a fixed background did: at the smallest thumbnails scrolling fell to under 30 frames a second) */
+.thumb-slot { overflow: hidden; }
+.thumb-slot:not(.asset-thumb) { position: relative; }
+.thumb-slot:has(> img:not(.is-loaded):not(.is-broken))::after { content: ""; position: absolute; inset: 0; background: linear-gradient(105deg, transparent 30%, var(--thumb-glint) 50%, transparent 70%); animation: thumb-wait var(--dur-wait) var(--ease-out) infinite; pointer-events: none; }
+@keyframes thumb-wait { from { transform: translateX(-100%); } to { transform: translateX(100%); } }
+@media (prefers-reduced-motion: reduce) { .thumb-slot:has(> img:not(.is-loaded):not(.is-broken))::after { display: none; } }
 .asset-card:hover { box-shadow: 0 0 0 2px var(--hud-muted); }
 .asset-card[aria-pressed="true"] { box-shadow: 0 0 0 3px var(--hud-accent); }
 .asset-info { position: absolute; left: 0; right: 0; bottom: 0; display: flex; flex-direction: column; gap: 1px; padding: var(--s-12) var(--s-6) var(--s-4); color: var(--media-fg); background: linear-gradient(to top, var(--media-fade), transparent); opacity: 0; transition: opacity var(--dur-fast) var(--ease-out); pointer-events: none; }

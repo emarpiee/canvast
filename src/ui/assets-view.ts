@@ -141,7 +141,12 @@ const SEARCH_PAUSE_MS = 250;
  * Cards kept beyond the view on each side, in screens (the grid) and in items (the filmstrip): scrolling back a little finds them still
  * there, their pictures shown, instead of new cards waiting for their pictures to be decoded again.
  */
-const GRID_OVERSCAN = 3;
+/** How many screens of cards above and below the view are kept in the page: one (three put 7 screens of cards in the page, ~46,000 elements
+ * at the smallest thumbnails, and styling them took half of each scrolled frame). */
+const GRID_OVERSCAN = 1;
+/** At most this many cards made in one go show a picture already loaded at once (decoded before they are painted, as a key's step); more,
+ * as a fast scroll makes, decode it off the page's thread, so the scroll does not wait for them. */
+const SYNC_DECODE_MAX = 12;
 const FILM_OVERSCAN = 12;
 /**
  * Make `parent`'s children exactly `els`, in order, moving as few as possible (a kept element stays in the page, so its picture is not
@@ -1112,12 +1117,13 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     return groups;
   };
   /** Show a card's picture: at once when it was loaded before, else once it is read or made (if the card is still in the page then). */
-  const loadThumb = (img: HTMLImageElement): void => {
+  const loadThumb = (img: HTMLImageElement, many = false): void => {
     const hash = img.dataset["hash"]!;
     const known = thumbUrls.get(hash);
     if (known) {
-      // Loaded before: decoded before the card is painted, so it shows at once (no blank card, no shimmer, while it decodes).
-      img.decoding = "sync";
+      // Loaded before: decoded before the card is painted, so it shows at once (no blank card, no shimmer, while it decodes); among many
+      // cards made at once (a fast scroll), off the page's thread.
+      img.decoding = many ? "async" : "sync";
       img.src = known;
       if (img.parentElement?.classList.contains("thumb-slot")) img.classList.add("is-loaded");
       return;
@@ -2455,7 +2461,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     for (const [h, m] of keep) mounted.set(h, m);
     for (const el of made) {
       const img = el.querySelector<HTMLImageElement>("img[data-hash]");
-      if (img) loadThumb(img);
+      if (img) loadThumb(img, made.length > SYNC_DECODE_MAX);
     }
     // A card drawn again (its tags changed, say) keeps the keyboard.
     if (focused?.hash && !focused.el.isConnected) mounted.get(focused.hash)?.el.querySelector<HTMLElement>(".asset-card")?.focus({ preventScroll: true });
