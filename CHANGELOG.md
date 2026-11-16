@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.6 — The gallery viewer never stays blank (2026-11-16)
+
+- **Fixed:** stepping on from a PDF, a note or a 3D model still opening in the gallery viewer left its empty panel over every item shown after it, a blank page until a restart: the panel is now taken down whenever the viewer moves on.
+
 ## 0.60.5 — Big hidden videos play, a frame for big videos, imports in hidden mode hidden (2026-11-16)
 
 - **Added:** a hidden video or sound plays as it is read, of any size, in the gallery and on the canvas, while the Hidden items are open: the desktop app asks the page for each part, decrypted there with the key in memory and never written (it played only after being decrypted whole, and one past the import limit not at all).

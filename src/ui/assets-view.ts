@@ -1265,6 +1265,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     try {
       opened = await kind.open(box, { hash, name, blob }, noteDeps, notePlace);
     } catch (e) {
+      if (token !== slideToken) return; // (the viewer moved on meanwhile: the next item has the stage, and took the panel down)
       noteBox.hidden = true;
       viewer.classList.remove("is-note");
       slideImg.hidden = false;
@@ -1276,21 +1277,24 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       slideCaption.classList.add("is-note");
       return;
     }
+    // (opened after the viewer moved on: closed, and its panel left down, as the next item's start took it down)
     if (token !== slideToken) return opened.close(false);
     note = opened;
     paintNoteZoom();
   };
   /** Before the note is left (another item, Back, Esc): its changes are saved or let go, or it stays open. Whether to go on. */
   const leaveNote = (): Promise<boolean> => (note ? note.leave() : Promise.resolve(true));
-  /** Close the note (changes still unsaved are saved without losing anything, see OpenNote.close). */
+  /**
+   * Close the note or file view (changes still unsaved are saved without losing anything, see OpenNote.close), and take its panel down
+   * always: also one still opening when the viewer moved on, which is not the note yet and would cover every later item.
+   */
   const unloadNote = (): void => {
     const n = note;
-    if (!n) return;
     note = null;
     viewer.classList.remove("is-note");
     noteBox.hidden = true;
     paintZoom();
-    n.close(!!entryOf(n.hash));
+    n?.close(!!entryOf(n.hash));
     noteBox.replaceChildren();
   };
   const pos = viewer.querySelector<HTMLElement>(".viewer-pos")!;

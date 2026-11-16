@@ -142,6 +142,24 @@ test("a PDF: its first page in the library, its shape on a card; it opens in the
   expect(app.consoleErrors).toEqual([]);
 });
 
+test("stepping on from a PDF still opening: the next picture shows, not the PDF's empty panel over it", async ({ app }) => {
+  const p = app.page;
+  await importPdf(p);
+  const red = makePng(4, 3, () => [200, 40, 40, 255]);
+  await p.getByTestId("assets-import-input").setInputFiles({ name: "red.png", mimeType: "image/png", buffer: red });
+  await expect(p.getByTestId("asset-card")).toHaveCount(2);
+  // (the next key at once, while the PDF is still being read: before, its empty panel stayed over every later item until a restart)
+  await card(p).dblclick();
+  const slide = p.getByTestId("slide-view");
+  await expect(slide.locator(".viewer-note")).toBeVisible(); // (its panel up, the PDF not read yet)
+  await p.keyboard.press("ArrowRight");
+  await expect(slide.locator("figcaption")).toContainText("red.png");
+  await expect.poll(() => slide.locator("figure img").evaluate((i: HTMLImageElement) => !i.hidden && i.naturalWidth > 0)).toBe(true);
+  await expect(slide.locator(".viewer-note")).toBeHidden();
+  await expect(view(p)).toHaveCount(0);
+  expect(app.consoleErrors).toEqual([]);
+});
+
 test("a PDF's card on a canvas has its page's shape, opens in the panel, and a copy can show another page", async ({ app }) => {
   const p = app.page;
   await importPdf(p);
