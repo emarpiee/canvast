@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.17 — AI agents in the desktop app (2026-11-17)
+
+- **Fixed:** the desktop app could not connect to an AI agent: it blocked the link to the canvast tools on this computer. ([AI agents](README.md#ai-agents))
+
 ## 0.60.16 — AI agents with less setup (2026-11-17)
 
 - **Docs:** README: *ZIPs and comic books* (its section, picture and limits), AI agents' picture and its row in Settings, every MCP client and its file, macros recording the buttons, menus and keys; the tools' menu and Organize pictures taken again (B1).

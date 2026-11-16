@@ -15,6 +15,7 @@ import { lstat, mkdir, open, type FileHandle, readFile, readdir, realpath, renam
 import { basename, dirname, join, resolve, sep } from "node:path";
 import { cleanWholeName } from "../src/doc/file-names";
 import { agentsFile } from "./tools-home";
+import { AGENT_PORT } from "../src/app/agent-link";
 import { BOARDS_DIR, isSafeRelativePath } from "../src/storage/workspace-names";
 import { readItem } from "../src/storage/library-mirror";
 import { SEAL_OVERHEAD, isHiddenFile } from "../src/storage/hidden-vault";
@@ -1265,7 +1266,8 @@ async function openWindow(workspace: string): Promise<void> {
   ses.setPermissionRequestHandler((_wc, permission, done) => done(allowed.has(permission)));
   ses.setPermissionCheckHandler((_wc, permission) => allowed.has(permission));
   ses.webRequest.onBeforeRequest((details, done) => {
-    const ok = /^(app|data|blob|devtools|chrome-extension):/.test(details.url);
+    // (and the AI agents' link, on this computer only: Settings > AI agents, ADR 0205)
+    const ok = /^(app|data|blob|devtools|chrome-extension):/.test(details.url) || details.url.startsWith(`ws://127.0.0.1:${AGENT_PORT}/canvast?`);
     done({ cancel: !ok });
   });
 
