@@ -23,6 +23,7 @@ interface Tab {
  * in the Settings view. Setting and tab names are words that find them.
  */
 export function settingCommands(tabs: readonly Tab[], store: Store, openTab: (tab: string) => void): Command[] {
+  // (ids: settings.toggle:<key>, settings.set:<key>=<value>, settings.open:<key>; one generic settings.set takes any key and value)
   const get = (k: string): unknown => store.get(k as never);
   const set = (k: string, v: unknown): void => void store.set(k as never, v as never);
   const out: Command[] = [];
@@ -30,10 +31,14 @@ export function settingCommands(tabs: readonly Tab[], store: Store, openTab: (ta
     for (const r of t.rows ?? []) {
       const words = `${t.label} ${r.help ?? ""} preferences options setting`;
       const open = (): void => openTab(t.id);
-      if (r.control.kind === "toggle") out.push({ group: "Setting", kind: "settings", title: `Toggle ${r.label.toLowerCase()}`, words, run: () => set(r.key, !get(r.key)) });
+      const hint = r.help ? r.help.split(/(?<=[.:;])\s/)[0]!.slice(0, 80) : `In Settings > ${t.label}`;
+      if (r.control.kind === "toggle") out.push({ id: `settings.toggle:${r.key}`, group: "Setting", kind: "settings", title: `Toggle ${r.label.toLowerCase()}`, hint: `Turn it on or off (Settings > ${t.label})`, risk: "edit", words, exec: () => set(r.key, !get(r.key)) });
       else if (r.control.kind === "select")
-        for (const [value, label] of r.control.options ?? []) out.push({ group: "Setting", kind: "settings", title: `${r.label}: ${label}`, words, enabled: () => String(get(r.key)) !== value, run: () => set(r.key, typeof get(r.key) === "number" ? Number(value) : value) });
-      out.push({ group: "Setting", kind: "settings", title: r.label, words, run: open });
+        for (const [value, label] of r.control.options ?? []) {
+          const to = (): void => set(r.key, typeof get(r.key) === "number" ? Number(value) : value);
+          out.push({ id: `settings.set:${r.key}=${value}`, group: "Setting", kind: "settings", title: `${r.label}: ${label}`, hint: `Settings > ${t.label}`, risk: "edit", words, why: () => (String(get(r.key)) !== value ? null : "It is already set so."), exec: to });
+        }
+      out.push({ id: `settings.open:${r.key}`, group: "Setting", kind: "settings", title: r.label, hint, risk: "read", words, exec: open });
     }
   }
   return out;

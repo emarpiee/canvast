@@ -10,7 +10,10 @@ import { LAYOUT_MENU } from "./toolbar";
 import { captionedGroup, hoverNames, syncGroups, syncScroll } from "./bar";
 import { placeBy, selectionBoxIn, uiScale, edgeBarsIn } from "./near-selection";
 import { isContainer } from "../doc/containers";
-import { closeMoreMenu, MENU_GAP, openMoreMenu } from "./more-menu";
+import { closeMoreMenu, commandRows as rowsOf, MENU_GAP, openMoreMenu } from "./more-menu";
+import { commands, pressCommand } from "../commands/registry";
+import { REASON } from "../commands/types";
+import type { Command } from "../commands/types";
 import { mediaBarTop } from "./media-player";
 import type { MenuItem } from "./more-menu";
 import type { BoolOp } from "../doc/boolean";
@@ -239,191 +242,210 @@ export function mountContextBar(host: HTMLElement, editor: EditorState, doc: Doc
   const q = (act: string, extra = ""): HTMLButtonElement => bar.querySelector<HTMLButtonElement>(`[data-ctx="${act}"]${extra}`)!;
   const each = (act: string, f: (b: HTMLButtonElement) => void): void => bar.querySelectorAll<HTMLButtonElement>(`[data-ctx="${act}"]`).forEach(f);
 
+  // The Actions bar's commands (ADR 0205): each of its buttons and menu rows runs one by id, as the palette, a macro and an outside caller do.
+  // What the canvas has already (group, masks, paths, networks) is the canvas's command (src/app/canvas-commands.ts), not a second one.
+  const sel = (): string | null => (editor.selection.size ? null : REASON.noSelection);
+  const can = (f: () => boolean, no: string) => (): string | null => sel() ?? (f() ? null : no);
+  const cmd = (id: string, title: string, hint: string, icon: string, exec: () => void, why: () => string | null = sel, extra: Partial<Command> = {}): Command => ({ id, group: "Actions", kind: "selection", title, hint, icon, risk: "edit", why, exec, ...extra });
+  const layoutBlocked = (): string | null => sel() ?? (actions.laidOutOrder() !== null ? "Their sheet places them: see its alignment." : null);
+  const picture = (): string | null => sel() ?? (actions.pictureTools() ? null : "Select a picture.");
+  const barCommands = (): Command[] => [
+    ...LAYOUT_MENU.find((g) => g.head.startsWith("Align"))!.items.map((i) => cmd(`layout.${i.id}`, `Align ${i.label}`, i.hint, i.icon, () => actions.layout({ align: i.id.split(":")[1] as AlignKey }), layoutBlocked)),
+    ...LAYOUT_MENU.find((g) => g.head.startsWith("Distribute"))!.items.map((i) => cmd(`layout.${i.id}`, `Distribute ${i.label}`, i.hint, i.icon, () => actions.layout({ distribute: i.id.split(":")[1] as "x" | "y" }), () => layoutBlocked() ?? (editor.selection.size < 3 ? "Select three or more." : null))),
+    ...LAYOUT_MENU.find((g) => g.head.startsWith("Arrange"))!.items.map((i) => cmd(`layout.${i.id}`, i.label, i.hint, i.icon, () => actions.layout({ grid: i.id.split(":")[1] as SortKey }))),
+    ...GAP_ORDER.map((g) => cmd(`layout.gap:${g}`, `Space: ${GAP_LABEL[g].toLowerCase()}`, GAP_HINT[g], `<span class="menu-gap">${GAP_SHORT[g]}</span>`, () => { actions.setGap(g); update(); }, () => (actions.laidOutOrder() !== null ? "Their sheet sets the space." : null))),
+    cmd("layout.keepTidy", "Keep it tidy", "As auto layout: it stays a grid", ICONS.autoLayout, () => { actions.setKeepTidy(!actions.keepTidy()); update(); }, () => (actions.laidOutOrder() !== null ? "Their sheet keeps it." : null)),
+    cmd("size.reset", "Reset size", "As placed, at this zoom", ICONS.imageUpscale, () => actions.resetSize(), () => sel() ?? (actions.canResetSize() ? null : actions.resetSizeBlock())),
+    ...(["w", "h"] as const).flatMap((axis) => (["smallest", "medium", "largest"] as const).map((pick) => {
+      const word = axis === "w" ? "Width" : "Height";
+      return cmd(`size.match:${axis}:${pick}`, `${word} of the ${pick}`, `All take its ${word.toLowerCase()}, in proportion`, axis === "w" ? ICONS.sameWidth : ICONS.sameHeight, () => actions.matchSize(axis, pick), () => sel() ?? ([...editor.selection].filter((id) => actions.isSizable(id)).length < 2 ? "Select two or more that can be sized." : null));
+    })),
+    cmd("sheet.each", "Put each on its own sheet", "A sheet for each selected object", ICONS.sheetEach, () => actions.sheetEach(), can(() => actions.canSheetEach(), "Select objects that are not on sheets.")),
+    cmd("sheet.fit", "Fit the sheet to its contents", "The sheet shrinks or grows to what is on it", ICONS.shrink, () => actions.fitSheet(), can(() => actions.canFitSheet(), "Select a sheet with something on it.")),
+    cmd("sheet.autoLayout", "Auto layout", "A row, a column, a wrap or a grid (Shift+A)", ICONS.autoLayout, () => actions.setAutoLayout(actions.autoLayout() !== true), can(() => actions.autoLayout() !== null, "Select a sheet.")),
+    cmd("sheet.autoLayoutNew", "Auto layout on a new sheet", "Round them, laid out as a row (Shift+A)", ICONS.autoLayout, () => { closeMoreMenu(); actions.layoutOnSheet(); }),
+    cmd("export.again", "Export again", "As last time, no dialog", ICONS.repeat2, () => { closeMoreMenu(); actions.exportAgain(); }, can(() => actions.canExport() && actions.canExportAgain(), "Nothing was exported yet."), { risk: "confirm", record: false }),
+    cmd("export.download", "Download the file", "Its file; several go in a ZIP", ICONS.download, () => actions.downloadFile(), can(() => actions.canDownload(), "Select a library file."), { risk: "confirm", record: false }),
+    cmd("text.copyMarkdown", "Copy Markdown", "The Markdown of the selected text", ICONS.markdown, () => actions.copyMarkdown(), can(() => [...editor.selection].some((id) => doc.get(id)?.kind === "text"), "Select text."), { record: false }),
+    cmd("state.set", "Set initial state", "To come back to it later", ICONS.stateSet, () => actions.setInitialState(true), can(() => { const st = actions.initialState(); return !!st && st.saved < st.count; }, "Every selected shape has one.")),
+    cmd("state.update", "Update initial state", "Save the shape as it is now", ICONS.refresh, () => actions.setInitialState(false), can(() => (actions.initialState()?.saved ?? 0) > 0, "No initial state is saved.")),
+    cmd("state.reset", "Reset to initial state", "Back to how it was saved", ICONS.stateReset, () => actions.resetInitialState(), can(() => (actions.initialState()?.saved ?? 0) > 0, "No initial state is saved.")),
+    ...OPS.map((o) => cmd(`bool.${o.op}`, o.label, o.aria.slice(o.aria.indexOf(": ") + 2), o.icon, () => actions.combine(o.op), can(() => actions.canCombine() || actions.booleanState() !== null, "Select two or more shapes."))),
+    cmd("bool.addToGroup", "Add to the group", "The shapes become shapes of it, with its operation", ICONS.squarePlus, () => actions.addToGroup(), can(() => actions.groupJoin() === "add", "Select a boolean group and shapes.")),
+    cmd("bool.takeOut", "Take out of the group", "The shapes stay where they are", ICONS.squareOut, () => actions.takeOutOfGroup(), can(() => actions.groupJoin() === "out", "Select shapes of a boolean group.")),
+    cmd("bool.flatten", "Flatten the boolean group", "Make the group one path (Ctrl+E)", ICONS.merge, () => actions.flattenBoolean(), can(() => actions.booleanState() !== null, "Select a boolean group.")),
+    cmd("bool.release", "Release the boolean group", "Take the group apart; the shapes stay as they are", ICONS.releaseBoolean, () => actions.releaseBoolean(), can(() => actions.booleanState() !== null, "Select a boolean group.")),
+    cmd("path.split", "Split into pieces", "Each outline, with its holes, its own object", ICONS.splitPieces, () => actions.splitPaths(), can(() => actions.canSplitPaths(), "Select a path of several outlines.")),
+    cmd("path.simplify", "Simplify", "Fewer nodes, the same shape", ICONS.chartSpline, () => actions.simplify(), can(() => actions.canSimplify(), "Select a path.")),
+    cmd("path.strokeToPath", "Pen stroke to path", "Turn the pen stroke into an editable path", ICONS.pencilRuler, () => actions.strokeToPath(), can(() => actions.canStrokeToPath(), "Select a pen stroke.")),
+    cmd("text.toPath", "Text to path", "Convert the text to a path (Ctrl+E)", ICONS.replace, () => actions.outline(), can(() => actions.canOutline(), "Select text.")),
+    cmd("text.onPath", "Text along a path", "Set the text along the selected path (select the text and the path)", ICONS.route, () => actions.setOnPath(), can(() => actions.canSetOnPath(), "Select a text and a path.")),
+    cmd("text.inShape", "Text inside the shape", "The text flows inside the selected closed shape", ICONS.textInShape, () => actions.setInShape(), can(() => actions.canSetInShape(), "Select a text and a closed shape.")),
+    cmd("text.offPath", "Text off its path or shape", "The text is set straight again", ICONS.routeOff, () => actions.takeOffPath(), can(() => actions.canTakeOffPath(), "Select text on a path or in a shape.")),
+    cmd("shape.builderDone", "Done", "Keep what the Shape builder made", ICONS.check, () => actions.finishBuilder(true), () => (editor.builder || editor.gapFill ? null : "The Shape builder is not on.")),
+    cmd("shape.builderCancel", "Cancel", "Leave the Shape builder without changes", ICONS.x, () => actions.finishBuilder(false), () => (editor.builder || editor.gapFill ? null : "The Shape builder is not on.")),
+    cmd("item.tag", "Tag", "Add tags to the selected", ICONS.tag, () => actions.tag()),
+    cmd("item.showInLibrary", "View in the library", "The selected pictures' files in the Library", ICONS.library, () => actions.showInLibrary(), can(() => actions.hasLibraryItems(), "Select a library file."), { record: false }),
+    cmd("item.open", "Open the file", "In the app that opens it on this computer", ICONS.externalLink, () => actions.openFile(), can(() => !!actions.fileSelection()?.open, "Select a library file."), { record: false }),
+    cmd("item.editNote", "Open in its view", "A note, a PDF or a 3D model in its own view", ICONS.filePenLine, () => actions.editNote(), can(() => { const f = actions.fileSelection(); return !!f && (f.note || f.view); }, "Select a note, a PDF or a model."), { record: false }),
+    cmd("item.makeNotes", "Make a note file", "A note file for each selected note card", ICONS.fileInput, () => actions.makeNoteFiles(), can(() => actions.canMakeNoteFiles(), "Select note cards.")),
+    cmd("item.attach", "Attach", "Make it follow another object", ICONS.link, () => actions.attach()),
+    cmd("picture.vectorise", "Vectorise", "Make the SVG picture shapes you can edit", ICONS.vectorPolygon, () => actions.vectorise(), can(() => actions.svgPicture(), "Select an SVG picture.")),
+    cmd("picture.adjust", "Adjust the picture", "Exposure, contrast, colour and more", ICONS.slidersVertical, () => actions.toggleAdjust(), picture),
+    cmd("picture.resetAdjust", "Reset adjustments", "The picture as it was", ICONS.listRestart, () => actions.resetAdjust(), can(() => !!actions.adjustState()?.adjusted, "The picture has no adjustments.")),
+    cmd("picture.copyAdjust", "Copy adjustments", "To paste on other pictures", ICONS.clipboardList, () => actions.copyAdjust(), can(() => !!actions.adjustState()?.adjusted, "The picture has no adjustments."), { record: false }),
+    cmd("picture.pasteAdjust", "Paste adjustments", "The copied adjustments on these pictures", ICONS.clipboardPaste, () => actions.pasteAdjust(), can(() => !!actions.pictureTools()?.canPaste, "No adjustments were copied.")),
+    cmd("picture.copyRendered", "Copy as a picture", "As it looks, to paste elsewhere", ICONS.clipboardPlain, () => actions.copyRendered(), picture, { record: false }),
+    cmd("picture.bake", "Bake", "A new picture file with the changes in it", ICONS.copyPlus, () => actions.bake(), can(() => actions.resettable().bakeable, "Nothing to bake.")),
+    ...(actions.photoCraft ? [cmd("picture.photocraft", "Edit in PhotoCraft", "The selected pictures or sheet in the photo editor", ICONS.photoCraft, () => actions.photoCraft!.run(q("photocraft")), can(() => actions.photoCraft!.offered(), "Select pictures or a sheet."))] : []),
+    cmd("item.resetRotation", "Reset rotation", "Straight again", ICONS.rotateCcw, () => actions.resetRotation(), can(() => actions.resettable().turned, "It is not turned.")),
+    cmd("item.applyRotation", "Make this the upright", "Its turn becomes its base", ICONS.rotateCwSquare, () => actions.applyRotation(), can(() => actions.resettable().turned, "It is not turned.")),
+    cmd("item.resetProportions", "Reset proportions", "Its own width and height again", ICONS.ratio, () => actions.resetProportions(), can(() => actions.resettable().stretched, "It is not stretched.")),
+    cmd("item.lock", "Lock or unlock", "So it cannot be moved", ICONS.lockKeyhole, () => actions.setFlag("locked")),
+    cmd("item.hide", "Hide or show", "Hidden on this canvas", ICONS.eyeOff, () => actions.setFlag("hidden")),
+  ];
+  commands.setProvider("actions", barCommands);
+  /** The command each plain button of the bar runs (the menus' buttons open their menu; their rows are commands). */
+  const CTX_COMMAND: Readonly<Record<string, string>> = {
+    builderdone: "shape.builderDone", buildercancel: "shape.builderCancel", tag: "item.tag", library: "item.showInLibrary", open: "item.open", editnote: "item.editNote", viewfile: "item.editNote",
+    makenote: "item.makeNotes", attach: "item.attach", detach: "edit.detach", vectorise: "picture.vectorise", adjust: "picture.adjust", adjustreset: "picture.resetAdjust", copyadj: "picture.copyAdjust",
+    pasteadj: "picture.pasteAdjust", copypng: "picture.copyRendered", bake: "picture.bake", photocraft: "picture.photocraft", unrotate: "item.resetRotation", baserot: "item.applyRotation",
+    unstretch: "item.resetProportions", duplicate: "edit.duplicate", group: "edit.group", ungroup: "edit.ungroup", front: "edit.front", back: "edit.back", lock: "item.lock", hide: "item.hide",
+    delete: "edit.delete", find: "find.palette",
+  };
+  for (const [ctx, id] of Object.entries(CTX_COMMAND)) each(ctx, (b) => (b.dataset["command"] = id));
+  /** The names the rows had before they were commands (`data-id`: what tests and scripts choose them by). */
+  const ROW_ID: Readonly<Record<string, string>> = {
+    "size.reset": "size:reset", "layout.keepTidy": "keeptidy", "edit.sheet": "puton", "sheet.each": "eachsheet", "edit.releaseSheet": "unsheet", "sheet.fit": "fitsheet", "sheet.autoLayout": "autolayout", "sheet.autoLayoutNew": "autolayout",
+    "export.open": "exportpic", "export.again": "exportagain", "export.download": "download", "export.svgToLibrary": "svglibrary", "text.copyMarkdown": "copymd", "state.set": "stateset", "state.update": "stateupdate", "state.reset": "statereset",
+    "bool.addToGroup": "addgroup", "bool.takeOut": "takeout", "bool.flatten": "flatten", "bool.release": "release", "mask.clip": "clipmask", "mask.alpha": "maskalpha", "mask.luminance": "maskluma", "mask.select": "selectmask",
+    "mask.invert": "invertmask", "mask.release": "releasemask", "path.split": "splitpieces", "path.simplify": "simplify", "path.strokeToPath": "strokepath", "path.outline": "outlinestroke", "path.width-taper": "taper",
+    "shape.network": "makenet", "shape.releaseNetwork": "releasenet", "shape.divide": "divide", "shape.builder": "shapebuilder", "shape.fillGaps": "fillgaps", "shape.fillGap": "fillgap", "text.toPath": "outline",
+    "text.onPath": "onpath", "text.inShape": "inshape", "text.offPath": "offpath",
+  };
+  const rowId = (id: string): string => ROW_ID[id] ?? id.replace(/^layout\./, "").replace(/^size\.match:/, "size:").replace(/^bool\./, "op:");
+  const commandRows = (list: ReadonlyArray<string | readonly [string, Partial<MenuItem>]>): MenuItem[] => rowsOf(list.map((x) => (typeof x === "string" ? ([x, { id: rowId(x) }] as const) : ([x[0], { id: rowId(x[0]), ...x[1] }] as const))));
+  const menu = (b: HTMLElement, title: string, items: () => MenuItem[]): void => openMoreMenu(b, items(), title, { keepOpen: true, refresh: items });
+  const tick = (id: string, checked: boolean): readonly [string, Partial<MenuItem>] => [id, { checked }];
+  const sep = (id: string): readonly [string, Partial<MenuItem>] => [id, { sep: true }];
+
   bar.addEventListener("click", (e) => {
     const b = (e.target as HTMLElement).closest<HTMLElement>("[data-ctx]");
     if (!b || (b as HTMLButtonElement).disabled) return;
+    const plain = CTX_COMMAND[b.dataset["ctx"] ?? ""];
+    if (plain) return void pressCommand(plain);
     switch (b.dataset["ctx"]) {
-      case "alignmenu": {
+      case "alignmenu":
         // One menu for Align and Distribute; it stays open while several are tried (the shared grouped-tools menu, more-menu.ts)
-        const rows = (head: string, prefix: string): MenuItem[] => LAYOUT_MENU.find((g) => g.head.startsWith(head))!.items.map((i) => ({
-          id: i.id, label: `${prefix}${i.label}`, hint: i.hint, icon: i.icon,
-          // (things their sheet lays out are placed by it: lining them up by hand would be undone at once)
-          ...(actions.laidOutOrder() !== null ? { disabled: true, hint: "Their sheet places them: see its alignment" } : { disabled: i.id.startsWith("distribute") && editor.selection.size < 3 }),
-          run: () => { const [kind, arg] = i.id.split(":") as [string, string]; actions.layout(kind === "align" ? { align: arg as AlignKey } : { distribute: arg as "x" | "y" }); },
-        }));
-        openMoreMenu(b, [...rows("Align", "Align "), ...rows("Distribute", "Distribute ")], "Align and distribute", { keepOpen: true });
+        menu(b, "Align and distribute", () => commandRows(LAYOUT_MENU.filter((g) => /^(Align|Distribute)/.test(g.head)).flatMap((g) => g.items.map((i) => `layout.${i.id}`))));
         break;
-      }
       case "sizemenu": {
         // Reset size and the same size as another of the selected, in one menu that stays open; what would change nothing says why
-        const picks = [["smallest", "Smallest"], ["medium", "Medium"], ["largest", "Largest"]] as const;
         const ids = (): string[] => [...editor.selection];
-        const same = (axis: "w" | "h", word: string, icon: string): MenuItem[] => (ids().filter((id) => actions.isSizable(id)).length < 2 ? [] : picks.map(([pick, name], i): MenuItem => ({ id: `size:${axis}:${pick}`, label: `${word} of the ${name.toLowerCase()}`, hint: `All take its ${word.toLowerCase()}, in proportion`, icon, ...(i === 0 ? { sep: true } : {}), run: () => actions.matchSize(axis, pick) })));
-        const items = (): MenuItem[] => {
-          const can = actions.canResetSize();
-          return [
-            ...(!ids().some((id) => actions.isPicture(id)) ? [] : [{ id: "size:reset", label: "Reset size", hint: can ? "As placed, at this zoom" : `Not now: ${actions.resetSizeBlock()}`, icon: ICONS.imageUpscale, disabled: !can, run: () => actions.resetSize() }]),
-            ...same("w", "Width", ICONS.sameWidth),
-            ...same("h", "Height", ICONS.sameHeight),
-          ];
-        };
-        openMoreMenu(b, items(), "Size", { keepOpen: true, refresh: items });
+        menu(b, "Size", () => commandRows([
+          ...(ids().some((id) => actions.isPicture(id)) ? ["size.reset"] : []),
+          ...(ids().filter((id) => actions.isSizable(id)).length < 2 ? [] : (["w", "h"] as const).flatMap((axis) => (["smallest", "medium", "largest"] as const).map((pick, i) => (i === 0 ? sep(`size.match:${axis}:${pick}`) : `size.match:${axis}:${pick}`)))),
+        ]));
         break;
       }
       case "arrangemenu": {
-        // The grid orders and the space between the items in one menu that stays open (the same grouped-tools menu as Align); the space is ticked
+        // The grid orders and the space between the items in one menu that stays open; the space is ticked
         // (things a sheet lays out: an order is the sheet's rule, ticked when it is the one; the space is the sheet's gap)
-        const items = (): MenuItem[] => {
+        const orders = LAYOUT_MENU.find((g) => g.head.startsWith("Arrange"))!.items;
+        menu(b, "Arrange in a grid", () => {
           const order = actions.laidOutOrder();
-          const orders = LAYOUT_MENU.find((g) => g.head.startsWith("Arrange"))!.items;
-          if (order !== null)
-            return orders.map((i): MenuItem => ({ id: i.id, label: i.label, hint: "The sheet keeps this order", icon: i.icon, checked: i.id === `grid:${order}`, run: () => actions.layout({ grid: i.id.split(":")[1] as SortKey }) }));
-          return [
-            ...orders.map((i): MenuItem => ({ id: i.id, label: i.label, hint: actions.keepTidy() ? "On a sheet that keeps it" : i.hint, icon: i.icon, run: () => actions.layout({ grid: i.id.split(":")[1] as SortKey }) })),
-            ...GAP_ORDER.map((g): MenuItem => ({ id: `gap:${g}`, label: `Space: ${GAP_LABEL[g].toLowerCase()}`, hint: GAP_HINT[g], icon: `<span class="menu-gap">${GAP_SHORT[g]}</span>`, checked: g === actions.gap(), run: () => { actions.setGap(g); update(); } })),
-            { id: "keeptidy", label: "Keep it tidy", hint: "As auto layout: it stays a grid", icon: ICONS.autoLayout, sep: true, checked: actions.keepTidy(), run: () => { actions.setKeepTidy(!actions.keepTidy()); update(); } },
-          ];
-        };
-        openMoreMenu(b, items(), "Arrange in a grid", { keepOpen: true, refresh: items });
+          if (order !== null) return commandRows(orders.map((i) => [`layout.${i.id}`, { checked: i.id === `grid:${order}`, hint: "The sheet keeps this order" }] as const));
+          return commandRows([
+            ...orders.map((i) => (actions.keepTidy() ? ([`layout.${i.id}`, { hint: "On a sheet that keeps it" }] as const) : `layout.${i.id}`)),
+            ...GAP_ORDER.map((g) => tick(`layout.gap:${g}`, g === actions.gap())),
+            ["layout.keepTidy", { sep: true, checked: actions.keepTidy() }] as const,
+          ]);
+        });
         break;
       }
-      case "sheetmenu": {
+      case "sheetmenu":
         // Put on a sheet, release it, fit it to what is on it: one menu that stays open; only what applies to the pick is listed
-        const items = (): MenuItem[] => [
-          { id: "puton", label: "Put on a sheet", hint: "On a new sheet (Ctrl+Alt+G)", icon: ICONS.sheetSelection, run: () => actions.putOnSheet() },
-          ...(actions.canSheetEach() ? [{ id: "eachsheet", label: "Put each on its own sheet", hint: "A sheet for each selected object", icon: ICONS.sheetEach, run: () => actions.sheetEach() }] : []),
-          ...(actions.canReleaseSheet() ? [{ id: "unsheet", label: "Release the sheet", hint: "Keeps what is on it", icon: ICONS.releaseSheet, run: () => actions.releaseSheet() }] : []),
-          ...(actions.canFitSheet() ? [{ id: "fitsheet", label: "Fit the sheet to its contents", hint: "The sheet shrinks or grows to what is on it", icon: ICONS.shrink, run: () => actions.fitSheet() }] : []),
-          actions.autoLayout() !== null
-            ? { id: "autolayout", label: "Auto layout", hint: "A row, a column, a wrap or a grid (Shift+A)", icon: ICONS.autoLayout, checked: actions.autoLayout() === true, run: () => actions.setAutoLayout(actions.autoLayout() !== true) }
-            : { id: "autolayout", label: "Auto layout on a new sheet", hint: "Round them, laid out as a row (Shift+A)", icon: ICONS.autoLayout, run: () => { closeMoreMenu(); actions.layoutOnSheet(); } },
-        ];
-        openMoreMenu(b, items(), "Sheets", { keepOpen: true, refresh: items });
+        menu(b, "Sheets", () => commandRows([
+          ["edit.sheet", { label: "Put on a sheet", hint: "On a new sheet (Ctrl+Alt+G)", icon: ICONS.sheetSelection }] as const,
+          ...(actions.canSheetEach() ? ["sheet.each"] : []),
+          ...(actions.canReleaseSheet() ? [["edit.releaseSheet", { hint: "Keeps what is on it", icon: ICONS.releaseSheet }] as const] : []),
+          ...(actions.canFitSheet() ? ["sheet.fit"] : []),
+          actions.autoLayout() !== null ? tick("sheet.autoLayout", actions.autoLayout() === true) : "sheet.autoLayoutNew",
+        ]));
         break;
-      }
-      case "exportmenu": {
+      case "exportmenu":
         // What takes the picked things out of the canvas, in one menu that stays open: only what applies to the pick is listed
-        const items = (): MenuItem[] => [
-          ...(actions.canExport() ? [{ id: "exportpic", label: "Export…", hint: "PNG, WebP, JPEG, SVG or PDF, at a size", icon: ICONS.imageUp, run: () => { closeMoreMenu(); actions.exportPicture(); } }] : []),
-          ...(actions.canExport() && actions.canExportAgain() ? [{ id: "exportagain", label: "Export again", hint: "As last time, no dialog", icon: ICONS.repeat2, run: () => { closeMoreMenu(); actions.exportAgain(); } }] : []),
-          ...(actions.canDownload() ? [{ id: "download", label: "Download the file", hint: "Its file; several go in a ZIP", icon: ICONS.download, run: () => actions.downloadFile() }] : []),
-          ...(actions.canExportSvg() ? [{ id: "svglibrary", label: "Save to library", hint: "An SVG in the library, to place again", icon: ICONS.save, run: () => actions.saveSvgToLibrary() }] : []),
-          ...([...editor.selection].some((id) => doc.get(id)?.kind === "text") ? [{ id: "copymd", label: "Copy Markdown", hint: "The Markdown of the selected text", icon: ICONS.markdown, run: () => actions.copyMarkdown() }] : []),
-        ];
-        openMoreMenu(b, items(), "Export", { keepOpen: true, refresh: items });
+        menu(b, "Export", () => commandRows([
+          ...(actions.canExport() ? [["export.open", { label: "Export…", hint: "PNG, WebP, JPEG, SVG or PDF, at a size", icon: ICONS.imageUp }] as const] : []),
+          ...(actions.canExport() && actions.canExportAgain() ? ["export.again"] : []),
+          ...(actions.canDownload() ? ["export.download"] : []),
+          ...(actions.canExportSvg() ? [["export.svgToLibrary", { label: "Save to library", hint: "An SVG in the library, to place again", icon: ICONS.save }] as const] : []),
+          ...([...editor.selection].some((id) => doc.get(id)?.kind === "text") ? ["text.copyMarkdown"] : []),
+        ]));
         break;
-      }
-      case "statemenu": {
+      case "statemenu":
         // Save, replace or go back to the picked shapes' initial state (ADR 0106): one menu that stays open; only what applies is listed
-        const items = (): MenuItem[] => {
+        menu(b, "Initial state", () => {
           const st = actions.initialState();
           if (!st) return [];
-          return [
-            ...(st.saved < st.count ? [{ id: "stateset", label: "Set initial state", hint: "To come back to it later", icon: ICONS.stateSet, run: () => actions.setInitialState(true) }] : []),
-            ...(st.saved > 0 ? [{ id: "stateupdate", label: "Update initial state", hint: "Save the shape as it is now", icon: ICONS.refresh, run: () => actions.setInitialState(false) }, { id: "statereset", label: "Reset to initial state", hint: "Back to how it was saved", icon: ICONS.stateReset, run: () => actions.resetInitialState() }] : []),
-          ];
-        };
-        openMoreMenu(b, items(), "Initial state", { keepOpen: true, refresh: items });
+          return commandRows([...(st.saved < st.count ? ["state.set"] : []), ...(st.saved > 0 ? ["state.update", "state.reset"] : [])]);
+        });
         break;
-      }
-      case "boolmenu": {
+      case "boolmenu":
         // The boolean operations, and what to do with the group they make: one menu that stays open and shows the operation in use
-        const items = (): MenuItem[] => {
+        menu(b, "Shapes", () => {
           const cur = actions.booleanState();
           const join = actions.groupJoin();
-          const row = (id: string, label: string, hint: string, icon: string, run: () => void, extra: Partial<MenuItem> = {}): MenuItem => ({ id, label, hint, icon, run, ...extra });
-          return [
-            ...(actions.canCombine() || cur !== null ? OPS.map((o) => row(`op:${o.op}`, o.label, o.aria.slice(o.aria.indexOf(": ") + 2), o.icon, () => actions.combine(o.op), { checked: cur === o.op })) : []),
-            ...(join === "add" ? [row("addgroup", "Add to the group", "The shapes become shapes of it, with its operation", ICONS.squarePlus, () => actions.addToGroup())] : []),
-            ...(join === "out" ? [row("takeout", "Take out of the group", "The shapes stay where they are", ICONS.squareOut, () => actions.takeOutOfGroup())] : []),
-            ...(cur !== null ? [row("flatten", "Flatten", "Make the group one path (Ctrl+E)", ICONS.merge, () => actions.flattenBoolean()), row("release", "Release", "Take the group apart; the shapes stay as they are", ICONS.releaseBoolean, () => actions.releaseBoolean())] : []),
-          ];
-        };
-        openMoreMenu(b, items(), "Shapes", { keepOpen: true, refresh: items });
+          return commandRows([
+            ...(actions.canCombine() || cur !== null ? OPS.map((o) => tick(`bool.${o.op}`, cur === o.op)) : []),
+            ...(join === "add" ? ["bool.addToGroup"] : []),
+            ...(join === "out" ? ["bool.takeOut"] : []),
+            ...(cur !== null ? [["bool.flatten", { label: "Flatten" }] as const, ["bool.release", { label: "Release" }] as const] : []),
+          ]);
+        });
         break;
-      }
-      case "maskmenu": {
-        const items = (): MenuItem[] => {
-          const row = (id: string, label: string, hint: string, icon: string, run: () => void, extra: Partial<MenuItem> = {}): MenuItem => ({ id, label, hint, icon, run, ...extra });
-          const make = actions.canMakeMask();
-          const has = actions.canReleaseMask();
-          return [
-            ...(make ? [
-              row("clipmask", "Clipping mask", "The top shape cuts what else is selected to its outline", ICONS.venetianMask, () => actions.makeClippingMask()),
-              row("maskalpha", "Mask by opacity", "The top object shows the others only where it is solid", ICONS.circleDashed, () => actions.makeMask("alpha")),
-              row("maskluma", "Mask by brightness", "The top object shows the others where it is light", ICONS.contrast, () => actions.makeMask("luminance")),
-            ] : []),
-            ...(has ? [
-              row("selectmask", "Select the mask", "Select the mask of the selected objects, to move or edit it", ICONS.scanEye, () => actions.selectMask()),
-              row("invertmask", "Invert the mask", "Show what it hides and hide what it shows", ICONS.circleSlash, () => actions.changeMask({ invert: !(actions.selectedMask()?.invert ?? false) }), { checked: actions.selectedMask()?.invert ?? false }),
-              row("releasemask", "Release the mask", "What it cut is whole again", ICONS.circleMinus, () => actions.changeMask({ release: true })),
-            ] : []),
-          ];
-        };
-        openMoreMenu(b, items(), "Masks", { keepOpen: true, refresh: items });
+      case "maskmenu":
+        menu(b, "Masks", () => commandRows([
+          ...(actions.canMakeMask() ? [
+            ["mask.clip", { hint: "The top shape cuts what else is selected to its outline", icon: ICONS.venetianMask }] as const,
+            ["mask.alpha", { hint: "The top object shows the others only where it is solid", icon: ICONS.circleDashed }] as const,
+            ["mask.luminance", { hint: "The top object shows the others where it is light", icon: ICONS.contrast }] as const,
+          ] : []),
+          ...(actions.canReleaseMask() ? [
+            ["mask.select", { hint: "Select the mask of the selected objects, to move or edit it", icon: ICONS.scanEye }] as const,
+            ["mask.invert", { hint: "Show what it hides and hide what it shows", icon: ICONS.circleSlash, checked: actions.selectedMask()?.invert ?? false }] as const,
+            ["mask.release", { hint: "What it cut is whole again", icon: ICONS.circleMinus }] as const,
+          ] : []),
+        ]));
         break;
-      }
       case "pathmenu": {
         // The tools that make, change or take apart paths and vector shapes, in one menu that stays open; only the ones that apply to the pick are listed
-        const items = (): MenuItem[] => {
-          const row = (id: string, label: string, hint: string, icon: string, run: () => void): MenuItem => ({ id, label, hint, icon, run });
-          const free = editor.builder === null && editor.gapFill === null; // (while the Shape builder or Fill a gap is on, Done and Cancel are on the bar)
-          return [
-            ...(actions.canSplitPaths() ? [row("splitpieces", "Split into pieces", "Each outline, with its holes, its own object", ICONS.splitPieces, () => actions.splitPaths())] : []),
-            ...(actions.canSimplify() ? [row("simplify", "Simplify", "Fewer nodes, the same shape", ICONS.chartSpline, () => actions.simplify())] : []),
-            ...(actions.canStrokeToPath() ? [row("strokepath", "Pen stroke to path", "Turn the pen stroke into an editable path", ICONS.pencilRuler, () => actions.strokeToPath())] : []),
-            ...(actions.canOutlineStroke() ? [
-              row("outlinestroke", "Outline stroke", "Make the line a shape of its own", ICONS.stamp, () => actions.outlineStroke()),
-              row("taper", "Taper", "Thin at both ends; stays editable (again: take it away)", ICONS.feather, () => actions.setWidthProfile("taper")),
-            ] : []),
-            ...(actions.canMakeNetwork() ? [row("makenet", "Vector network", "Join the selected paths where they meet and fill the regions they enclose", ICONS.network, () => actions.makeNetwork())] : []),
-            ...(actions.canReleaseNetwork() ? [row("releasenet", "Release the network", "Its edges are an ordinary path again", ICONS.unplug, () => actions.releaseNetwork())] : []),
-            ...(actions.canDivide() && free ? [
-              row("divide", "Divide", "Cut the selected shapes into the regions they overlap in", ICONS.slice, () => actions.divide()),
-              row("shapebuilder", "Shape builder", "Drag across regions to merge them, Alt-drag to delete them", ICONS.puzzle, () => { closeMoreMenu(); actions.shapeBuilder(); }),
-            ] : []),
-            ...(actions.canFillGaps() && free ? [
-              row("fillgaps", "Fill gaps", "Fill every empty place the selected shapes close in, under them", ICONS.paintRoller, () => actions.fillGaps()),
-              row("fillgap", "Fill a gap…", "Click the gaps to fill, one by one; Enter or Esc when done", ICONS.mousePointerClick, () => { closeMoreMenu(); actions.fillGap(); }),
-            ] : []),
-            ...(actions.canOutline() ? [row("outline", "Text to path", "Convert the text to a path (Ctrl+E)", ICONS.replace, () => actions.outline())] : []),
-            ...(actions.canSetOnPath() ? [row("onpath", "Text along a path", "Set the text along the selected path (select the text and the path)", ICONS.route, () => actions.setOnPath())] : []),
-            ...(actions.canSetInShape() ? [row("inshape", "Text inside the shape", "The text flows inside the selected closed shape", ICONS.textInShape, () => actions.setInShape())] : []),
-            ...(actions.canTakeOffPath() ? [row("offpath", "Text off its path or shape", "The text is set straight again", ICONS.routeOff, () => actions.takeOffPath())] : []),
-          ];
-        };
-        openMoreMenu(b, items(), "Path tools", { keepOpen: true, refresh: items });
+        const free = (): boolean => editor.builder === null && editor.gapFill === null; // (while the Shape builder or Fill a gap is on, Done and Cancel are on the bar)
+        menu(b, "Path tools", () => commandRows([
+          ...(actions.canSplitPaths() ? ["path.split"] : []),
+          ...(actions.canSimplify() ? ["path.simplify"] : []),
+          ...(actions.canStrokeToPath() ? ["path.strokeToPath"] : []),
+          ...(actions.canOutlineStroke() ? [
+            ["path.outline", { hint: "Make the line a shape of its own", icon: ICONS.stamp }] as const,
+            ["path.width-taper", { label: "Taper", hint: "Thin at both ends; stays editable (again: take it away)", icon: ICONS.feather }] as const,
+          ] : []),
+          ...(actions.canMakeNetwork() ? [["shape.network", { hint: "Join the selected paths where they meet and fill the regions they enclose", icon: ICONS.network }] as const] : []),
+          ...(actions.canReleaseNetwork() ? [["shape.releaseNetwork", { hint: "Its edges are an ordinary path again", icon: ICONS.unplug }] as const] : []),
+          ...(actions.canDivide() && free() ? [
+            ["shape.divide", { label: "Divide", hint: "Cut the selected shapes into the regions they overlap in", icon: ICONS.slice }] as const,
+            ["shape.builder", { hint: "Drag across regions to merge them, Alt-drag to delete them", icon: ICONS.puzzle }] as const,
+          ] : []),
+          ...(actions.canFillGaps() && free() ? [
+            ["shape.fillGaps", { hint: "Fill every empty place the selected shapes close in, under them", icon: ICONS.paintRoller }] as const,
+            ["shape.fillGap", { label: "Fill a gap…", hint: "Click the gaps to fill, one by one; Enter or Esc when done", icon: ICONS.mousePointerClick }] as const,
+          ] : []),
+          ...(actions.canOutline() ? ["text.toPath"] : []),
+          ...(actions.canSetOnPath() ? ["text.onPath"] : []),
+          ...(actions.canSetInShape() ? ["text.inShape"] : []),
+          ...(actions.canTakeOffPath() ? ["text.offPath"] : []),
+        ]));
         break;
       }
-      case "builderdone": actions.finishBuilder(true); break;
-      case "buildercancel": actions.finishBuilder(false); break;
-      case "tag": actions.tag(); break;
-      case "library": actions.showInLibrary(); break;
-      case "open": actions.openFile(); break;
-      case "editnote": case "viewfile": actions.editNote(); break;
-      case "makenote": actions.makeNoteFiles(); break;
-      case "attach": actions.attach(); break;
-      case "detach": actions.detach(); break;
-      case "vectorise": actions.vectorise(); break;
-      case "adjust": actions.toggleAdjust(); break;
-      case "adjustreset": actions.resetAdjust(); break;
-      case "copyadj": actions.copyAdjust(); break;
-      case "pasteadj": actions.pasteAdjust(); break;
-      case "copypng": actions.copyRendered(); break;
-      case "bake": actions.bake(); break;
-      case "photocraft": actions.photoCraft?.run(b); break;
-      case "unrotate": actions.resetRotation(); break;
-      case "baserot": actions.applyRotation(); break;
-      case "unstretch": actions.resetProportions(); break;
-      case "duplicate": actions.duplicate(); break;
-      case "group": actions.group(); break;
-      case "ungroup": actions.ungroup(); break;
-      case "front": actions.arrange("front"); break;
-      case "back": actions.arrange("back"); break;
-      case "lock": actions.setFlag("locked"); break;
-      case "hide": actions.setFlag("hidden"); break;
-      case "delete": actions.deleteSelection(); break;
-      case "find": actions.findCommand(); break;
     }
   });
   // The bar must not start a drag or a selection change on the canvas below it.

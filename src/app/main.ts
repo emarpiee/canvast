@@ -181,6 +181,7 @@ import type { Adjust } from "../doc/adjust";
 import { downloadSelection, pickedFiles } from "./download";
 import { mountCommandPalette } from "../ui/command-palette";
 import { commands, pressCommand } from "../commands/registry";
+import { REASON } from "../commands/types";
 import { canvasCommands, OLD_CANVAS_IDS, type CanvasActions } from "./canvas-commands";
 import { Macros } from "../commands/macros";
 import { barCommands } from "../commands/from-bars";
@@ -3150,15 +3151,15 @@ async function start(): Promise<void> {
       return !!hit; // (empty canvas: the menu of the canvas, whatever is picked)
     },
   });
-  registry.setProvider("panels", () => dock.commands().map((c): Command => ({ ...c, enabled: () => appView === "canvas" && (c.enabled?.() ?? true) })));
+  registry.setProvider("panels", () => dock.commands().map((c): Command => ({ ...c, why: () => (appView === "canvas" ? (c.why?.() ?? null) : REASON.notOnCanvas) })));
   registry.setProvider("settings", () => [
-    ...SETTINGS_TABS.map((t): Command => ({ group: "Settings", kind: "settings", title: t.label, words: "preferences options", run: () => { setView("settings"); settingsView.show(t.id); } })),
+    ...SETTINGS_TABS.map((t): Command => ({ id: `settings.tab:${t.id}`, group: "Settings", kind: "settings", title: t.label, hint: "Open this page of Settings", risk: "read", words: "preferences options", exec: () => { setView("settings"); settingsView.show(t.id); } })),
     ...settingCommands(SETTINGS_TABS, settings, (tab) => { setView("settings"); settingsView.show(tab); }),
   ]);
   registry.setProvider("bars", () => (appView === "canvas" ? barCommands() : []));
   registry.setProvider("artcraft", () =>
     PHOTOCRAFT_FEATURES.entry.newDocument && photoCraft.available
-      ? [{ id: "artcraft.photocraft.open", group: "ArtCraft", kind: "artcraft", title: "Open PhotoCraft", words: "photo editor new document image edit layers", run: () => void photoCraft.openBlank() }]
+      ? [{ id: "artcraft.photocraft.open", group: "ArtCraft", kind: "artcraft", title: "Open PhotoCraft", hint: "A new document in the photo editor", risk: "edit", words: "photo editor new document image edit layers", exec: () => photoCraft.openBlank() }]
       : []);
   // Boards and canvases of the navigator, and the fixed shortcuts of Settings > Shortcuts (choosing one opens that list).
   registry.setProvider("navigator", () => {
@@ -3166,13 +3167,20 @@ async function start(): Promise<void> {
     if (!tree) return [];
     const out: Command[] = [];
     for (const { board, canvases } of tree.boards) {
-      for (const c of canvases) out.push({ id: `canvas:${c.id}`, group: "Canvas", kind: "canvas", title: `${board.name} / ${c.name}`, words: "open go switch board", enabled: () => session.current?.canvasId !== c.id, run: () => { setView("canvas"); void session.openCanvas(c.id); } });
+      for (const c of canvases) registry.alias(`canvas:${c.id}`, `canvas.open:${c.id}`); // (the id old macros have)
+      for (const c of canvases) out.push({ id: `canvas.open:${c.id}`, group: "Canvas", kind: "canvas", title: `${board.name} / ${c.name}`, hint: "Open this canvas", risk: "edit", record: false, words: "open go switch board", why: () => (session.current?.canvasId !== c.id ? null : "It is open."), exec: async () => { setView("canvas"); await session.openCanvas(c.id); } });
     }
-    out.push({ group: "Canvas", kind: "canvas", title: "Rename this canvas", words: "name", enabled: () => !!session.current, takes: { prompt: "New name of the canvas", run: (n) => void session.renameCanvas(session.current!.canvasId, n) }, run: () => undefined });
-    out.push({ group: "Canvas", kind: "canvas", title: "Rename this board", words: "name", enabled: () => !!session.current, takes: { prompt: "New name of the board", run: (n) => void session.renameBoard(session.current!.boardId, n) }, run: () => undefined });
+    const named = { name: "name", type: "text", doc: "the new name", required: true } as const;
+    out.push({ id: "canvas.rename", group: "Canvas", kind: "canvas", title: "Rename this canvas", hint: "Give the open canvas a new name", risk: "edit", words: "name", why: () => (session.current ? null : REASON.noCanvas), options: [named], takes: { prompt: "New name of the canvas", option: "name", run: (n) => void session.renameCanvas(session.current!.canvasId, n) } });
+    out.push({ id: "board.rename", group: "Canvas", kind: "canvas", title: "Rename this board", hint: "Give the open board a new name", risk: "edit", words: "name", why: () => (session.current ? null : REASON.noCanvas), options: [named], takes: { prompt: "New name of the board", option: "name", run: (n) => void session.renameBoard(session.current!.boardId, n) } });
     return out;
   });
-  registry.setProvider("shortcuts", () => [...KEY_COMMANDS.map((c): Command => ({ group: "Shortcut", kind: "shortcut", quiet: true, title: c.name, keys: keymap.bindings(c.id).map(displayCombo).join(", ") || "none", words: c.group, run: () => { setView("settings"); settingsView.show("shortcuts"); } })), ...FIXED_SHORTCUTS.flatMap((g) => g.items.map((i): Command => ({ group: "Shortcut", kind: "shortcut", quiet: true, title: i.does, keys: i.keys, words: g.group, run: () => { setView("settings"); settingsView.show("shortcuts"); } })))]);
+  // (a shortcut row is where to read and change a key: choosing one opens the shortcut list)
+  const showKeys = (): void => { setView("settings"); settingsView.show("shortcuts"); };
+  registry.setProvider("shortcuts", () => [
+    ...KEY_COMMANDS.map((c): Command => ({ id: `shortcut.show:${c.id}`, group: "Shortcut", kind: "shortcut", quiet: true, title: c.name, hint: "See or change its key", risk: "read", record: false, keys: keymap.bindings(c.id).map(displayCombo).join(", ") || "none", words: c.group, exec: showKeys })),
+    ...FIXED_SHORTCUTS.flatMap((g, gi) => g.items.map((i, ii): Command => ({ id: `shortcut.fixed:${gi}.${ii}`, group: "Shortcut", kind: "shortcut", quiet: true, title: i.does, hint: "A key that is always this one", risk: "read", record: false, keys: i.keys, words: g.group, exec: showKeys }))),
+  ]);
   const macros = new Macros(registry, (text) => { editor.message = text; editor.changed(); });
   const palette = mountCommandPalette(registry);
   window.addEventListener("keydown", (e) => {

@@ -74,12 +74,12 @@ describe("commands made from the bars and the settings", () => {
     let opened = "";
     const cmds = settingCommands(tabs, store, (t) => (opened = t));
     expect(cmds.map((x) => x.title)).toEqual(["Toggle zen mode", "Zen mode", "Theme: System", "Theme: Light", "Theme: Dark", "Theme"]);
-    cmds[0]!.run!();
+    void cmds[0]!.exec!({}, { caller: "test" });
     expect(values["ui.zen"]).toBe(true);
-    expect(cmds.filter((x) => x.enabled && !x.enabled()).map((x) => x.title)).toEqual(["Theme: Light"]);
-    cmds.find((x) => x.title === "Theme: Dark")!.run!();
+    expect(cmds.filter((x) => x.why && x.why() !== null).map((x) => x.title)).toEqual(["Theme: Light"]);
+    void cmds.find((x) => x.title === "Theme: Dark")!.exec!({}, { caller: "test" });
     expect(values["ui.theme"]).toBe("dark");
-    cmds.find((x) => x.title === "Theme")!.run!();
+    void cmds.find((x) => x.title === "Theme")!.exec!({}, { caller: "test" });
     expect(opened).toBe("appearance");
   });
 });
