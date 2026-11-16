@@ -202,5 +202,6 @@ test("zip-view", async ({ scene: s }) => {
   await row.filter({ hasText: "dancer_adjusting_her_slipper" }).first().click({ modifiers: ["Control"] });
   await expect(s.p.locator('[data-testid="archive-row"][aria-selected="true"]')).toHaveCount(2);
   await s.settle(800);
-  await s.shot("zip-view");
+  // (the view's bar, its path and the files: what the picture is about; the details beside it are the Library's)
+  await s.shot("zip-view", await s.around({ els: ['[data-testid="archive-view"] .view-bar', '[data-testid="archive-row"] >> nth=-1'], pad: 12 }));
 });
