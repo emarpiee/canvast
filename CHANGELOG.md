@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.60.19 — See what the AI agent does (2026-11-17)
+
+- **Added:** while **Settings > AI agents** is on, an AI agent button sits left of the Settings button, its dot lit while one is connected; it opens what the agent did (its last actions, each with **Go there**). ([AI agents](README.md#ai-agents))
+- **Added:** the agent's pointer, with what it did, is drawn on the canvas where it made or changed something, and those items are outlined for a moment; off the view, the pointer waits at the edge and points the way. The info bar says each action. ([AI agents](README.md#ai-agents))
+- **Added:** an agent can make shapes, sheets and texts (`item.create`), and read the items (`read.items`, `read.selection`), the boards and canvases (`read.canvases`) and a search of the Library (`library.search`); every answer tells what it made, changed or removed. ([AI agents](README.md#ai-agents))
+
 ## 0.60.18 — AI agents connect (2026-11-17)
 
 - **Fixed:** canvast could never connect to the canvast tools' AI agent link: the tools answered its connection with a wrong key, which every browser refuses. ([AI agents](README.md#ai-agents))

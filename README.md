@@ -2434,7 +2434,7 @@ Let an AI agent (a program that speaks MCP, such as Claude Desktop or Claude Cod
 | --- | --- |
 | Turn it on | **Settings > AI agents > Let AI agents use canvast**. Off until you turn it on |
 | Pairing | Run the [canvast tools](#canvast-tools-without-the-app) and choose **Connect an AI agent**: they show a pairing code and what to put in the agent's settings. Type the code in **Pairing code**. The desktop app finds the code of the canvast tools on the same computer by itself: leave the field empty |
-| What it can do | Every action of canvast is a command with a name: the agent lists them, then runs them with their options (which items, which colour, which folder) and reads what happened |
+| What it can do | Every action of canvast is a command with a name: the agent lists them, then runs them with their options (which items, which colour, which folder) and reads what happened: what it made, changed or removed. It can also make shapes, sheets and texts, and read the items of a canvas, the boards and canvases, and a search of the Library |
 | What asks you first | Deleting, hidden items, replacing the workspace and writing files to the disk: canvast shows **An AI agent wants to…** with **Allow** and **Cancel** |
 | What it never does | Passwords, unlocking hidden items, these settings, sharing on the network and erasing the trash for good stay yours |
 | Only look | **Agents may only look**: it can list, search and read, and changes nothing |

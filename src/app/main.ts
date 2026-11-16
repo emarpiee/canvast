@@ -26,7 +26,8 @@ import { fileInLibrary } from "./library-filing";
 import { newNoteName, storeFrame } from "./frames";
 import { isBackdrop, newObjectId, rasterKey } from "../doc/model";
 import type { CanvasObject, ImageObject, ObjectId, TextObject } from "../doc/model";
-import { screenToWorld, type ScreenPoint } from "../core/camera";
+import { screenToWorld, worldToScreen, type ScreenPoint } from "../core/camera";
+import { drawAgentPointer } from "../render/agent-mark";
 import type { AssetRecord } from "../assets/asset-library";
 import type { Gradient, GradientStop } from "../doc/paint";
 import type { PathObject } from "../doc/model";
@@ -124,7 +125,9 @@ import { mountPropertiesLayout } from "../ui/properties-layout";
 import { setPropsWhere } from "../ui/tool-hint";
 import { installCombobox } from "../ui/combobox";
 import { installMenuKeys } from "../ui/more-menu";
-import { chooseDialog, confirmDialog, promptDialog } from "../ui/confirm";
+import { chooseDialog, confirmDialog, listDialog, promptDialog } from "../ui/confirm";
+import { esc } from "../ui/format";
+import type { Touched } from "./agent-link";
 import { busyProgress, currentBusy, openBusyScreen, openStartScreen } from "../ui/busy-screen";
 import { canSwitchWorkspace, openWorkspaceSwitcher } from "../ui/workspace-switch";
 import type { BusyScreen } from "../ui/busy-screen";
@@ -182,7 +185,8 @@ import { downloadSelection, pickedFiles } from "./download";
 import { mountCommandPalette } from "../ui/command-palette";
 import { commands, pressCommand } from "../commands/registry";
 import { REASON } from "../commands/types";
-import { canvasCommands, OLD_CANVAS_IDS, type CanvasActions } from "./canvas-commands";
+import { canvasCommands, ITEMS_MAX, OLD_CANVAS_IDS, type CanvasActions, type ItemRow } from "./canvas-commands";
+import type { ShapeKind } from "../doc/path";
 import { mountAgentLink } from "./agent-link";
 import { Macros } from "../commands/macros";
 import { barCommands } from "../commands/from-bars";
@@ -734,6 +738,10 @@ async function start(): Promise<void> {
   setInterval(() => assets.evict(), 2000);
 
   let backdrop: ({ f: Frame } & ReturnType<typeof worldBackdrop>) | null = null;
+  /** The tools' way to make a shape or a sheet without a drag (`item.create`). */
+  let makeShape: ((tool: "shape" | "sheet", kind: Exclude<ShapeKind, "balloon">, a: ScreenPoint, b: ScreenPoint) => boolean) | null = null;
+  /** Where the AI agent's pointer was last drawn (its next move glides from there). */
+  let agentPointerAt: { x: number; y: number } | null = null;
   /** Render synchronously and return the timing breakdown. */
   const renderNow = (shot?: { pattern: boolean; overlays: boolean; transparent: boolean }): FrameBreakdown => {
     const t0 = performance.now();
@@ -851,6 +859,39 @@ async function start(): Promise<void> {
     if ((editor.revealAt || editor.revealIds) && (!shot || shot.overlays)) {
       const all = (visible ??= visibleObjects(doc, index, editor, fc, vp));
       if (editor.revealIds) drawRevealOutlines(ctx, all.filter((po) => editor.revealIds!.has(po.obj.id)), theme, true);
+    }
+    // Where an AI agent works (ADR 0205): what it made or changed outlined, and its pointer there gliding from where it was, then fading.
+    const mark = editor.agentMark;
+    if (mark && (!shot || shot.overlays)) {
+      const now = performance.now();
+      const all = mark.ids.length ? (visible ??= visibleObjects(doc, index, editor, fc, vp)) : [];
+      const shown = all.filter((po) => mark.ids.includes(po.obj.id));
+      const fade = Math.min(1, (mark.until - now) / 600);
+      if (shown.length) {
+        ctx.save();
+        ctx.globalAlpha = Math.max(0, fade);
+        drawRevealOutlines(ctx, shown, theme, true);
+        ctx.restore();
+      }
+      let to: { x: number; y: number } | null = null;
+      if (shown.length) {
+        const minX = Math.min(...shown.map((po) => po.box.minX));
+        const maxX = Math.max(...shown.map((po) => po.box.maxX));
+        const minY = Math.min(...shown.map((po) => po.box.minY));
+        const maxY = Math.max(...shown.map((po) => po.box.maxY));
+        to = { x: (minX + maxX) / 2, y: (minY + maxY) / 2 };
+      } else {
+        // shortcut: off the view, only an item of the canvas's own space is pointed at (one inside a nested frame is not), from its anchor
+        const o = view.frame === doc.space.world ? mark.ids.map((id) => doc.get(id)).find((x) => x && !x.frame) : undefined;
+        if (o) to = worldToScreen(view.camera, vp, o.anchor);
+      }
+      if (to && Number.isFinite(to.x) && Number.isFinite(to.y)) {
+        const t = mark.from ? Math.min(1, (now - mark.at) / 350) : 1;
+        const ease = 1 - (1 - t) ** 3;
+        const at = mark.from ? { x: mark.from.x + (to.x - mark.from.x) * ease, y: mark.from.y + (to.y - mark.from.y) * ease } : to;
+        agentPointerAt = at;
+        drawAgentPointer(ctx, at, vp, `AI agent: ${mark.title}`, theme, fade);
+      }
     }
     if (editor.revealAt && (!shot || shot.overlays)) {
       const all = (visible ??= visibleObjects(doc, index, editor, fc, vp));
@@ -1377,7 +1418,7 @@ async function start(): Promise<void> {
     e.preventDefault();
     e.stopImmediatePropagation();
   }, { capture: true, passive: false });
-  attachTools(canvas, view, doc, index, editor, { autoLayout: () => autoLayoutShortcut(doc, editor), listAutoScroll: () => settings.get("select.listAutoScroll"), edgePanSpeed: () => (settings.get("nav.edgePanOn") ? settings.get("nav.edgePan") / 100 : 0), editText: (t, at, box) => textEditor.open(t, at, box), openItem: (h, id) => {
+  attachTools(canvas, view, doc, index, editor, { setMaker: (fn) => void (makeShape = fn), autoLayout: () => autoLayoutShortcut(doc, editor), listAutoScroll: () => settings.get("select.listAutoScroll"), edgePanSpeed: () => (settings.get("nav.edgePanOn") ? settings.get("nav.edgePan") / 100 : 0), editText: (t, at, box) => textEditor.open(t, at, box), openItem: (h, id) => {
         const o = doc.get(id);
         void notePanel.open(h, o?.kind === "image" ? cardActions(o) : undefined);
       }, newNote: (at, w) => void newNoteAt(at, w), toolForKey: (k) => toolForKey(k), navForKey: (k) => navForKey(k),
@@ -3034,6 +3075,22 @@ async function start(): Promise<void> {
     clearFlagOn: (ids, flag) => setFlagOn(doc, editor, [...ids], flag, false),
     revealInLibrary: (hashes) => { setView("assets"); void assetsView.reveal([...hashes]); },
     itemIds: () => new Set([...doc.all()].map((o) => o.id)),
+    items: (which) => {
+      const vis = visibleObjects(doc, index, editor, view.frameCamera, view.viewport);
+      const boxes = new Map(vis.map((po) => [po.obj.id, po.box]));
+      const src = which === "view" ? vis.map((po) => po.obj) : which === "selection" ? [...editor.selection].map((id) => doc.get(id)).filter((o): o is CanvasObject => !!o) : doc.ordered();
+      const r = (n: number): number => Math.round(n * 10) / 10;
+      const rows = src.slice(0, ITEMS_MAX).map((o): ItemRow => {
+        const b = boxes.get(o.id);
+        return { id: o.id, kind: o.kind === "path" && (o as PathObject).container ? "sheet" : o.kind === "path" && (o as PathObject).shape ? (o as PathObject).shape! : o.kind, name: labelOf(o, assetNames.map).text, box: b ? { x: r(b.minX), y: r(b.minY), w: r(b.maxX - b.minX), h: r(b.maxY - b.minY) } : null, selected: editor.selection.has(o.id), ...(o.hidden ? { hidden: true } : {}), ...(o.locked ? { locked: true } : {}) };
+      });
+      return { rows, total: src.length };
+    },
+    viewSize: () => ({ width: view.viewport.width, height: view.viewport.height }),
+    make: (kind, b, text) => {
+      if (kind === "text") return textEditor.add(text, screenToWorld(view.camera, view.viewport, { x: b.x, y: b.y }), { widthPx: Math.max(40, Math.abs(b.w)) });
+      return makeShape?.(kind === "sheet" ? "sheet" : "shape", kind === "sheet" ? "rect" : kind, { x: b.x, y: b.y }, { x: b.x + b.w, y: b.y + b.h }) ?? false;
+    },
     keys: keysOf,
     tools: TOOL_ORDER.map((t) => ({ id: TOOL_COMMAND[t], title: TOOL_NAME[t], use: () => editor.setTool(t) })),
     undo: () => undo(doc, editor),
@@ -3162,16 +3219,104 @@ async function start(): Promise<void> {
       agentLink.sync();
     }
   });
+  // What an agent's run did to the items (told in its answer, and where its pointer goes): from the steps the canvas stored meanwhile.
+  const watchItems = (): (() => Touched) => {
+    const made = new Set<string>(), changed = new Set<string>(), removed = new Set<string>();
+    const off = doc.subscribe((source, ids) => {
+      if (source === "load" || !ids) return;
+      const tx = source === "do" ? doc.lastTransaction : undefined;
+      for (const id of ids) {
+        if (!doc.get(id)) {
+          if (!made.delete(id)) (changed.delete(id), removed.add(id));
+        } else if (tx?.after.has(id) && !tx.before.get(id) && !removed.has(id)) made.add(id);
+        else if (!made.has(id)) changed.add(id);
+      }
+    });
+    return () => (off(), { made: [...made], changed: [...changed], removed: [...removed] });
+  };
+  /** What agents did, newest last (Settings never grows with it: the AI agent button opens it in a list). */
+  const agentLog: Array<{ at: number; title: string; ok: boolean; error?: string; ids: string[] }> = [];
+  let agentLoop = 0;
+  /** Its pointer moves to what it touched, or to the selection; the info bar says what it did. */
+  const agentRan = (method: string, params: unknown, result: unknown): void => {
+    const p = (params ?? {}) as { id?: unknown; steps?: Array<{ id?: unknown }> };
+    const r = (result ?? {}) as { ok?: boolean; error?: string; made?: string[]; changed?: string[]; results?: Array<{ ok: boolean; error?: string }> };
+    const title = (id: unknown): string => registry.get(String(id))?.title ?? String(id);
+    const ids = [...(r.made ?? []), ...(r.changed ?? [])];
+    const done = method === "batch" && r.results ? (p.steps ?? []).slice(0, r.results.length).map((st, i) => ({ title: title(st.id), res: r.results![i]! })) : [];
+    const steps = method === "run" ? [{ title: title(p.id), res: r }] : done.length ? done : [{ title: method === "batch" ? "Several commands" : "Read the list of commands", res: r.ok === false ? r : { ok: true } }];
+    for (const st of steps) agentLog.push({ at: Date.now(), title: st.title, ok: st.res.ok !== false, ...(st.res.error ? { error: st.res.error } : {}), ids });
+    if (agentLog.length > 500) agentLog.splice(0, agentLog.length - 500);
+    agentList?.refresh();
+    if (method === "list") return;
+    const last = steps[steps.length - 1];
+    const words = steps.length > 1 ? `${last?.title ?? ""} (${plural(steps.length, "step")})` : (last?.title ?? "");
+    editor.message = r.ok === false ? `AI agent: ${words}: ${r.error ?? last?.res.error ?? "not done"}` : `AI agent: ${words}`;
+    const at = performance.now();
+    const shown = ids.length ? ids : appView === "canvas" ? [...editor.selection] : [];
+    editor.agentMark = { ids: shown, title: words, at, until: at + 4000, from: view.glideMs ? agentPointerAt : null }; // (reduced motion: it jumps)
+    const loop = ++agentLoop;
+    // (frames only while the pointer glides and fades: one frame between)
+    const frames = (): void => {
+      const m = editor.agentMark;
+      if (loop !== agentLoop || !m) return;
+      const now = performance.now();
+      if (now >= m.until) return void ((editor.agentMark = null), editor.redraw());
+      editor.redraw();
+      if (now < m.at + 350 || now > m.until - 600) requestAnimationFrame(frames);
+      else setTimeout(frames, m.until - 600 - now);
+    };
+    frames();
+    editor.changed();
+  };
+  let agentList: { refresh(): void } | null = null;
+  const agentChip = document.querySelector<HTMLButtonElement>('[data-testid="agent-chip"]');
+  const showAgentChip = (connected: boolean): void => {
+    if (!agentChip) return;
+    agentChip.hidden = !settings.get("agents.on");
+    agentChip.dataset["state"] = connected ? "connected" : "waiting";
+    const words = connected ? "AI agent: connected. What it did" : "AI agent: waiting for one. What it did";
+    agentChip.setAttribute("aria-label", words);
+    agentChip.title = words;
+  };
+  agentChip?.addEventListener("click", () => void pressCommand("agents.activity"));
+  registry.setProvider("agents", () => [{
+    id: "agents.activity", group: "AI agents", kind: "settings", title: "What the AI agent did", hint: "Its last actions, newest first", icon: ICONS.tabAgents, risk: "read",
+    why: () => null,
+    exec: () => {
+      agentList = listDialog({
+        title: "What the AI agent did",
+        testid: "agent-activity-dialog",
+        lines: [agentLink.connected ? "An AI agent is connected. Turn it off in Settings > AI agents." : "No AI agent is connected now (Settings > AI agents)."],
+        body: () => `<ul class="set-errors">${agentLog.map((e, i) => ({ e, i })).reverse().map(({ e, i }) => `<li><time>${new Date(e.at).toLocaleTimeString()}</time> ${e.ok ? "" : "❌ "}${esc(e.title)}${e.error ? `: ${esc(e.error)}` : ""}${e.ids.length && e.ids.some((id) => doc.get(id)) ? ` <button type="button" class="set-done" data-agent-go="${i}">Go there</button>` : ""}</li>`).join("") || "<li>Nothing yet.</li>"}</ul>`,
+        onClick: (t, _refresh, close) => {
+          const i = t.closest<HTMLElement>("[data-agent-go]")?.dataset["agentGo"];
+          const e = i === undefined ? undefined : agentLog[Number(i)];
+          if (!e) return;
+          close();
+          setView("canvas");
+          void pressCommand("select.items", { ids: e.ids.filter((id) => doc.get(id)) });
+          void pressCommand("view.fitSelection");
+        },
+      });
+      return { ok: true };
+    },
+  }]);
   const agentLink = mountAgentLink({
     registry,
     on: () => settings.get("agents.on"),
     code: () => settings.get("agents.code") || toolsCode, // (typed, or the desktop app's: the code the canvast tools made on this computer)
     readOnly: () => settings.get("agents.readOnly"),
     say: (text) => { editor.message = text; editor.changed(); },
+    changed: showAgentChip,
+    watch: watchItems,
+    ran: agentRan,
   });
+  showAgentChip(false);
   settings.subscribe(() => {
     if (settings.get("agents.on")) readToolsCode(); // (the tools may have made their code since)
     agentLink.sync();
+    showAgentChip(agentLink.connected);
   });
   if (settings.get("agents.on")) readToolsCode();
   // The context menu (right click, or the menu key): the commands that fit what is under the pointer and what is picked, from the same registry.

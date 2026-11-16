@@ -225,6 +225,8 @@ export function mountNavigator(root: HTMLElement, session: Session, openCanvasVi
     },
   });
   commands.setProvider("navigator-actions", () => [
+    { id: "read.canvases", group: "Boards and canvases", kind: "canvas", title: "List the boards and canvases", hint: "Their ids and names, and which is open", risk: "read", why: () => (session.tree ? null : REASON.noWorkspace),
+      exec: () => ({ ok: true, value: session.tree!.boards.map((b) => ({ id: b.board.id, name: b.board.name, canvases: b.canvases.map((c) => ({ id: c.id, name: c.name, items: c.objectCount, open: session.current?.canvasId === c.id })) })) }) },
     nav("canvas.openId", "Open a canvas", "By its id", "edit", [ID], (o) => session.openCanvas(String(o["id"])), hasCanvas),
     nav("canvas.newIn", "New canvas on a board", "An empty canvas", "edit", [{ ...ID, doc: "the board" }], (o) => session.newCanvas(String(o["id"])), hasBoard),
     nav("canvas.renameId", "Rename a canvas", "By its id", "edit", [ID, { name: "name", type: "text", doc: "the new name", required: true }], (o) => session.renameCanvas(String(o["id"]), String(o["name"])), hasCanvas),

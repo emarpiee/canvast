@@ -37,7 +37,7 @@ export type Options = Readonly<Record<string, unknown>>;
 
 /** What a run gave: done, with what it made or changed (ids) and any value it reads; or an error in plain words. */
 export type Result =
-  | { ok: true; made?: readonly string[]; changed?: readonly string[]; value?: unknown; note?: string }
+  | { ok: true; made?: readonly string[]; changed?: readonly string[]; removed?: readonly string[]; value?: unknown; note?: string }
   | { ok: false; error: string; suggest?: readonly string[] };
 
 /** Who runs a command: the person (a button, a menu, a key, the palette), a macro, a test, or an outside caller (the control channel). */

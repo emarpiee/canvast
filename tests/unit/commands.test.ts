@@ -200,6 +200,10 @@ describe("the link to AI agents, the app's side (ADR 0205)", () => {
     expect(((await answer(r, "run", { id: "a.edit" }, true)) as { ok: boolean }).ok).toBe(false);
     expect(await answer(r, "run", { id: "a.read" }, true)).toEqual({ ok: true, value: 1 });
     expect(await answer(r, "batch", { steps: [{ id: "a.edit" }, { id: "a.edit" }] }, false)).toMatchObject({ ok: true, completed: 2 });
+    // what a run did to the items is told in its answer; a refused run tells nothing
+    const watch = () => () => ({ made: ["n1"], changed: [], removed: ["o1"] });
+    expect(await answer(r, "run", { id: "a.edit" }, false, watch)).toEqual({ ok: true, made: ["n1"], removed: ["o1"] });
+    expect(await answer(r, "run", { id: "a.pass" }, false, watch)).not.toHaveProperty("made");
     await expect(answer(r, "drop", {}, false)).rejects.toThrow("no method");
     await expect(answer(r, "run", {}, false)).rejects.toThrow("id");
     expect(log).toEqual(["edit", "edit", "edit"]);

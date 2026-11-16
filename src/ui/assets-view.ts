@@ -5679,6 +5679,15 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     lib("library.importFolder", "Import a folder", "With its subfolders", "edit", () => folderInput.click(), writable),
     lib("library.newNote", "New note", "A markdown note, opened to write in", "edit", () => newNote(), writable),
     lib("library.slideshowShown", "Slideshow", "The selected items, or everything listed", "edit", () => slideshow(), () => inLibrary() ?? (filtered().length ? null : "Nothing is listed.")),
+    lib("library.search", "Search the library", "Files whose name, tags or words match, as the search box finds them", "read", async (o) => {
+      const all = listing && !pagesNow() ? listing : await session.catalog?.list().catch(() => null);
+      if (!all) return { ok: false, error: REASON.noWorkspace };
+      const words = searchWords(String(o["query"] ?? ""));
+      const concealed = concealedNow();
+      const max = typeof o["limit"] === "number" ? Math.floor(o["limit"]) : 50;
+      const found = all.entries.filter((e) => inScopeOf(withUsage(e), "all", { concealed }, hiddenMode) && matchesQuery(e, words, "all", "all"));
+      return { ok: true, value: { total: found.length, items: found.slice(0, max).map((e) => ({ hash: e.hash, name: e.name, type: e.type, size: e.size, tags: meta(e).tags })) } };
+    }, () => (session.catalog ? null : REASON.noWorkspace), { options: [{ name: "query", type: "text", doc: "words, #tag or a property, as typed in the Library's search", required: true }, { name: "limit", type: "number", doc: "at most this many (default 50)", min: 1, max: 500 }] }),
     lib("library.reload", "Reload the library", "Read it again and draw every card anew", "read", () => { relistAll = true; void refresh(); }),
     lib("library.placeOn", "Place on a canvas", "On a canvas, or a new canvas or board", "edit", (o) => {
       const hashes = itemsOf(o);

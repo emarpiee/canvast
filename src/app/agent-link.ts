@@ -23,7 +23,14 @@ export interface AgentLinkDeps {
   say(text: string): void;
   /** Whether it is connected changed (what shows it on the screen). */
   changed?(connected: boolean): void;
+  /** Start noting what the canvas's items do; the function returned stops and tells (what a run made, changed or removed). */
+  watch?: Watch;
+  /** A call was answered: what it asked and what came of it (what shows the person where the agent works). */
+  ran?(method: string, params: unknown, result: unknown): void;
 }
+
+export type Touched = { made: string[]; changed: string[]; removed: string[] };
+export type Watch = () => () => Touched;
 
 export interface AgentLink {
   readonly connected: boolean;
@@ -32,18 +39,28 @@ export interface AgentLink {
 }
 
 /** How a request is answered: the one place an agent's call becomes a command's run. */
-export async function answer(registry: CommandRegistry, method: string, params: unknown, readOnly: boolean): Promise<unknown> {
+export async function answer(registry: CommandRegistry, method: string, params: unknown, readOnly: boolean, watch?: Watch): Promise<unknown> {
   registry.readOnlyCallers = readOnly;
   const p = (params ?? {}) as { id?: unknown; options?: unknown; steps?: unknown; filter?: unknown; stopOnError?: unknown };
   if (method === "list") return registry.list(typeof p.filter === "string" ? p.filter : "");
+  // (what the run did to the items, told in its answer when the command does not say it itself: the agent sees what it made)
+  const told = async <R extends { ok: boolean }>(run: Promise<R>): Promise<R> => {
+    const stop = watch?.();
+    const r = await run;
+    const t = stop?.();
+    if (!t || !r.ok) return r;
+    const out: Record<string, unknown> = { ...r };
+    for (const k of ["made", "changed", "removed"] as const) if (t[k].length && out[k] === undefined) out[k] = t[k];
+    return out as unknown as R;
+  };
   if (method === "run") {
     if (typeof p.id !== "string") throw new Error('"run" needs the id of a command.');
-    return registry.execute(p.id, (p.options ?? {}) as Options, { caller: "agent" });
+    return told(registry.execute(p.id, (p.options ?? {}) as Options, { caller: "agent" }));
   }
   if (method === "batch") {
     if (!Array.isArray(p.steps)) throw new Error('"batch" needs its steps: [{ id, options }].');
     if (p.steps.length > MAX_BATCH) throw new Error(`A batch has at most ${MAX_BATCH} steps.`);
-    return registry.batch(p.steps as Array<{ id: string; options?: Options }>, { caller: "agent" }, p.stopOnError !== false);
+    return told(registry.batch(p.steps as Array<{ id: string; options?: Options }>, { caller: "agent" }, p.stopOnError !== false));
   }
   throw new Error(`There is no method "${method}": list, run or batch.`);
 }
@@ -93,9 +110,16 @@ export function mountAgentLink(deps: AgentLinkDeps): AgentLink {
         return;
       }
       const id = req.id;
-      void answer(deps.registry, String(req.method), req.params, deps.readOnly()).then(
-        (result) => sock.readyState === WebSocket.OPEN && sock.send(JSON.stringify({ id, result })),
-        (err: unknown) => sock.readyState === WebSocket.OPEN && sock.send(JSON.stringify({ id, error: (err as Error)?.message ?? String(err) })),
+      void answer(deps.registry, String(req.method), req.params, deps.readOnly(), deps.watch).then(
+        (result) => {
+          deps.ran?.(String(req.method), req.params, result);
+          if (sock.readyState === WebSocket.OPEN) sock.send(JSON.stringify({ id, result }));
+        },
+        (err: unknown) => {
+          const error = (err as Error)?.message ?? String(err);
+          deps.ran?.(String(req.method), req.params, { ok: false, error });
+          if (sock.readyState === WebSocket.OPEN) sock.send(JSON.stringify({ id, error }));
+        },
       );
     };
     sock.onclose = () => {

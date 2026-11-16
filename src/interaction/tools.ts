@@ -354,6 +354,8 @@ export interface ToolHooks {
    * items, a hidden or locked thing); `onOpen` runs just before it opens. Whether it opened.
    */
   revealList(at: ScreenPoint, pick: (ids: readonly ObjectId[], enter: readonly string[], additive: boolean) => void, opts: { onlyIfChoice: boolean; onOpen(): void; add?: boolean; touch?: boolean }): boolean;
+  /** Takes the way to make a shape or a sheet from corner `a` to corner `b` without a drag (a command's: `item.create`), drawn as the tool draws it. */
+  setMaker?(make: (tool: "shape" | "sheet", kind: Exclude<ShapeKind, "balloon">, a: ScreenPoint, b: ScreenPoint) => boolean): void;
 }
 
 export function attachTools(
@@ -846,6 +848,25 @@ export function attachTools(
     doc.commit(doc.transaction(editor.tool === "sheet" ? "Draw sheet" : `Draw ${SHAPE_NAMES[d.kind].toLowerCase()}`, [obj]));
     editor.selectMade([obj.id]); // (the tool stays; its handles, a balloon's tail too, work on it: madeHandlePress)
   };
+
+  hooks.setMaker?.((tool, kind, a, b) => {
+    if (g.kind !== "none" || editor.blockEdit()) return false;
+    const was = { tool: editor.tool, kind: editor.shapeKind };
+    editor.tool = tool;
+    editor.shapeKind = kind;
+    // (Ctrl held: no snapping, the corners are where the command says)
+    const ev = { ctrlKey: true, metaKey: false, shiftKey: false, altKey: false, pointerId: -1 } as PointerEvent;
+    try {
+      startShape(a, ev);
+      commitShape(b, false, ev, a);
+    } finally {
+      g = { kind: "none" };
+      editor.tool = was.tool;
+      editor.shapeKind = was.kind;
+      editor.changed();
+    }
+    return true;
+  });
 
   // The Path tool: a click adds a corner, a drag pulls a smooth node's handles out, a click on the first node closes the path;
   // Enter or a double-click ends it open.
