@@ -54,7 +54,7 @@ export function commandItems(registry: CommandRegistry, titles: readonly string[
     const c = all.find((x) => x.title === title && x.group !== "Tool");
     const row = ROWS[title];
     if (!c || !row || (c.enabled && !c.enabled())) return [];
-    return [{ label: title, ...row, danger: title.startsWith("Delete"), run: () => void registry.run(c.id) }];
+    return [{ label: title, ...row, danger: title.startsWith("Delete"), command: c.id, run: () => void registry.press(c.id) }];
   });
 }
 

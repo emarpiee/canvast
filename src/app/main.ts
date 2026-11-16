@@ -610,7 +610,7 @@ async function start(): Promise<void> {
   settings.subscribe((key) => {
     if (key === "notes.cardProps" && setShownProps(settings.get("notes.cardProps"))) redrawNoteCards();
   });
-  matchMedia("(prefers-color-scheme: dark)").addEventListener("change", applyNoteLook);
+  matchMedia("(prefers-color-scheme: dark)").addEventListener("change", applyNoteLook); // view-state: (the system's light or dark)
   const autoDatesNow = (): void => setAutoDates({ on: settings.get("notes.autoDates"), created: settings.get("notes.createdKey"), modified: settings.get("notes.modifiedKey"), format: settings.get("notes.dateFormat"), title: settings.get("notes.titleKey"), titleFrom: settings.get("notes.titleFrom"), rename: settings.get("notes.renameOnSave"), nameFrom: settings.get("notes.nameFrom"), nameStyle: settings.get("notes.nameStyle") });
   autoDatesNow();
   settings.subscribe((key) => AUTO_NOTE_SETTINGS.includes(key) && autoDatesNow());
@@ -1140,6 +1140,7 @@ async function start(): Promise<void> {
     invalidate();
   };
   new ResizeObserver(resize).observe(host);
+  // view-state: (the system's light or dark)
   matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => {
     theme = readTheme(document.documentElement);
     setCanvasInk(theme.ink);
@@ -1211,7 +1212,7 @@ async function start(): Promise<void> {
     },
   });
   document.addEventListener("click", (e) => {
-    if ((e.target as HTMLElement).closest?.("[data-photocraft-close]")) void photoCraft.close();
+    if ((e.target as HTMLElement).closest?.("[data-photocraft-close]")) pressCommand("artcraft.photocraft.close");
   });
   const textEditor = mountTextEditor(host, view, doc, editor, libraryFonts, () => settings.get("ui.properties"));
   textFollow = textEditor.follow;
@@ -1337,20 +1338,20 @@ async function start(): Promise<void> {
       let add = opts.add ?? false;
       const HINT: Record<RevealWhy, string> = { hidden: "Hidden: click to show it", locked: "Locked: click to unlock it", mask: "Part of a mask" };
       const items = (): MenuItem[] => [
-        { id: "reveal-add", label: "Add to the selection", hint: "Click to add or remove; click outside to end", icon: ICONS.listChecks, checked: add, run: () => { add = !add; } },
+        { id: "reveal-add", label: "Add to the selection", hint: "Click to add or remove; click outside to end", icon: ICONS.listChecks, checked: add, command: "select.items", run: () => { add = !add; } }, // (how the rows below select: they run select.items)
         ...rows.map((r, i): MenuItem => {
           const on = r.ids.every((id) => editor.selection.has(id));
           return { id: `reveal:${r.key ?? r.ids[0]}`, label: `${"\u2003".repeat(r.depth ?? 0)}${r.label}`, hint: r.why ? HINT[r.why] : r.from === "selection" ? "In the selection: select this one" : "Select this one", icon: r.icon, checked: on, disabled: r.why === "mask", ...(r.sep && i > 0 ? { sep: true } : {}), run: () => {
             if (r.why === "hidden" || r.why === "locked") {
-              setFlagOn(doc, editor, r.ids, r.why, false);
+              pressCommand(r.why === "hidden" ? "item.unhide" : "item.unlock", { ids: r.ids });
               return void closeMoreMenu();
             }
-            if (add && on) editor.select([...editor.selection].filter((x) => !r.ids.includes(x)));
+            if (add && on) pressCommand("select.items", { ids: [...editor.selection].filter((x) => !r.ids.includes(x)) });
             else pick(r.ids, r.enter, add);
             if (!add) closeMoreMenu();
           } };
         }),
-        ...(opts.touch ? canvasItems(registry, true).map((it, i): MenuItem => ({ ...it, ...(i === 0 ? { sep: true } : {}), run: () => { closeMoreMenu(); it.run(); } })) : []),
+        ...(opts.touch ? canvasItems(registry, true).map((it, i): MenuItem => ({ ...it, ...(i === 0 ? { sep: true } : {}), run: () => { closeMoreMenu(); it.run(); } })) : []), // (canvasItems' rows carry their command)
       ];
       openMoreMenu(anchor, items(), opts.touch ? "Under your finger" : "Choose what to select", {
         keepOpen: true,
@@ -1883,7 +1884,7 @@ async function start(): Promise<void> {
         const { record } = await assets.importFileDetailed(file, false);
         const where = await fileInLibraryAs(record.hash, targets.some((t) => holdsPattern(t.ids)) ? "pattern" : "export");
         editor.message = `Exported “${file.name}” in ${where}.`;
-        editor.messageAction = { label: "View", run: () => { setView("assets"); void assetsView.reveal([record.hash]); } };
+        editor.messageAction = { label: "View", command: "library.reveal", run: () => void pressCommand("library.reveal", { hashes: [record.hash] }) };
         editor.changed();
       },
     });
@@ -1977,7 +1978,7 @@ async function start(): Promise<void> {
         if (png && (await writeSystemClipboard({ image: png })) === "image") forgetCopiedPicture();
       }
       editor.message = `Screenshot saved: “${fileName}” in ${where}.`;
-      editor.messageAction = { label: "View", run: () => { setView("assets"); void assetsView.reveal([record.hash]); } };
+      editor.messageAction = { label: "View", command: "library.reveal", run: () => void pressCommand("library.reveal", { hashes: [record.hash] }) };
       editor.changed();
     } catch (e) {
       editor.message = `Could not save the screenshot: ${(e as Error).message}`;
@@ -2165,7 +2166,7 @@ async function start(): Promise<void> {
       const { record } = await assets.importFileDetailed(new File([text], name, { type: "image/svg+xml" }), false);
       const where = await fileInLibraryAs(record.hash, holdsPattern([...editor.selection, ...descendantsOf(doc.all(), editor.selection)]) ? "pattern" : "svg");
       editor.message = `Saved “${name}” in ${where}.${svgWarningOfSelection(doc, editor) ? ` ${svgWarningOfSelection(doc, editor)}` : ""}`;
-      editor.messageAction = { label: "View", run: () => { setView("assets"); void assetsView.reveal([record.hash]); } };
+      editor.messageAction = { label: "View", command: "library.reveal", run: () => void pressCommand("library.reveal", { hashes: [record.hash] }) };
     } catch (e) {
       editor.message = `Could not save to the library: ${(e as Error).message}`;
     }
@@ -3004,7 +3005,7 @@ async function start(): Promise<void> {
     editor.changed();
   });
   // The save indicator opens Settings > Storage, the one place for space, the library folder, saving and backups.
-  document.querySelector<HTMLElement>('[data-testid="save-status"]')!.addEventListener("click", () => { setView("settings"); settingsView.show("storage"); });
+  document.querySelector<HTMLElement>('[data-testid="save-status"]')!.addEventListener("click", () => void pressCommand("settings.tab:storage"));
 
   // The command palette (ADR 0117, 0129): Ctrl+K or Ctrl+Shift+P finds any command by words, and `@kind` narrows it to a kind. The commands come
   // from the registry (src/commands): each part of the app adds its own, so a new feature or a macro has one place to put them.
@@ -3029,6 +3030,9 @@ async function start(): Promise<void> {
     selectionSize: () => editor.selection.size,
     readOnly: () => session.readOnly,
     select: (ids) => editor.select([...ids]),
+    selectItems: (ids, add) => editor.select(add ? [...new Set([...editor.selection, ...ids])] : [...ids]),
+    clearFlagOn: (ids, flag) => setFlagOn(doc, editor, [...ids], flag, false),
+    revealInLibrary: (hashes) => { setView("assets"); void assetsView.reveal([...hashes]); },
     itemIds: () => new Set([...doc.all()].map((o) => o.id)),
     keys: keysOf,
     tools: TOOL_ORDER.map((t) => ({ id: TOOL_COMMAND[t], title: TOOL_NAME[t], use: () => editor.setTool(t) })),
@@ -3174,7 +3178,10 @@ async function start(): Promise<void> {
   registry.setProvider("bars", () => (appView === "canvas" ? barCommands() : []));
   registry.setProvider("artcraft", () =>
     PHOTOCRAFT_FEATURES.entry.newDocument && photoCraft.available
-      ? [{ id: "artcraft.photocraft.open", group: "ArtCraft", kind: "artcraft", title: "Open PhotoCraft", hint: "A new document in the photo editor", risk: "edit", words: "photo editor new document image edit layers", exec: () => photoCraft.openBlank() }]
+      ? [
+          { id: "artcraft.photocraft.open", group: "ArtCraft", kind: "artcraft", title: "Open PhotoCraft", hint: "A new document in the photo editor", risk: "edit", words: "photo editor new document image edit layers", exec: () => photoCraft.openBlank() },
+          { id: "artcraft.photocraft.close", group: "ArtCraft", kind: "artcraft", title: "Close PhotoCraft", hint: "It asks first when something is not saved", risk: "edit", words: "photo editor quit", exec: () => photoCraft.close() },
+        ]
       : []);
   // Boards and canvases of the navigator, and the fixed shortcuts of Settings > Shortcuts (choosing one opens that list).
   registry.setProvider("navigator", () => {

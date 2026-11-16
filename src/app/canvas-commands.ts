@@ -13,6 +13,12 @@ export interface CanvasActions {
   selectionSize(): number;
   readOnly(): boolean;
   select(ids: readonly string[]): void;
+  /** Select these items, or add them to the selection (`add`); entering the groups they are in when they are inside one. */
+  selectItems(ids: readonly string[], add: boolean): void;
+  /** Show (unhide) or unlock these items. */
+  clearFlagOn(ids: readonly string[], flag: "hidden" | "locked"): void;
+  /** These library files, in the Library. */
+  revealInLibrary(hashes: readonly string[]): void;
   /** Every item id on the canvas now (what a command made is told from it). */
   itemIds(): ReadonlySet<string>;
   /** The keys of a command now (Settings > Shortcuts). */
@@ -164,6 +170,16 @@ export function canvasCommands(a: CanvasActions): Command[] {
     cmd("edit.delete", "Edit", "Delete the selection", "From this canvas", "confirm", picked, onItems(() => a.deleteSelection()), { options: [IDS], words: "remove erase" }),
     cmd("edit.showHidden", "Edit", "Show all hidden", "Items hidden on this canvas", "edit", when(canvas, a.anyHidden, "Nothing is hidden on this canvas."), () => a.showHidden(), { words: "unhide reveal eye" }),
     cmd("edit.unlockAll", "Edit", "Unlock all", "So they can be moved", "edit", when(canvas, a.anyLocked, "Nothing is locked."), () => a.unlockAll(), { words: "unlock locked" }),
+    cmd("select.items", "Edit", "Select items", "These items, or add them to the selection", "edit", canvas, (o) => {
+      const ids = o["ids"] as string[];
+      const there = a.itemIds();
+      const gone = ids.filter((id) => !there.has(id));
+      if (gone.length) return { ok: false, error: `No item ${gone.slice(0, 3).map((g) => `"${g}"`).join(", ")} on this canvas.` };
+      a.selectItems(ids, o["add"] === true);
+      return { ok: true };
+    }, { options: [{ name: "ids", type: "ids", doc: "the items", required: true }, { name: "add", type: "boolean", doc: "add them to what is selected" }] }),
+    ...(["hidden", "locked"] as const).map((flag) => cmd(flag === "hidden" ? "item.unhide" : "item.unlock", "Edit", flag === "hidden" ? "Show items" : "Unlock items", flag === "hidden" ? "Hidden items on this canvas, shown again" : "So they can be moved", "edit", canvas, (o) => a.clearFlagOn(o["ids"] as string[], flag), { options: [{ name: "ids", type: "ids", doc: "the items", required: true }] })),
+    cmd("library.reveal", "Go to", "Show in the Library", "These files, in the Library", "edit", () => null, (o) => a.revealInLibrary(o["hashes"] as string[]), { options: [{ name: "hashes", type: "ids", doc: "the library files", required: true }] }),
     cmd("edit.selectAll", "Edit", "Select everything", "All on this canvas", "edit", canvas, () => a.selectAll(), { words: "all"}),
 
     item("edit.group", "Arrange", "Group", "Move them as one", () => a.group()),
