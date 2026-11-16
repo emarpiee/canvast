@@ -2,7 +2,7 @@
 
 ## 0.60.14 — Every action a command, and a link to AI agents (2026-11-16)
 
-- **Added:** **Settings > AI agents** (off until you turn it on): an AI agent on this computer (a program that speaks MCP, such as Claude Desktop or Claude Code) can list and run canvast's commands through the canvas tools (`canvast-tools mcp`), once you type the pairing code the tools show. Deleting, hidden items, replacing the workspace and writing files ask you first, in canvast; the password, these settings and what opens hidden items are never the agent's; **Agents may only look** lets it read and change nothing (B25).
+- **Added:** **Settings > AI agents** (off until you turn it on): an AI agent on this computer (a program that speaks MCP, such as Claude Desktop or Claude Code) can list and run canvast's commands through the canvast tools (`canvast-tools mcp`), once you type the pairing code the tools show. Deleting, hidden items, replacing the workspace and writing files ask you first, in canvast; the password, these settings and what opens hidden items are never the agent's; **Agents may only look** lets it read and change nothing (B25).
 - **Changed:** the keys run the same commands as the buttons, the menus and the command palette, and a macro records whatever ran a command (a button, a menu row, a key), not only the palette; a step dragged live (a slider) is left out, the value it ends on is kept.
 
 ### For developers

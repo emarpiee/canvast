@@ -14,7 +14,7 @@ for (const m of html.matchAll(/\b(?:src|href|srcset|poster|data|action)\s*=\s*["
 for (const m of html.matchAll(/(?:url\(\s*["']?|@import\s+["'])((?:https?:)?\/\/[^"')\s]+)/gi)) {
   problems.push(`external CSS reference: ${m[1]}`);
 }
-/** The one address the page may connect to: the canvas tools on this computer, for AI agents (ADR 0205; off until the person turns it on). */
+/** The one address the page may connect to: the canvast tools on this computer, for AI agents (ADR 0205; off until the person turns it on). */
 const LOOPBACK = /^ws:\/\/127\.0\.0\.1:(47380|\$\{\w+\})\/canvast\?/;
 // Module or script loading by URL from inside code.
 for (const m of html.matchAll(/\b(?:import\s*\(|importScripts\s*\(|fetch\s*\(|new\s+(?:Worker|WebSocket|EventSource)\s*\()\s*["'`](https?:|wss?:|\/\/)[^"'`]*/gi)) {
@@ -58,7 +58,7 @@ for (const m of html.matchAll(/(?:https?|wss?):\/\/[^\s"'`)<>]+/gi)) {
 // The page's own Content-Security-Policy is the second wall (the browser refuses what it forbids): it must stay closed.
 const csp = /<meta http-equiv="Content-Security-Policy" content="([^"]*)"/.exec(html)?.[1] ?? "";
 const directive = (name) => csp.split(";").map((d) => d.trim()).find((d) => d.startsWith(`${name} `));
-// (connect-src: the canvas tools on this computer and nothing else, for AI agents, ADR 0205: the page opens it only while the person has it on)
+// (connect-src: the canvast tools on this computer and nothing else, for AI agents, ADR 0205: the page opens it only while the person has it on)
 for (const [name, want] of [["default-src", "'none'"], ["connect-src", "ws://127.0.0.1:47380"], ["base-uri", "'none'"], ["form-action", "'none'"], ["object-src", "'none'"]]) {
   if (directive(name) !== `${name} ${want}` && !(name === "object-src" && directive("default-src") === "default-src 'none'")) problems.push(`CSP: ${name} must be ${want} (is: ${directive(name) ?? "missing"})`);
 }

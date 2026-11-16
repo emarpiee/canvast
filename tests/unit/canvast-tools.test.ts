@@ -120,7 +120,7 @@ describe("canvast tools: a workspace's hidden items shared, decrypted only as th
   });
 });
 
-describe("canvas tools: the link to AI agents (mcp, ADR 0205)", () => {
+describe("canvast tools: the link to AI agents (mcp, ADR 0205)", () => {
   it("answers MCP: initialize, the tools, and calls passed on to canvast", async () => {
     const calls: Array<[string, unknown]> = [];
     const app = async (method: string, params: unknown): Promise<unknown> => {

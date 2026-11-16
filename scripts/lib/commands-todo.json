@@ -2,15 +2,9 @@
   "//": "Actions made before the rule (ADR 0205), counted per file by npm run check:commands. The list only shrinks: move an action to a command, then lower its count (npm run check:commands -- --shrink). Never raise a count or add a file.",
   "files": {
     "src/app/editor-state.ts": 1,
-    "src/app/hud.ts": 1,
     "src/app/progress.ts": 2,
-    "src/ui/assets-view.ts": 3,
-    "src/ui/context-menu.ts": 1,
-    "src/ui/model-view.ts": 1,
     "src/ui/more-menu.ts": 1,
-    "src/ui/notices.ts": 1,
-    "src/ui/text-editor.ts": 1,
-    "src/ui/toolbar.ts": 3
+    "src/ui/notices.ts": 1
   },
   "live": {
     "rule": 193,

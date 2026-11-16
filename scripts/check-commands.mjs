@@ -132,7 +132,7 @@ function topKeys(text, from, to) {
     if (c === "{" || c === "(" || c === "[") depth++;
     else if (c === "}" || c === ")" || c === "]") depth--;
     else if (depth === 0) {
-      const m = /^(?:\.\.\.)?([A-Za-z_$][\w$]*)\s*(:|\(|,|\s*})/.exec(text.slice(i, i + 64));
+      const m = /^(?:\.\.\.)?([A-Za-z_$][\w$]*)\??\s*(:|\(|,|\s*})/.exec(text.slice(i, i + 64)); // (an optional key too: command?:)
       const prev = text.slice(Math.max(from + 1, i - 1), i);
       if (m && (i === from + 1 || /[\s,{]/.test(prev))) {
         keys.add(m[1]);

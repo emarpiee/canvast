@@ -79,9 +79,9 @@ export const SETTINGS = {
   /** Hidden mode stays on when the library is left (it still ends with Exit, the word deleted, locking, or closing the app). */
   "library.hiddenCopySeconds": { scope: "device", default: 30, validate: range(0, 3600), effect: "immediate" } as Def<number>,
   "library.hiddenStay": { scope: "device", default: false, validate: bool, effect: "immediate" } as Def<boolean>,
-  /** AI agents (ADR 0205): an MCP client may run canvast's commands through the canvas tools on this computer. Off until the person turns it on. */
+  /** AI agents (ADR 0205): an MCP client may run canvast's commands through the canvast tools on this computer. Off until the person turns it on. */
   "agents.on": { scope: "device", default: false, validate: bool, effect: "immediate" } as Def<boolean>,
-  /** The pairing code the canvas tools show: only a program that knows it is answered. */
+  /** The pairing code the canvast tools show: only a program that knows it is answered. */
   "agents.code": { scope: "device", default: "", validate: text(32), effect: "immediate" } as Def<string>,
   /** Agents may only read (list, search, look): every other command is refused to them. */
   "agents.readOnly": { scope: "device", default: false, validate: bool, effect: "immediate" } as Def<boolean>,
