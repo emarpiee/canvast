@@ -8,6 +8,12 @@ import { REASON } from "../commands/types";
  */
 export type Panel = "adjust" | "layers" | "bookmarks" | "pattern" | "styles" | "tags";
 
+/** One item as an outside caller reads it: `box` is its place on the view in px (null when it is off the view). */
+export interface ItemRow { id: string; kind: string; name: string; box: { x: number; y: number; w: number; h: number } | null; selected: boolean; hidden?: boolean; locked?: boolean }
+export const ITEMS_MAX = 1000;
+export const MAKE_KINDS = ["rect", "ellipse", "line", "polygon", "star", "sheet", "text"] as const;
+export type MakeKind = (typeof MAKE_KINDS)[number];
+
 export interface CanvasActions {
   onCanvas(): boolean;
   selectionSize(): number;
@@ -23,6 +29,12 @@ export interface CanvasActions {
   itemIds(): ReadonlySet<string>;
   /** The keys of a command now (Settings > Shortcuts). */
   keys(id: string): string;
+  /** The items on the view, every item of the canvas (at most `ITEMS_MAX`), or the selected ones, as an outside caller reads them. */
+  items(which: "view" | "all" | "selection"): { rows: ItemRow[]; total: number };
+  /** The view's size in px (where `item.create` places things). */
+  viewSize(): { width: number; height: number };
+  /** Make a shape, a sheet or a text in the box `b` (px of the view), as its tool makes it, selected. Whether it could. */
+  make(kind: MakeKind, b: { x: number; y: number; w: number; h: number }, text: string): boolean;
   tools: ReadonlyArray<{ id: string; title: string; use(): void }>;
 
   undo(): void;
@@ -183,6 +195,36 @@ export function canvasCommands(a: CanvasActions): Command[] {
     ...(["hidden", "locked"] as const).map((flag) => cmd(flag === "hidden" ? "item.unhide" : "item.unlock", "Edit", flag === "hidden" ? "Show items" : "Unlock items", flag === "hidden" ? "Hidden items on this canvas, shown again" : "So they can be moved", "edit", canvas, (o) => a.clearFlagOn(o["ids"] as string[], flag), { options: [{ name: "ids", type: "ids", doc: "the items", required: true }] })),
     cmd("library.reveal", "Go to", "Show in the Library", "These files, in the Library", "edit", () => null, (o) => a.revealInLibrary(o["hashes"] as string[]), { options: [{ name: "hashes", type: "ids", doc: "the library files", required: true }] }),
     cmd("edit.selectAll", "Edit", "Select everything", "All on this canvas", "edit", canvas, () => a.selectAll(), { words: "all"}),
+    cmd("item.create", "Edit", "Make an item", "A shape, a sheet or a text, at a place on the view", "edit", writable(canvas), (o) => {
+      const v = a.viewSize();
+      const kind = o["kind"] as MakeKind;
+      const w = typeof o["w"] === "number" ? o["w"] : kind === "text" ? 320 : 240;
+      const h = typeof o["h"] === "number" ? o["h"] : kind === "line" ? 0 : 160;
+      const x = typeof o["x"] === "number" ? o["x"] : (v.width - w) / 2;
+      const y = typeof o["y"] === "number" ? o["y"] : (v.height - h) / 2;
+      const text = typeof o["text"] === "string" ? o["text"].trim() : "";
+      if (kind === "text" && !text) return { ok: false, error: "A text needs its words (text)." };
+      if (kind !== "text" && Math.hypot(w, h) < 4) return { ok: false, error: "Too small to make: give w and h of a few px at least." };
+      const before = a.itemIds();
+      if (!a.make(kind, { x, y, w, h }, text)) return { ok: false, error: "Nothing could be made now (a tool is in use, or the canvas cannot be changed)." };
+      const made = [...a.itemIds()].filter((id) => !before.has(id));
+      return made.length ? { ok: true, made } : { ok: false, error: "Nothing was made." };
+    }, { options: [
+      { name: "kind", type: "choice", doc: "what to make", choices: MAKE_KINDS, required: true },
+      { name: "x", type: "number", doc: "its left, in px of the view (default: centred)", min: -100000, max: 100000 },
+      { name: "y", type: "number", doc: "its top, in px of the view (default: centred)", min: -100000, max: 100000 },
+      { name: "w", type: "number", doc: "its width in px (default 240; a line goes from x, y to x + w, y + h)", min: -100000, max: 100000 },
+      { name: "h", type: "number", doc: "its height in px (default 160)", min: -100000, max: 100000 },
+      { name: "text", type: "text", doc: "a text's words (Markdown)" },
+    ], words: "add new draw create shape rectangle ellipse line star sheet frame text" }),
+    cmd("read.items", "Read", "List the items", "Their id, kind, name and place on the view", "read", canvas, (o) => {
+      const { rows, total } = a.items(o["all"] === true ? "all" : "view");
+      return { ok: true, value: { items: rows, total }, ...(rows.length < total ? { note: `The first ${rows.length} of ${total}.` } : {}) };
+    }, { options: [{ name: "all", type: "boolean", doc: `every item of the canvas, not only those on the view (at most ${ITEMS_MAX.toLocaleString()})` }] }),
+    cmd("read.selection", "Read", "List the selected items", "Their id, kind, name and place on the view", "read", canvas, () => {
+      const { rows, total } = a.items("selection");
+      return { ok: true, value: { items: rows, total } };
+    }),
 
     item("edit.group", "Arrange", "Group", "Move them as one", () => a.group()),
     item("edit.ungroup", "Arrange", "Ungroup", "Separate them again", () => a.ungroup()),

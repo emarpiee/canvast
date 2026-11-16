@@ -90,6 +90,7 @@
   --r-md: 8px;
   --r-lg: 12px;
   --r-pill: 999px;
+  --gear-w: var(--bar-h); /* (the Settings button and what stands beside it, at the top right: the bars stop short of it) */
   --r-dot: 50%; /* (a round dot, a swatch, a round button: a square in sharp corners) */
 
   /* ==== Design tokens (ADR 0068). Every colour, text size, weight, space, radius and icon size in this file is one of these; no literal
@@ -1165,7 +1166,13 @@ input[type="radio"]:checked::before { content: ""; width: var(--sp-3); height: v
 #toolbar > .dock > .tb-group { flex-direction: column; gap: var(--s-2); }
 #toolbar > .dock { flex-direction: column; gap: var(--s-2); top: calc((var(--edge) + var(--bar-h) + var(--near)) / var(--ui-scale, 1)); right: calc(var(--edge) / var(--ui-scale, 1)); max-height: calc(100dvh - (2 * var(--edge) + var(--bar-h) + 2 * var(--near) + var(--hud-bottom-h, var(--bar-h))) / var(--ui-scale, 1)); overflow-y: auto; scrollbar-width: none; }
 /* Settings: a button of its own in the top-right corner of every view. */
-.view-settings { position: fixed; pointer-events: auto; top: var(--edge); right: var(--edge); z-index: var(--z-edge); zoom: var(--ui-scale, 1); }
+.view-settings { position: fixed; pointer-events: auto; top: var(--edge); right: var(--edge); z-index: var(--z-edge); zoom: var(--ui-scale, 1); display: flex; gap: var(--s-4); }
+/* The AI agent beside it (ADR 0205): shown while Settings > AI agents is on; its dot says whether one is connected. The bars keep clear of both. */
+.view-settings .agent-chip { position: relative; }
+.view-settings .agent-chip[hidden] { display: none; }
+.agent-chip::after { content: ""; position: absolute; right: var(--sp-2); bottom: var(--sp-2); width: var(--sp-4); height: var(--sp-4); border-radius: var(--r-dot); background: var(--hud-muted); outline: var(--sp-1) solid var(--hud-bg); }
+.agent-chip[data-state="connected"]::after { background: var(--hud-accent); }
+:root:has(.agent-chip:not([hidden])) { --gear-w: calc(2 * var(--bar-h) + var(--s-4)); }
 .view-settings button { display: inline-flex; align-items: center; justify-content: center; width: var(--bar-h); height: var(--bar-h); padding: 0; box-sizing: border-box; color: inherit; background: var(--hud-bg); border: 1px solid var(--hud-border); border-radius: var(--r-lg); box-shadow: var(--hud-lift); backdrop-filter: blur(8px); cursor: pointer; }
 .view-settings button svg { width: 18px; height: 18px; }
 .view-settings button:hover { background: var(--hud-hover); }
@@ -1192,7 +1199,7 @@ input[type="radio"]:checked::before { content: ""; width: var(--sp-3); height: v
 .win-row button:focus-visible { outline: 2px solid var(--hud-accent); outline-offset: -2px; }
 .win-row svg { width: var(--icon-md); height: var(--icon-md); }
 #toolbar > .rail { left: calc(var(--edge) / var(--ui-scale, 1)); }
-#toolbar { top: var(--edge); left: calc((var(--nav-w, 0px) + var(--edge)) / var(--ui-scale, 1)); right: calc((var(--bar-h) + 2 * var(--near) + 2 * var(--edge)) / var(--ui-scale, 1)); }
+#toolbar { top: var(--edge); left: calc((var(--nav-w, 0px) + var(--edge)) / var(--ui-scale, 1)); right: calc((var(--gear-w) + 2 * var(--near) + 2 * var(--edge)) / var(--ui-scale, 1)); }
 /* The Properties bar takes the room between the left cluster and the dock and no more: wider than that, its row scrolls (ADR 0128). */
 #toolbar > .toolbar { min-width: 0; }
 .tb-options-row { min-width: 0; }
@@ -1276,7 +1283,7 @@ body:has(.assets-place-zone:not([hidden])) :is(#nav, .view-settings, .assets-bar
 .drag-stack { position: fixed; top: calc(-1 * var(--drag-stack) * 3); left: 0; width: var(--drag-stack); height: var(--drag-stack); }
 .drag-stack img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; border: 2px solid var(--hud-bg); border-radius: var(--r-md); box-shadow: var(--hud-lift); transform: translate(calc(var(--i) * var(--sp-2)), calc(var(--i) * var(--sp-2))) rotate(calc(var(--i) * 3deg)); }
 .drag-count { position: absolute; top: calc(-1 * var(--near)); right: calc(-1 * var(--near)); min-width: var(--sp-10); padding: var(--s-1) var(--s-4); font: var(--weight-semibold) var(--text-sm) var(--font-ui); text-align: center; color: var(--hud-accent-fg); background: var(--hud-accent); border-radius: var(--r-pill); }
-.assets-bar { display: flex; flex-wrap: wrap; align-items: center; gap: var(--near); min-height: calc(var(--ctl) + 2 * var(--pad) + 2px); padding-left: calc(var(--nav-w, 0px) + var(--near)); padding-right: calc(var(--bar-h) + var(--near) + var(--edge)); }
+.assets-bar { display: flex; flex-wrap: wrap; align-items: center; gap: var(--near); min-height: calc(var(--ctl) + 2 * var(--pad) + 2px); padding-left: calc(var(--nav-w, 0px) + var(--near)); padding-right: calc(var(--gear-w) + var(--near) + var(--edge)); }
 .assets-search { flex: 1 1 220px; min-width: 0; max-width: 380px; }
 .assets-bar input[type="search"], .assets-bar select { height: var(--ctl); } /* (as tall as the bar's buttons; the look: the one field style) */
 .assets-bar select { padding-right: var(--s-4); }
@@ -2029,7 +2036,7 @@ body[data-viewing] #nav, body[data-viewing] .view-settings { display: none; }
 @media (max-width: 640px) {
   :root { --row: calc(var(--ctl) + 2 * var(--pad) + 2px); }
   /* Row 1: the view tabs and the workspace menu share the width. */
-  #nav { right: calc(var(--edge) + var(--bar-h) + var(--near)); } /* (clear of the Settings button, and of the window's buttons) */
+  #nav { right: calc(var(--edge) + var(--gear-w) + var(--near)); } /* (clear of the Settings button, and of the window's buttons) */
   #workspace { flex: 1; min-width: 0; }
   #workspace .nav { display: block; }
   .nav-pill { width: 100%; max-width: none; }
@@ -3096,7 +3103,7 @@ dialog.export-dlg.is-multi[open] { display: flex; flex-direction: column; height
 
 /* Phones: the gear sits in the top-right corner, so the tabs and the workspace menu stop short of it. */
 @media (max-width: 640px) {
-  #nav { right: calc(var(--edge) + var(--bar-h) + var(--near)); }
+  #nav { right: calc(var(--edge) + var(--gear-w) + var(--near)); }
 }
 /* Small screens, Settings: the tabs are one row that scrolls sideways (the same cue as the bars); a group's title becomes a thin line between its tabs. */
 @media (max-width: 720px) {
