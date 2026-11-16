@@ -708,7 +708,7 @@ dialog.confirm::backdrop { background: var(--hud-scrim); }
 dialog.list-dialog[open] { display: flex; flex-direction: column; }
 dialog.list-dialog [data-list-body] { flex: 1; min-height: 0; overflow-y: auto; }
 dialog.list-dialog .confirm-actions { flex: none; }
-.agent-log li { display: flex; align-items: center; gap: var(--s-6); min-height: var(--list-h); }
+dialog.confirm .confirm-list.agent-log li { display: flex; align-items: center; gap: var(--s-6); min-height: var(--list-h); }
 .agent-log time { flex: none; color: var(--hud-muted); font-variant-numeric: tabular-nums; }
 .agent-log .agent-log-what { flex: 1; min-width: 0; overflow-wrap: anywhere; }
 .agent-log button { flex: none; }

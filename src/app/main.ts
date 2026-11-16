@@ -3311,7 +3311,7 @@ async function start(): Promise<void> {
       agentList = listDialog({
         title: "What the AI agent did",
         testid: "agent-activity-dialog",
-        lines: [agentLink.connected ? "An AI agent is connected. Turn it off in Settings > AI agents." : "No AI agent is connected now (Settings > AI agents)."],
+        lines: [agentChip?.dataset["state"] === "connected" ? "An AI agent is connected. Turn it off in Settings > AI agents." : "No AI agent is connected now (Settings > AI agents)."], // (as the button shows it)
         body: () => `<ul class="confirm-list agent-log">${agentLog.map((e, i) => ({ e, i })).reverse().map(({ e, i }) => `<li><time>${new Date(e.at).toLocaleTimeString()}</time><span class="agent-log-what">${e.ok ? "" : "❌ "}${esc(e.title)}${e.error ? `: ${esc(e.error)}` : ""}</span>${e.ids.length && e.ids.some((id) => doc.get(id)) ? `<button type="button" class="set-done" data-agent-go="${i}">Go there</button>` : ""}</li>`).join("") || "<li>Nothing yet.</li>"}</ul>`,
         onClick: (t, _refresh, close) => {
           const i = t.closest<HTMLElement>("[data-agent-go]")?.dataset["agentGo"];
