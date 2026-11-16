@@ -108,7 +108,14 @@ test("every control on the canvas, in the Library and in Settings runs a command
   const p = app.page;
   const counts: Record<string, number> = {};
   const look = async (view: string): Promise<void> => {
-    const bare = await bareControls(app);
+    // (a view draws some of its parts after it opens: counted once the count holds for three looks in a row)
+    let bare = await bareControls(app);
+    for (let same = 0, tries = 0; same < 2 && tries < 40; tries++) {
+      await p.waitForTimeout(250);
+      const again = await bareControls(app);
+      same = again.length === bare.length ? same + 1 : 0;
+      bare = again;
+    }
     counts[view] = bare.length;
     console.log(`${view}: ${bare.length} controls without a command`);
     for (const b of bare) console.log(`  ${b}`);
