@@ -126,6 +126,7 @@ export async function openModelView(el: HTMLElement, file: FileFacts, deps: View
     });
   const usual = (s: Setting): SettingValue => defaultLook(first)[s.k]!;
   const rows = mountSettings(rowsEl, {
+    command: { id: "model.set", title: "Set a 3D view setting", group: "3D view" },
     sections,
     get: (k) => (k === "clip" ? String(look[k]) : look[k]!),
     set: (k, v) => {

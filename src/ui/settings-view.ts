@@ -7,7 +7,7 @@ import type { SettingKey, SettingValue, SettingsStore } from "../settings/settin
 import { openColourPopover } from "./colour-popover";
 import { swatchBackground } from "../render/ink";
 import { NAME_STYLES } from "../app/screenshot";
-import { SETTINGS } from "../settings/settings";
+import { SETTINGS, refusedToAgents } from "../settings/settings";
 import { FIXED_SHORTCUTS } from "../settings/shortcuts";
 import { KEY_COMMANDS, type Keymap, type KeyCommand, comboOfEvent, displayCombo, judge } from "../settings/keymap";
 import { esc } from "./format";
@@ -21,7 +21,8 @@ import { capabilities, clearErrorLog, diagnosticReport, errorLog, onErrorLog } f
 import { ICONS } from "./icons";
 import { logoSvg } from "./brand";
 import { desktopBridge } from "../storage/desktop-bridge";
-import { openWorkspaceSwitcher } from "./workspace-switch";
+import { commands, pressCommand, runCommand } from "../commands/registry";
+import type { Command, OptionSpec, Risk } from "../commands/types";
 import { photoCraftVersion } from "../artcraft/photocraft/payload";
 import { PREFS_KEY as PHOTOCRAFT_PREFS } from "../artcraft/photocraft/prefs";
 
@@ -621,7 +622,8 @@ export function mountSettingsView(root: HTMLElement, settings: SettingsStore, ke
     noneEl.hidden = words.length === 0 || total > 0;
     noneEl.textContent = `Nothing in Settings matches "${searchEl.value.trim()}".`;
   };
-  searchEl.addEventListener("input", search);
+  searchEl.addEventListener("input", search); // view-state: (typing the search)
+  // view-state: (clears the search)
   clearEl.addEventListener("click", () => {
     searchEl.value = "";
     search();
@@ -715,7 +717,7 @@ export function mountSettingsView(root: HTMLElement, settings: SettingsStore, ke
   root.addEventListener("click", (e) => {
     const pw = (e.target as HTMLElement).closest<HTMLElement>("[data-pw]");
     if (pw && backup) {
-      void passwordCard(pw.dataset["kind"] as "hidden" | "workspace", pw.dataset["pw"] as "set" | "remove" | "lock" | "newkey");
+      pressCommand(`password.${pw.dataset["pw"]}`, { kind: pw.dataset["kind"]! });
       return;
     }
     if (backup && (e.target as HTMLElement).closest("[data-reset-all]")) {
@@ -744,8 +746,9 @@ export function mountSettingsView(root: HTMLElement, settings: SettingsStore, ke
   };
   root.addEventListener("change", (e) => {
     const split = (e.target as HTMLElement).closest<HTMLSelectElement>("[data-library-split]");
-    if (split && backup?.librarySplit) void backup.librarySplit.set(Number(split.value) as 1 | 2 | 3).then(() => fillSplit());
+    if (split && backup?.librarySplit) pressCommand("settings.librarySplit", { split: split.value });
   });
+  // view-state: (the file picker of settings.importBackup)
   root.addEventListener("change", (e) => {
     const input = e.target as HTMLInputElement;
     if (input.dataset["testid"] !== "set-import-input" || !backup) return;
@@ -782,9 +785,51 @@ export function mountSettingsView(root: HTMLElement, settings: SettingsStore, ke
   };
   /** Give `combo` to a command (replacing its keys, or beside them), taking it from the commands in `owners`. */
   const bind = (id: string, mode: "replace" | "add", combo: string, owners: readonly KeyCommand[]): void => {
-    for (const o of owners) keymap.set(o.id, keymap.bindings(o.id).filter((c) => c !== combo));
-    keymap.set(id, mode === "replace" ? [combo] : [...keymap.bindings(id), combo]);
+    for (const o of owners) pressCommand("keys.set", { id: o.id, keys: keymap.bindings(o.id).filter((c) => c !== combo) });
+    pressCommand("keys.set", { id, keys: mode === "replace" ? [combo] : [...keymap.bindings(id), combo] });
   };
+  // Settings' commands (ADR 0205): every row, key and button of this view runs one; an agent never gets the settings of its own link,
+  // the hidden items' or a password's (refusedToAgents, and the password commands are the person's only).
+  const KIND: OptionSpec = { name: "kind", type: "choice", doc: "the hidden items' password, or the workspace's", required: true, choices: ["hidden", "workspace"] };
+  const setCmd = (id: string, title: string, hint: string, risk: Risk, options: readonly OptionSpec[], exec: NonNullable<Command["exec"]>, why: () => string | null = () => null): Command => ({ id, group: "Settings", kind: "settings", title, hint, risk, options, why, exec });
+  commands.setProvider("settings-view", () => [
+    setCmd("settings.set", "Change a setting", "Any setting, by its key", "edit", [{ name: "key", type: "text", doc: "the setting's key (Settings shows them)", required: true }, { name: "value", type: "json", doc: "its new value", required: true }], (o, ctx) => {
+      const key = String(o["key"]) as SettingKey;
+      if (!(key in SETTINGS)) return { ok: false, error: `There is no setting "${key}".` };
+      if (ctx.caller === "agent" && refusedToAgents(key)) return { ok: false, error: `"${key}" can only be changed by the person, in Settings.` };
+      return settings.set(key, o["value"] as never) ? { ok: true } : { ok: false, error: `That is not a value for "${key}".` };
+    }),
+    setCmd("settings.reset", "Reset a setting", "Back to its usual value", "edit", [{ name: "key", type: "text", doc: "the setting's key", required: true }], (o, ctx) => {
+      const key = String(o["key"]) as SettingKey;
+      if (!(key in SETTINGS)) return { ok: false, error: `There is no setting "${key}".` };
+      if (ctx.caller === "agent" && refusedToAgents(key)) return { ok: false, error: `"${key}" can only be changed by the person, in Settings.` };
+      settings.reset(key);
+    }),
+    setCmd("keys.set", "Set a command's keys", "Settings > Shortcuts", "edit", [{ name: "id", type: "text", doc: "the command (a shortcut's id)", required: true }, { name: "keys", type: "json", doc: "its keys, as text: [\"Ctrl+Shift+F\"]", required: true }], (o) => {
+      const keys = o["keys"];
+      if (!Array.isArray(keys) || !keys.every((k) => typeof k === "string")) return { ok: false, error: '"keys" is a list of keys as text.' };
+      if (!KEY_COMMANDS.some((c) => c.id === o["id"])) return { ok: false, error: `No shortcut "${String(o["id"])}".` };
+      keymap.set(String(o["id"]), keys as string[]);
+    }),
+    setCmd("keys.reset", "Reset a command's keys", "Back to its own keys", "edit", [{ name: "id", type: "text", doc: "the command (a shortcut's id)", required: true }], (o) => void keymap.reset(String(o["id"]))),
+    setCmd("keys.resetAll", "Reset every shortcut", "All back to their own keys", "edit", [], () => settings.reset("keys.custom" as SettingKey)),
+    ...(["set", "remove", "lock", "newkey"] as const).map((action) => setCmd(`password.${action}`, { set: "Set a password", remove: "Remove a password", lock: "Lock now", newkey: "A new key" }[action], { set: "Of the hidden items or the workspace", remove: "Of the hidden items or the workspace", lock: "Nothing opens until the password is typed", newkey: "Encrypt again with a new key" }[action], action === "lock" ? "edit" : "refused", [KIND], (o) => void passwordCard(o["kind"] as "hidden" | "workspace", action), () => (backup ? null : "Not in this build."))),
+    setCmd("settings.librarySplit", "Split the library's index", "Into more, smaller files", "edit", [{ name: "split", type: "choice", doc: "1, 2 or 3", required: true, choices: ["1", "2", "3"] }], (o) => void backup?.librarySplit?.set(Number(o["split"]) as 1 | 2 | 3).then(() => fillSplit()), () => (backup?.librarySplit ? null : "Not in this build.")),
+    setCmd("settings.importBackup", "Import a backup", "A .canvast file into this workspace", "confirm", [], () => root.querySelector<HTMLInputElement>('[data-testid="set-import-input"]')?.click(), () => (backup ? null : "Not in this build.")),
+    setCmd("photocraft.resetPrefs", "Reset PhotoCraft's preferences", "Its own, the next time it opens", "confirm", [], (_o, ctx) => {
+      const done = (): void => {
+        settings.set("photocraft.prefs", "");
+        try { localStorage.removeItem(PHOTOCRAFT_PREFS); } catch { /* (no storage: nothing kept) */ }
+      };
+      if (ctx.caller === "agent") return done();
+      return void confirmDialog({ title: "Reset PhotoCraft's own preferences?", lines: ["Its preferences go back to their defaults the next time it opens (its brush presets stay). Your files are not touched."], confirmLabel: "Reset them", danger: false }).then((yes) => {
+        if (!yes) return;
+        done();
+        const b = root.querySelector<HTMLButtonElement>("[data-photocraft-reset]");
+        if (b) b.textContent = "Reset: they are the defaults from its next start";
+      });
+    }),
+  ]);
   const askNote = (text: string, yes: string): void => {
     const n = root.querySelector<HTMLElement>("[data-key-note]");
     if (!n) return;
@@ -830,7 +875,7 @@ export function mountSettingsView(root: HTMLElement, settings: SettingsStore, ke
     if (row.control.kind === "range") {
       const out = t.parentElement?.querySelector("output");
       if (out) out.textContent = `${fmt(Number(t.value))} ${row.control.unit ?? ""}`.trim();
-      if (row.control.live) settings.set(key, Number(t.value) as never);
+      if (row.control.live) pressCommand("settings.set", { key, value: Number(t.value) });
     }
   });
   root.addEventListener("change", (e) => {
@@ -840,7 +885,7 @@ export function mountSettingsView(root: HTMLElement, settings: SettingsStore, ke
     const row = all.find((r) => r.key === key)!;
     const value = row.control.kind === "toggle" ? (t as HTMLInputElement).checked : row.control.kind === "range" ? Number(t.value) : t.value;
     // A value the setting refuses puts the control back to what is stored.
-    if (!settings.set(key, value as never)) refresh();
+    void runCommand("settings.set", { key, value }).then((r) => !r.ok && refresh());
   });
   root.addEventListener("click", (e) => {
     const t = e.target as HTMLElement;
@@ -855,12 +900,12 @@ export function mountSettingsView(root: HTMLElement, settings: SettingsStore, ke
     if (swatch) {
       const key = swatch.dataset["colour"] as SettingKey;
       const label = all.find((r) => r.key === key)?.label ?? "Colour";
-      return openColourPopover(swatch, { name: label, value: String(settings.get(key)), onInput: (hex) => void settings.set(key, hex as never) });
+      return openColourPopover(swatch, { name: label, value: String(settings.get(key)), onInput: (hex) => void pressCommand("settings.set", { key, value: hex }) });
     }
     const adaptive = t.closest<HTMLElement>("[data-adaptive]");
-    if (adaptive) return void settings.set(adaptive.dataset["adaptive"] as SettingKey, !settings.get(adaptive.dataset["adaptive"] as SettingKey) as never);
+    if (adaptive) return void pressCommand("settings.set", { key: adaptive.dataset["adaptive"]!, value: !settings.get(adaptive.dataset["adaptive"] as SettingKey) });
     const preset = t.closest<HTMLElement>("[data-preset]");
-    if (preset) return void settings.set(preset.dataset["preset"] as SettingKey, Number(preset.dataset["value"]) as never);
+    if (preset) return void pressCommand("settings.set", { key: preset.dataset["preset"]!, value: Number(preset.dataset["value"]) });
     const change = t.closest<HTMLElement>("[data-change-key]");
     if (change) {
       capturing = { id: change.dataset["changeKey"]!, mode: change.dataset["mode"] === "add" ? "add" : "replace" };
@@ -873,16 +918,16 @@ export function mountSettingsView(root: HTMLElement, settings: SettingsStore, ke
     const drop = t.closest<HTMLElement>("[data-key-remove]");
     if (drop) {
       const id = drop.dataset["keyRemove"]!;
-      keymap.set(id, keymap.bindings(id).filter((c) => c !== drop.dataset["combo"]));
+      pressCommand("keys.set", { id, keys: keymap.bindings(id).filter((c) => c !== drop.dataset["combo"]) });
       return keyNote(`${nameOf(id)}: ${drop.dataset["combo"]} taken away.${keymap.bindings(id).length ? "" : " It has no key now."}`);
     }
     const resetKey = t.closest<HTMLElement>("[data-key-reset]");
     if (resetKey) {
-      keymap.reset(resetKey.dataset["keyReset"]!);
+      pressCommand("keys.reset", { id: resetKey.dataset["keyReset"]! });
       return keyNote(`${nameOf(resetKey.dataset["keyReset"]!)}: back to its own keys.`);
     }
     if (t.closest("[data-keys-reset-all]")) {
-      settings.reset("keys.custom" as SettingKey);
+      pressCommand("keys.resetAll");
       return keyNote("Every shortcut is back to its own keys.");
     }
     if (t.closest("[data-key-yes]") && pending) {
@@ -892,19 +937,10 @@ export function mountSettingsView(root: HTMLElement, settings: SettingsStore, ke
     }
     if (t.closest("[data-key-no]")) return keyNote("Cancelled: nothing changed.");
     const reset = t.closest<HTMLElement>("[data-reset]");
-    if (reset) return settings.reset(reset.dataset["reset"] as SettingKey);
+    if (reset) return void pressCommand("settings.reset", { key: reset.dataset["reset"]! });
     if (t.closest("[data-reload]")) location.reload();
-    const pcReset = t.closest<HTMLButtonElement>("[data-photocraft-reset]");
-    if (pcReset) {
-      void confirmDialog({ title: "Reset PhotoCraft's own preferences?", lines: ["Its preferences go back to their defaults the next time it opens (its brush presets stay). Your files are not touched."], confirmLabel: "Reset them", danger: false }).then((yes) => {
-        if (!yes) return;
-        settings.set("photocraft.prefs", "");
-        try { localStorage.removeItem(PHOTOCRAFT_PREFS); } catch { /* (no storage: nothing kept) */ }
-        pcReset.textContent = "Reset: they are the defaults from its next start";
-      });
-    }
-    const sw = t.closest<HTMLElement>("[data-switch-workspace]");
-    if (sw) void openWorkspaceSwitcher(sw);
+    if (t.closest<HTMLButtonElement>("[data-photocraft-reset]")) pressCommand("photocraft.resetPrefs");
+    if (t.closest<HTMLElement>("[data-switch-workspace]")) pressCommand("workspace.switch");
     if (t.closest("[data-done]")) onClose();
   });
   /** Stop waiting for keys (focus moved away, another tab, or the view closed): nothing changes. */
@@ -989,7 +1025,7 @@ export function mountSettingsView(root: HTMLElement, settings: SettingsStore, ke
       if (!row) return null;
       const items = ROW_ACTIONS.flatMap(([sel, label, icon, hint]): MenuItem[] => {
         const b = row.querySelector<HTMLButtonElement>(sel);
-        return b ? [{ label, hint, icon, disabled: b.disabled, run: () => b.click() }] : [];
+        return b ? [{ label, hint, icon, disabled: b.disabled, command: b.dataset["reset"] ? "settings.reset" : "settings.set", run: () => b.click() }] : []; // (the row's own button, which runs its command)
       });
       return items.length ? items : null;
     },

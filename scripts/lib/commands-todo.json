@@ -5,7 +5,7 @@
     "src/app/editor-state.ts": 1,
     "src/app/follow.ts": 1,
     "src/app/hud.ts": 4,
-    "src/app/main.ts": 9,
+    "src/app/main.ts": 1,
     "src/app/progress.ts": 2,
     "src/app/tour.ts": 1,
     "src/artcraft/photocraft/app.ts": 2,
