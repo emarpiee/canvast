@@ -23,7 +23,7 @@ export interface Notice {
   /** Notices with the same channel replace each other (all importing messages, say). */
   readonly channel?: string;
   /** A button on the notice (e.g. View); it runs and the notice goes. */
-  readonly action?: { readonly label: string; run(): void };
+  readonly action?: { readonly label: string; /** The command it runs (ADR 0205). */ readonly command?: string; run(): void };
 }
 
 /** The kind, progress and channel a plain message means. */

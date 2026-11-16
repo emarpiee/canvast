@@ -867,6 +867,7 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
   const layoutEl = <T extends HTMLElement>(sel: string): T => q<T>(`[data-auto-layout] ${sel}`)!;
   const toUnits = (px: number): number => { const al = actions.autoLayout(); return al && al.ppu > 0 && al.ppu < Infinity ? Math.max(0, px) / al.ppu : NaN; };
   const setLayout = (layout: LayoutPatch, final = true): boolean => pressCommand("sheet.setLayout", { layout, live: !final });
+  // commands: (setLayout runs sheet.setLayout)
   for (const b of qa<HTMLElement>("[data-layout-flow]")) b.addEventListener("click", () => void setLayout({ flow: b.dataset["layoutFlow"] as SheetLayout["flow"] }));
   for (const i of [0, 1] as const) liveNumber(layoutEl(`[data-layout-gap="${i}"]`), (v, final) => { const al = actions.autoLayout(), u = toUnits(v); if (al && Number.isFinite(u)) setLayout({ gap: i === 0 ? [u, al.layout.gap[1]] : [al.layout.gap[0], u] }, final); });
   const PAD: Record<string, number[]> = { t: [0], r: [1], b: [2], l: [3], h: [1, 3], v: [0, 2] };
@@ -883,7 +884,9 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
     b.setAttribute("aria-pressed", String(b.getAttribute("aria-pressed") !== "true"));
     editor.changed(); // (the bar is drawn again: the fields of each side show or go)
   });
+  // commands: (setLayout runs sheet.setLayout)
   layoutEl<HTMLSelectElement>("[data-layout-align]").addEventListener("change", (e) => void setLayout({ align: (e.target as HTMLSelectElement).value as SheetLayout["align"] }));
+  // commands: (setLayout runs sheet.setLayout)
   layoutEl<HTMLSelectElement>("[data-layout-justify]").addEventListener("change", (e) => void setLayout({ justify: (e.target as HTMLSelectElement).value as SheetLayout["justify"] }));
   layoutEl<HTMLSelectElement>("[data-layout-size]").addEventListener("change", (e) => {
     const v = (e.target as HTMLSelectElement).value;

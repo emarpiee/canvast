@@ -210,7 +210,7 @@ export async function openModelView(el: HTMLElement, file: FileFacts, deps: View
       if (!pointers.size) drag = null;
       settle();
     });
-  box.addEventListener("contextmenu", (e) => e.preventDefault());
+  box.addEventListener("contextmenu", (e) => e.preventDefault()); // view-state: (no browser menu over the model)
   let wheelTimer: ReturnType<typeof setTimeout> | undefined;
   box.addEventListener("wheel", (e) => {
     e.preventDefault();

@@ -312,7 +312,7 @@ export function mountHud(root: HTMLElement, view: ViewState, stats: FrameStats, 
     }, BACKGROUND_HOLD_MS);
   });
   for (const ev of ["pointerup", "pointerleave", "pointercancel"]) bgButton.addEventListener(ev, () => window.clearTimeout(holdTimer));
-  bgButton.addEventListener("contextmenu", (e) => e.preventDefault()); // (a long touch and a right click: the hold above is what they do)
+  bgButton.addEventListener("contextmenu", (e) => e.preventDefault()); // view-state: // (a long touch and a right click: the hold above is what they do)
   // view-state: (opens the colour chooser; what it picks runs canvas.setBackground)
   bgButton.addEventListener("click", (e) => {
     e.stopPropagation();

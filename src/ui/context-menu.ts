@@ -106,6 +106,7 @@ export function bindContextMenu(el: HTMLElement, b: ContextBinding): void {
       if (items?.length) showContextMenu(at.clientX, at.clientY, items, b.label);
     });
   };
+  // view-state: (opens the menu; its rows are commands)
   el.addEventListener("contextmenu", (e) => {
     const t = e.target as HTMLElement;
     if (t.closest?.("input, textarea, [contenteditable='true']")) return; // (a field keeps the browser's own: copy, paste, spelling)

@@ -2741,7 +2741,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     /** A row's "more" button: it opens the shared menu with these rows, and a right click on the row does too. */
     const more = (kind: SideKind, id: string, name: string, items: SideRow[]): string => {
       if (ro) return "";
-      sideRows.set(`${kind}:${id}`, { label: `Actions for ${kindWord[kind]} ${name}`, items: items.map((i) => ({ label: i.label, hint: i.hint, icon: i.icon, aria: i.aria, ...(i.danger ? { danger: true } : {}), run: () => pressAs(side, { [i.attr]: i.value, "data-id": id, "data-key": id }) })) });
+      sideRows.set(`${kind}:${id}`, { label: `Actions for ${kindWord[kind]} ${name}`, items: items.map((i) => ({ label: i.label, hint: i.hint, icon: i.icon, aria: i.aria, ...(i.danger ? { danger: true } : {}), command: i.attr === "data-folder-action" ? (FOLDER_COMMANDS[i.value]?.[0] ?? "library.sideAction") : i.value === "delete" ? "library.sideDelete" : "library.sideAction", run: () => pressAs(side, { [i.attr]: i.value, "data-id": id, "data-key": id }) })) });
       return `<button type="button" class="side-more" data-side-more data-kind="${kind}" data-id="${esc(id)}" aria-haspopup="menu" aria-expanded="false" aria-label="More actions for ${kindWord[kind]} ${esc(name)}" title="More">${ICONS.ellipsis}</button>`;
     };
     const picked = pickedKeys(scope);
@@ -3938,7 +3938,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
         const now = notesNow().fields[Number(c.data["index"])];
         if (!now?.key.trim()) break;
         const type = propType(now.key, now.value);
-        openMoreMenu(b, PROP_TYPES.map((t) => ({ label: t.label, hint: t.expects, icon: PROP_ICON[t.id], checked: t.id === type, id: `prop-type-${t.id}`, run: () => pinType(now.key, t.id) })), "Property type");
+        openMoreMenu(b, PROP_TYPES.map((t) => ({ label: t.label, hint: t.expects, icon: PROP_ICON[t.id], checked: t.id === type, id: `prop-type-${t.id}`, command: "library.propertyType", run: () => void pressCommand("library.propertyType", { key: now.key, type: t.id }) })), "Property type");
         break;
       }
       case "item-remove": {
@@ -5688,6 +5688,16 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       session.editor.changed();
     }, inLibrary),
     lib("library.details", "Details panel", "Show or hide it", "edit", () => toggleDetails(), inLibrary),
+    // (a row of the sidebar: a tag, a canvas tag or a saved search: what its ⋯ menu offers, run as its own button does)
+    lib("library.sideAction", "A sidebar row's action", "Rename, move or look at a tag, canvas tag or saved search", "edit", (o) => {
+      if (o["action"] === "delete") return { ok: false, error: "Deleting is library.sideDelete." };
+      pressAs(side, { [`data-${String(o["kind"])}-action`]: String(o["action"]), "data-id": String(o["id"]) });
+      return { ok: true };
+    }, inLibrary, { options: [{ name: "kind", type: "choice", doc: "tag, ctag (a canvas tag) or saved (a saved search)", required: true, choices: ["tag", "ctag", "saved"] }, { name: "action", type: "choice", doc: "what to do", required: true, choices: ["rename", "look", "up", "down"] }, { name: "id", type: "text", doc: "the row's id", required: true }] }),
+    lib("library.sideDelete", "Delete a sidebar row", "A tag, a canvas tag or a saved search", "confirm", (o) => void pressAs(side, { [`data-${String(o["kind"])}-action`]: "delete", "data-id": String(o["id"]) }), writable,
+      { asks: true, options: [{ name: "kind", type: "choice", doc: "tag, ctag (a canvas tag) or saved (a saved search)", required: true, choices: ["tag", "ctag", "saved"] }, { name: "id", type: "text", doc: "the row's id", required: true }] }),
+    lib("library.propertyType", "Set a property's type", "How a note's property is read", "edit", (o) => void pinType(String(o["key"]), o["type"] as never), writable,
+      { options: [{ name: "key", type: "text", doc: "the property's name", required: true }, { name: "type", type: "choice", doc: "its type", required: true, choices: PROP_TYPES.map((t) => t.id) }] }),
     lib("hidden.exit", "Exit hidden mode", "They leave the screen, still unlocked", "edit", () => exitHidden(), () => (hiddenMode ? null : "Hidden mode is not on.")),
     lib("hidden.stay", "Stay in hidden mode", "When leaving the library, or not", "edit", () => { settings.set("library.hiddenStay", !settings.get("library.hiddenStay")); paintHiddenMode(); }, () => (hiddenMode ? null : "Hidden mode is not on.")),
   ]);
@@ -5772,6 +5782,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   for (const el of [usageSel, sortSel]) el.addEventListener("input", () => render()); // view-state: (the filters)
   // Typing redraws the results once the typing pauses, not on every letter (a large library would make each key wait for the whole grid).
   let typingTimer = 0;
+  // view-state: (typing the search)
   search.addEventListener("input", () => {
     clearTimeout(typingTimer);
     typingTimer = window.setTimeout(render, SEARCH_PAUSE_MS);

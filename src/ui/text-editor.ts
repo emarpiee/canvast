@@ -28,6 +28,7 @@ import { esc } from "./format";
 import { openColourPopover } from "./colour-popover";
 import { promptDialog } from "./confirm";
 import { boxOfElementIn, placeAbove } from "./near-selection";
+import { commands, pressCommand } from "../commands/registry";
 
 /**
  * WYSIWYG text editing with a native contenteditable overlay placed exactly
@@ -438,6 +439,10 @@ export function mountTextEditor(
     document.execCommand("fontName", false, hash ? familyFor(hash) : (getComputedStyle(box).fontFamily.split(",")[0] ?? "").trim().replace(/^["']|["']$/g, ""));
   });
   view.subscribe(position);
+  // The text being typed: its format as a command (ADR 0205), for the bar's menus, a macro and an outside caller while a text is open.
+  commands.setProvider("text-editor", () => (bar.hidden ? [] : [{ id: "text.format", group: "Text", kind: "text", title: "Format the text being typed", hint: "Bold, a heading, a list and more", risk: "edit", why: () => null,
+    options: [{ name: "format", type: "text", doc: "what to do (bold, italic, h1, ul and the rest of the bar's)", required: true }],
+    exec: (o) => void run(String(o["format"]), bar) }]));
   bar.addEventListener("mousedown", (e) => {
     if (!(e.target as HTMLElement).closest("select")) e.preventDefault(); // keep the text selection
   });
@@ -448,7 +453,7 @@ export function mountTextEditor(
     if (menuBtn && menu) {
       // (a choice of the menu runs on the words still selected in the text: the text takes the focus back first; the menu stays open, as
       // every group menu of a bar, with the choice now made ticked, until Escape or a press outside)
-      const items = (): MenuItem[] => menu.items.map((f): MenuItem => ({ id: f.cmd, label: f.label, hint: f.hint, icon: f.icon, ...(isOn(f.cmd) === null ? {} : { checked: isOn(f.cmd)! }), run: () => run(f.cmd, menuBtn) }));
+      const items = (): MenuItem[] => menu.items.map((f): MenuItem => ({ id: f.cmd, label: f.label, hint: f.hint, icon: f.icon, ...(isOn(f.cmd) === null ? {} : { checked: isOn(f.cmd)! }), command: "text.format", run: () => void pressCommand("text.format", { format: f.cmd }) }));
       openMoreMenu(menuBtn, items(), menu.label, { keepOpen: true, refresh: items, keepFocus: true }); // (the keys go on into the text)
       return;
     }
