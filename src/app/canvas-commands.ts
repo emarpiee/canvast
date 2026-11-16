@@ -132,7 +132,7 @@ export function canvasCommands(a: CanvasActions): Command[] {
     const made = [...a.itemIds()].filter((id) => !before.has(id));
     return made.length ? { ok: true, made } : { ok: true };
   };
-  const cmd = (id: string, group: string, title: string, hint: string, risk: Risk, why: () => string | null, exec: Command["exec"], extra: Partial<Command> = {}): Command => {
+  const cmd = (id: string, group: string, title: string, hint: string, risk: Risk, why: () => string | null, exec: NonNullable<Command["exec"]>, extra: Partial<Command> = {}): Command => {
     const keys = a.keys(id);
     return { id, group, title, hint, risk, why, exec, ...(keys ? { keys } : {}), ...extra };
   };

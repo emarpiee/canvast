@@ -3037,7 +3037,7 @@ async function start(): Promise<void> {
     copyFile: desktopBridge() ? () => selectedFiles().then((ents) => (forgetCopiedPicture(), copyItemsAsFiles(copyOnCanvas, ents))) : null,
     canCopyFile: () => selectedHashes().length > 0,
     cut: () => { if (!document.execCommand("cut")) cutSelection(doc, editor, view); }, // (as Copy: the cut event below puts it on the system clipboard)
-    paste: () => pasteObjects(doc, editor, view, null),
+    paste: async () => void (await pasteObjects(doc, editor, view, null)),
     duplicate: () => duplicateSelection(doc, editor, view),
     canRename: () => selectedPictures().length > 0,
     rename: () => renamePictures(),
@@ -3050,7 +3050,7 @@ async function start(): Promise<void> {
     unlockAll: () => clearFlag(doc, editor, "locked"),
     selectAll: () => editor.select(doc.ordered().filter((o) => !o.hidden && !o.locked).map((o) => o.id)),
     canRecolour: () => newInk(DEFAULT_INK) !== DEFAULT_INK,
-    recolour: () => recolourOldInk(doc, editor),
+    recolour: async () => void (await recolourOldInk(doc, editor)),
     group: () => groupSelection(doc, editor),
     ungroup: () => ungroupSelection(doc, editor),
     sheet: () => sheetSelection(doc, editor),

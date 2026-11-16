@@ -26,6 +26,7 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
       - run: npm ci
+      - run: npm run check:commands -- --list
       - run: npm run typecheck
       - run: npm run test:unit
       - run: npm run build
@@ -37,7 +38,6 @@ jobs:
       - run: npm run check:storage
       - run: npm run check:name-rules
       - run: npm run check:components
-      - run: npm run check:commands
       - run: npm run check:picker
       - run: npm run check:patterns
       - run: npm run check:shots
