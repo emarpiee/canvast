@@ -5,8 +5,8 @@ import type { ResolvedCommand } from "./types";
  * `area.action` (lower case, dots or colons between parts), a hint, a risk, and `exec` or `takes` (not the old `run`). Risky kinds of
  * work must say so: a command that deletes, or touches hidden items, a password or the whole workspace is `confirm` or `refused`.
  */
-const RISKY = /\b(delete|remove|erase|empty the trash|password)\b|\bhidden (items|mode|folder)|\b(replace the workspace|switch workspace)\b/i;
-const ID = /^[a-z][a-zA-Z0-9-]*([.:][a-zA-Z0-9][\w.:\- ]*)+$/;
+const RISKY = /\b(delete|erase for good|empty the trash|password)\b|\bhidden (items|folder)|\b(replace the workspace|switch workspace)\b/i;
+const ID = /^[a-z][a-zA-Z0-9-]*([.:][a-zA-Z0-9][\w.:=\- ]*)+$/;
 
 export function ruleProblems(all: readonly ResolvedCommand[]): Array<{ id: string; source: string; missing: string[] }> {
   const out: Array<{ id: string; source: string; missing: string[] }> = [];

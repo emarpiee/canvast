@@ -26,8 +26,8 @@ export function mountNavigator(root: HTMLElement, session: Session, openCanvasVi
   root.innerHTML = `
     <div class="nav">
       <div class="nav-pill" data-cmd-group="Navigate" data-testid="workspace-nav" data-active="true">
-        <button type="button" class="nav-crumb" data-testid="view-canvas" aria-current="page" aria-label="Canvas view" title="Canvas view">${ICONS.infinity}</button>
-        <button type="button" class="nav-name-btn" data-testid="workspace-chevron" aria-haspopup="true" aria-expanded="false" title="Switch board or canvas"><span class="nav-crumb-text"></span>${ICONS.chevronDown}</button>
+        <button type="button" class="nav-crumb" data-view-state data-testid="view-canvas" aria-current="page" aria-label="Canvas view" title="Canvas view">${ICONS.infinity}</button>
+        <button type="button" class="nav-name-btn" data-view-state data-testid="workspace-chevron" aria-haspopup="true" aria-expanded="false" title="Switch board or canvas"><span class="nav-crumb-text"></span>${ICONS.chevronDown}</button>
       </div>
       <div class="nav-menu" role="menu" data-testid="workspace-menu" hidden></div>
     </div>

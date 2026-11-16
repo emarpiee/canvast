@@ -25,6 +25,7 @@ import { commands, pressCommand, runCommand } from "../commands/registry";
 import type { Command, OptionSpec, Risk } from "../commands/types";
 import { photoCraftVersion } from "../artcraft/photocraft/payload";
 import { PREFS_KEY as PHOTOCRAFT_PREFS } from "../artcraft/photocraft/prefs";
+import { markCommands } from "../commands/from-bars";
 
 /** The desktop build (ADR 0177): the workspace is a folder, so what Settings says about storage, privacy and the page differs. */
 /** A row for something that is not a stored setting (Sharing's), with the settings rows' look. */
@@ -838,7 +839,11 @@ export function mountSettingsView(root: HTMLElement, settings: SettingsStore, ke
   };
   const all = [...SETTINGS_TABS.flatMap((t) => t.rows ?? []), ...(DESKTOP ? [DELETE_TO_ROW, TRASH_DAYS_ROW] : [])];
   /** Show the stored values in the controls (never while one is being typed into: only called on a change). */
+  /** Each control of Settings and the command it runs (ADR 0205). */
+  const SETTINGS_CONTROLS: ReadonlyArray<readonly [string, string]> = [["[data-set]", "settings.set"], ["[data-colour]", "settings.set"], ["[data-adaptive]", "settings.set"], ["[data-preset]", "settings.set"], ["[data-reset]", "settings.reset"], ["[data-change-key]", "keys.set"], ["[data-key-remove]", "keys.set"], ["[data-key-yes]", "keys.set"], ["[data-key-reset]", "keys.reset"], ["[data-keys-reset-all]", "keys.resetAll"], ["[data-pw]", "password.set"], ["[data-library-split]", "settings.librarySplit"], ["[data-photocraft-reset]", "photocraft.resetPrefs"], ["[data-switch-workspace]", "workspace.switch"]];
   const refresh = (): void => {
+    markCommands(root, SETTINGS_CONTROLS);
+    for (const b of root.querySelectorAll<HTMLElement>("[data-done], [data-key-no], [data-concealed-show], [data-about], [data-reload]")) b.dataset["viewState"] = "";
     renderKeys();
     search();
     // Privacy › Concealed folders: how many, and the list (a list that grows opens in a dialog, never on the page).

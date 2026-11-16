@@ -49,6 +49,7 @@ import { editableInPhotoCraft } from "../artcraft/photocraft/app";
 import { clearRect, MENU_GAP, moreButton, openMoreMenu, pressAs } from "./more-menu";
 import type { MenuItem } from "./more-menu";
 import { commands, pressCommand } from "../commands/registry";
+import { markCommands } from "../commands/from-bars";
 import { REASON } from "../commands/types";
 import type { Command, Options, OptionSpec, Risk } from "../commands/types";
 import { bindContextMenu, grouped as groupedMenu } from "./context-menu";
@@ -494,6 +495,9 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   };
   const fileInput = root.querySelector<HTMLInputElement>('[data-testid="assets-import-input"]')!;
   const importBtn = root.querySelector<HTMLButtonElement>('[data-action="import"]')!;
+  // The Library bar's buttons and the command each runs (ADR 0205); sorting, the layout and the sidebar's sections only change what is shown.
+  markCommands(root, [['[data-action="import"]', "library.import"], ['[data-action="slideshow"]', "library.slideshowShown"], ['.assets-bar [data-action="details"]', "library.details"], ['[data-action="reload-library"]', "library.reload"], ['[data-action="exit-hidden"]', "hidden.exit"], ['[data-action="lock-hidden"]', "hidden.lock"], ['[data-action="hidden-stay"]', "hidden.stay"]]);
+  for (const el of root.querySelectorAll<HTMLElement>('[data-action="sort-dir"], [data-action="reset-filters"], [data-action="show-all"], [data-action="to-top"], [data-action="columns"], .assets-controls [data-layout]')) el.dataset["viewState"] = "";
   const side = root.querySelector<HTMLElement>(".assets-side")!;
 
   // What the user chose to hide (the details panel, the viewer's controls) is remembered on this device.
@@ -2725,7 +2729,13 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     return n;
   };
   let lastSideHtml = "";
+  /** The sidebar: its rows filter what is listed (view state); New folder is a command (ADR 0205). */
+  const markSide = (): void => {
+    for (const el of side.querySelectorAll<HTMLElement>(".side-item, .side-sec-toggle, [data-side-sort]")) el.dataset["viewState"] = "";
+    markCommands(side, [['[data-folder-action="new"]', "folder.new"], ["[data-folder-action=rename]", "folder.rename"], ["[data-folder-action=move]", "folder.move"]]);
+  };
   const renderSide = (): void => {
+    requestAnimationFrame(markSide);
     if (!listing) return;
     // (a hidden folder's name typed in the box does not outlast the Hidden items; a folder being named is not searched away)
     if (sideFindHidden !== hiddenMode) {

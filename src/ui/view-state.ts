@@ -71,7 +71,7 @@ commands.setProvider("file-bookmarks", () => (holder ? [
       holder!((marks) => marks.map((m) => (m.at === o["at"] ? { ...m, label } : m)));
       return { ok: true };
     } },
-  { id: "file.deleteBookmark", group: "Bookmarks", kind: "bookmark", title: "Delete a file's bookmark", hint: "Only this bookmark", risk: "edit", why: () => null,
+  { id: "file.deleteBookmark", group: "Bookmarks", kind: "bookmark", title: "Delete a file's bookmark", hint: "Only this bookmark", risk: "confirm", why: () => null,
     options: [{ name: "at", type: "text", doc: "the bookmark's place", required: true }],
     exec: (o) => void holder!((marks) => marks.filter((m) => m.at !== o["at"])) },
 ] : []));

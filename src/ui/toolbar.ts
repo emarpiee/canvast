@@ -1180,7 +1180,7 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
   pickGroup.addEventListener("click", onClick); // commands: (onClick runs the bar's commands)
 
   const update = (): void => {
-    markCommands(root, BAR_COMMANDS);
+    markCommands(document, BAR_COMMANDS); // (the bar's parts may stand elsewhere: Settings > Appearance places them)
     for (const b of qa<HTMLElement>("[data-subject]")) b.dataset["viewState"] = ""; // (which kind of the selection the bar shows)
     balloonBar.sync(); // (before the groups are sorted: what applies is shown)
     for (const b of qa<HTMLElement>("[data-tool]")) {

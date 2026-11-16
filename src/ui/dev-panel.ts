@@ -35,6 +35,7 @@ const SAMPLES: ReadonlyArray<Notice> = [
 export function mountDevPanel(root: HTMLElement, view: ViewState, doc: DocumentStore, onCleared: () => void, notify: (n: Notice) => void): void {
   const panel = document.createElement("div");
   panel.className = "hud-dev";
+  panel.dataset["viewState"] = ""; // (the developer panel, #debug only: a tester's own controls)
   panel.dataset["testid"] = "dev-panel";
   panel.innerHTML = `
     <div class="dev-row dev-jumps" role="group" aria-label="Zoom jumps">
