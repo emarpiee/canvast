@@ -109,6 +109,10 @@ export interface DebugHook {
   commandList(filter?: string): CommandRow[];
   /** Run a command by id as this caller, with its result. */
   runCommand(id: string, options?: Options, caller?: Caller): Promise<Result>;
+  /** A command run as an AI agent's call: its answer, and the agent's pointer, button and list as a real link shows them. */
+  agentRun(id: string, options?: Options): Promise<unknown>;
+  /** The AI agent button shown as connected (true) or waiting (Settings > AI agents on). */
+  agentShown(connected: boolean): void;
   /** The commands that do not follow the rule yet, each with what it lacks (the live audit). */
   commandRuleProblems(): Array<{ id: string; source: string; missing: string[] }>;
   camera(): SerializedCamera;
@@ -320,6 +324,10 @@ export interface DebugHook {
 }
 
 export interface DebugDeps {
+  /** Run a command as an AI agent's call (through the link's answer, so its pointer and its list show it). */
+  agentRun?: (id: string, options: Options) => Promise<unknown>;
+  /** Show the AI agent button as connected or waiting (Settings > AI agents must be on). */
+  agentShown?: (connected: boolean) => void;
   doc: DocumentStore;
   editor: EditorState;
   session: Session;
@@ -406,6 +414,8 @@ export function installDebugHook(
   const hook: DebugHook = {
     commandList: (filter) => commands.list(filter),
     runCommand: (id, options = {}, caller = "test") => commands.execute(id, options, { caller }),
+    agentRun: (id, options = {}) => deps.agentRun?.(id, options) ?? Promise.resolve(null),
+    agentShown: (connected) => deps.agentShown?.(connected),
     commandRuleProblems: () => ruleProblems(commands.all()),
     camera: () => serializeCamera(view.worldCamera()),
     selectionBox: () => menuAvoid(),

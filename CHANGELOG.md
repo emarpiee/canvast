@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.60.24 — AI agents in alpha (2026-11-17)
+
+- **Changed:** when an AI agent works off the view, its pointer waits at the edge longer, with a ring pulsing round it (still under reduced motion). ([Seeing what an agent does](README.md#seeing-what-an-agent-does))
+- **Docs:** README: AI agents marked alpha, what an agent's pointer, button and list show, with their pictures, and the agents' limits.
+
+### For developers
+
+- The pan and zoom standard counted the tiles a frame was missing, not those it built: over a backdrop a frame builds only what its time allows, so a slower machine counted the same tiles again and the run failed by chance; it now counts the tiles built (the budget is unchanged).
+- The debug hook runs a command as an AI agent's call (`agentRun`) and shows the AI agent button's state (`agentShown`), for tests and pictures.
+
 ## 0.60.23 — Honest answers to AI agents (2026-11-17)
 
 - **Fixed:** with the Select tool and nothing selected, setting a fill or outline said it was done but changed nothing; it now says nothing is selected (an AI agent drew 308 shapes with no paint this way). ([AI agents](README.md#ai-agents))

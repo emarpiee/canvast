@@ -187,7 +187,7 @@ import { commands, MAX_BATCH, pressCommand } from "../commands/registry";
 import { REASON } from "../commands/types";
 import { canvasCommands, ITEMS_MAX, OLD_CANVAS_IDS, type CanvasActions, type ItemRow } from "./canvas-commands";
 import type { ShapeKind } from "../doc/path";
-import { mountAgentLink } from "./agent-link";
+import { answer, mountAgentLink } from "./agent-link";
 import { Macros } from "../commands/macros";
 import { barCommands } from "../commands/from-bars";
 import { settingCommands } from "../commands/settings-commands";
@@ -890,7 +890,8 @@ async function start(): Promise<void> {
         const ease = 1 - (1 - t) ** 3;
         const at = mark.from ? { x: mark.from.x + (to.x - mark.from.x) * ease, y: mark.from.y + (to.y - mark.from.y) * ease } : to;
         agentPointerAt = at;
-        drawAgentPointer(ctx, at, vp, `AI agent: ${mark.title}`, theme, fade);
+        mark.off = drawAgentPointer(ctx, at, vp, `AI agent: ${mark.title}`, theme, fade, view.glideMs ? now : 0); // (reduced motion: a still ring)
+        if (mark.off) mark.until = Math.max(mark.until, mark.at + 8000); // (off the view it waits longer: it is easy to miss at the edge)
       }
     }
     if (editor.revealAt && (!shot || shot.overlays)) {
@@ -3286,7 +3287,7 @@ async function start(): Promise<void> {
       const now = performance.now();
       if (now >= m.until) return void ((editor.agentMark = null), editor.redraw());
       editor.redraw();
-      if (now < m.at + 350 || now > m.until - 600) requestAnimationFrame(frames);
+      if (now < m.at + 350 || now > m.until - 600 || m.off) requestAnimationFrame(frames);
       else setTimeout(frames, m.until - 600 - now);
     };
     frames();
@@ -3310,7 +3311,7 @@ async function start(): Promise<void> {
       agentList = listDialog({
         title: "What the AI agent did",
         testid: "agent-activity-dialog",
-        lines: [agentLink.connected ? "An AI agent is connected. Turn it off in Settings > AI agents." : "No AI agent is connected now (Settings > AI agents)."],
+        lines: [agentChip?.dataset["state"] === "connected" ? "An AI agent is connected. Turn it off in Settings > AI agents." : "No AI agent is connected now (Settings > AI agents)."], // (as the button shows it)
         body: () => `<ul class="confirm-list agent-log">${agentLog.map((e, i) => ({ e, i })).reverse().map(({ e, i }) => `<li><time>${new Date(e.at).toLocaleTimeString()}</time><span class="agent-log-what">${e.ok ? "" : "❌ "}${esc(e.title)}${e.error ? `: ${esc(e.error)}` : ""}</span>${e.ids.length && e.ids.some((id) => doc.get(id)) ? `<button type="button" class="set-done" data-agent-go="${i}">Go there</button>` : ""}</li>`).join("") || "<li>Nothing yet.</li>"}</ul>`,
         onClick: (t, _refresh, close) => {
           const i = t.closest<HTMLElement>("[data-agent-go]")?.dataset["agentGo"];
@@ -3718,7 +3719,10 @@ async function start(): Promise<void> {
         invalidate();
         return new Promise((resolve) => frameWaiters.push(resolve));
       },
-      { doc, editor, session, renderNow, index, draws: () => drawCount, pictureLocked: (hash) => assets.isLocked(hash), appView: () => appView, setSetting: (k, v) => void (settings as unknown as { set(k: string, v: unknown): Promise<void> }).set(k, v), getSetting: (k) => settings.get(k as never), setView, tiles, density, quality, indexReady: () => indexSync.ready(), labels: () => labels },
+      { doc, editor, session, renderNow, index, draws: () => drawCount, pictureLocked: (hash) => assets.isLocked(hash), appView: () => appView, setSetting: (k, v) => void (settings as unknown as { set(k: string, v: unknown): Promise<void> }).set(k, v), getSetting: (k) => settings.get(k as never), setView, tiles, density, quality, indexReady: () => indexSync.ready(), labels: () => labels,
+        // (an AI agent's run as the link makes it, for tests and pictures: its answer, its pointer, the button's dot and the list)
+        agentRun: async (id, options) => { const r = await answer(registry, "run", { id, options }, settings.get("agents.readOnly"), watchItems); agentRan("run", { id, options }, r); return r; },
+        agentShown: (connected) => showAgentChip(connected) },
     );
   }
   resize();

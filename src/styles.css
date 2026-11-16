@@ -708,7 +708,7 @@ dialog.confirm::backdrop { background: var(--hud-scrim); }
 dialog.list-dialog[open] { display: flex; flex-direction: column; }
 dialog.list-dialog [data-list-body] { flex: 1; min-height: 0; overflow-y: auto; }
 dialog.list-dialog .confirm-actions { flex: none; }
-.agent-log li { display: flex; align-items: center; gap: var(--s-6); min-height: var(--list-h); }
+dialog.confirm .confirm-list.agent-log li { display: flex; align-items: center; gap: var(--s-6); min-height: var(--list-h); }
 .agent-log time { flex: none; color: var(--hud-muted); font-variant-numeric: tabular-nums; }
 .agent-log .agent-log-what { flex: 1; min-width: 0; overflow-wrap: anywhere; }
 .agent-log button { flex: none; }
@@ -1179,7 +1179,7 @@ input[type="radio"]:checked::before { content: ""; width: var(--sp-3); height: v
 .view-settings .agent-chip { position: relative; }
 .view-settings .agent-chip[hidden] { display: none; }
 .agent-chip::after { content: ""; position: absolute; right: var(--sp-2); bottom: var(--sp-2); width: var(--sp-4); height: var(--sp-4); border-radius: var(--r-dot); background: var(--hud-muted); outline: var(--sp-1) solid var(--hud-bg); }
-.agent-chip[data-state="connected"]::after { background: var(--hud-accent); }
+.agent-chip[data-state="connected"]::after { background: var(--hud-success); }
 :root:has(.agent-chip:not([hidden])) { --gear-w: calc(2 * var(--bar-h) + var(--s-4)); }
 .view-settings button { display: inline-flex; align-items: center; justify-content: center; width: var(--bar-h); height: var(--bar-h); padding: 0; box-sizing: border-box; color: inherit; background: var(--hud-bg); border: 1px solid var(--hud-border); border-radius: var(--r-lg); box-shadow: var(--hud-lift); backdrop-filter: blur(8px); cursor: pointer; }
 .view-settings button svg { width: 18px; height: 18px; }
