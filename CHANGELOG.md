@@ -9,6 +9,7 @@
 ### For developers
 
 - **Added:** `--scroll` in the library benchmark (`scripts/bench-library.mjs`, the *Bench library* workflow): frames per second while scrolling the Library, and where the time goes (script, style, layout, paint).
+- **Added:** B24 in the backlog: a setting changed just before a reload sometimes comes back as it was (found by two tests of `frames.spec.ts`).
 - **Fixed:** end-to-end tests start once the text font is in: its arrival drew every tile again, which on a slow machine came in the middle of a test counting tiles (`tiles.spec.ts`) (B8).
 - **Changed:** release notes start with a summary (title, a few sentences, ✨ Highlights, ⚠️ Before you update), then 👩‍🎨 For users (🆕 New, 🔧 Improved, 🐛 Fixed, each with its README section) and 🛠️ For developers, each line once; `**Fixed before release:**` and `**Docs:**` bullets stay out of them, and a release without its summary and highlights stops (B23). The unreleased sections since 0.60.0 follow the new form.
 
