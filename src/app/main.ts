@@ -3110,6 +3110,8 @@ async function start(): Promise<void> {
     },
     keys: keysOf,
     tools: TOOL_ORDER.map((t) => ({ id: TOOL_COMMAND[t], title: TOOL_NAME[t], use: () => editor.setTool(t) })),
+    canUndo: () => doc.canUndo,
+    canRedo: () => doc.canRedo,
     undo: () => undo(doc, editor),
     redo: () => redo(doc, editor),
     copy: () => { if (!document.execCommand("copy")) copySelection(doc, editor, view); }, // (as the keys do: the copy event below puts it on the system clipboard too)

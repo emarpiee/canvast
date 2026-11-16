@@ -46,6 +46,8 @@ export interface CanvasActions {
 
   undo(): void;
   redo(): void;
+  canUndo(): boolean;
+  canRedo(): boolean;
   copy(): void;
   copyFile: (() => Promise<void>) | null;
   canCopyFile(): boolean;
@@ -178,8 +180,8 @@ export function canvasCommands(a: CanvasActions): Command[] {
 
   const list: Command[] = [
     ...a.tools.map((t) => cmd(t.id, "Tool", t.title, `Use the ${t.title.replace(/ \(.*\)$/, "").toLowerCase()} tool`, "edit", canvas, () => t.use())),
-    cmd("edit.undo", "Edit", "Undo", "Take back the last change", "edit", canvas, () => a.undo(), { keys: a.keys("edit.undo") || "Ctrl+Z", words: "back revert" }),
-    cmd("edit.redo", "Edit", "Redo", "Do it again", "edit", canvas, () => a.redo(), { keys: a.keys("edit.redo") || "Ctrl+Shift+Z", words: "again" }),
+    cmd("edit.undo", "Edit", "Undo", "Take back the last change", "edit", when(canvas, a.canUndo, "Nothing to undo: the history starts when the app is opened."), () => a.undo(), { keys: a.keys("edit.undo") || "Ctrl+Z", words: "back revert" }),
+    cmd("edit.redo", "Edit", "Redo", "Do it again", "edit", when(canvas, a.canRedo, "Nothing to redo."), () => a.redo(), { keys: a.keys("edit.redo") || "Ctrl+Shift+Z", words: "again" }),
     cmd("edit.recolourOldInk", "Edit", "Change the old default ink to the canvas ink", "Old near-black drawings readable again", "edit", when(canvas, a.canRecolour, "Nothing has the old default ink."), () => a.recolour(), { words: "recolour near-black dark outline theme light old drawings readable" }),
     item("edit.copy", "Edit", "Copy", "To paste elsewhere", () => a.copy(), picked, { keys: "Ctrl+C"}),
     ...(a.copyFile ? [item("edit.copyFile", "Edit", "Copy file", "The real file, for a file manager", () => a.copyFile!(), when(picked, a.canCopyFile, "No library file is selected."), { words: "real file clipboard file manager"})] : []),
