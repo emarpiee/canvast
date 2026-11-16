@@ -611,7 +611,7 @@ export class AssetLibrary {
         // (a picture that does not decode: the file's own card)
       }
     }
-    return makeFileCardFrom(rec.name, describeFile(rec.name, rec.type).chip, async () => new Uint8Array(await rec.blob.arrayBuffer()), { size, hash: rec.hash, layoutW, preview, fileSize: rec.blob.size });
+    return makeFileCardFrom(rec.name, describeFile(rec.name, rec.type).chip, async () => new Uint8Array(await rec.blob.arrayBuffer()), { size, hash: rec.hash, layoutW, preview, fileSize: rec.blob.size, blob: rec.blob });
   }
 
   /** `key` is the hash, or `hash#ms` for the picture of a video at a time (doc/model.ts rasterKey). */

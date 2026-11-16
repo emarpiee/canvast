@@ -3275,7 +3275,7 @@ dialog.choice-dialog { width: min(var(--choice-w), calc(100vw - var(--sp-10))); 
 .choice-make { margin-top: var(--s-4); }
 
 /* A file in a view of its own (ui/file-views.ts), in the library's viewer and in the panel on a canvas alike. */
-:is(.pdf-view, .model-view) { flex: 1; min-height: 0; display: flex; flex-direction: column; background: var(--hud-bg); color: var(--hud-fg); }
+:is(.pdf-view, .model-view, .archive-view) { flex: 1; min-height: 0; display: flex; flex-direction: column; background: var(--hud-bg); color: var(--hud-fg); }
 .view-bar { flex: none; display: flex; flex-wrap: wrap; align-items: center; gap: var(--s-2); padding: var(--s-2) var(--s-4); min-height: var(--bar-h); border-bottom: 1px solid var(--hud-border); }
 .view-bar .layer-btn { flex: none; width: var(--ctl); height: var(--ctl); border-radius: var(--ctl-r); opacity: 1; }
 .view-bar .layer-btn svg { width: var(--icon-md); height: var(--icon-md); }
@@ -3292,6 +3292,41 @@ dialog.choice-dialog { width: min(var(--choice-w), calc(100vw - var(--sp-10))); 
 .textLayer :is(span, br) { color: transparent; position: absolute; white-space: pre; cursor: text; transform-origin: 0 0; }
 .textLayer ::selection { background: var(--text-chosen); color: transparent; }
 .textLayer br::selection { background: transparent; }
+/* An archive (ZIP, CBZ): its files as a list under the folders' path, one file shown, or its pictures as pages. */
+.archive-view [hidden] { display: none; }
+.archive-tools { display: contents; }
+.archive-path { flex: none; display: flex; flex-wrap: wrap; align-items: center; gap: var(--s-1); padding: var(--s-2) var(--s-4); border-bottom: 1px solid var(--hud-border); font: var(--font-meta); }
+.archive-crumb { padding: var(--s-1) var(--s-2); border-radius: var(--r-sm); color: var(--hud-muted); background: none; }
+button.archive-crumb:hover { background: var(--hud-hover); color: var(--hud-fg); }
+.archive-crumb:last-child { color: var(--hud-fg); }
+.archive-sep { display: inline-flex; color: var(--hud-muted); }
+.archive-sep svg { width: var(--icon-sm); height: var(--icon-sm); }
+.archive-list, .archive-file { flex: 1; min-height: 0; overflow: auto; }
+.archive-list:focus, .archive-file:focus, .archive-pages:focus { outline: none; }
+.archive-row { display: grid; grid-template-columns: var(--icon-md) minmax(0, 1fr) auto auto auto; align-items: center; gap: var(--s-4); min-height: var(--list-h); padding: 0 var(--s-4); cursor: default; }
+.archive-row:hover { background: var(--hud-hover); }
+.archive-row[aria-selected="true"] { background: var(--hud-accent); color: var(--hud-accent-fg); }
+.archive-row[aria-selected="true"] :is(.archive-facts, .archive-date, .archive-lock) { color: var(--hud-accent-fg); }
+.archive-icon, .archive-lock { display: inline-flex; }
+.archive-icon svg, .archive-lock svg { width: var(--icon-md); height: var(--icon-md); }
+.archive-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.archive-lock, .archive-facts, .archive-date { color: var(--hud-muted); font: var(--font-meta); white-space: nowrap; }
+.archive-row .archive-lock { grid-column: 3; }
+.archive-row .archive-facts { grid-column: 4; }
+.archive-row .archive-date { grid-column: 5; }
+.archive-empty, .archive-note { padding: var(--s-8); color: var(--hud-muted); }
+.archive-note { display: flex; flex-direction: column; align-items: flex-start; gap: var(--s-6); }
+.archive-text { margin: 0; padding: var(--s-8); font: var(--text-sm)/1.5 var(--font-mono); white-space: pre-wrap; overflow-wrap: anywhere; }
+.archive-file { display: flex; }
+.archive-file > .archive-media { margin: auto; max-width: 100%; max-height: 100%; }
+.archive-file > .archive-text, .archive-file > .archive-note { flex: 1; align-self: flex-start; }
+.archive-pages { flex: 1; min-height: 0; overflow: auto; padding: var(--s-4); display: flex; }
+.archive-page { flex: none; margin: auto; display: block; background: var(--paper); box-shadow: var(--hud-lift); }
+@container (max-width: 40rem) {
+  .archive-row { grid-template-columns: var(--icon-md) minmax(0, 1fr) auto auto; }
+  .archive-row .archive-date { display: none; }
+}
+.archive-view { container-type: inline-size; }
 .model-main { flex: 1; min-height: 0; display: flex; }
 .model-stage { flex: 1; min-width: 0; position: relative; cursor: grab; touch-action: none; }
 .model-stage:active { cursor: grabbing; }

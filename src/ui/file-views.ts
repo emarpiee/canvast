@@ -1,4 +1,4 @@
-import { isModelFile, isPdfFile } from "../assets/file-kind";
+import { isArchiveFile, isModelFile, isPdfFile } from "../assets/file-kind";
 import { noteKindOf, opensAsNote, tooBigForNote } from "../notes/note-file";
 import { OpenNote } from "./note-session";
 import type { NoteDeps, NotePlace } from "./note-session";
@@ -64,7 +64,7 @@ export interface FileFacts {
 }
 
 export interface FileViewKind {
-  readonly id: "note" | "pdf" | "model";
+  readonly id: "note" | "pdf" | "model" | "archive";
   /** What the interface calls it. */
   readonly noun: string;
   /** Whether it has bookmarks, listed in the details. */
@@ -110,6 +110,16 @@ const KINDS: readonly FileViewKind[] = [
     named: isModelFile,
     claims: (f) => isModelFile(f.name),
     open: async (el, f, deps, place) => (await import("./model-view")).openModelView(el, f, deps, place),
+  },
+  {
+    // A ZIP, or a comic book (CBZ): found by the names of the files in it.
+    id: "archive",
+    noun: "archive",
+    marks: true,
+    named: isArchiveFile,
+    claims: (f) => isArchiveFile(f.name),
+    words: async (blob) => (await import("../assets/archive")).archiveWords(blob),
+    open: async (el, f, deps, place) => (await import("./archive-view")).openArchiveView(el, f, deps, place),
   },
 ];
 

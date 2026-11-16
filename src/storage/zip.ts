@@ -31,7 +31,8 @@ const MAX_ENTRIES = 0xffff;
 /** Counts and offsets are read as numbers: beyond this they could not be addressed in a browser anyway. */
 const MAX_SAFE = Number.MAX_SAFE_INTEGER;
 
-const TABLE = (() => {
+/** The CRC-32 table (ZIP polynomial), shared with the old ZIP encryption's keys. */
+export const CRC_TABLE = (() => {
   const t = new Uint32Array(256);
   for (let n = 0; n < 256; n++) {
     let c = n;
@@ -44,7 +45,7 @@ const TABLE = (() => {
 /** CRC-32 (ZIP polynomial). Pass the previous result to continue over chunks. */
 export function crc32(bytes: Uint8Array, prev = 0): number {
   let c = ~prev >>> 0;
-  for (let i = 0; i < bytes.length; i++) c = TABLE[(c ^ bytes[i]!) & 0xff]! ^ (c >>> 8);
+  for (let i = 0; i < bytes.length; i++) c = CRC_TABLE[(c ^ bytes[i]!) & 0xff]! ^ (c >>> 8);
   return ~c >>> 0;
 }
 
@@ -191,12 +192,44 @@ async function view(b: Blob, start: number, end: number): Promise<DataView> {
   return new DataView(await b.slice(start, end).arrayBuffer());
 }
 
+/** One file listed in a ZIP's directory, as written there (nothing checked but its place in the file). */
+export interface ZipRecord {
+  name: string;
+  /** General purpose flags: bit 0 encrypted, bit 3 sizes after the data, bit 11 a UTF-8 name. */
+  flags: number;
+  /** 0 stored, 8 deflated, 99 WinZip AES (its own method in `extra`). */
+  method: number;
+  crc: number;
+  /** Its size in the archive, and unpacked. */
+  csize: number;
+  usize: number;
+  localOffset: number;
+  /** MS-DOS time and date of its last change. */
+  time: number;
+  date: number;
+  /** Its extra fields (the directory's). */
+  extra: DataView;
+}
+
+/** One extra field of a record, by its id, null when it has none. */
+export function extraField(extra: DataView, id: number): DataView | null {
+  for (let q = 0; q + 4 <= extra.byteLength; ) {
+    const len = extra.getUint16(q + 2, true);
+    if (q + 4 + len > extra.byteLength) return null;
+    if (extra.getUint16(q, true) === id) return new DataView(extra.buffer, extra.byteOffset + q + 4, len);
+    q += 4 + len;
+  }
+  return null;
+}
+
+/** A name that is not UTF-8 (an old archive's, flag 11 off): read as Windows' Western code page, the closest a browser has to the old DOS one. */
+const LOOSE = new TextDecoder("windows-1252");
+
 /**
- * Read a ZIP's directory. Every offset and size is bounds-checked against the
- * file; only stored, unencrypted entries are accepted; duplicate names are
- * rejected. Entry bytes are not read here (see `verifyEntry`).
+ * Read a ZIP's directory: every record's facts, bounds-checked against the file (ZIP64 too). `names`: "strict" throws on a name that is not
+ * UTF-8 (canvast's own archives); "any" reads an old archive's names as best it can (its Unicode path field first).
  */
-export async function readZip(file: Blob): Promise<Map<string, ZipEntry>> {
+export async function zipDirectory(file: Blob, names: "strict" | "any" = "strict"): Promise<{ records: ZipRecord[]; cdOffset: number }> {
   const n = file.size;
   if (n < 22) throw new ZipError("not an archive (file too small)");
   const tailStart = Math.max(0, n - 22 - 0xffff);
@@ -231,14 +264,14 @@ export async function readZip(file: Blob): Promise<Map<string, ZipEntry>> {
   if (cdOffset + cdSize > n) throw new ZipError("unsupported or damaged archive directory");
   const cd = await view(file, cdOffset, cdOffset + cdSize);
   const dec = new TextDecoder("utf-8", { fatal: true });
-  const out = new Map<string, ZipEntry>();
-  const names = new Set<string>();
-  const listed: Array<{ name: string; crc: number; usize: number; localOffset: number }> = [];
+  const records: ZipRecord[] = [];
   let p = 0;
   for (let i = 0; i < count; i++) {
     if (p + 46 > cd.byteLength || cd.getUint32(p, true) !== 0x02014b50) throw new ZipError("damaged archive directory");
     const flags = cd.getUint16(p + 8, true);
     const method = cd.getUint16(p + 10, true);
+    const time = cd.getUint16(p + 12, true);
+    const date = cd.getUint16(p + 14, true);
     const crc = cd.getUint32(p + 16, true);
     let csize = cd.getUint32(p + 20, true);
     let usize = cd.getUint32(p + 24, true);
@@ -247,57 +280,69 @@ export async function readZip(file: Blob): Promise<Map<string, ZipEntry>> {
     const commentLen = cd.getUint16(p + 32, true);
     let localOffset = cd.getUint32(p + 42, true);
     if (p + 46 + nameLen + extraLen > cd.byteLength) throw new ZipError("damaged archive directory");
+    const extra = new DataView(cd.buffer, cd.byteOffset + p + 46 + nameLen, extraLen);
     // ZIP64 extra field: the sizes and the offset that did not fit are here, in this order, each only when its field holds 0xFFFFFFFF.
     if (usize === LIMIT || csize === LIMIT || localOffset === LIMIT) {
-      let q = p + 46 + nameLen;
-      const stop = q + extraLen;
-      let found = false;
-      while (q + 4 <= stop) {
-        const id = cd.getUint16(q, true);
-        const len = cd.getUint16(q + 2, true);
-        if (id === 0x0001 && q + 4 + len <= stop) {
-          let r = q + 4;
-          const next = (): number => {
-            if (r + 8 > q + 4 + len) throw new ZipError("damaged archive directory");
-            const v = cd.getBigUint64(r, true);
-            r += 8;
-            if (v > BigInt(MAX_SAFE)) throw new ZipError("archive is larger than this browser can address");
-            return Number(v);
-          };
-          if (usize === LIMIT) usize = next();
-          if (csize === LIMIT) csize = next();
-          if (localOffset === LIMIT) localOffset = next();
-          found = true;
-          break;
-        }
-        q += 4 + len;
-      }
-      if (!found) throw new ZipError("damaged archive directory");
+      const z = extraField(extra, 0x0001);
+      if (!z) throw new ZipError("damaged archive directory");
+      let r = 0;
+      const next = (): number => {
+        if (r + 8 > z.byteLength) throw new ZipError("damaged archive directory");
+        const v = z.getBigUint64(r, true);
+        r += 8;
+        if (v > BigInt(MAX_SAFE)) throw new ZipError("archive is larger than this browser can address");
+        return Number(v);
+      };
+      if (usize === LIMIT) usize = next();
+      if (csize === LIMIT) csize = next();
+      if (localOffset === LIMIT) localOffset = next();
     }
+    const raw = new Uint8Array(cd.buffer, cd.byteOffset + p + 46, nameLen);
     let name: string;
     try {
-      name = dec.decode(new Uint8Array(cd.buffer, cd.byteOffset + p + 46, nameLen));
+      name = dec.decode(raw);
     } catch {
-      throw new ZipError("archive has a file name that is not valid UTF-8");
+      if (names === "strict") throw new ZipError("archive has a file name that is not valid UTF-8");
+      // Info-ZIP's Unicode path field (version 1, the CRC of the old name, the UTF-8 name), else the old code page.
+      const u = extraField(extra, 0x7075);
+      const utf = u && u.byteLength > 5 && u.getUint8(0) === 1 ? new TextDecoder("utf-8", { fatal: false }).decode(new Uint8Array(u.buffer, u.byteOffset + 5, u.byteLength - 5)) : "";
+      name = utf || LOOSE.decode(raw);
     }
-    if (flags & 1) throw new ZipError(`"${name}" is encrypted`);
-    if (method !== 0 || csize !== usize) throw new ZipError(`"${name}" is compressed; only archives exported by canvast can be imported`);
-    if (out.has(name)) throw new ZipError(`archive lists "${name}" twice`);
-    if (names.has(name)) throw new ZipError(`archive lists "${name}" twice`);
-    names.add(name);
-    listed.push({ name, crc, usize, localOffset });
+    records.push({ name, flags, method, crc, csize, usize, localOffset, time, date, extra });
     p += 46 + nameLen + extraLen + commentLen;
   }
-  // The local headers say where each entry's bytes start (their name and extra field may differ from the directory's): read them in parallel batches.
-  for (let from = 0; from < listed.length; from += 256) {
-    const batch = listed.slice(from, from + 256);
-    const heads = await Promise.all(batch.map((e) => view(file, e.localOffset, Math.min(n, e.localOffset + 30))));
-    batch.forEach((e, k) => {
-      const lh = heads[k]!;
-      if (lh.byteLength < 30 || lh.getUint32(0, true) !== 0x04034b50) throw new ZipError(`damaged entry "${e.name}"`);
-      const start = e.localOffset + 30 + lh.getUint16(26, true) + lh.getUint16(28, true);
-      if (start + e.usize > cdOffset) throw new ZipError(`entry "${e.name}" runs past the end of the data`);
-      out.set(e.name, { name: e.name, size: e.usize, crc: e.crc, data: file.slice(start, start + e.usize) });
+  return { records, cdOffset };
+}
+
+/** Where a record's bytes start: after its local header, whose name and extra field may differ from the directory's. */
+export async function recordStart(file: Blob, r: Pick<ZipRecord, "localOffset" | "name">): Promise<number> {
+  const lh = await view(file, r.localOffset, Math.min(file.size, r.localOffset + 30));
+  if (lh.byteLength < 30 || lh.getUint32(0, true) !== 0x04034b50) throw new ZipError(`damaged entry "${r.name}"`);
+  return r.localOffset + 30 + lh.getUint16(26, true) + lh.getUint16(28, true);
+}
+
+/**
+ * Read a canvast archive's directory. Every offset and size is bounds-checked against the
+ * file; only stored, unencrypted entries are accepted; duplicate names are
+ * rejected. Entry bytes are not read here (see `verifyEntry`).
+ */
+export async function readZip(file: Blob): Promise<Map<string, ZipEntry>> {
+  const { records, cdOffset } = await zipDirectory(file, "strict");
+  const out = new Map<string, ZipEntry>();
+  for (const r of records) {
+    if (r.flags & 1) throw new ZipError(`"${r.name}" is encrypted`);
+    if (r.method !== 0 || r.csize !== r.usize) throw new ZipError(`"${r.name}" is compressed; only archives exported by canvast can be imported`);
+    if (out.has(r.name)) throw new ZipError(`archive lists "${r.name}" twice`);
+    out.set(r.name, { name: r.name, size: r.usize, crc: r.crc, data: file.slice(0, 0) });
+  }
+  // The local headers say where each entry's bytes start: read them in parallel batches.
+  for (let from = 0; from < records.length; from += 256) {
+    const batch = records.slice(from, from + 256);
+    const starts = await Promise.all(batch.map((r) => recordStart(file, r)));
+    batch.forEach((r, k) => {
+      const start = starts[k]!;
+      if (start + r.usize > cdOffset) throw new ZipError(`entry "${r.name}" runs past the end of the data`);
+      out.get(r.name)!.data = file.slice(start, start + r.usize);
     });
   }
   return out;

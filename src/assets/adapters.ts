@@ -1,8 +1,9 @@
 import { CARD_SCALE, noteCardSize, notePicture } from "../notes/note-preview";
 import { noteKindOf, tooBigForNote } from "../notes/note-file";
-import { isFontFile, isModelFile, isPdfFile } from "./file-kind";
+import { isArchiveFile, isFontFile, isModelFile, isPdfFile } from "./file-kind";
 import { modelPicture } from "./model-engine";
-import { pdfPicture } from "./pdf-engine";
+import { PDF_CARD_EDGE, pageFit, pdfPicture } from "./pdf-engine";
+import { archivePage } from "./archive";
 import { FILE_CARD_H, FILE_CARD_W, cardContext, makeFileCard, fillTextCentred, groundFill, inkOnGround } from "./card";
 import type { ViewGround } from "../storage/workspace-repo";
 
@@ -19,6 +20,8 @@ export interface PictureOptions {
   layoutW?: number | undefined;
   /** The file's size, when known: a file too large for a picture is then not read at all. */
   fileSize?: number | undefined;
+  /** The file itself, when at hand: a kind that needs only part of it (an archive's first page) reads only that part. */
+  blob?: Blob | undefined;
 }
 
 /**
@@ -40,6 +43,20 @@ const PICTURE_KINDS: ReadonlyArray<{ claims(name: string): boolean; picture(name
   { claims: (name) => isFontFile({ type: "", name }), picture: async (_name, chip, read) => fontCard(chip, await read()).catch(() => null) },
   { claims: (name) => isPdfFile({ name }), picture: (_name, _chip, read, o) => pdfPicture(read, { hash: o.hash, page: Number(o.preview) || 1, size: o.size, edge: o.edge }) },
   { claims: isModelFile, picture: (name, _chip, read, o) => modelPicture(read, name, o) },
+  {
+    // A ZIP or a comic book: its first picture (a comic's cover), or the page a card shows; none when it has a password.
+    claims: isArchiveFile,
+    picture: async (_name, _chip, read, o) => {
+      const page = await archivePage(o.blob ?? new Blob([(await read()) as Uint8Array<ArrayBuffer>]), Number(o.preview) || 1);
+      if (!page) return null;
+      const bmp = await createImageBitmap(page);
+      const fit = o.size ?? pageFit({ w: bmp.width, h: bmp.height }, o.edge ?? PDF_CARD_EDGE);
+      if (fit.w === bmp.width && fit.h === bmp.height) return bmp;
+      const out = await createImageBitmap(bmp, { resizeWidth: fit.w, resizeHeight: fit.h, resizeQuality: "high" });
+      bmp.close();
+      return out;
+    },
+  },
 ];
 
 /** What can be drawn of a file from its bytes, null when nothing could be. */

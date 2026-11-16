@@ -43,7 +43,7 @@ const KIND_EXTS: Record<string, readonly string[]> = {
   art_sources: ["psd", "psb", "kra", "xcf", "clip", "csp", "procreate", "sai", "sai2", "ai", "afphoto", "afdesign", "afpub", "pdn", "ora", "fig", "sketch", "xd", "mdp"],
   presets: ["abr", "kpp", "bundle", "brushset", "brush", "sut", "ase", "aco", "gpl", "ggr", "swatches", "pat"],
   "3d": ["obj", "fbx", "glb", "gltf", "stl", "blend", "usdz", "usd", "3mf", "ply", "dae", "3ds"],
-  archives: ["zip", "rar", "7z", "tar", "gz", "tgz", "bz2", "xz", "zst"],
+  archives: ["zip", "cbz", "cbr", "cb7", "rar", "7z", "tar", "gz", "tgz", "bz2", "xz", "zst"],
   fonts: ["ttf", "otf", "woff", "woff2", "ttc"],
   notes: ["md", "markdown", "txt"],
   documents: ["pdf", "doc", "docx", "odt", "rtf", "csv", "xls", "xlsx", "ods", "ppt", "pptx", "odp", "epub", "html", "htm", "json"],

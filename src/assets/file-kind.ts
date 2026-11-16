@@ -21,8 +21,13 @@ export const isPdfFile = (x: { type?: string; name: string }): boolean => x.type
 /** A 3D model this app reads. */
 export const isModelFile = (name: string): boolean => ["GLB", "GLTF", "STL", "OBJ", "PLY"].includes(extOf(name));
 
+/** A ZIP or a comic book (CBZ: a ZIP of its pages), opened in the archive view. */
+export const isArchiveFile = (name: string): boolean => ["ZIP", "CBZ"].includes(extOf(name));
+/** A comic book: it opens on its pages. */
+export const isComicFile = (name: string): boolean => extOf(name) === "CBZ";
+
 /** A file card with a thumbnail of its own (a font's letters, a note's page, a PDF's first page, a 3D model's view), else a card shows the file tile. */
-export const hasThumb = (x: { type: string; name: string; card?: boolean }): boolean => !isCard(x) || isFontFile(x) || isArtFile(x.name) || noteKindOf(x.name) !== null || isPdfFile(x) || isModelFile(x.name) || (x.card === true && x.type.startsWith("video/"));
+export const hasThumb = (x: { type: string; name: string; card?: boolean }): boolean => !isCard(x) || isFontFile(x) || isArtFile(x.name) || noteKindOf(x.name) !== null || isPdfFile(x) || isModelFile(x.name) || isArchiveFile(x.name) || (x.card === true && x.type.startsWith("video/"));
 
 /** The extension of a file name, upper case and at most eight letters or digits; "" when there is none. */
 export function extOf(name: string): string {
@@ -55,6 +60,7 @@ const CATEGORIES: readonly Category[] = [
   { label: "Document", exts: ["pdf", "doc", "docx", "odt", "rtf", "pages", "epub", "mobi", "tex", "wpd"], todo: "Download it and open it in a reader or word processor." },
   { label: "Spreadsheet", exts: ["xls", "xlsx", "ods", "numbers", "xlsm"], todo: "Download it and open it in a spreadsheet app." },
   { label: "Presentation", exts: ["ppt", "pptx", "odp", "key"], todo: "Download it and open it in a presentation app." },
+  { label: "Comic book", exts: ["cbz", "cbr", "cb7"], todo: "Download it and open it in a comic reader." },
   { label: "Archive", exts: ["zip", "rar", "7z", "tar", "gz", "tgz", "bz2", "xz", "iso", "dmg"], todo: "Download it and unpack it with an archive tool." },
   { label: "Design file", exts: ["psd", "psb", "ai", "xd", "sketch", "fig", "figcraft", "afdesign", "afphoto", "kra", "clip", "xcf", "indd", "eps"], todo: "Download it and open it in the app that made it." },
   { label: "Font", exts: ["ttf", "otf", "woff", "woff2", "eot"], todo: "Download it and install it, or open it in a font viewer." },

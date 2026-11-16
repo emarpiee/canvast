@@ -3,6 +3,8 @@ import { readFileSync, writeFileSync } from "node:fs";
 import type { Page } from "@playwright/test";
 import { expect, test } from "./harness";
 import { makePng } from "./png";
+import { writeZip } from "../../src/storage/zip";
+import { ZIPS } from "./zips";
 
 /** Files that open in a view of their own (ui/file-views.ts), beyond notes: in the library and on a canvas. */
 
@@ -456,6 +458,74 @@ test("a PDF with a password asks for it, says when it is wrong, and stays a card
   await p.locator('[data-testid="asset-card"][title="locked.pdf"]').dblclick();
   await p.getByTestId("prompt-dialog").getByRole("button", { name: "Cancel" }).click();
   await expect(p.locator('[data-testid="slide-view"] figcaption')).toContainText("has a password");
+  expect(app.consoleErrors).toEqual([]);
+});
+
+/** A comic book made here: three pages of three colours (named so that only natural order reads them right: 1, 2, 10) and a text file. */
+const makeCbz = async (): Promise<Buffer> => {
+  const page = (rgb: [number, number, number], w: number, h: number) => new Blob([new Uint8Array(makePng(w, h, () => [...rgb, 255]))]);
+  const zip = await writeZip([
+    { name: "issue/p10.png", data: page([0, 0, 255], 30, 40) },
+    { name: "issue/p1.png", data: page([255, 0, 0], 30, 40) },
+    { name: "issue/p2.png", data: page([0, 160, 0], 30, 40) },
+    { name: "issue/credits.txt", data: new Blob(["Lettering by hand."]) },
+  ]);
+  return Buffer.from(await zip.arrayBuffer());
+};
+const pageColour = (p: Page) => p.getByTestId("archive-page-img").evaluate((i: HTMLImageElement) => {
+  const c = document.createElement("canvas");
+  c.width = c.height = 1;
+  const x = c.getContext("2d")!;
+  x.drawImage(i, 0, 0, 1, 1);
+  const [r, g, b] = x.getImageData(0, 0, 1, 1).data;
+  return r! > 128 ? "red" : g! > 100 ? "green" : b! > 128 ? "blue" : "?";
+});
+
+test("a comic book (CBZ) opens on its pages in natural order, its cover on the card; a ZIP opens on its files: a text read inside, a file imported; a password asked for, a wrong one refused", async ({ app }) => {
+  const p = app.page;
+  await p.getByTestId("view-assets").click();
+  await p.getByTestId("assets-import-input").setInputFiles({ name: "issue.cbz", mimeType: "application/vnd.comicbook+zip", buffer: await makeCbz() });
+  const comic = p.locator('[data-testid="asset-card"][title="issue.cbz"]');
+  await expect(comic).toHaveCount(1, { timeout: 15_000 });
+  // The card shows its cover (the first page, its shape: taller than wide).
+  await expect.poll(() => comic.locator(".asset-thumb img").evaluate((i: HTMLImageElement) => i.naturalWidth > 0 && i.naturalWidth < i.naturalHeight).catch(() => false)).toBe(true);
+  await comic.dblclick();
+  await expect(p.getByTestId("archive-view")).toBeVisible();
+  await expect(p.getByTestId("archive-page-img")).toHaveAttribute("data-page", "1");
+  expect(await pageColour(p)).toBe("red");
+  await p.getByTestId("view-next").click();
+  await expect(p.getByTestId("archive-page-img")).toHaveAttribute("data-page", "2");
+  expect(await pageColour(p)).toBe("green");
+  await p.getByTestId("view-next").click();
+  await expect(p.getByTestId("archive-page-img")).toHaveAttribute("data-page", "3");
+  expect(await pageColour(p)).toBe("blue"); // (p10 last, not between p1 and p2)
+  // Its files: the folder, then a text read inside it; a page imported into the library.
+  await p.getByTestId("view-files").click();
+  const rows = p.getByTestId("archive-row");
+  await rows.filter({ hasText: "issue" }).dblclick();
+  await expect(rows).toHaveText([/credits\.txt/, /p1\.png/, /p2\.png/, /p10\.png/]);
+  await rows.filter({ hasText: "credits.txt" }).dblclick();
+  await expect(p.getByTestId("archive-file")).toContainText("Lettering by hand.");
+  await p.getByTestId("view-files").click();
+  const before = await p.getByTestId("asset-card").count();
+  await rows.filter({ hasText: "p2.png" }).click();
+  await p.getByTestId("view-import").click();
+  await p.keyboard.press("Escape");
+  await expect(p.getByTestId("asset-card")).toHaveCount(before + 1, { timeout: 15_000 });
+  // A ZIP with a password (the old PKZIP kind, made by zip -P): it opens on its files; a file asks for the password.
+  await p.getByTestId("assets-import-input").setInputFiles({ name: "locked.zip", mimeType: "application/zip", buffer: Buffer.from(ZIPS.zipCrypto, "base64") });
+  const locked = p.locator('[data-testid="asset-card"][title="locked.zip"]');
+  await expect(locked).toHaveCount(1, { timeout: 15_000 });
+  await locked.dblclick();
+  await expect(p.getByTestId("archive-summary")).toContainText("with a password");
+  await rows.filter({ hasText: "comic" }).dblclick();
+  await rows.filter({ hasText: "readme.txt" }).dblclick();
+  await p.getByTestId("prompt-input").fill("wrong");
+  await p.getByTestId("prompt-ok").click();
+  await expect(p.getByTestId("prompt-dialog")).toContainText("not the one");
+  await p.getByTestId("prompt-input").fill("secret");
+  await p.getByTestId("prompt-ok").click();
+  await expect(p.getByTestId("archive-file")).toContainText("Read me first.");
   expect(app.consoleErrors).toEqual([]);
 });
 

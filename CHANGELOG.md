@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.60.8 — ZIP and comic book viewer (2026-11-16)
+
+- **Added:** a ZIP or a comic book (CBZ) opens in a view of its own, in the library's viewer and in the panel on a canvas. **Files** lists its folders and files (name, size, date, a padlock on one with a password); a double-click opens a folder, shows a picture, a video, a sound or a text inside it, or offers to import a PDF, note or 3D model and open it in its own view. **Import to the library** takes the selected files (all in the folder when none is), into the open folder, hidden in hidden mode. **Pages** reads its pictures one at a time in natural order (page 2 before page 10), with Page Up and Down, Space, a click on the page, zoom, bookmarks and the page it was left at; a CBZ opens there. Its card shows its first picture (a comic's cover), or the page chosen for it on a canvas.
+- **Added:** archives with a password open: the old PKZIP kind and WinZip's AES (128, 192 or 256 bits, what 7-Zip and WinZip make). The password is asked once while the view is open and kept nowhere; a wrong one is said. Stored and Deflate files open; other methods (LZMA, BZIP2, Zstandard…) are listed but say they cannot be opened here.
+- **Changed:** the library's search finds a ZIP or CBZ by the names of the files in it.
+
 ## 0.60.7 — The Library's reset button in hidden mode (2026-11-16)
 
 - **Fixed:** with a filter of the sidebar on (a folder, Favourites, a tag), hidden mode showed the Reset all filters button with nothing filtered there, and it did nothing: it went by the filter kept for when hidden mode ends. It now says only what is on screen, so it also shows for a hidden folder picked in hidden mode (it did not); the filter left on outside comes back at the end, with the button.
