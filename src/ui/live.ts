@@ -11,10 +11,12 @@ export function liveNumber(input: HTMLInputElement, apply: (value: number, final
     const v = parse(t);
     return Number.isFinite(v) ? v : null;
   };
+  // view-state: (a dialog's or chooser's own control: what it gives goes to the command that opened it)
   input.addEventListener("input", () => {
     const v = read();
     if (v !== null) apply(v, false);
   });
+  // view-state: (a dialog's or chooser's own control: what it gives goes to the command that opened it)
   input.addEventListener("change", () => {
     const v = read();
     if (v !== null) apply(v, true);

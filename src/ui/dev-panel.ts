@@ -72,6 +72,7 @@ export function mountDevPanel(root: HTMLElement, view: ViewState, doc: DocumentS
     raf = requestAnimationFrame(tick);
   };
 
+  // view-state: (the developer panel, #debug only)
   panel.addEventListener("click", (e) => {
     const b = (e.target as HTMLElement).closest("button");
     if (!b) return;

@@ -163,6 +163,7 @@ export function mountPropertiesLayout(root: HTMLElement, canvasHost: HTMLElement
     const chip = (e.target as HTMLElement).closest<HTMLElement>("[data-vchip]");
     if (chip) popSection(chip, chip.dataset["vchip"]!);
   };
+  // view-state: (a chip opens its popover; what it changes is a command)
   for (const el of [top.row, nearRow]) el.addEventListener("click", onChip);
   // (a press on the chips is not a press on the canvas under them)
   near.addEventListener("pointerdown", (e) => e.stopPropagation());

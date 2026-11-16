@@ -126,6 +126,7 @@ export function openTreeChooser(opts: ChooserOptions): Promise<Map<string, Choic
 
   return new Promise((resolve) => {
     let answer: Map<string, ChoiceDone> | null = null;
+    // view-state: (a dialog's or chooser's own control: what it gives goes to the command that opened it)
     dlg.addEventListener("change", (e) => {
       const box = e.target as HTMLInputElement;
       if (box.dataset["id"] === undefined) return; // (the top choice, Unfiled or Top level, is the empty one)
@@ -135,6 +136,7 @@ export function openTreeChooser(opts: ChooserOptions): Promise<Map<string, Choic
         else if (tab.one && !n.group) n.state = "off";
       }
     });
+    // view-state: (a dialog's or chooser's own control: what it gives goes to the command that opened it)
     dlg.addEventListener("click", (e) => {
       const b = (e.target as HTMLElement).closest<HTMLButtonElement>("button");
       if (!b) return;
@@ -166,6 +168,7 @@ export function openTreeChooser(opts: ChooserOptions): Promise<Map<string, Choic
       made.get(tab.id)!.add(target.id);
       search.value = "";
     };
+    // view-state: (a dialog's or chooser's own control: what it gives goes to the command that opened it)
     search.addEventListener("input", draw);
     search.addEventListener("keydown", (e) => {
       if (e.key !== "Enter") return;

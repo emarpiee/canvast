@@ -70,6 +70,7 @@ export function mountHintLine(editor: EditorState, doc: DocumentStore, mode: () 
   });
   // A button's own words give way as soon as it is used or the tool changes (the toolbar may have moved under a pointer that did not).
   let tool = editor.tool;
+  // view-state: (the hint line)
   document.addEventListener("click", () => {
     if (hover !== null) {
       hover = null;

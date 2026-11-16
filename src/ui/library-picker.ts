@@ -80,10 +80,12 @@ export function openLibraryPicker(anchor: HTMLElement | null, items: readonly Li
       e.stopPropagation();
       done(null);
     };
+    // view-state: (a dialog's or chooser's own control: what it gives goes to the command that opened it)
     pop.addEventListener("click", (e) => {
       const b = (e.target as HTMLElement).closest<HTMLElement>("[data-hash]");
       if (b) done(b.dataset["hash"]!);
     });
+    // view-state: (a dialog's or chooser's own control: what it gives goes to the command that opened it)
     pop.querySelector<HTMLButtonElement>("[data-lib-import]")?.addEventListener("click", (e) => {
       const button = e.currentTarget as HTMLButtonElement;
       const input = document.createElement("input");
@@ -92,6 +94,7 @@ export function openLibraryPicker(anchor: HTMLElement | null, items: readonly Li
       input.accept = opts.importFiles!.accept;
       choosingFile = true;
       input.addEventListener("cancel", () => (choosingFile = false));
+      // view-state: (a dialog's or chooser's own control: what it gives goes to the command that opened it)
       input.addEventListener("change", () => {
         choosingFile = false;
         const files = [...(input.files ?? [])];
@@ -106,6 +109,7 @@ export function openLibraryPicker(anchor: HTMLElement | null, items: readonly Li
       });
       input.click();
     });
+    // view-state: (a dialog's or chooser's own control: what it gives goes to the command that opened it)
     pop.querySelector<HTMLInputElement>("[data-lib-search]")!.addEventListener("input", (e) => draw((e.target as HTMLInputElement).value.trim().toLowerCase()));
     holdColourPopover(true);
     document.body.appendChild(pop);

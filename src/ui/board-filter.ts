@@ -56,12 +56,14 @@ export function wireBoardFilter(menu: HTMLElement, list: BoardList, state: Board
       }
     });
   };
+  // view-state: (the filter of the board list)
   input?.addEventListener("input", () => {
     state.query = input.value;
     apply();
   });
   sections.forEach((s, i) => {
     const head = s.querySelector<HTMLElement>(list.head);
+    // view-state: (the filter of the board list)
     head?.addEventListener("click", (e) => {
       if (!s.classList.contains("is-folded") && !state.open.has(i)) return;
       if ((e.target as HTMLElement).closest("button, input")) return;

@@ -62,11 +62,13 @@ export function mountPlayerControls(host: HTMLElement, settings: SettingsStore, 
     if (document.activeElement !== volume) volume.value = String(muted ? 0 : Math.round((video()?.volume ?? 1) * 100));
   };
 
+  // view-state: (playing a video or a sound)
   scrub.addEventListener("input", () => {
     if (!eng) return;
     eng.seek(Number(scrub.value) * eng.len());
     refresh();
   });
+  // view-state: (playing a video or a sound)
   volume.addEventListener("input", () => {
     const n = Number(volume.value); // (this player's own: the setting is only where a player starts)
     const v = video();
@@ -75,6 +77,7 @@ export function mountPlayerControls(host: HTMLElement, settings: SettingsStore, 
       v.volume = n / 100;
     }
   });
+  // view-state: (playing a video or a sound)
   bar.addEventListener("click", (e) => {
     const cmd = (e.target as HTMLElement).closest<HTMLElement>("[data-cmd]")?.dataset["cmd"];
     if (!eng || !cmd) return;

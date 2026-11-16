@@ -53,6 +53,7 @@ export function closeSearchHelp(): void {
 
 /** Wire the button: it opens the card; choosing an example puts it in `input` (before any `/ # @` the canvas search added) and searches. */
 export function wireSearchHelp(button: HTMLElement, input: HTMLInputElement, note = "Type the operators in capitals.", extra: readonly { keys: string; does: string; example: string }[] = []): void {
+  // view-state: (a dialog's or chooser's own control: what it gives goes to the command that opened it)
   button.addEventListener("click", () => {
     if (current?.anchor === button) return closeSearchHelp();
     closeSearchHelp();
@@ -65,6 +66,7 @@ export function wireSearchHelp(button: HTMLElement, input: HTMLInputElement, not
     placeMenu(card, button);
     button.setAttribute("aria-expanded", "true");
     current = { card, anchor: button };
+    // view-state: (a dialog's or chooser's own control: what it gives goes to the command that opened it)
     card.addEventListener("click", (e) => {
       const b = (e.target as HTMLElement).closest<HTMLElement>("[data-example]");
       if (!b) return;

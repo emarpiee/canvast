@@ -17,6 +17,7 @@ export function mountViewSwitch(root: HTMLElement, onSelect: (v: AppView) => voi
   const pc = photoCraft ? document.getElementById("photocraft-switch") : null;
   if (pc) {
     pc.innerHTML = `<div class="view-switch pc-switch" data-cmd-group="Navigate" role="tablist" aria-label="PhotoCraft"><button type="button" role="tab" data-view="photocraft" data-testid="view-photocraft" aria-label="PhotoCraft" title="PhotoCraft, the photo editor (it keeps running while you are in another view)">${ICONS.photoCraft}</button><button type="button" class="view-close" data-photocraft-close data-testid="photocraft-close" hidden aria-label="Close PhotoCraft (it asks first when something is not saved)" title="Close PhotoCraft">${ICONS.x}</button></div>`;
+    // view-state: (which view shows: also the commands go.canvas, go.library and the Settings pages)
     pc.addEventListener("click", (e) => {
       const t = (e.target as HTMLElement).closest<HTMLButtonElement>('[role="tab"]');
       if (t) onSelect("photocraft");
@@ -35,10 +36,12 @@ export function mountViewSwitch(root: HTMLElement, onSelect: (v: AppView) => voi
       t.tabIndex = on || (v === "canvas" && t.dataset["view"] === "assets") ? 0 : -1;
     }
   };
+  // view-state: (which view shows: also the commands go.canvas, go.library and the Settings pages)
   root.addEventListener("click", (e) => {
     const t = (e.target as HTMLElement).closest<HTMLButtonElement>('[role="tab"]');
     if (t) onSelect(t.dataset["view"] as AppView);
   });
+  // view-state: (which view shows: also the commands go.canvas, go.library and the Settings pages)
   document.addEventListener("click", (e) => {
     if ((e.target as HTMLElement).closest('[data-view="settings"]')) onSelect("settings");
   });

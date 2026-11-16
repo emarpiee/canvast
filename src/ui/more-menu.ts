@@ -213,6 +213,7 @@ export function openMoreMenu(anchor: HTMLElement, items: readonly MenuItem[], la
   }
   let armed = !opts.needPress;
   menu.addEventListener("pointerdown", () => { armed = true; });
+  // commands: (a row runs its command)
   menu.addEventListener("click", (e) => {
     if (!armed) return;
     const moreOf = (e.target as HTMLElement).closest<HTMLElement>("[data-more-i]");
@@ -226,6 +227,7 @@ export function openMoreMenu(anchor: HTMLElement, items: readonly MenuItem[], la
       sub.setAttribute("role", "menu");
       sub.setAttribute("aria-label", `What to do with ${it.label}`);
       sub.innerHTML = it.more!.map(rowHtml).join("");
+      // commands: (a row runs its command)
       sub.addEventListener("click", (ev) => {
         const b = (ev.target as HTMLElement).closest<HTMLButtonElement>("[data-i]");
         if (!b || b.disabled) return;

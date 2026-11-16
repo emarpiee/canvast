@@ -43,6 +43,7 @@ export function paintRecent(box: HTMLElement, key: string, typed: string, saved?
 
 /** One click does it: search again (`pick`), remove one, or clear the recent ones. `repaint` redraws the chips afterwards. */
 export function wireRecent(box: HTMLElement, key: string, pick: (r: RecentSearch) => void, repaint: () => void, saved?: SavedStore): void {
+  // view-state: (a dialog's or chooser's own control: what it gives goes to the command that opened it)
   box.addEventListener("click", (e) => {
     const t = (e.target as HTMLElement).closest<HTMLElement>("button");
     if (!t) return;
@@ -80,6 +81,7 @@ export function paintSaveToggle(btn: HTMLButtonElement, typed: string, way: Sear
 
 /** Press: save the search typed, or remove it when it is saved. `changed` repaints. */
 export function wireSaveToggle(btn: HTMLButtonElement, input: HTMLInputElement, way: () => SearchWay, saved: SavedStore, changed: () => void): void {
+  // view-state: (a dialog's or chooser's own control: what it gives goes to the command that opened it)
   btn.addEventListener("click", () => {
     const list = savedOf(saved);
     const on = list.some((s) => sameSearch(s, input.value, way()));
