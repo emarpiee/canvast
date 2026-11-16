@@ -6,7 +6,7 @@
 
 ### For developers
 
-- **Added:** an agent working in this repository needs no setup: `.mcp.json` (Claude Code), `.cursor/mcp.json` (Cursor) and `.vscode/mcp.json` (VS Code) start `node scripts/mcp.mjs`, which builds the canvast tools when they are missing or older than their source and runs `canvast-tools mcp`, keeping the standard output for the protocol.
+- **Added:** an agent working in this repository needs no setup: `.mcp.json` (Claude Code), `.codex/config.toml` (Codex CLI, once the project is trusted), `.cursor/mcp.json` (Cursor) and `.vscode/mcp.json` (VS Code) start `node scripts/mcp.mjs`, which builds the canvast tools when they are missing or older than their source and runs `canvast-tools mcp`, keeping the standard output for the protocol.
 - **Changed:** the canvast tools' own folder is one module for the tools and the desktop app (`desktop/tools-home.ts`).
 
 ## 0.60.15 — Every action a command, all of it (2026-11-17)

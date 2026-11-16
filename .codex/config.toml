@@ -1,0 +1,4 @@
+# canvast's MCP server for Codex (used once the project is trusted): the same as .mcp.json, .cursor/mcp.json and .vscode/mcp.json.
+[mcp_servers.canvast]
+command = "node"
+args = ["scripts/mcp.mjs"]

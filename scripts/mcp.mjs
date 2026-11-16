@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // canvast's MCP server for an AI agent working in this repository (ADR 0205): `node scripts/mcp.mjs`, which the project files
-// `.mcp.json` (Claude Code), `.cursor/mcp.json` (Cursor) and `.vscode/mcp.json` (VS Code) start. It builds the canvast tools when they are
+// `.mcp.json` (Claude Code), `.codex/config.toml` (Codex CLI), `.cursor/mcp.json` (Cursor) and `.vscode/mcp.json` (VS Code) start. It builds the canvast tools when they are
 // missing or older than their source, then runs `canvast-tools mcp`. The standard output is the protocol's: everything said goes to the
 // standard error. Any other MCP client: the same command.
 import { spawn, spawnSync } from "node:child_process";

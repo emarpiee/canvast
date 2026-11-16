@@ -2798,7 +2798,17 @@ Every action of canvast is a command with a fixed name (`edit.undo`, `library.mo
 | `command_run` | One command by id with its options; the answer says what it made or changed, or why not |
 | `command_batch` | Several in order, stopping at the first that fails (or not); not one undo step |
 
-**From this repository**, an agent needs no setup of its own: `.mcp.json` (Claude Code), `.cursor/mcp.json` (Cursor) and `.vscode/mcp.json` (VS Code) start `node scripts/mcp.mjs`, which builds the canvast tools when they are missing or older than their source and runs `canvast-tools mcp`. Any other MCP client: the same command. Allow it when the client asks, then turn on Settings > AI agents (in the desktop app, nothing more; in a browser, with the code `node dist-tools/canvast-tools.mjs` shows under **Connect an AI agent**). One agent at a time: the tools listen on one port.
+**From this repository**, an agent needs no setup of its own. Each of these clients reads a file of the repository that starts `node scripts/mcp.mjs`, which builds the canvast tools when they are missing or older than their source and runs `canvast-tools mcp`:
+
+| Client | Its file | |
+| --- | --- | --- |
+| Claude Code | `.mcp.json` | Allow canvast when it asks |
+| Codex CLI | `.codex/config.toml` | Read once the project is trusted |
+| Cursor | `.cursor/mcp.json` | |
+| VS Code | `.vscode/mcp.json` | |
+| Any other (Claude Desktop, …) | Its own settings | The command `node /full/path/to/canvast/scripts/mcp.mjs`, or the line the canvast tools show under **Connect an AI agent** |
+
+Then turn on Settings > AI agents: in the desktop app nothing more; in a browser, type the code the canvast tools show under **Connect an AI agent**. One agent at a time: the tools listen on one port.
 
 | Risk | Means |
 | --- | --- |
