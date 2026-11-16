@@ -55,6 +55,7 @@ export function mountTour(host: HTMLElement, view: ViewState, list: BookmarkList
     e.preventDefault();
     e.stopPropagation(); // (nothing else reacts to the keys of a tour)
   };
+  // view-state: (the tour's caption: steps the tour)
   caption.addEventListener("click", (e) => {
     const b = (e.target as HTMLElement).closest("button");
     if (!b) return;

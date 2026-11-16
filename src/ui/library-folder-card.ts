@@ -5,6 +5,7 @@ import { esc } from "./format";
 import { LIBRARY_FILE, externalFolder, folderSupported } from "../storage/external-folder";
 import { runOpenLibraryFile, runSaveLibraryFile } from "./archive-ui";
 import { beginProgress } from "../app/progress";
+import { commands, pressCommand } from "../commands/registry";
 
 /**
  * The library folder card of Settings > Storage (ADR 0159): where the originals are kept, and the moves between the
@@ -69,19 +70,28 @@ export function mountLibraryFolderCard(host: HTMLElement, session: Session): () 
       <p class="storage-note">Files are named by their content and keep their extension (<code>a07c9f….png</code>). Do not move, rename or edit them: canvast finds each one by that name.</p>`;
   };
 
+  // The library folder's commands (ADR 0205): the person's only (they read and move files on the disk).
+  commands.setProvider("library-folder", () => session.storage?.libraryFolder ? [
+    { id: "libraryFolder.autoIndex", group: "Library folder", kind: "library", title: "Index the folder by itself", hint: "Files added there come into the library", risk: "refused", why: () => null,
+      options: [{ name: "on", type: "boolean", doc: "on or off", required: true }],
+      exec: (o) => { session.settingsHook?.setAuto(o["on"] === true); if (o["on"] === true) session.autoIndex?.poke(); } },
+    { id: "libraryFolder.act", group: "Library folder", kind: "library", title: "The library folder", hint: "Choose, reconnect, forget, or move files", risk: "refused", why: () => null,
+      options: [{ name: "act", type: "text", doc: "what the card's button says (choose, reconnect, forget, save-library, open-library, names, in, out)", required: true }],
+      exec: (o) => void folderAct(String(o["act"])) },
+  ] : []);
   host.addEventListener("change", (e) => {
     const box = (e.target as HTMLElement).closest<HTMLInputElement>("[data-auto-index]");
-    if (!box) return;
-    session.settingsHook?.setAuto(box.checked);
-    if (box.checked) session.autoIndex?.poke();
+    if (box) pressCommand("libraryFolder.autoIndex", { on: box.checked });
   });
   let busy = false;
-  host.addEventListener("click", async (e) => {
+  host.addEventListener("click", (e) => {
     const b = (e.target as HTMLElement).closest<HTMLButtonElement>("[data-folder]");
+    if (b && !b.disabled) pressCommand("libraryFolder.act", { act: b.dataset["folder"] ?? "" });
+  });
+  const folderAct = async (act: string): Promise<void> => {
     const folder = session.storage?.libraryFolder;
-    if (!b || !folder || b.disabled || busy) return;
+    if (!folder || busy) return;
     busy = true; // (one job at a time: the buttons do nothing until it ends)
-    const act = b.dataset["folder"];
     try {
       if (act === "choose") {
         await folder.choose();
@@ -108,7 +118,7 @@ export function mountLibraryFolderCard(host: HTMLElement, session: Session): () 
     busy = false;
     session.autoIndex?.poke(); // (files moved or a folder chosen: the index is out of date)
     void draw();
-  });
+  };
   externalFolder.subscribe(() => void draw());
   externalFolder.subscribeSaved(() => void draw()); // (the library index was written by itself)
   return draw;

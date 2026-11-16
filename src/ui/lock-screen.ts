@@ -28,6 +28,7 @@ export function openLockScreen(check: (typed: string) => Promise<boolean>): Prom
   const openButton = dlg.querySelector<HTMLButtonElement>("[data-testid=lock-ok]")!;
   wireSecretFields(dlg);
   // (the desktop app: another workspace, as the workspace switcher goes there; this one stays locked)
+  // typing: (the password, typed by the person: never an agent's)
   dlg.querySelector(".lock-other")?.addEventListener("click", (e) => {
     const to = (e.target as HTMLElement).closest<HTMLElement>("[data-go]")?.dataset["go"];
     if (to) void desktopBridge()?.switchWorkspace(to);
@@ -54,6 +55,7 @@ export function openLockScreen(check: (typed: string) => Promise<boolean>): Prom
       input.value = "";
       input.focus();
     };
+    // typing: (the password, typed by the person: never an agent's)
     openButton.addEventListener("click", () => void submit());
     input.addEventListener("keydown", (e) => {
       if (e.key !== "Enter") return;

@@ -190,6 +190,7 @@ export function startPhotoCraft(container: HTMLElement, host: PhotoCraftHost, fe
   for (const kind of ["pointerdown", "keydown"]) win.addEventListener(kind, () => void (pressing || (lastInput = performance.now())), true);
 
   // ---- its own messages: running, stopped, could not start
+  // view-state: (a click in PhotoCraft's frame: its own)
   doc.addEventListener("click", (e) => {
     const a = (e.target as Element | null)?.closest?.("a");
     if (!a) return;

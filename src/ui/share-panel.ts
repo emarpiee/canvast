@@ -10,6 +10,7 @@ import { confirmDialog, listDialog, promptDialog } from "./confirm";
 import { ICONS } from "./icons";
 import { redraw } from "./redraw";
 import { plural } from "../doc/plural";
+import { commands, pressCommand } from "../commands/registry";
 
 const esc = (s: string): string => s.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
 const when = (t: number | null): string => (t ? new Date(t).toLocaleString() : "never");
@@ -197,14 +198,20 @@ export function mountSharing(host: HTMLElement, share: ShareCalls, row: SettingR
     );
   };
 
+  // Sharing's commands (ADR 0205): the person's only, never an outside caller's (what this computer shows to the network).
+  const SHARE_WHAT = ["guests", "dav", "davShared", "autoStart", "hidden"] as const;
+  commands.setProvider("sharing", () => [
+    { id: "share.set", group: "Sharing", kind: "share", title: "Share on this network", hint: "Turn a kind of sharing on or off", risk: "refused", why: () => null,
+      options: [{ name: "what", type: "choice", doc: SHARE_WHAT.join(", "), required: true, choices: SHARE_WHAT }, { name: "on", type: "boolean", doc: "on or off", required: true }],
+      exec: (o) => void act(o["what"] as (typeof SHARE_WHAT)[number], o["on"] === true) },
+    { id: "share.newCode", group: "Sharing", kind: "share", title: "A new sharing code", hint: "Devices sign in again", risk: "refused", why: () => null, exec: () => void act("newCode") },
+  ]);
   host.addEventListener("change", (e) => {
     const t = e.target as HTMLInputElement;
-    if (t.matches("[data-share-on]")) act("guests", t.checked);
-    if (t.matches("[data-share-dav-on]")) act("dav", t.checked);
-    if (t.matches("[data-share-dav-shared]")) act("davShared", t.checked);
-    if (t.matches("[data-share-auto]")) act("autoStart", t.checked);
-    if (t.matches("[data-share-hidden]")) act("hidden", t.checked);
+    const what = t.matches("[data-share-on]") ? "guests" : t.matches("[data-share-dav-on]") ? "dav" : t.matches("[data-share-dav-shared]") ? "davShared" : t.matches("[data-share-auto]") ? "autoStart" : t.matches("[data-share-hidden]") ? "hidden" : null;
+    if (what) pressCommand("share.set", { what, on: t.checked });
   });
+  // commands: (a new code runs share.newCode; the rest opens lists to read)
   host.addEventListener("click", (e) => {
     const at = e.target as HTMLElement;
     if (at.closest("[data-share-open-dav]")) void share.call("openDav");
@@ -212,7 +219,7 @@ export function mountSharing(host: HTMLElement, share: ShareCalls, row: SettingR
     if (at.closest("[data-share-logins]")) loginsList();
     if (at.closest("[data-share-apps]")) appsList();
     if (at.closest("[data-share-activity]")) activityList();
-    if (at.closest("[data-share-new-code]")) act("newCode");
+    if (at.closest("[data-share-new-code]")) pressCommand("share.newCode");
     if (at.closest("[data-share-new-dav]")) act("newDavPassword");
     if (at.closest("[data-share-dav-add]"))
       void promptDialog({ title: "Add a device to the folder", lines: ["A name for it (Phone, Laptop…). It gets its own user name and password; it can add files at first, and you choose the rest."], value: "", confirmLabel: "Add" }).then((name) => {

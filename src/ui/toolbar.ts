@@ -1447,6 +1447,7 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
   const afterUpdate: Array<() => void> = [];
   editor.subscribe(update);
   doc.subscribe(update);
+  // view-state: (the bar's layout on a narrow screen)
   phoneWidth.addEventListener("change", () => {
     placeColours();
     update();

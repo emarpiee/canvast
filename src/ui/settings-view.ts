@@ -568,6 +568,7 @@ export function mountSettingsView(root: HTMLElement, settings: SettingsStore, ke
   };
   const errorLine = (e: { at: number; what: string }): string => `<li><time>${new Date(e.at).toLocaleTimeString()}</time> ${esc(e.what)}</li>`;
   onErrorLog(showErrors);
+  // view-state: (lists to read: concealed folders, errors, about)
   root.addEventListener("click", (e) => {
     if ((e.target as HTMLElement).closest("[data-concealed-show]") && backup?.concealedFolders) {
       void backup.concealedFolders().then((names) => listDialog({ title: "Concealed folders", testid: "concealed-dialog", lines: ["Their items are listed only when the folder is opened. Reveal one from its ⋯ menu in the Library."], body: () => `<ul class="set-errors">${names.map((n) => `<li>${esc(n)}</li>`).join("") || "<li>None</li>"}</ul>` }));

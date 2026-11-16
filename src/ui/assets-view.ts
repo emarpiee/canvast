@@ -2019,6 +2019,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     // The button that was pressed may have just been hidden: keep the keyboard in the viewer.
     if (!viewer.hidden) viewer.focus();
   };
+  // commands: (the viewer's own controls show; Favourite and Place press the details' buttons, which run their commands)
   viewer.addEventListener("click", (e) => {
     const t = e.target as HTMLElement;
     const film1 = t.closest<HTMLElement>(".film-item");
@@ -5153,7 +5154,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
         const b = inspector.querySelector<HTMLButtonElement>(`[data-action="${action}"]`);
         if (!b || b.hidden) return [];
         const text = label ?? (b.getAttribute("aria-label") || b.textContent?.trim() || action);
-        return [{ id: action, label: text, hint, icon: b.querySelector("svg")?.outerHTML ?? icon, danger: b.classList.contains("is-danger"), disabled: b.disabled, run: () => b.click() }];
+        return [{ id: action, label: text, hint, icon: b.querySelector("svg")?.outerHTML ?? icon, danger: b.classList.contains("is-danger"), disabled: b.disabled, command: PANEL_COMMANDS[action]?.[0] ?? "library.details", run: () => b.click() }]; // (the details' button, which runs its command)
       }),
     );
   // Copy and paste with the system clipboard. Copy puts the picture (as PNG, the one picture type every program takes) alone, because a program that is offered a
@@ -5896,6 +5897,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   importBtn.addEventListener("click", () => void pressCommand("library.import"));
   const folderInput = root.querySelector<HTMLInputElement>('[data-testid="assets-import-folder-input"]')!;
   const importMenu = root.querySelector<HTMLElement>('[data-action="import-menu"]')!;
+  // view-state: (opens the import menu; its rows are commands)
   importMenu.addEventListener("click", () =>
     openMoreMenu(importMenu, [
       { label: "Import files", icon: ICONS.arrowDownToLine, hint: "Pictures, video, audio and other files", command: "library.import", run: () => void pressCommand("library.import") },

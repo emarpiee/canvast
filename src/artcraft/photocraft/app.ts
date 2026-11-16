@@ -443,8 +443,8 @@ export function createPhotoCraft(deps: PhotoCraftDeps): PhotoCraftApp {
       if (pics.length < all) say(`${plural(all - pics.length, "picture")} left out: PhotoCraft does not open ${all - pics.length === 1 ? "its" : "their"} kind of file, or ${all - pics.length === 1 ? "it is" : "they are"} hidden.`);
       if (pics.length === 1 || !F.entry.layers || !anchor || !t) return eachInItsOwn(pics);
       openMoreMenu(anchor, [
-        { id: "photocraft-each", label: "Each in its own document", hint: "A tab for each picture", icon: ICONS.files, run: () => void eachInItsOwn(pics) },
-        { id: "photocraft-layers", label: "As layers of one document", hint: "Placed as on the canvas", icon: ICONS.layers, run: () => void asProject({ ...t, ids: new Set(pics.map((p) => p.o.id)) }, "pictures") },
+        { id: "photocraft-each", label: "Each in its own document", hint: "A tab for each picture", icon: ICONS.files, command: "picture.photocraft", run: () => void eachInItsOwn(pics) },
+        { id: "photocraft-layers", label: "As layers of one document", hint: "Placed as on the canvas", icon: ICONS.layers, command: "picture.photocraft", run: () => void asProject({ ...t, ids: new Set(pics.map((p) => p.o.id)) }, "pictures") },
       ], "Edit in PhotoCraft");
     },
     close: askClose,

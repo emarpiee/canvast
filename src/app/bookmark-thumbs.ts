@@ -65,6 +65,7 @@ export async function updateThumbs(job: ThumbJob): Promise<ThumbResult> {
     }
   };
   window.addEventListener("keydown", key, true);
+  // view-state: (stops drawing the bookmarks' pictures)
   veil.addEventListener("click", () => (stopped = true));
   job.hold(true);
   const out = new Map<string, string>();

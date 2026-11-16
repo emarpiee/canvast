@@ -1341,7 +1341,7 @@ async function start(): Promise<void> {
         { id: "reveal-add", label: "Add to the selection", hint: "Click to add or remove; click outside to end", icon: ICONS.listChecks, checked: add, command: "select.items", run: () => { add = !add; } }, // (how the rows below select: they run select.items)
         ...rows.map((r, i): MenuItem => {
           const on = r.ids.every((id) => editor.selection.has(id));
-          return { id: `reveal:${r.key ?? r.ids[0]}`, label: `${"\u2003".repeat(r.depth ?? 0)}${r.label}`, hint: r.why ? HINT[r.why] : r.from === "selection" ? "In the selection: select this one" : "Select this one", icon: r.icon, checked: on, disabled: r.why === "mask", ...(r.sep && i > 0 ? { sep: true } : {}), run: () => {
+          return { command: r.why === "hidden" ? "item.unhide" : r.why === "locked" ? "item.unlock" : "select.items", id: `reveal:${r.key ?? r.ids[0]}`, label: `${"\u2003".repeat(r.depth ?? 0)}${r.label}`, hint: r.why ? HINT[r.why] : r.from === "selection" ? "In the selection: select this one" : "Select this one", icon: r.icon, checked: on, disabled: r.why === "mask", ...(r.sep && i > 0 ? { sep: true } : {}), run: () => {
             if (r.why === "hidden" || r.why === "locked") {
               pressCommand(r.why === "hidden" ? "item.unhide" : "item.unlock", { ids: r.ids });
               return void closeMoreMenu();
