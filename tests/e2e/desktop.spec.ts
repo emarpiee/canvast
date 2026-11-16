@@ -374,12 +374,13 @@ test("library folders are real folders: filing or renaming an item moves its fil
   const flush = () => page.evaluate(() => window.__canvastDebug.flushStorage());
   const libraryFiles = () => files(ws).filter((f) => f.startsWith("library/"));
   try {
-    for (const [name, buffer] of [["Hand Study.png", red], ["Pose.png", blue]] as const) {
+    for (const [name, shown, buffer] of [["Hand Study.png", "hand_study.png", red], ["Pose.png", "pose.png", blue]] as const) {
       await page.getByTestId("import-input").setInputFiles({ name, mimeType: "image/png", buffer });
-      await expect.poll(() => page.evaluate((n) => window.__canvastDebug.assetListing().then((l) => l.entries.some((e) => e.name === n)), name)).toBe(true);
+      // (the name its file has on disk: tidy, Keep file names being off)
+      await expect.poll(() => page.evaluate((n) => window.__canvastDebug.assetListing().then((l) => l.entries.some((e) => e.name === n)), shown)).toBe(true);
     }
     const hashOf = (name: string) => page.evaluate((n) => window.__canvastDebug.assetListing().then((l) => l.entries.find((e) => e.name === n)!.hash), name);
-    const [r, b] = [await hashOf("Hand Study.png"), await hashOf("Pose.png")];
+    const [r, b] = [await hashOf("hand_study.png"), await hashOf("pose.png")];
     await lib("createFolder", "f1", "Refs: Hands?");
     await lib("createFolder", "f2", "Sub", "f1");
     await flush();
@@ -414,12 +415,12 @@ test("library folders are real folders: filing or renaming an item moves its fil
     expect(index.folders.length).toBe(2);
     expect([index.version, index.parts.every((k) => /^[0-9a-f]{2}$/.test(k))]).toEqual([3, true]);
     const inParts = index.parts.flatMap((k) => (JSON.parse(readFileSync(join(ws, `.canvast/library/items-${k}.json`), "utf8")) as { items: { name: string }[] }).items.map((i) => i.name));
-    expect(inParts.sort()).toEqual(["Hand Study.png", "Pose.png"]);
+    expect(inParts.sort()).toEqual(["hand_study.png", "pose.png"]);
     const json = readFileSync(join(ws, ".canvast/library.json"), "utf8");
     expect(JSON.parse(json).copyOf).toBe(".canvast/library");
     expect(JSON.parse(json).items.map((i: { name: string; file: string; folderId: string | null }) => [i.name, i.file, i.folderId]).sort()).toEqual([
-      ["Hand Study.png", "library/anatomy/sub/hand_study.png", "f2"],
-      ["Pose.png", "library/images/pose.png", null],
+      ["hand_study.png", "library/anatomy/sub/hand_study.png", "f2"],
+      ["pose.png", "library/images/pose.png", null],
     ]);
     // Show in file manager (the details, and the item's right-click menu): the system is asked to show that very file in its folder.
     await app.evaluate(({ shell }) => {
@@ -429,10 +430,10 @@ test("library folders are real folders: filing or renaming an item moves its fil
     });
     const shown = () => app.evaluate(() => (globalThis as unknown as { shown: string[] }).shown);
     await page.getByTestId("view-assets").click();
-    await page.locator('[data-testid="asset-card"][aria-label^="Hand Study.png"]').click();
+    await page.locator('[data-testid="asset-card"][aria-label^="hand_study.png"]').click();
     await page.getByTestId("asset-show-file").click();
     await expect.poll(shown).toEqual([join(ws, "library/anatomy/sub/hand_study.png")]);
-    await page.locator('[data-testid="asset-card"][aria-label^="Pose.png"]').click({ button: "right" });
+    await page.locator('[data-testid="asset-card"][aria-label^="pose.png"]').click({ button: "right" });
     await page.getByRole("menuitem", { name: "Show in file manager" }).click();
     await expect.poll(shown).toEqual([join(ws, "library/anatomy/sub/hand_study.png"), join(ws, "library/images/pose.png")]);
   } finally {
@@ -449,17 +450,17 @@ test("library folders are real folders: filing or renaming an item moves its fil
     const listing = () => page.evaluate(() => window.__canvastDebug.assetListing().then((l) => [l.folders.map((f) => f.name).sort(), l.entries.map((e) => [e.name, e.folderIds?.[0] ?? null, e.present]).sort()]));
     await expect.poll(listing, { timeout: 10_000 }).toEqual([
       ["Anatomy", "Sub"],
-      [["Hand Study.png", "f2", true], ["Pose.png", null, true]],
+      [["hand_study.png", "f2", true], ["pose.png", null, true]],
     ]);
     await expect.poll(async () => (await page.evaluate(() => window.__canvastDebug.flushStorage()), existsSync(join(ws, ".canvast/library/index.json"))), { timeout: 10_000 }).toBe(true);
     // An older app on a third device renames an item in library.json (it knows no parts): taken here, while the app runs.
     const old = JSON.parse(readFileSync(join(ws, ".canvast/library.json"), "utf8")) as { copyOf?: string; items: { name: string }[] };
     delete old.copyOf;
-    old.items.find((i) => i.name === "Pose.png")!.name = "Pose (renamed).png";
+    old.items.find((i) => i.name === "pose.png")!.name = "Pose (renamed).png";
     writeFileSync(join(ws, ".canvast/library.json"), JSON.stringify(old));
     await expect.poll(listing, { timeout: 10_000 }).toEqual([
       ["Anatomy", "Sub"],
-      [["Hand Study.png", "f2", true], ["Pose (renamed).png", null, true]],
+      [["hand_study.png", "f2", true], ["pose-renamed.png", null, true]], // (its file then takes the tidy name, and the item that name)
     ]);
   } finally {
     await app.close();
@@ -474,18 +475,18 @@ test("a big library (past the size library.json is kept for) writes only what ch
   const pics = [1, 2, 3, 4, 5, 6].map((k) => makePng(k, 3, () => [k * 30, 200 - k * 20, 90, 255]));
   try {
     await page.evaluate(() => window.__canvastDebug.libraryTesting({ compatMax: 0 })); // (as if past 10,000 items)
-    await page.getByTestId("import-input").setInputFiles(pics.map((buffer, k) => ({ name: `Pic ${k}.png`, mimeType: "image/png", buffer })));
+    await page.getByTestId("import-input").setInputFiles(pics.map((buffer, k) => ({ name: `pic_${k}.png`, mimeType: "image/png", buffer })));
     await expect.poll(() => listing().then((l) => l.length)).toBe(6);
     await page.evaluate(() => window.__canvastDebug.flushStorage());
     expect(existsSync(join(ws, ".canvast/library.json"))).toBe(false); // (not kept past the limit)
     const before = parts();
     const hash = createHash("sha256").update(pics[2]!).digest("hex");
-    await page.evaluate((h) => window.__canvastDebug.libraryOp("rename", h, "Renamed One.png"), hash);
+    await page.evaluate((h) => window.__canvastDebug.libraryOp("rename", h, "renamed_one.png"), hash);
     await page.evaluate(() => window.__canvastDebug.flushStorage());
     const after = parts();
     const changed = [...after.keys()].filter((f) => after.get(f) !== before.get(f));
     expect(changed).toEqual([`.canvast/library/items-${hash.slice(0, 2)}.json`]);
-    expect(after.get(changed[0]!)).toContain("Renamed One.png");
+    expect(after.get(changed[0]!)).toContain("renamed_one.png");
     expect(existsSync(join(ws, "library/images/renamed_one.png"))).toBe(true);
     // Check library files (command palette): every file read and compared with its item; one damaged, one gone, both named.
     writeFileSync(join(ws, "library/images/pic_0.png"), Buffer.from("not the picture any more"));
@@ -494,13 +495,13 @@ test("a big library (past the size library.json is kept for) writes only what ch
     await page.locator(".palette-input").fill("check library files");
     await expect(page.locator(".palette-title").first()).toHaveText("Check library files");
     await page.keyboard.press("Enter");
-    await expect(page.getByTestId("toast")).toContainText("Checked 6 library files: 1 changed or damaged (“Pic 0.png”); 1 missing (“Pic 1.png”)", { timeout: 15_000 });
+    await expect(page.getByTestId("toast")).toContainText("Checked 6 library files: 1 changed or damaged (“pic_0.png”); 1 missing (“pic_1.png”)", { timeout: 15_000 });
     // The quick check looks at sizes only: the same two are found without reading anything.
     await page.keyboard.press("Control+k");
     await page.locator(".palette-input").fill("check library files quick");
     await expect(page.locator(".palette-title").first()).toHaveText("Check library files (quick)");
     await page.keyboard.press("Enter");
-    await expect(page.getByTestId("toast")).toContainText("Quick check of 6 library files: 1 changed or damaged (“Pic 0.png”); 1 missing (“Pic 1.png”)", { timeout: 15_000 });
+    await expect(page.getByTestId("toast")).toContainText("Quick check of 6 library files: 1 changed or damaged (“pic_0.png”); 1 missing (“pic_1.png”)", { timeout: 15_000 });
   } finally {
     await app.close();
   }
@@ -627,7 +628,7 @@ test("hidden items, browser to desktop: a browser backup's hidden item (readable
   const at = 1_700_000_000_000;
   // A backup as the browser makes one: the item's file readable in it, with what the library says of it (hidden, its note and date).
   const src = tempDir("cv-browser-");
-  let { app, page } = await launch(src);
+  let { app, page } = await launch(src, "userdata", true); // (Keep file names: the item keeps its name as given, its file's)
   let made: Buffer;
   try {
     await page.getByTestId("view-assets").click();
@@ -738,17 +739,17 @@ test("a backup exported from Settings and imported into a workspace folder: writ
     await expect.poll(() => page.evaluate(() => window.__canvastDebug.session().tree?.length ?? 0)).toBe(1);
     const t = await page.evaluate(() => window.__canvastDebug.session().tree!);
     await page.evaluate(([bid, cid]) => window.__canvastDebug.workspaceOp("renameBoard", bid, "Studies").then(() => window.__canvastDebug.workspaceOp("renameCanvas", cid, "Hands")), [t[0]!.id, t[0]!.canvases[0]!.id] as [string, string]);
-    await page.getByTestId("import-input").setInputFiles({ name: "Green Leaf.png", mimeType: "image/png", buffer: green });
+    await page.getByTestId("import-input").setInputFiles({ name: "green_leaf.png", mimeType: "image/png", buffer: green });
     await expect.poll(() => page.evaluate((id) => window.__canvastDebug.storedObjectIds(id).then((ids) => ids.length), t[0]!.canvases[0]!.id)).toBe(1);
     const hash = await page.evaluate(() => window.__canvastDebug.assetListing().then((l) => l.entries[0]!.hash));
     await page.evaluate((h) => window.__canvastDebug.libraryOp("createFolder", "f1", "Plants").then(() => window.__canvastDebug.libraryOp("file", h, "f1")), hash);
     // A hidden item (in the library only): included in the backup, it goes in still encrypted, with its key file, and nothing readable.
     expect(await page.evaluate(() => window.__canvastDebug.hiddenOp("set", "pw"))).toEqual({ ok: true, state: "open" });
     await page.getByTestId("view-assets").click();
-    await page.getByTestId("assets-import-input").setInputFiles({ name: "Secret Plan.png", mimeType: "image/png", buffer: secret });
+    await page.getByTestId("assets-import-input").setInputFiles({ name: "secret_plan.png", mimeType: "image/png", buffer: secret });
     await expect.poll(() => page.evaluate(() => window.__canvastDebug.assetListing().then((l) => l.entries.length))).toBe(2);
     // Its note and the date it came: in the backup too (the hidden items' index, sealed, with their key).
-    greenAt = await page.evaluate(() => window.__canvastDebug.assetListing().then((l) => l.entries.find((e) => e.name === "Green Leaf.png")!.importedAt));
+    greenAt = await page.evaluate(() => window.__canvastDebug.assetListing().then((l) => l.entries.find((e) => e.name === "green_leaf.png")!.importedAt));
     secretHash = createHash("sha256").update(secret).digest("hex");
     await page.evaluate(([h, n]) => window.__canvastDebug.libraryOp("note", h!, n!), [secretHash, LONG_NOTE]);
     secretAt = await page.evaluate((h) => window.__canvastDebug.assetListing().then((l) => l.entries.find((e) => e.hash === h)!.importedAt), secretHash);
@@ -813,7 +814,7 @@ test("a backup exported from Settings and imported into a workspace folder: writ
       await window.__canvastDebug.removeAssetBytes(hash);
       const db = await new Promise<IDBDatabase>((ok, ko) => Object.assign(indexedDB.open("canvast"), { onsuccess(this: IDBRequest<IDBDatabase>) { ok(this.result); }, onerror: ko }));
       const tx = db.transaction("assets", "readwrite");
-      tx.objectStore("assets").put({ hash, type: "image/png", size: bytes.length, name: "Green Leaf.png", pixelW: 3, pixelH: 2, importedAt: 1, blob: new Blob([new Uint8Array(bytes)], { type: "image/png" }) }, hash);
+      tx.objectStore("assets").put({ hash, type: "image/png", size: bytes.length, name: "green_leaf.png", pixelW: 3, pixelH: 2, importedAt: 1, blob: new Blob([new Uint8Array(bytes)], { type: "image/png" }) }, hash);
       await new Promise((ok) => (tx.oncomplete = ok));
       db.close();
     }, Array.from(green));
@@ -827,21 +828,21 @@ test("a backup exported from Settings and imported into a workspace folder: writ
   // The original is the file now, not a copy in the app's storage: it is read from there after a restart.
   ({ app, page } = await launch(ws));
   try {
-    await expect.poll(() => page.evaluate(() => window.__canvastDebug.assetListing().then((l) => l.entries.map((e) => [e.name, e.present]))), { timeout: 10_000 }).toEqual([["Green Leaf.png", true]]);
+    await expect.poll(() => page.evaluate(() => window.__canvastDebug.assetListing().then((l) => l.entries.map((e) => [e.name, e.present]))), { timeout: 10_000 }).toEqual([["green_leaf.png", true]]);
     // The Hidden items opened with the password they were hidden with: the item comes back from its own file, hidden, with its name (after a restart too).
     expect((await page.evaluate(() => window.__canvastDebug.hiddenOp("check", "pw"))).ok).toBe(true);
-    await expect.poll(() => page.evaluate(() => window.__canvastDebug.assetListing().then((l) => l.entries.map((e) => [e.name, !!e.hidden, e.present]).sort())), { timeout: 15_000 }).toEqual([["Green Leaf.png", false, true], ["Secret Plan.png", true, true]]);
+    await expect.poll(() => page.evaluate(() => window.__canvastDebug.assetListing().then((l) => l.entries.map((e) => [e.name, !!e.hidden, e.present]).sort())), { timeout: 15_000 }).toEqual([["green_leaf.png", false, true], ["secret_plan.png", true, true]]);
     expect(await page.evaluate((h) => window.__canvastDebug.originalBytes(h), createHash("sha256").update(secret).digest("hex"))).toEqual(Array.from(secret));
     await expect.poll(() => page.evaluate((h) => window.__canvastDebug.assetListing().then((l) => l.entries.filter((e) => e.hash === h).map((e) => [e.note, e.importedAt])), secretHash), { timeout: 15_000 }).toEqual([[LONG_NOTE, secretAt]]);
     // (a shown item keeps when it came too: the library's Newest is the same as where the backup was made)
-    expect(await page.evaluate(() => window.__canvastDebug.assetListing().then((l) => l.entries.find((e) => e.name === "Green Leaf.png")!.importedAt))).toBe(greenAt);
+    expect(await page.evaluate(() => window.__canvastDebug.assetListing().then((l) => l.entries.find((e) => e.name === "green_leaf.png")!.importedAt))).toBe(greenAt);
     // Settings > Storage > Rebuild from the folder: the working copy goes, the app reloads, and reads it all again from the folder (settings kept).
     await page.evaluate(() => window.__canvastDebug.setSetting("ui.density", "dense"));
     await page.getByTestId("save-status").click();
     await page.getByTestId("reset-all").click();
     await Promise.all([page.waitForEvent("load"), page.getByTestId("confirm-ok").click()]);
     await page.waitForFunction(() => typeof window.__canvastDebug !== "undefined", null, { timeout: 30_000, polling: 100 });
-    await expect.poll(() => page.evaluate(() => window.__canvastDebug.assetListing().then((l) => l.entries.map((e) => [e.name, e.present]))), { timeout: 10_000 }).toEqual([["Green Leaf.png", true]]);
+    await expect.poll(() => page.evaluate(() => window.__canvastDebug.assetListing().then((l) => l.entries.map((e) => [e.name, e.present]))), { timeout: 10_000 }).toEqual([["green_leaf.png", true]]);
     expect(await page.evaluate(() => window.__canvastDebug.session().tree!.map((b) => b.name).sort())).toEqual(["Board 1", "Studies"]);
     expect(await page.evaluate(() => localStorage.getItem("canvast.settings")?.includes("dense") ?? null)).toBe(true);
   } finally {
@@ -992,8 +993,8 @@ test("hidden items are encrypted: sealed into .hidden/ with nothing readable lef
   type Tool = { decryptHidden: (ws: string, out: string, pw: string, opts?: { flat?: boolean }) => Promise<number>; encryptHidden: (ws: string, files: string[], pw: string) => Promise<number> };
   const { decryptHidden, encryptHidden } = (await import(join(process.cwd(), "scripts/hidden-items.mjs"))) as Tool;
   try {
-    await page.getByTestId("import-input").setInputFiles({ name: "Secret Plan.png", mimeType: "image/png", buffer: secret });
-    await expect.poll(listing).toEqual([["Secret Plan.png", false, true]]);
+    await page.getByTestId("import-input").setInputFiles({ name: "secret_plan.png", mimeType: "image/png", buffer: secret });
+    await expect.poll(listing).toEqual([["secret_plan.png", false, true]]);
     hash = await page.evaluate(() => window.__canvastDebug.assetListing().then((l) => l.entries[0]!.hash));
     expect(await hid("set", "pw1")).toEqual({ ok: true, state: "open" });
     // Filed in a library folder, then the folder hidden (Hide folder): the item is hidden with it, and the folder's name is in no
@@ -1015,7 +1016,7 @@ test("hidden items are encrypted: sealed into .hidden/ with nothing readable lef
     expect(JSON.parse(readFileSync(join(ws, ".canvast/workspace.json"), "utf8")).locks?.hidden).toBeUndefined();
     expect(files(ws).filter((f) => f.startsWith("library/") || f.startsWith(".trash/"))).toEqual([]);
     expect(traces()).toEqual([]);
-    expect(await listing()).toEqual([["Secret Plan.png", true, true]]);
+    expect(await listing()).toEqual([["secret_plan.png", true, true]]);
     expect(await hid("set", null as unknown as string)).toEqual({ ok: false, state: "open" }); // (not removed while an item is hidden)
     expect(await hid("set", "pw2")).toEqual({ ok: false, state: "open" }); // (the current password is needed: the key cannot be read out)
     expect(await hid("set", "pw2", "nope")).toEqual({ ok: false, state: "open" });
@@ -1025,10 +1026,10 @@ test("hidden items are encrypted: sealed into .hidden/ with nothing readable lef
     await expect(decryptHidden(ws, `${ws}-out`, "pw1")).rejects.toThrow(/wrong password/);
     expect(await decryptHidden(ws, `${ws}-out`, "pw2")).toBe(1);
     // (in its library folder, which the file's own header names: the tree comes back from the files alone; --flat puts it at the top)
-    expect(readFileSync(join(`${ws}-out`, "Secret Folder", "Secret Plan.png")).equals(secret)).toBe(true);
-    expect(JSON.parse(readFileSync(join(`${ws}-out`, "hidden-items.json"), "utf8"))[0]).toMatchObject({ name: "Secret Plan.png", hidden: true, writtenAs: "Secret Folder/Secret Plan.png" });
+    expect(readFileSync(join(`${ws}-out`, "Secret Folder", "secret_plan.png")).equals(secret)).toBe(true);
+    expect(JSON.parse(readFileSync(join(`${ws}-out`, "hidden-items.json"), "utf8"))[0]).toMatchObject({ name: "secret_plan.png", hidden: true, writtenAs: "Secret Folder/secret_plan.png" });
     expect(await decryptHidden(ws, `${ws}-flat`, "pw2", { flat: true })).toBe(1);
-    expect(readFileSync(join(`${ws}-flat`, "Secret Plan.png")).equals(secret)).toBe(true);
+    expect(readFileSync(join(`${ws}-flat`, "secret_plan.png")).equals(secret)).toBe(true);
     // The simple way: the script, .hidden and a loose hidden.json in one folder, run with no arguments (the password piped in).
     const simple = `${ws}-simple`;
     mkdirSync(simple);
@@ -1036,7 +1037,7 @@ test("hidden items are encrypted: sealed into .hidden/ with nothing readable lef
     cpSync(join(ws, ".canvast", "hidden.json"), join(simple, "hidden.json"));
     cpSync(join(process.cwd(), "scripts", "hidden-items.mjs"), join(simple, "hidden-items.mjs"));
     execFileSync(process.execPath, [join(simple, "hidden-items.mjs")], { input: "pw2\n", cwd: tmpdir() });
-    expect(readFileSync(join(simple, "output", "Secret Folder", "Secret Plan.png")).equals(secret)).toBe(true);
+    expect(readFileSync(join(simple, "output", "Secret Folder", "secret_plan.png")).equals(secret)).toBe(true);
     // New key (Settings > Privacy): every file sealed again with a new key, its name and folder too; the item opens as before; a copy of
     // hidden.json from before, with the password it took, opens nothing any more.
     const before = readFileSync(join(ws, ".canvast", "hidden.json"));
@@ -1093,7 +1094,7 @@ test("hidden items are encrypted: sealed into .hidden/ with nothing readable lef
     const opened = Date.now();
     const onDisk = () => ({ sealed: files(ws).filter((f) => f.startsWith(".hidden/") && !f.endsWith(".name")), trashed: files(ws).filter((f) => f.startsWith(".trash/.hidden/")) });
     try {
-      await expect.poll(() => listing().then((l) => l.sort()), { timeout: 45_000 }).toEqual([["Secret Plan.png", true, true], [name, true, true]].sort());
+      await expect.poll(() => listing().then((l) => l.sort()), { timeout: 45_000 }).toEqual([["secret_plan.png", true, true], [name, true, true]].sort());
     } catch (e) {
       // (the list did not come: are the files still there, and where?)
       console.error(`hidden list empty after ${Date.now() - opened} ms; on disk: ${JSON.stringify(onDisk())}`);
@@ -1539,8 +1540,8 @@ test("library files changed outside the app: a renamed or moved file is found by
   const listing = () =>
     page.evaluate(() => window.__canvastDebug.assetListing().then((l) => l.entries.map((e) => [e.name, l.folders.find((f) => f.id === e.folderIds?.[0])?.name ?? null, e.present, e.instances]).sort()));
   try {
-    await page.getByTestId("import-input").setInputFiles({ name: "Hand Study.png", mimeType: "image/png", buffer: red });
-    await expect.poll(listing).toEqual([["Hand Study.png", null, true, 1]]);
+    await page.getByTestId("import-input").setInputFiles({ name: "hand_study.png", mimeType: "image/png", buffer: red });
+    await expect.poll(listing).toEqual([["hand_study.png", null, true, 1]]);
     await expect.poll(() => page.evaluate(() => window.__canvastDebug.saveStatus())).toBe("verified");
   } finally {
     await app.close();
@@ -1554,8 +1555,8 @@ test("library files changed outside the app: a renamed or moved file is found by
   ({ app, page } = await launch(ws));
   try {
     await expect.poll(listing, { timeout: 10_000 }).toEqual([
-      ["Loomis Hands.png", "anatomy", true, 1], // (the placed picture still shows it)
-      ["Pose One.png", "poses", true, 0],
+      ["loomis_hands.png", "anatomy", true, 1], // (the placed picture still shows it)
+      ["pose_one.png", "poses", true, 0],
     ]);
     await page.evaluate(() => window.__canvastDebug.flushStorage());
     // Their files then take their place in the naming convention, as any item's does.
@@ -1568,21 +1569,21 @@ test("library files changed outside the app: a renamed or moved file is found by
   ({ app, page } = await launch(ws));
   try {
     await expect.poll(listing, { timeout: 10_000 }).toEqual([
-      ["Loomis Hands.png", "anatomy", true, 1],
-      ["Pose One.png", "poses", false, 0],
+      ["loomis_hands.png", "anatomy", true, 1],
+      ["pose_one.png", "poses", false, 0],
     ]);
     // Put back in its place while the app runs (from a trash, by hand): there again at once, no restart.
     writeFileSync(join(ws, "library/poses/pose_one.png"), poseBytes);
     await expect.poll(listing, { timeout: 10_000 }).toEqual([
-      ["Loomis Hands.png", "anatomy", true, 1],
-      ["Pose One.png", "poses", true, 0],
+      ["loomis_hands.png", "anatomy", true, 1],
+      ["pose_one.png", "poses", true, 0],
     ]);
     // A copy of a file the library has, put in another folder under another name: an item of its own, and never removed for it.
     writeFileSync(join(ws, "library/poses/Hand Copy.png"), red);
     await expect.poll(listing, { timeout: 10_000 }).toEqual([
-      ["Hand Copy.png", "poses", true, 0],
-      ["Loomis Hands.png", "anatomy", true, 1],
-      ["Pose One.png", "poses", true, 0],
+      ["hand_copy.png", "poses", true, 0],
+      ["loomis_hands.png", "anatomy", true, 1],
+      ["pose_one.png", "poses", true, 0],
     ]);
     await page.evaluate(() => window.__canvastDebug.flushStorage());
     await expect.poll(() => files(ws).filter((f) => f.startsWith("library/") && f.endsWith(".png")).sort(), { timeout: 10_000 }).toEqual(["library/anatomy/loomis_hands.png", "library/poses/hand_copy.png", "library/poses/pose_one.png"]);
@@ -1631,9 +1632,9 @@ test("library files changed outside the app: a renamed or moved file is found by
   ({ app, page } = await launch(ws));
   try {
     await expect.poll(listing, { timeout: 15_000 }).toEqual([
-      ["Hand Copy.png", "poses", true, 0], // (the copy stays an item of its own)
-      ["Loomis Hands.png", "anatomy", true, 1],
-      ["Pose One.png", "poses", true, 0],
+      ["hand_copy.png", "poses", true, 0], // (the copy stays an item of its own)
+      ["loomis_hands.png", "anatomy", true, 1],
+      ["pose_one.png", "poses", true, 0],
       ["huge_art.kra", "poses", false, 0], // (their files removed above: missing)
       ["huge_scan.tif", "poses", false, 0],
       ["while_closed.png", "poses", true, 0],
@@ -1751,7 +1752,7 @@ test("an item's file saved again outside the app, of any kind (a painting in its
   const placed = () => page.evaluate(() => (window.__canvastDebug.objects() as unknown as Array<{ assetId?: string }>).map((o) => o.assetId));
   let file = "";
   try {
-    await page.getByTestId("import-input").setInputFiles({ name: "Study.kra", mimeType: "application/octet-stream", buffer: bytes(4000, 1) });
+    await page.getByTestId("import-input").setInputFiles({ name: "study.kra", mimeType: "application/octet-stream", buffer: bytes(4000, 1) });
     await expect.poll(async () => (await listing()).length).toBe(1);
     const [first] = await listing();
     await page.evaluate((h) => window.__canvastDebug.libraryOp("note", h, "keep me"), first!.hash);
@@ -1761,7 +1762,7 @@ test("an item's file saved again outside the app, of any kind (a painting in its
     // Saved again by its program while the app runs (a new size): the same item follows it, on the canvas too.
     await page.waitForTimeout(2000); // (a save a moment after the app's own writes, not in the same batch of the folder's changes)
     writeFileSync(join(ws, file), bytes(5200, 2));
-    await expect.poll(async () => (await listing()).map((e) => [e.name, e.present, e.instances, e.note, e.hash !== first!.hash]), { timeout: 15_000 }).toEqual([["Study.kra", true, 1, "keep me", true]]);
+    await expect.poll(async () => (await listing()).map((e) => [e.name, e.present, e.instances, e.note, e.hash !== first!.hash]), { timeout: 15_000 }).toEqual([["study.kra", true, 1, "keep me", true]]);
     const [second] = await listing();
     expect(await placed()).toEqual([second!.hash]);
     // Saved again at the same size: told apart by its content.
@@ -1776,7 +1777,7 @@ test("an item's file saved again outside the app, of any kind (a painting in its
   writeFileSync(join(ws, file), bytes(6100, 4));
   ({ app, page } = await launch(ws));
   try {
-    await expect.poll(async () => (await listing()).map((e) => [e.name, e.present, e.instances, e.note]), { timeout: 15_000 }).toEqual([["Study.kra", true, 1, "keep me"]]);
+    await expect.poll(async () => (await listing()).map((e) => [e.name, e.present, e.instances, e.note]), { timeout: 15_000 }).toEqual([["study.kra", true, 1, "keep me"]]);
     const [third] = await listing();
     expect(await placed()).toEqual([third!.hash]);
     expect(readFileSync(join(ws, file)).length, "the file is the one saved, untouched").toBe(6100);
@@ -1952,8 +1953,8 @@ test("a workspace folder renamed onto the path of another opened before reads no
   // The other workspace, opened here once with an item of its own (this device's cache of it is kept by the app), then deleted.
   let { app, page } = await launch(b, "device");
   try {
-    await page.getByTestId("import-input").setInputFiles({ name: "Theirs.png", mimeType: "image/png", buffer: theirs });
-    await expect.poll(() => names(page)).toEqual([["Theirs.png", false]]);
+    await page.getByTestId("import-input").setInputFiles({ name: "theirs.png", mimeType: "image/png", buffer: theirs });
+    await expect.poll(() => names(page)).toEqual([["theirs.png", false]]);
     await page.evaluate(() => window.__canvastDebug.flushStorage());
   } finally {
     await app.close();
@@ -1961,7 +1962,7 @@ test("a workspace folder renamed onto the path of another opened before reads no
   rmSync(b, { recursive: true });
   ({ app, page } = await launch(a, "device-a"));
   try {
-    await page.getByTestId("import-input").setInputFiles([{ name: "Mine.png", mimeType: "image/png", buffer: mine }, { name: "Secret.png", mimeType: "image/png", buffer: secret }]);
+    await page.getByTestId("import-input").setInputFiles([{ name: "mine.png", mimeType: "image/png", buffer: mine }, { name: "secret.png", mimeType: "image/png", buffer: secret }]);
     await expect.poll(() => names(page)).toHaveLength(2);
     await page.evaluate(() => window.__canvastDebug.hiddenOp("set", "pw"));
     await page.evaluate((h) => window.__canvastDebug.libraryOp("hide", h, "1"), sha(secret));
@@ -1975,9 +1976,9 @@ test("a workspace folder renamed onto the path of another opened before reads no
   ({ app, page } = await launch(b, "device"));
   try {
     // (read again from the folder, as on a new device: the hidden item comes from its sealed index once the password is given)
-    await expect.poll(() => names(page), { timeout: 15_000 }).toEqual([["Mine.png", false]]);
+    await expect.poll(() => names(page), { timeout: 15_000 }).toEqual([["mine.png", false]]);
     expect((await page.evaluate(() => window.__canvastDebug.hiddenOp("check", "pw"))).ok).toBe(true);
-    await expect.poll(() => names(page), { timeout: 15_000 }).toEqual([["Mine.png", false], ["Secret.png", true]]);
+    await expect.poll(() => names(page), { timeout: 15_000 }).toEqual([["mine.png", false], ["secret.png", true]]);
     expect(await page.evaluate((h) => window.__canvastDebug.originalBytes(h), sha(secret))).toEqual(Array.from(secret));
     await page.evaluate(() => window.__canvastDebug.flushStorage());
     // Nothing of the other was written into it.
@@ -2082,7 +2083,7 @@ test("the library's files in .canvast/library/ deleted by hand: nothing is taken
   const parts = () => (existsSync(join(ws, ".canvast/library")) ? readdirSync(join(ws, ".canvast/library")).sort() : []);
   let before: string[] = [];
   try {
-    await page.getByTestId("import-input").setInputFiles(pics.map((buffer, k) => ({ name: `Pic ${k}.png`, mimeType: "image/png", buffer })));
+    await page.getByTestId("import-input").setInputFiles(pics.map((buffer, k) => ({ name: `pic_${k}.png`, mimeType: "image/png", buffer })));
     await expect.poll(() => page.evaluate(() => window.__canvastDebug.assetListing().then((l) => l.entries.length)), { timeout: 20_000 }).toBe(3);
     await page.evaluate((h) => window.__canvastDebug.libraryOp("note", h, "kept note"), createHash("sha256").update(pics[0]!).digest("hex"));
     await page.evaluate(() => window.__canvastDebug.flushStorage());
@@ -2098,7 +2099,7 @@ test("the library's files in .canvast/library/ deleted by hand: nothing is taken
     await page.evaluate(() => window.__canvastDebug.flushStorage());
     await expect.poll(parts, { timeout: 15_000 }).toEqual(before);
     const listing = await page.evaluate(() => window.__canvastDebug.assetListing().then((l) => l.entries.map((e) => [e.name, e.state, e.note ?? ""]).sort()));
-    expect(listing).toEqual([["Pic 0.png", "active", "kept note"], ["Pic 1.png", "active", ""], ["Pic 2.png", "active", ""]]);
+    expect(listing).toEqual([["pic_0.png", "active", "kept note"], ["pic_1.png", "active", ""], ["pic_2.png", "active", ""]]);
     expect(parts().filter((n) => n.startsWith("items-")).map((n) => readFileSync(join(ws, ".canvast/library", n), "utf8")).join("")).toContain("kept note");
   } finally {
     await app.close();
@@ -2241,7 +2242,7 @@ test("a file renamed outside the app keeps its place in notes: the links follow,
   // While it runs (a name the disk writes its own way).
   renameSync(join(ws, "library/ext/pic_one.png"), join(ws, "library/ext/Second Name.png"));
   await expect.poll(() => readFileSync(note, "utf8"), { timeout: 15_000 }).toContain("![a](ext/second_name.png)");
-  expect(readFileSync(note, "utf8")).toContain("![[Second Name.png]]");
+  await expect.poll(() => readFileSync(note, "utf8"), { timeout: 15_000 }).toContain("![[second_name.png]]"); // (the item takes its file's tidy name, and the wikilink follows)
   expect(existsSync(join(ws, "library/ext/second_name.png"))).toBe(true);
   await app.close();
   // While it is closed.
