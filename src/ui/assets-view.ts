@@ -4446,8 +4446,9 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   placeMenu.addEventListener("click", (e) => {
     const b = (e.target as HTMLElement).closest<HTMLElement>("[data-pm]");
     if (!b) return;
+    const hashes = [...placing]; // (closing the menu forgets what it was for)
     closePlaceMenu();
-    pressCommand("library.placeOn", { hashes: placing, where: b.dataset["pm"]!, id: b.dataset["id"] ?? "" });
+    pressCommand("library.placeOn", { hashes, where: b.dataset["pm"]!, id: b.dataset["id"] ?? "" });
   });
   const placeOn = (hashes: string[], kind: string, id: string): void => {
     const card = hashes.length === 1 ? cardInView(hashes[0]!) : undefined;
