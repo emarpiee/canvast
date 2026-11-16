@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.7 — The Library's reset button in hidden mode (2026-11-16)
+
+- **Fixed:** with a filter of the sidebar on (a folder, Favourites, a tag), hidden mode showed the Reset all filters button with nothing filtered there, and it did nothing: it went by the filter kept for when hidden mode ends. It now says only what is on screen, so it also shows for a hidden folder picked in hidden mode (it did not); the filter left on outside comes back at the end, with the button.
+
 ## 0.60.6 — The gallery viewer never stays blank (2026-11-16)
 
 - **Fixed:** stepping on from a PDF, a note or a 3D model still opening in the gallery viewer left its empty panel over every item shown after it, a blank page until a restart: the panel is now taken down whenever the viewer moves on.

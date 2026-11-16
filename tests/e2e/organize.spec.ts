@@ -299,6 +299,10 @@ test("hiding: a hidden item is in no list until the word is typed (and the passw
 
   // The word opens the list, after the password; a wrong one asks again.
   await p.getByTestId("view-assets").click();
+  // A filter left on outside hidden mode is kept for its end, and the reset button inside says only hidden mode's own (it showed and did nothing).
+  const reset = p.getByTestId("assets-reset-filters");
+  await side(p, /^Favourites/).click();
+  await expect(reset).toBeVisible();
   await search.fill("hidden:");
   await p.getByTestId("prompt-input").fill("nope");
   await p.getByTestId("prompt-ok").click();
@@ -311,6 +315,7 @@ test("hiding: a hidden item is in no list until the word is typed (and the passw
   await expect(side(p, /^All hidden items/)).toContainText("1");
   await expect(card(p, HASH)).toBeVisible();
   await expect(cards(p)).toHaveCount(1);
+  await expect(reset).toBeHidden();
   // The pin in its status bar chip keeps hidden mode on when the library is left (Settings > Privacy has it too); unpinned, it ends.
   const stay = p.getByTestId("hidden-mode-stay");
   await stay.click();
@@ -329,12 +334,22 @@ test("hiding: a hidden item is in no list until the word is typed (and the passw
   for (const h of [HASH, GREEN_HASH]) await p.evaluate(([h, f]) => window.__canvastDebug.libraryOp("file", h, f), [h, vault] as const);
   await expect(side(p, /^All hidden items/)).toContainText("2");
   await expect(side(p, /^Vault/)).toContainText("2");
-  // Exit ends it: the view as it was, with nothing hidden anywhere in it.
+  await side(p, /^Vault/).click();
+  await expect(reset).toBeVisible(); // (a hidden folder filters too)
+  await reset.click();
+  await expect(side(p, /^All hidden items/)).toHaveAttribute("aria-current", "true");
+  await expect(reset).toBeHidden();
+  // Exit ends it: the view as it was (Favourites again, so the button is back and resets it), with nothing hidden anywhere in it.
   await p.getByTestId("hidden-mode-exit").click();
   await expect(bar).toBeHidden();
   await expect(cards(p)).toHaveCount(0);
   await expect(p.getByTestId("tag-list")).not.toContainText("secretTag");
   await expect(p.getByTestId("folder-tree")).not.toContainText("Vault");
+  await expect(side(p, /^Favourites/)).toHaveAttribute("aria-current", "true");
+  await expect(reset).toBeVisible();
+  await reset.click();
+  await expect(side(p, /^All items/)).toHaveAttribute("aria-current", "true");
+  await expect(reset).toBeHidden();
   // Unhide folder (in hidden mode) shows it and everything in it; Exit ends hidden mode.
   await search.fill("hidden:");
   await p.getByTestId("prompt-input").fill("secret");

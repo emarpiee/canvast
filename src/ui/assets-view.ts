@@ -2507,7 +2507,8 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   /** Keep the filters (not the search) with the layout, and show the reset button only when one is not its default, or a search narrows the list (it filters too). */
   const keepFilters = (): void => {
     const f = { usage: usageSel.value, sort: sortSel.value, reversed, scope: beforeHidden?.scope ?? scope }; // (hidden mode's scope is not kept)
-    resetFiltersBtn.hidden = f.usage === NO_FILTERS.usage && f.sort === NO_FILTERS.sort && !f.reversed && f.scope === NO_FILTERS.scope && !search.value.trim();
+    // The button says what is on screen: in hidden mode its own scope, never the one kept for when it ends (that one, which the button cannot reset from here, left it shown and doing nothing).
+    resetFiltersBtn.hidden = f.usage === NO_FILTERS.usage && f.sort === NO_FILTERS.sort && !f.reversed && scope === NO_FILTERS.scope && !search.value.trim();
     if (JSON.stringify(f) === JSON.stringify(ui.filters)) return;
     ui.filters = f;
     saveUi();
