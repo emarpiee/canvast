@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.60.13 — Smoother Library scrolling, bookmark button back, steadier tile tests (2026-11-16)
+
+- **Fixed:** scrolling the Library with small thumbnails stuttered: each step put every card already on the screen back in the page, so all of them were styled and laid out again. Only the cards a scroll brings are added now: at the smallest thumbnails, about 40 frames a second instead of under 30, and almost no frame over 50 ms (B2). The waiting shimmer on a card moves without repainting it.
+- **Fixed:** the details of a PDF, comic book or 3D model showed no **Bookmark current page** (or **view**) button when it opened: it came only after something drew the details again.
+- **Added:** README pictures of *Move a folder* and *Pasted picture name*; the PDF and 3D pictures taken again with the bookmark button (B1).
+- **Added:** `--scroll` in the library benchmark (`scripts/bench-library.mjs`, the *Bench library* workflow): frames per second while scrolling the Library, and where the time goes (script, style, layout, paint).
+- **Fixed:** end-to-end tests start once the text font is in: its arrival drew every tile again, which on a slow machine came in the middle of a test counting tiles (`tiles.spec.ts`) (B8).
+- **Added:** B23 in the backlog: better-formatted release notes.
+
 ## 0.60.12 — A public backlog, builds for other systems open for contribution (2026-11-16)
 
 - **Added:** `BACKLOG.md` beside the CHANGELOG: the work not done yet, each item with an ID, its priority (high, medium, low) and status (open, closed, removed); closed and removed items stay, with the version or the reason. The README's *Contributing and support* and CONTRIBUTING.md point to it.
