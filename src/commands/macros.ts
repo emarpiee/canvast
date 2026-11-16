@@ -47,7 +47,7 @@ export class Macros {
 
   constructor(private readonly registry: CommandRegistry, private readonly tell: (text: string) => void) {
     registry.onRun((c, options) => {
-      if (!this.steps || this.playing || c.kind === "macro" || c.record === false || (c.risk === "read" && c.record !== true)) return;
+      if (!this.steps || this.playing || c.kind === "macro" || c.record === false || (c.risk === "read" && c.record !== true) || options["live"] === true) return; // (a live step is a preview: the kept one follows)
       this.steps.push(Object.keys(options).length ? { id: c.id, options } : { id: c.id });
     });
     registry.setProvider("macros", () => this.commands());

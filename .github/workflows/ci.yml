@@ -26,7 +26,6 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
       - run: npm ci
-      - run: npm run check:commands
       - run: npm run typecheck
       - run: npm run test:unit
       - run: npm run build
@@ -42,6 +41,8 @@ jobs:
       - run: npm run check:patterns
       - run: npm run check:shots
       - run: npm run check:repro
+      - if: always()
+        run: npm run check:commands
       - name: Keep the built file
         uses: actions/upload-artifact@v4
         with:

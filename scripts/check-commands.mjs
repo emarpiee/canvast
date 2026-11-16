@@ -4,7 +4,8 @@
 //   handler   a click, double-click, context-menu, change, input or submit listener (or `.onclick =`) whose code does not run a command
 //             (`runCommand(`, `commands.run(`, `commands.execute(`, `registry.run(`, `registry.execute(`, `pressCommand(`) and is not
 //             marked as view state (`// view-state: <why>` on its line or the line above: it only changes what is shown, as folding a
-//             section, typing in a search box, a tab, a hover)
+//             section, typing in a search box, a tab, a hover), or as a named handler that runs commands (`// commands: <which>`: this
+//             check reads text, so it cannot follow a function's name to its body)
 //   menu      a menu row (an object with `label:` and `run:`) without `command:` (the id of the command it runs)
 //   command   a command (an object with `title:` and `group:` that runs: `run:`, `exec:` or `takes:`) without a fixed `id:`, a `hint:`, a
 //             `risk:` and `exec:` or `takes:` (not the old `run:`)
@@ -22,7 +23,7 @@ const SCAN = ["src"];
 const SKIP = [/^src\/commands\//, /\.d\.ts$/, /^src\/gen\//, /^src\/render\//, /^src\/core\//, /^src\/scene\//, /^src\/storage\//];
 
 const RUNS = /\b(runCommand|pressCommand|commands\.(run|execute|batch)|registry\.(run|execute|batch))\s*\(/;
-const MARK = /\/\/\s*(view-state|typing):\s*\S/;
+const MARK = /\/\/\s*(view-state|typing|commands):\s*\S/;
 
 function files(dir) {
   const out = [];

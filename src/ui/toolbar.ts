@@ -3,6 +3,9 @@ import { scrubNumbers } from "../colour-picker/scrub";
 import { RATIO_PRESETS, formatRatio, parseRatio } from "../app/export-size";
 import { esc } from "./format";
 import { openMoreMenu } from "./more-menu";
+import { commands, pressCommand } from "../commands/registry";
+import { REASON } from "../commands/types";
+import type { Command, Options, OptionSpec, Result } from "../commands/types";
 import type { MenuItem } from "./more-menu";
 import { createBar, isOff, syncGroups, syncScroll } from "./bar";
 import { assignSections } from "./bar-sections";
@@ -31,6 +34,7 @@ import type { LayoutCommand } from "../app/actions";
 import type { AlignKey, SortKey } from "../doc/arrange";
 import type { PenKind } from "../interaction/pens";
 import { ICONS } from "./icons";
+import { TOOL_COMMAND } from "../settings/shortcuts";
 import { newInk, swatchBackground } from "../render/ink";
 import { penFromSlider, sliderFromPen } from "../interaction/pen-width";
 
@@ -483,6 +487,121 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
   pickBar.row.append(pickGroup);
   const pq = (sel: string): HTMLElement => pickGroup.querySelector<HTMLElement>(sel)!;
   const input = q<HTMLInputElement>("input[type=file]")!;
+
+  // The Properties bar's commands (ADR 0205): every field, button and chip of it runs one, so the palette, a macro and an outside caller set
+  // the same properties. `live` is a step while a field is dragged or typed (not an undo step, not recorded); without it the change is kept.
+  const sel = (): string | null => (editor.selection.size ? null : REASON.noSelection);
+  const LIVE: OptionSpec = { name: "live", type: "boolean", doc: "a step while dragging: not kept as an undo step" };
+  const num = (name: string, doc: string, min?: number, max?: number): OptionSpec => ({ name, type: "number", doc, required: true, ...(min !== undefined ? { min } : {}), ...(max !== undefined ? { max } : {}) });
+  const kept = (o: Options): boolean => o["live"] !== true;
+  const patchOf = (o: Options, name: string, keys: readonly string[]): Record<string, unknown> | string => {
+    const v = o[name];
+    if (!v || typeof v !== "object" || Array.isArray(v)) return `"${name}" is a set of named values.`;
+    const bad = Object.keys(v).filter((k) => !keys.includes(k));
+    return bad.length ? `"${name}" has no ${bad.map((k) => `"${k}"`).join(", ")}; it takes ${keys.join(", ")}.` : (v as Record<string, unknown>);
+  };
+  const withPatch = (name: string, keys: readonly string[], apply: (patch: never, o: Options) => void) => (o: Options): Result => {
+    const p = patchOf(o, name, keys);
+    if (typeof p === "string") return { ok: false, error: p };
+    apply(p as never, o);
+    return { ok: true };
+  };
+  const TEXT_KEYS = ["assetId", "sizePx", "align", "autoWidth", "color", "gradient", "outline", "lineHeight", "tracking", "kerning", "features", "axes", "paraGap", "indent", "caps", "maxLines", "heightPx", "valign", "card", "pathOpts", "shapeOpts"] as const;
+  const LAYOUT_KEYS = ["flow", "gap", "pad", "align", "justify", "hug", "columns", "cols", "rows", "columnsBy", "rowHeight", "sort"] as const;
+  const TOOL_OPTIONS = ["penWidth", "shapeWidth", "sides", "tips", "eraser", "stabilizer"] as const;
+  const TOGGLES = ["stabilizer", "eraseParts", "eraseGroups", "alignBox", "ignoreFill", "snap", "followZoom", "lockRadius", "lockWidth"] as const;
+  const setToolOption = (name: (typeof TOOL_OPTIONS)[number], v: number, keep: boolean): void => {
+    if (name === "penWidth") {
+      editor.penWidthPx = v;
+      if (editor.lock) editor.lock = { ...actions.depth(), px: editor.penWidthPx };
+      if (editor.tool === "select") actions.setSelectedWidth(editor.penWidthPx, keep); // (the selected strokes follow it)
+    } else if (name === "shapeWidth") {
+      if (v === 0) editor.shapeStroke = null;
+      else {
+        editor.shapeWidthPx = v;
+        if (editor.shapeStroke === null && editor.shapeKind !== "line") editor.shapeStroke = "#1f2329";
+      }
+    } else if (name === "sides" || name === "tips") {
+      if (!(v >= 3 && v <= 24)) return;
+      if (name === "sides") editor.shapeSides = Math.round(v);
+      else editor.shapeTips = Math.round(v);
+    } else if (name === "eraser") editor.eraserPx = v;
+    else editor.stabilizer = { ...editor.stabilizer, strength: v };
+    editor.changed();
+  };
+  const prop = (id: string, title: string, hint: string, options: readonly OptionSpec[], exec: NonNullable<Command["exec"]>, why: () => string | null = sel): Command => ({ id, group: "Properties", kind: "selection", title, hint, risk: "edit", options, why, exec });
+  commands.setProvider("properties", () => [
+    prop("tools.set", "Set a tool option", "A pen width, a shape's sides or points, the eraser", [{ name: "name", type: "choice", doc: "which option", required: true, choices: TOOL_OPTIONS }, num("value", "its value (px for widths)", 0, 100000), LIVE], (o) => setToolOption(o["name"] as (typeof TOOL_OPTIONS)[number], Number(o["value"]), kept(o)), () => null),
+    prop("tools.toggle", "Turn a tool option on or off", "The stabilizer, snapping, erasing parts, a locked width and more", [{ name: "name", type: "choice", doc: "which option", required: true, choices: TOGGLES }], (o) => {
+      const n = o["name"] as (typeof TOGGLES)[number];
+      if (n === "stabilizer") editor.stabilizer = { ...editor.stabilizer, on: !editor.stabilizer.on };
+      else if (n === "lockWidth") editor.lock = editor.lock ? null : { ...actions.depth(), px: editor.penWidthPx }; // (a new size is the new reference)
+      else if (n === "eraseGroups") editor.eraseWholeGroups = !editor.eraseWholeGroups;
+      else if (n === "ignoreFill") editor.ignoreFilling = !editor.ignoreFilling;
+      else editor[n] = !editor[n];
+      editor.changed();
+    }, () => null),
+    prop("tools.choose", "Choose a tool's kind or colour", "The pen's kind or colour, the shape's kind, what the lasso takes", [{ name: "name", type: "choice", doc: "which choice", required: true, choices: ["penKind", "penColour", "shapeKind", "lassoFilter"] }, { name: "value", type: "text", doc: "a pen kind, a colour (#rrggbb), a shape kind, or strokes or all", required: true }], (o) => {
+      const v = String(o["value"]);
+      if (o["name"] === "penKind") editor.penKind = v as PenKind;
+      else if (o["name"] === "penColour") {
+        if (!/^#[0-9a-f]{3,8}$/i.test(v)) return { ok: false, error: '"value" is a colour (#rrggbb).' };
+        editor.penColor = v;
+      } else if (o["name"] === "shapeKind") {
+        if (!SHAPE_KINDS.some((k) => k === v)) return { ok: false, error: `"value" is one of ${SHAPE_KINDS.join(", ")}.` };
+        editor.shapeKind = v as typeof editor.shapeKind;
+        editor.made.clear(); // (another kind: the next shape is being prepared, its options are the tool's: ADR 0198)
+        if (editor.tool === "path") editor.setTool("shape");
+      } else {
+        if (v !== "strokes" && v !== "all") return { ok: false, error: '"value" is strokes or all.' };
+        editor.lassoFilter = v;
+      }
+      editor.changed();
+      return { ok: true };
+    }, () => null),
+    prop("text.setStyle", "Set the text style", "The font, size, colour, alignment and more of the selected text", [{ name: "style", type: "json", doc: `what to change: ${TEXT_KEYS.join(", ")}`, required: true }, LIVE], withPatch("style", TEXT_KEYS, (p, o) => actions.setTextStyle(p as TextLook, kept(o)))),
+    prop("item.setPin", "Pin to the sheet", "Where it stays when its sheet is resized", [{ name: "h", type: "text", doc: "left, right, both, centre or scale" }, { name: "v", type: "text", doc: "top, bottom, both, centre or scale" }], (o) => actions.setPin({ ...(typeof o["h"] === "string" ? { h: o["h"] } : {}), ...(typeof o["v"] === "string" ? { v: o["v"] } : {}) })),
+    prop("item.moveOnSheet", "Place on its sheet", "Its place from the sheet's corner, in px as seen now", [num("x", "from the left"), num("y", "from the top"), LIVE], (o) => actions.moveOnSheet(Number(o["x"]), Number(o["y"]), kept(o))),
+    prop("item.resizeOnSheet", "Size on its sheet", "Its size in px as seen now", [num("w", "width", 0), num("h", "height", 0), LIVE], (o) => actions.resizeOnSheet(Number(o["w"]), Number(o["h"]), kept(o))),
+    prop("sheet.setRatio", "Set the sheet's shape", "Its width over its height (16:9 is 1.778)", [num("ratio", "width over height", 0.01, 100)], (o) => actions.setSheetRatio(Number(o["ratio"]), true), () => sel() ?? (actions.sheetRatio() === null ? "Select a sheet." : null)),
+    prop("sheet.turn", "Turn the sheet on its side", "Portrait to landscape, or back", [], () => { const now = actions.sheetRatio(); if (now !== null) actions.setSheetRatio(1 / now, true); }, () => sel() ?? (actions.sheetRatio() === null ? "Select a sheet." : null)),
+    prop("sheet.toggleScale", "Scale what is on the sheet", "What is on it grows and shrinks with it, or stays", [], () => actions.setSheetScale(!actions.sheetScale())),
+    prop("sheet.saveRatio", "Save this ratio", "Keep the sheet's shape in the list", [], () => actions.saveRatio(), () => sel() ?? (actions.sheetRatio() === null ? "Select a sheet." : null)),
+    prop("sheet.manageRatios", "Manage custom ratios", "Rename or remove saved ratios", [], () => actions.manageRatios(), () => null),
+    prop("sheet.setLayout", "Set the auto layout", "The flow, gaps, padding, alignment and columns of the selected sheet", [{ name: "layout", type: "json", doc: `what to change: ${LAYOUT_KEYS.join(", ")}`, required: true }, LIVE], withPatch("layout", LAYOUT_KEYS, (p, o) => actions.setAutoLayout(p as LayoutPatch, kept(o))), () => sel() ?? (actions.autoLayout() ? null : "Select a sheet with auto layout.")),
+    prop("item.setInLayout", "Set its place in the layout", "Its span, its limits, how it fills, or free of the layout", [{ name: "patch", type: "json", doc: "what to change: span, min, max, fill, free", required: true }], withPatch("patch", ["span", "min", "max", "fill", "free"], (p) => actions.setInLayout(p as InLayoutPatch)), () => sel() ?? (actions.inLayout() ? null : "Select something an auto layout places.")),
+    prop("layout.applyStyle", "Apply a layout style", "A saved layout style on the selected sheet", [{ name: "name", type: "text", doc: "the style's name", required: true }], (o) => {
+      const al = actions.autoLayout();
+      const st = actions.layoutStyles().find((x) => x.name === o["name"]);
+      if (!al || !st) return { ok: false, error: `No layout style "${String(o["name"])}".` };
+      actions.setAutoLayout(layoutTimes(st.data, 1 / al.ppu, 1 / al.ppu));
+      return { ok: true };
+    }, () => sel() ?? (actions.autoLayout() ? null : "Select a sheet with auto layout.")),
+    prop("layout.saveStyle", "Save this layout as a style", "Kept in Styles, for any sheet", [], () => { const al = actions.autoLayout(); if (al) actions.saveLayoutStyle(layoutTimes(al.layout, al.ppu, al.ppu)); }, () => sel() ?? (actions.autoLayout() ? null : "Select a sheet with auto layout.")),
+    prop("shape.setCorners", "Set the corner radius", "One radius, or one for each corner, in px as seen now", [{ name: "radii", type: "json", doc: "a list of numbers: one, or one per corner", required: true }, LIVE], (o) => {
+      const r = o["radii"];
+      if (!Array.isArray(r) || !r.length || !r.every((v) => typeof v === "number" && Number.isFinite(v) && v >= 0)) return { ok: false, error: '"radii" is a list of numbers of 0 or more.' };
+      if (r.length !== 1 && r.length !== actions.selectedCorners()?.nodes) return { ok: false, error: `Give one radius, or ${actions.selectedCorners()?.nodes ?? "one per corner"}.` };
+      actions.cornersSelected(r as number[], kept(o));
+      return { ok: true };
+    }),
+    prop("shape.set", "Set the shape's numbers", "A polygon's sides, a star's points and depth, a corner radius", [{ name: "shape", type: "json", doc: "what to change: sides, tips, inner, radiusPx", required: true }, LIVE], withPatch("shape", ["sides", "tips", "inner", "radiusPx"], (p, o) => actions.shapeSelected(p, kept(o)))),
+    prop("path.setSmoothing", "Set the smoothing", "How smooth the selected paths' corners are", [num("value", "percent", 0, 100), LIVE], (o) => actions.setSmoothing(Number(o["value"]), kept(o))),
+    prop("item.setStrokeWidth", "Set the line width", "The selected lines' width, in px as seen now", [num("px", "width", 0, 100000), LIVE], (o) => actions.setSelectedWidth(Number(o["px"]), kept(o))),
+    prop("paint.set", "Set the fill or outline", "The colour, gradient or pattern of the selection, or of the next shape", [{ name: "which", type: "choice", doc: "fill or outline", required: true, choices: ["fill", "stroke"] }, { name: "paint", type: "json", doc: "a colour (#rrggbb), a gradient, or null for none" }, LIVE], (o) => setPaint(o["which"] as "fill" | "stroke", (o["paint"] ?? null) as Paint | null, kept(o)), () => null),
+    prop("paint.replace", "Replace a colour of the selection", "Every use of one colour in the selected becomes another", [{ name: "from", type: "json", doc: "the colour (#rrggbb) or paint to replace, as the selection uses it", required: true }, { name: "paint", type: "json", doc: "what it becomes; null for none" }, LIVE], (o) => {
+      const from = o["from"] as Paint;
+      if (!actions.selectionPaints().items.some((it) => JSON.stringify(it.paint) === JSON.stringify(from))) return { ok: false, error: "The selection does not use that colour." };
+      actions.recolourSelected(from, (o["paint"] ?? null) as Paint | null, kept(o));
+      return { ok: true };
+    }),
+    prop("picture.crop", "Crop", "Start cropping the selected picture, or finish", [], () => { const id = [...editor.selection][0]; editor.cropId = editor.cropId ? null : (id ?? null); editor.changed(); }),
+    prop("picture.uncrop", "Uncrop", "The whole picture again", [], () => actions.uncrop()),
+    prop("item.unflip", "Unflip", "Not mirrored any more", [], () => actions.unflip()),
+    prop("library.import", "Import files", "Pictures, fonts, notes and more into the library", [], () => input.click(), () => null),
+    prop("text.importFont", "Add a font file", "Import a font and set the text in it", [], () => fontInput.click()),
+  ]);
+  // view-state: (the file picker of library.import: it takes the files chosen)
   input.addEventListener("change", () => {
     if (input.files?.length) actions.importFiles([...input.files]);
     input.value = "";
@@ -490,42 +609,22 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
 
   // Continuous pen size: a new size is the new lock reference, like a preset.
   q<HTMLInputElement>("[data-size]")!.addEventListener("input", (e) => {
-    editor.penWidthPx = penFromSlider(Number((e.target as HTMLInputElement).value));
-    if (editor.lock) editor.lock = { ...actions.depth(), px: editor.penWidthPx };
-    if (editor.tool === "select") actions.setSelectedWidth(editor.penWidthPx, false); // live: the selected strokes follow the slider
-    editor.changed();
+    pressCommand("tools.set", { name: "penWidth", value: penFromSlider(Number((e.target as HTMLInputElement).value)), live: true }); // (live: the selected strokes follow the slider)
   });
 
   // On Select the slider also sets the selected strokes' thickness, once on release (one undo step).
   q<HTMLInputElement>("[data-size]")!.addEventListener("change", () => {
-    if (editor.tool === "select") actions.setSelectedWidth(editor.penWidthPx, true);
+    pressCommand("tools.set", { name: "penWidth", value: editor.penWidthPx });
   });
 
   scrubNumbers(barEl); // (the bar's own: it works wherever the bar is placed)
   // As the Width field of the outline options: the far left is no outline (the width is kept), any other place a width that turns one on.
   q<HTMLInputElement>("[data-shape-width]")!.addEventListener("input", (e) => {
     const v = Number((e.target as HTMLInputElement).value);
-    if (v === 0) editor.shapeStroke = null;
-    else {
-      editor.shapeWidthPx = penFromSlider(v);
-      if (editor.shapeStroke === null && editor.shapeKind !== "line") editor.shapeStroke = "#1f2329";
-    }
-    editor.changed();
+    pressCommand("tools.set", { name: "shapeWidth", value: v === 0 ? 0 : penFromSlider(v) });
   });
-  q<HTMLInputElement>("[data-sides]")!.addEventListener("input", (e) => {
-    const v = Math.round(Number((e.target as HTMLInputElement).value));
-    if (v >= 3 && v <= 24) {
-      editor.shapeSides = v;
-      editor.changed();
-    }
-  });
-  q<HTMLInputElement>("[data-tips]")!.addEventListener("input", (e) => {
-    const v = Math.round(Number((e.target as HTMLInputElement).value));
-    if (v >= 3 && v <= 24) {
-      editor.shapeTips = v;
-      editor.changed();
-    }
-  });
+  q<HTMLInputElement>("[data-sides]")!.addEventListener("input", (e) => void pressCommand("tools.set", { name: "sides", value: Math.round(Number((e.target as HTMLInputElement).value)) }));
+  q<HTMLInputElement>("[data-tips]")!.addEventListener("input", (e) => void pressCommand("tools.set", { name: "tips", value: Math.round(Number((e.target as HTMLInputElement).value)) }));
 
   // The fill and outline chips: the colours the next shape gets (Shape and Path tools), or those of the selected paths.
   const editsSelection = (): boolean => editor.editsSelection;
@@ -549,8 +648,8 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
       noneLabel: which === "fill" ? "No fill" : "No outline",
       // a picture or objects fill the picked shapes (ADR 0154)
       ...(which === "fill" && editsSelection() ? { modes: ["none", "solid", "linear", "radial", "angular", "image", "objects"] as const } : {}),
-      onInput: (p) => setPaint(which, p, false),
-      onChange: (p) => setPaint(which, p, true),
+      onInput: (p) => pressCommand("paint.set", { which, paint: p, live: true }),
+      onChange: (p) => pressCommand("paint.set", { which, paint: p }),
       onClose: () => {
         if (editsSelection()) actions.paintSelected({}, true); // drop a preview that was never stored
       },
@@ -561,17 +660,17 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
   const shapeInput = (sel: string, apply: (v: number) => { sides?: number; tips?: number; inner?: number; radiusPx?: number } | null): void => {
     liveNumber(q<HTMLInputElement>(sel)!, (v, final) => {
       const change = apply(v);
-      if (change) actions.shapeSelected(change, final);
+      if (change) pressCommand("shape.set", { shape: change, live: !final });
     });
   };
   // (one value, or one for every corner)
   const radiusInput = q<HTMLInputElement>("[data-sel-radius]")!;
   const radiusApply = (final: boolean): void => {
     const parts = radiusInput.value.trim().split(/[\s,]+/).map(Number);
-    if (parts.every((v) => Number.isFinite(v) && v >= 0) && (parts.length === 1 || parts.length === actions.selectedCorners()?.nodes)) actions.cornersSelected(parts, final);
+    if (parts.every((v) => Number.isFinite(v) && v >= 0) && (parts.length === 1 || parts.length === actions.selectedCorners()?.nodes)) pressCommand("shape.setCorners", { radii: parts, live: !final });
   };
-  radiusInput.addEventListener("input", () => radiusApply(false));
-  radiusInput.addEventListener("change", () => radiusApply(true));
+  radiusInput.addEventListener("input", () => radiusApply(false)); // view-state: (runs shape.setCorners, above)
+  radiusInput.addEventListener("change", () => radiusApply(true)); // view-state: (runs shape.setCorners, above)
   // The font list is read from the library when the menu is opened (and after an import); the selected font is always shown.
   const fontSelect = q<HTMLSelectElement>("[data-text-font]")!;
   const fontInput = q<HTMLInputElement>("[data-testid=font-input]")!;
@@ -607,22 +706,25 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
   fontSelect.addEventListener("change", () => {
     if (fontSelect.value === "__import") {
       fontSelect.value = actions.selectedTextStyle()?.assetId ?? "";
-      fontInput.click();
-    } else actions.setTextStyle({ assetId: fontSelect.value || null });
+      pressCommand("text.importFont");
+    } else pressCommand("text.setStyle", { style: { assetId: fontSelect.value || null } });
   });
+  // view-state: (the file picker of text.importFont)
   fontInput.addEventListener("change", () => {
     const f = fontInput.files?.[0];
     fontInput.value = "";
     if (f) void actions.importFont(f).then((hash) => {
-      if (hash) actions.setTextStyle({ assetId: hash });
+      if (hash) pressCommand("text.setStyle", { style: { assetId: hash } });
       askFonts();
     });
   });
-  liveNumber(q<HTMLInputElement>("[data-text-size]")!, (v, final) => v > 0 && actions.setTextStyle({ sizePx: v }, final));
+  const textStyle = (style: TextLook, final = true): boolean => pressCommand("text.setStyle", { style, live: !final });
+  liveNumber(q<HTMLInputElement>("[data-text-size]")!, (v, final) => v > 0 && textStyle({ sizePx: v }, final));
   // (these buttons keep the focus where it is, so a text being edited stays open and takes the change)
   for (const b of qa<HTMLElement>("[data-text-align], [data-text-fit]")) b.addEventListener("mousedown", (e) => e.preventDefault());
-  for (const b of qa<HTMLElement>("[data-text-align]")) b.addEventListener("click", () => actions.setTextStyle({ align: b.dataset["textAlign"] as "left" }));
-  for (const b of qa<HTMLElement>("[data-text-fit]")) b.addEventListener("click", () => actions.setTextStyle({ autoWidth: b.dataset["textFit"] === "width" }));
+  for (const b of qa<HTMLElement>("[data-text-align]")) b.addEventListener("click", () => void pressCommand("text.setStyle", { style: { align: b.dataset["textAlign"] } }));
+  for (const b of qa<HTMLElement>("[data-text-fit]")) b.addEventListener("click", () => void pressCommand("text.setStyle", { style: { autoWidth: b.dataset["textFit"] === "width" } }));
+  // view-state: (opens the colour chooser; what it picks runs text.setStyle)
   q<HTMLElement>("[data-text-colour]")!.addEventListener("click", (e) => {
     const anchor = e.currentTarget as HTMLElement;
     openPaintPopover(anchor, {
@@ -630,8 +732,8 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
       paint: actions.selectedTextStyle()?.gradient ?? actions.selectedTextStyle()?.color ?? null,
       noneLabel: "No colour",
       modes: ["solid", "linear", "radial"],
-      onInput: (p) => p !== null && actions.setTextStyle(typeof p === "string" ? { color: p, gradient: null } : isGradient(p) ? { gradient: p } : {}, false),
-      onChange: (p) => p !== null && actions.setTextStyle(typeof p === "string" ? { color: p, gradient: null } : isGradient(p) ? { gradient: p } : {}),
+      onInput: (p) => p !== null && textStyle(typeof p === "string" ? { color: p, gradient: null } : isGradient(p) ? { gradient: p } : {}, false),
+      onChange: (p) => p !== null && textStyle(typeof p === "string" ? { color: p, gradient: null } : isGradient(p) ? { gradient: p } : {}),
     });
   });
   // The line round the letters: its colour here, its width beside it (px at this zoom, kept as a share of the size).
@@ -639,6 +741,7 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
     const size = actions.selectedTextStyle()?.sizePx;
     return size ? px / size : 0.05;
   };
+  // view-state: (opens the colour chooser; what it picks runs text.setStyle)
   q<HTMLElement>("[data-text-outline]")!.addEventListener("click", (e) => {
     const t = actions.selectedTextStyle();
     openPaintPopover(e.currentTarget as HTMLElement, {
@@ -646,14 +749,15 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
       paint: t?.outline?.c ?? null,
       noneLabel: "No outline",
       modes: ["none", "solid"],
-      onInput: (p) => actions.setTextStyle({ outline: typeof p === "string" ? { c: p, w: actions.selectedTextStyle()?.outline?.w ?? 0.05 } : null }, false),
-      onChange: (p) => actions.setTextStyle({ outline: typeof p === "string" ? { c: p, w: actions.selectedTextStyle()?.outline?.w ?? 0.05 } : null }),
+      onInput: (p) => textStyle({ outline: typeof p === "string" ? { c: p, w: actions.selectedTextStyle()?.outline?.w ?? 0.05 } : null }, false),
+      onChange: (p) => textStyle({ outline: typeof p === "string" ? { c: p, w: actions.selectedTextStyle()?.outline?.w ?? 0.05 } : null }),
     });
   });
   liveNumber(q<HTMLInputElement>("[data-text-outline-w]")!, (v, final) => {
     const t = actions.selectedTextStyle();
-    actions.setTextStyle({ outline: v > 0 ? { c: t?.outline?.c ?? t?.color ?? "#000000", w: outlineWidthEm(v) } : null }, final);
+    textStyle({ outline: v > 0 ? { c: t?.outline?.c ?? t?.color ?? "#000000", w: outlineWidthEm(v) } : null }, final);
   });
+  // view-state: (opens the font options; what they change runs text.setStyle)
   q<HTMLElement>("[data-text-font-options]")!.addEventListener("click", (e) => {
     const t = actions.selectedTextStyle();
     if (!t) return;
@@ -666,25 +770,26 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
       kerning: t.kerning,
       features: offered.map((tag) => ({ tag, label: FONT_FEATURES[tag] ?? (tag.startsWith("ss") ? `Stylistic set ${Number(tag.slice(2))}` : `Character variant ${Number(tag.slice(2))}`), on: t.features.includes(tag) })),
       axes: font.axes.map((a) => ({ ...a, value: t.axes?.[a.tag] ?? a.def })),
-      onChange: (patch, final) => actions.setTextStyle({ ...patch, ...(patch.axes && Object.keys(patch.axes).length === 0 ? { axes: null } : {}) }, final),
+      onChange: (patch, final) => textStyle({ ...patch, ...(patch.axes && Object.keys(patch.axes).length === 0 ? { axes: null } : {}) }, final),
     });
   });
+  // view-state: (opens the text box options; what they change runs text.setStyle)
   q<HTMLElement>("[data-text-box]")!.addEventListener("click", (e) => {
     const t = actions.selectedTextStyle();
     if (!t) return;
     openTextBoxPopover(e.currentTarget as HTMLElement, {
       paraGap: t.paraGap, indent: t.indent, caps: t.caps, maxLines: t.maxLines, heightPx: t.heightPx, valign: t.valign, card: t.card, pathOpts: t.pathOpts, shapeOpts: t.shapeOpts,
-      onChange: (patch, final) => actions.setTextStyle(patch, final),
+      onChange: (patch, final) => textStyle(patch, final),
     });
   });
-  liveNumber(q<HTMLInputElement>("[data-text-line]")!, (v, final) => actions.setTextStyle({ lineHeight: v }, final));
-  liveNumber(q<HTMLInputElement>("[data-text-track]")!, (v, final) => actions.setTextStyle({ tracking: v / 100 }, final));
-  q<HTMLSelectElement>("[data-pin-h]")!.addEventListener("change", (e) => actions.setPin({ h: (e.target as HTMLSelectElement).value }));
-  q<HTMLSelectElement>("[data-pin-v]")!.addEventListener("change", (e) => actions.setPin({ v: (e.target as HTMLSelectElement).value }));
+  liveNumber(q<HTMLInputElement>("[data-text-line]")!, (v, final) => textStyle({ lineHeight: v }, final));
+  liveNumber(q<HTMLInputElement>("[data-text-track]")!, (v, final) => textStyle({ tracking: v / 100 }, final));
+  q<HTMLSelectElement>("[data-pin-h]")!.addEventListener("change", (e) => void pressCommand("item.setPin", { h: (e.target as HTMLSelectElement).value }));
+  q<HTMLSelectElement>("[data-pin-v]")!.addEventListener("change", (e) => void pressCommand("item.setPin", { v: (e.target as HTMLSelectElement).value }));
   const sheetField = (sel: string): HTMLInputElement => q<HTMLInputElement>(sel)!;
   const onSheet = (sel: string): HTMLInputElement => q<HTMLInputElement>(sel)!;
-  for (const f of ["[data-on-x]", "[data-on-y]"]) liveNumber(onSheet(f), (_v, final) => actions.moveOnSheet(Number(onSheet("[data-on-x]").value), Number(onSheet("[data-on-y]").value), final));
-  for (const f of ["[data-on-w]", "[data-on-h]"]) liveNumber(onSheet(f), (_v, final) => actions.resizeOnSheet(Number(onSheet("[data-on-w]").value), Number(onSheet("[data-on-h]").value), final));
+  for (const f of ["[data-on-x]", "[data-on-y]"]) liveNumber(onSheet(f), (_v, final) => pressCommand("item.moveOnSheet", { x: Number(onSheet("[data-on-x]").value), y: Number(onSheet("[data-on-y]").value), live: !final }));
+  for (const f of ["[data-on-w]", "[data-on-h]"]) liveNumber(onSheet(f), (_v, final) => pressCommand("item.resizeOnSheet", { w: Number(onSheet("[data-on-w]").value), h: Number(onSheet("[data-on-h]").value), live: !final }));
   // The shape of a sheet: typed (16:9, A4 portrait …), picked from the shapes, or turned on its side. Anything else keeps what it was.
   const ratioField = sheetField("[data-sheet-ratio]");
   const showRatio = (): void => {
@@ -701,10 +806,10 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
       ratioField.removeAttribute("aria-invalid");
       return;
     }
-    actions.setSheetRatio(r, true);
+    pressCommand("sheet.setRatio", { ratio: r });
     ratioField.value = formatRatio(actions.sheetRatio() ?? r);
   };
-  ratioField.addEventListener("change", commitRatio);
+  ratioField.addEventListener("change", commitRatio); // view-state: (commitRatio runs sheet.setRatio)
   ratioField.addEventListener("keydown", (e) => {
     if (e.key === "Enter") ratioField.blur();
     else if (e.key === "Escape") {
@@ -727,53 +832,51 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
     const sel = e.target as HTMLSelectElement;
     const pick = sel.value;
     sel.value = "";
-    if (pick === "save") return actions.saveRatio();
-    if (pick === "manage") return actions.manageRatios();
+    if (pick === "save") return void pressCommand("sheet.saveRatio");
+    if (pick === "manage") return void pressCommand("sheet.manageRatios");
     // (a custom ratio is given as it was saved, upright or on its side)
-    if (pick.startsWith("c:")) return actions.setSheetRatio(Number(pick.slice(2)), true);
+    if (pick.startsWith("c:")) return void pressCommand("sheet.setRatio", { ratio: Number(pick.slice(2)) });
     const r = Number(pick);
     const now = actions.sheetRatio();
-    if (r > 0 && now !== null) actions.setSheetRatio(now < 1 ? 1 / r : r, true); // (a sheet on its side stays on its side)
+    if (r > 0 && now !== null) pressCommand("sheet.setRatio", { ratio: now < 1 ? 1 / r : r }); // (a sheet on its side stays on its side)
   });
-  q<HTMLElement>("[data-sheet-turn]")!.addEventListener("click", () => {
-    const now = actions.sheetRatio();
-    if (now !== null) actions.setSheetRatio(1 / now, true);
-  });
-  q<HTMLElement>("[data-sheet-scale]")!.addEventListener("click", () => {
-    actions.setSheetScale(!actions.sheetScale());
-  });
+  q<HTMLElement>("[data-sheet-turn]")!.addEventListener("click", () => void pressCommand("sheet.turn"));
+  q<HTMLElement>("[data-sheet-scale]")!.addEventListener("click", () => void pressCommand("sheet.toggleScale"));
   // Auto layout (ADR 0186): the flow, the gap and padding (typed in px as seen now, kept in the sheet's units), the alignment, hugging, columns.
   const layoutEl = <T extends HTMLElement>(sel: string): T => q<T>(`[data-auto-layout] ${sel}`)!;
   const toUnits = (px: number): number => { const al = actions.autoLayout(); return al && al.ppu > 0 && al.ppu < Infinity ? Math.max(0, px) / al.ppu : NaN; };
-  for (const b of qa<HTMLElement>("[data-layout-flow]")) b.addEventListener("click", () => actions.setAutoLayout({ flow: b.dataset["layoutFlow"] as SheetLayout["flow"] }));
-  for (const i of [0, 1] as const) liveNumber(layoutEl(`[data-layout-gap="${i}"]`), (v, final) => { const al = actions.autoLayout(), u = toUnits(v); if (al && Number.isFinite(u)) actions.setAutoLayout({ gap: i === 0 ? [u, al.layout.gap[1]] : [al.layout.gap[0], u] }, final); });
+  const setLayout = (layout: LayoutPatch, final = true): boolean => pressCommand("sheet.setLayout", { layout, live: !final });
+  for (const b of qa<HTMLElement>("[data-layout-flow]")) b.addEventListener("click", () => void setLayout({ flow: b.dataset["layoutFlow"] as SheetLayout["flow"] }));
+  for (const i of [0, 1] as const) liveNumber(layoutEl(`[data-layout-gap="${i}"]`), (v, final) => { const al = actions.autoLayout(), u = toUnits(v); if (al && Number.isFinite(u)) setLayout({ gap: i === 0 ? [u, al.layout.gap[1]] : [al.layout.gap[0], u] }, final); });
   const PAD: Record<string, number[]> = { t: [0], r: [1], b: [2], l: [3], h: [1, 3], v: [0, 2] };
   for (const [k, at] of Object.entries(PAD)) liveNumber(layoutEl(`[data-layout-pad="${k}"]`), (v, final) => {
     const al = actions.autoLayout(), u = toUnits(v);
     if (!al || !Number.isFinite(u)) return;
     const pad = [...al.layout.pad] as [number, number, number, number];
     for (const i of at) pad[i] = u;
-    actions.setAutoLayout({ pad }, final);
+    setLayout({ pad }, final);
   });
+  // view-state: (shows a field for each side, or one for all)
   layoutEl<HTMLElement>("[data-layout-pad-each]").addEventListener("click", (e) => {
     const b = e.currentTarget as HTMLElement;
     b.setAttribute("aria-pressed", String(b.getAttribute("aria-pressed") !== "true"));
     editor.changed(); // (the bar is drawn again: the fields of each side show or go)
   });
-  layoutEl<HTMLSelectElement>("[data-layout-align]").addEventListener("change", (e) => actions.setAutoLayout({ align: (e.target as HTMLSelectElement).value as SheetLayout["align"] }));
-  layoutEl<HTMLSelectElement>("[data-layout-justify]").addEventListener("change", (e) => actions.setAutoLayout({ justify: (e.target as HTMLSelectElement).value as SheetLayout["justify"] }));
+  layoutEl<HTMLSelectElement>("[data-layout-align]").addEventListener("change", (e) => void setLayout({ align: (e.target as HTMLSelectElement).value as SheetLayout["align"] }));
+  layoutEl<HTMLSelectElement>("[data-layout-justify]").addEventListener("change", (e) => void setLayout({ justify: (e.target as HTMLSelectElement).value as SheetLayout["justify"] }));
   layoutEl<HTMLSelectElement>("[data-layout-size]").addEventListener("change", (e) => {
     const v = (e.target as HTMLSelectElement).value;
-    actions.setAutoLayout({ hug: v === "fit" ? [true, true] : v === "w" ? [false, true] : v === "h" ? [true, false] : [false, false] });
+    pressCommand("sheet.setLayout", { layout: { hug: v === "fit" ? [true, true] : v === "w" ? [false, true] : v === "h" ? [true, false] : [false, false] } });
   });
   layoutEl<HTMLElement>("[data-layout-overflow]").addEventListener("click", () => {
     const al = actions.autoLayout();
-    if (al) actions.setAutoLayout({ hug: [al.layout.hug[0] || al.overflow[0], al.layout.hug[1] || al.overflow[1]] });
+    if (al) pressCommand("sheet.setLayout", { layout: { hug: [al.layout.hug[0] || al.overflow[0], al.layout.hug[1] || al.overflow[1]] } });
   });
-  liveNumber(layoutEl("[data-layout-columns]"), (v, final) => { if (final) actions.setAutoLayout(Number.isFinite(v) && v >= 1 ? { columns: Math.round(v) } : { columns: undefined, cols: undefined }); }, Number, true);
-  layoutEl<HTMLSelectElement>("[data-layout-colsby]").addEventListener("change", (e) => actions.setAutoLayout({ columnsBy: (e.target as HTMLSelectElement).value as "count" | "shape" }));
-  liveNumber(layoutEl("[data-layout-rowh]"), (v, final) => { const u = toUnits(v); if (Number.isFinite(u) && u > 0) actions.setAutoLayout({ rowHeight: u }, final); });
-  layoutEl<HTMLSelectElement>("[data-layout-sort]").addEventListener("change", (e) => { const v = (e.target as HTMLSelectElement).value; actions.setAutoLayout({ sort: v ? (v as SheetLayout["sort"]) : undefined }); });
+  liveNumber(layoutEl("[data-layout-columns]"), (v, final) => { if (final) setLayout(Number.isFinite(v) && v >= 1 ? { columns: Math.round(v) } : { columns: undefined, cols: undefined }); }, Number, true);
+  layoutEl<HTMLSelectElement>("[data-layout-colsby]").addEventListener("change", (e) => void pressCommand("sheet.setLayout", { layout: { columnsBy: (e.target as HTMLSelectElement).value } }));
+  liveNumber(layoutEl("[data-layout-rowh]"), (v, final) => { const u = toUnits(v); if (Number.isFinite(u) && u > 0) setLayout({ rowHeight: u }, final); });
+  layoutEl<HTMLSelectElement>("[data-layout-sort]").addEventListener("change", (e) => { const v = (e.target as HTMLSelectElement).value; pressCommand("sheet.setLayout", { layout: { sort: v || undefined } }); });
+  // view-state: (opens the tracks editor; what it changes runs sheet.setLayout)
   layoutEl<HTMLElement>("[data-layout-tracks]").addEventListener("click", (e) => {
     const al = actions.autoLayout();
     if (!al) return;
@@ -782,46 +885,43 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
       cols: al.layout.cols ?? Array.from({ length: Math.max(1, n) }, () => ({ size: "hug" as const })),
       rows: al.layout.rows ?? [],
       ppu: al.ppu,
-      onChange: (cols, rows, final) => actions.setAutoLayout({ cols, columns: cols.length, ...(rows.length ? { rows } : { rows: undefined }) }, final),
+      onChange: (cols, rows, final) => setLayout({ cols, columns: cols.length, ...(rows.length ? { rows } : { rows: undefined }) }, final),
     });
   });
   // Layout styles (ADR 0193): kept in px as seen when saved, given in px as seen now, as the numbers of the bar are.
+  // view-state: (opens the menu of layout styles; its rows are commands)
   layoutEl<HTMLElement>("[data-layout-styles]").addEventListener("click", (e) => {
     const al = actions.autoLayout();
     if (!al || !(al.ppu > 0 && al.ppu < Infinity)) return;
     const saved = actions.layoutStyles();
     openMoreMenu(e.currentTarget as HTMLElement, [
-      ...saved.map((st): MenuItem => ({ label: st.name, hint: st.summary, icon: ICONS.layoutStyles, run: () => actions.setAutoLayout(layoutTimes(st.data, 1 / al.ppu, 1 / al.ppu)) })),
-      ...(saved.length ? [] : [{ label: "No layout styles yet", hint: "Save this one with the row below", icon: ICONS.layoutStyles, disabled: true, run: () => undefined } satisfies MenuItem]),
-      { label: "Save this layout as a style", hint: "Kept in Styles, for any sheet", icon: ICONS.save, sep: true, run: () => actions.saveLayoutStyle(layoutTimes(al.layout, al.ppu, al.ppu)) },
+      ...saved.map((st): MenuItem => ({ label: st.name, hint: st.summary, icon: ICONS.layoutStyles, command: "layout.applyStyle", run: () => void pressCommand("layout.applyStyle", { name: st.name }) })),
+      ...(saved.length ? [] : [{ label: "No layout styles yet", hint: "Save this one with the row below", icon: ICONS.layoutStyles, disabled: true, command: "layout.applyStyle", run: () => undefined } satisfies MenuItem]),
+      { label: "Save this layout as a style", hint: "Kept in Styles, for any sheet", icon: ICONS.save, sep: true, command: "layout.saveStyle", run: () => void pressCommand("layout.saveStyle") },
     ], "Layout styles");
   });
   for (const i of [0, 1] as const) liveNumber(q<HTMLInputElement>(`[data-in-span="${i}"]`)!, (v, final) => {
     const il = actions.inLayout();
     if (!final || !il || !(v >= 1)) return;
-    actions.setInLayout({ span: i === 0 ? [Math.round(v), il.span[1]] : [il.span[0], Math.round(v)] });
+    pressCommand("item.setInLayout", { patch: { span: i === 0 ? [Math.round(v), il.span[1]] : [il.span[0], Math.round(v)] } });
   });
   for (const k of ["min", "max"] as const) for (const i of [0, 1] as const) liveNumber(q<HTMLInputElement>(`[data-in-${k}="${i}"]`)!, (v, final) => {
     const il = actions.inLayout();
     if (!final || !il || !(v >= 0)) return;
     const pair = [...il[k]] as [number, number];
     pair[i] = Math.min(100, v) / 100;
-    actions.setInLayout({ [k]: pair });
+    pressCommand("item.setInLayout", { patch: { [k]: pair } });
   });
-  q<HTMLSelectElement>("[data-in-fill]")!.addEventListener("change", (e) => actions.setInLayout({ fill: (e.target as HTMLSelectElement).value as "none" | "x" | "y" | "both" }));
-  q<HTMLElement>("[data-in-free]")!.addEventListener("click", () => { const il = actions.inLayout(); if (il) actions.setInLayout({ free: !il.free }); });
-  q<HTMLElement>("[data-crop]")!.addEventListener("click", () => {
-    const id = [...editor.selection][0];
-    editor.cropId = editor.cropId ? null : (id ?? null);
-    editor.changed();
-  });
-  q<HTMLElement>("[data-uncrop]")!.addEventListener("click", () => actions.uncrop());
-  for (const b of qa<HTMLElement>("[data-flip]")) b.addEventListener("click", () => actions.flip(b.dataset["flip"] as "x" | "y"));
-  q<HTMLElement>("[data-unflip]")!.addEventListener("click", () => actions.unflip());
+  q<HTMLSelectElement>("[data-in-fill]")!.addEventListener("change", (e) => void pressCommand("item.setInLayout", { patch: { fill: (e.target as HTMLSelectElement).value } }));
+  q<HTMLElement>("[data-in-free]")!.addEventListener("click", () => { const il = actions.inLayout(); if (il) pressCommand("item.setInLayout", { patch: { free: !il.free } }); });
+  q<HTMLElement>("[data-crop]")!.addEventListener("click", () => void pressCommand("picture.crop"));
+  q<HTMLElement>("[data-uncrop]")!.addEventListener("click", () => void pressCommand("picture.uncrop"));
+  for (const b of qa<HTMLElement>("[data-flip]")) b.addEventListener("click", () => void pressCommand(b.dataset["flip"] === "y" ? "edit.flipV" : "edit.flipH"));
+  q<HTMLElement>("[data-unflip]")!.addEventListener("click", () => void pressCommand("item.unflip"));
   shapeInput("[data-sel-sides]", (v) => (v >= 3 && v <= 24 ? { sides: Math.round(v) } : null));
   shapeInput("[data-sel-tips]", (v) => (v >= 3 && v <= 24 ? { tips: Math.round(v) } : null));
-  liveNumber(q<HTMLInputElement>("[data-sel-smooth]")!, (v, final) => v >= 0 && v <= 100 && actions.setSmoothing(v, final));
-  liveNumber(outlineWInput, (v, final) => v >= 0 && actions.setSelectedWidth(v, final));
+  liveNumber(q<HTMLInputElement>("[data-sel-smooth]")!, (v, final) => v >= 0 && v <= 100 && pressCommand("path.setSmoothing", { value: v, live: !final }));
+  liveNumber(outlineWInput, (v, final) => v >= 0 && pressCommand("item.setStrokeWidth", { px: v, live: !final }));
   shapeInput("[data-sel-inner]", (v) => (v >= 5 && v <= 95 ? { inner: v / 100 } : null));
 
   // Drag a number's field to change it, live (one undo step when released): the quick way to a radius, a count, a ratio.
@@ -902,9 +1002,9 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
       noneLabel: "No colour",
       // a pen stroke has one flat colour: no gradient to offer when strokes are all that is picked
       ...([...editor.selection].every((id) => doc.get(id)?.kind === "stroke") ? { modes: ["solid"] as const } : {}),
-      onInput: (p) => actions.recolourSelected(current, p, false),
+      onInput: (p) => pressCommand("paint.replace", { from: current, paint: p, live: true }),
       onChange: (p) => {
-        actions.recolourSelected(current, p, true);
+        pressCommand("paint.replace", { from: current, paint: p });
         if (p !== null) current = p;
       },
       onClose: () => {
@@ -968,50 +1068,39 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
     });
   };
 
-  q<HTMLInputElement>("[data-eraser-size]")!.addEventListener("input", (e) => {
-    editor.eraserPx = Number((e.target as HTMLInputElement).value);
-    editor.changed();
-  });
-
-  q<HTMLInputElement>("[data-strength]")!.addEventListener("input", (e) => {
-    editor.stabilizer = { ...editor.stabilizer, strength: Number((e.target as HTMLInputElement).value) };
-    editor.changed();
-  });
+  q<HTMLInputElement>("[data-eraser-size]")!.addEventListener("input", (e) => void pressCommand("tools.set", { name: "eraser", value: Number((e.target as HTMLInputElement).value) }));
+  q<HTMLInputElement>("[data-strength]")!.addEventListener("input", (e) => void pressCommand("tools.set", { name: "stabilizer", value: Number((e.target as HTMLInputElement).value) }));
 
   const onClick = (e: Event): void => {
     const b = (e.target as HTMLElement).closest("button");
     if (!b) return;
     const d = b.dataset;
+    // (each choice runs a command, ADR 0205; what only opens a chooser or picks the kind the bar shows is the bar's own)
     if (d["subject"]) {
-      editor.subject = d["subject"];
+      editor.subject = d["subject"]; // view-state: (which kind of the selection the bar shows)
       editor.changed();
     } else if (d["maskInk"]) {
-      actions.paintMask(d["maskInk"] as "show" | "hide" | "done");
+      pressCommand(d["maskInk"] === "show" ? "mask.paintWhite" : d["maskInk"] === "hide" ? "mask.paintBlack" : "mask.paintDone");
     } else if (d["penKind"]) {
-      editor.penKind = d["penKind"] as PenKind;
-      editor.changed();
+      pressCommand("tools.choose", { name: "penKind", value: d["penKind"] });
     } else if (d["tool"]) {
       // the button of a tool with kinds (Shape, Pen), pressed while it is the tool, closes its kinds; pressed again, opens them
       const t = d["tool"] as Tool;
       const fam = t === "shape" ? "shape" : t === "pen" ? "pen" : null;
       const same = fam !== null && !!b.closest(".rail") && (fam === "shape" ? editor.tool === "shape" || editor.tool === "path" : editor.tool === "pen");
       flyShut = same ? (flyShut === fam ? null : fam) : null;
-      editor.setTool(t);
+      pressCommand(TOOL_COMMAND[t]);
       editor.changed();
     } else if (d["color"]) {
-      editor.penColor = d["color"];
-      editor.changed();
+      pressCommand("tools.choose", { name: "penColour", value: d["color"] });
     } else if (d["shapeKind"]) {
-      editor.shapeKind = d["shapeKind"] as typeof editor.shapeKind;
-      editor.made.clear(); // (another kind: the next shape is being prepared, its options are the tool's: ADR 0198)
-      if (editor.tool === "path") editor.setTool("shape");
-      editor.changed();
+      pressCommand("tools.choose", { name: "shapeKind", value: d["shapeKind"] });
     } else if (d["selColour"] !== undefined) {
       editColour(b, Number(d["selColour"]));
     } else if (d["selMore"] !== undefined) {
-      // the colours past the chips, as a list: each opens the paint chooser, on this button
+      // the colours past the chips, as a list: each opens the paint chooser, on this button (what it picks is a command)
       const rest = actions.selectionPaints().items.slice(SEL_CHIPS);
-      openMoreMenu(b, rest.map((it, j): MenuItem => ({ label: paintName(it.paint), hint: usage(it), icon: `<span class="menu-swatch" style="--paint:${chipPaint(it.paint)}"></span>`, aria: `${paintName(it.paint)}, used by ${usage(it)}: change it`, run: () => editColour(b, SEL_CHIPS + j) })), "More colours of the selection", { compact: true });
+      openMoreMenu(b, rest.map((it, j): MenuItem => ({ label: paintName(it.paint), hint: usage(it), icon: `<span class="menu-swatch" style="--paint:${chipPaint(it.paint)}"></span>`, aria: `${paintName(it.paint)}, used by ${usage(it)}: change it`, command: "paint.replace", run: () => editColour(b, SEL_CHIPS + j) })), "More colours of the selection", { compact: true });
     } else if (d["outlineOptions"] !== undefined) {
       openOutline(b);
     } else if (d["paint"]) {
@@ -1020,72 +1109,51 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
       openColourPopover(b, {
         name: "Pen colour",
         value: editor.penColor,
-        onInput: (hex) => {
-          editor.penColor = hex;
-          editor.changed();
-        },
+        onInput: (hex) => void pressCommand("tools.choose", { name: "penColour", value: hex }),
         onChange: () => editor.changed(), // the recent colours changed
       });
     } else if (d["width"]) {
-      editor.penWidthPx = Number(d["width"]);
-      if (editor.lock) editor.lock = { ...actions.depth(), px: editor.penWidthPx }; // a new size is the new reference
-      editor.changed();
+      pressCommand("tools.set", { name: "penWidth", value: Number(d["width"]) });
     } else if (d["stab"] !== undefined) {
-      editor.stabilizer = { ...editor.stabilizer, on: !editor.stabilizer.on };
-      editor.changed();
+      pressCommand("tools.toggle", { name: "stabilizer" });
     } else if (d["bookmarks"] !== undefined) {
-      editor.bookmarksOpen = !editor.bookmarksOpen;
-      editor.changed();
+      pressCommand("panel.bookmarks");
     } else if (d["styles"] !== undefined) {
-      editor.stylesOpen = !editor.stylesOpen;
-      editor.changed();
+      pressCommand("panel.styles");
     } else if (d["tags"] !== undefined) {
-      editor.tagsOpen = !editor.tagsOpen;
-      editor.changed();
+      pressCommand("panel.tags");
     } else if (d["layers"] !== undefined) {
-      editor.layersOpen = !editor.layersOpen;
-      editor.changed();
+      pressCommand("panel.layers");
     } else if (d["patternPanel"] !== undefined) {
-      editor.patternOpen = !editor.patternOpen;
-      editor.changed();
+      pressCommand("panel.pattern");
     } else if (d["adjustPanel"] !== undefined) {
-      editor.adjustOpen = !editor.adjustOpen;
-      editor.changed();
+      pressCommand("panel.adjust");
     } else if (d["eraseParts"] !== undefined) {
-      editor.eraseParts = !editor.eraseParts;
-      editor.changed();
+      pressCommand("tools.toggle", { name: "eraseParts" });
     } else if (d["eraseGroups"] !== undefined) {
-      editor.eraseWholeGroups = !editor.eraseWholeGroups;
-      editor.changed();
+      pressCommand("tools.toggle", { name: "eraseGroups" });
     } else if (d["boxAxis"] !== undefined) {
-      editor.alignBox = !editor.alignBox;
-      editor.changed();
+      pressCommand("tools.toggle", { name: "alignBox" });
     } else if (d["ignoreFill"] !== undefined) {
-      editor.ignoreFilling = !editor.ignoreFilling;
-      editor.changed();
+      pressCommand("tools.toggle", { name: "ignoreFill" });
     } else if (d["snap"] !== undefined) {
-      editor.snap = !editor.snap;
-      editor.changed();
+      pressCommand("tools.toggle", { name: "snap" });
     } else if (d["follow"] !== undefined) {
-      editor.followZoom = !editor.followZoom;
-      editor.changed();
+      pressCommand("tools.toggle", { name: "followZoom" });
     } else if (d["lockRadius"] !== undefined) {
-      editor.lockRadius = !editor.lockRadius;
-      editor.changed();
+      pressCommand("tools.toggle", { name: "lockRadius" });
     } else if (d["lock"] !== undefined) {
-      editor.lock = editor.lock ? null : { ...actions.depth(), px: editor.penWidthPx };
-      editor.changed();
+      pressCommand("tools.toggle", { name: "lockWidth" });
     } else if (d["filter"]) {
-      editor.lassoFilter = d["filter"] as "strokes" | "all";
-      editor.changed();
-    } else if (d["action"] === "import") input.click();
-    else if (d["action"] === "search") actions.openSearch("");
-    else if (d["action"] === "screenshot") actions.screenshot();
-    else if (d["action"] === "undo") actions.undo();
-    else if (d["action"] === "redo") actions.redo();
+      pressCommand("tools.choose", { name: "lassoFilter", value: d["filter"] });
+    } else if (d["action"] === "import") pressCommand("library.import");
+    else if (d["action"] === "search") pressCommand("find.canvas");
+    else if (d["action"] === "screenshot") pressCommand("view.screenshot");
+    else if (d["action"] === "undo") pressCommand("edit.undo");
+    else if (d["action"] === "redo") pressCommand("edit.redo");
   };
   listen("click", onClick);
-  pickGroup.addEventListener("click", onClick);
+  pickGroup.addEventListener("click", onClick); // commands: (onClick runs the bar's commands)
 
   const update = (): void => {
     balloonBar.sync(); // (before the groups are sorted: what applies is shown)
