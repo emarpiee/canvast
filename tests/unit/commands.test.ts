@@ -206,6 +206,6 @@ describe("the link to AI agents, the app's side (ADR 0205)", () => {
     expect(await answer(r, "run", { id: "a.pass" }, false, watch)).not.toHaveProperty("made");
     await expect(answer(r, "drop", {}, false)).rejects.toThrow("no method");
     await expect(answer(r, "run", {}, false)).rejects.toThrow("id");
-    expect(log).toEqual(["edit", "edit", "edit"]);
+    expect(log).toEqual(["edit", "edit", "edit", "edit"]);
   });
 });
