@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.20 — AI agent answers (2026-11-17)
+
+- **Fixed before release:** an AI agent's answer could name an item it had just made as changed (the first of a batch): what a run made, changed or removed is now told from the items there were when it started. ([AI agents](README.md#ai-agents))
+
 ## 0.60.19 — See what the AI agent does (2026-11-17)
 
 - **Added:** while **Settings > AI agents** is on, an AI agent button sits left of the Settings button, its dot lit while one is connected; it opens what the agent did (its last actions, each with **Go there**). ([AI agents](README.md#ai-agents))

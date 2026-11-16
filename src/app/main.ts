@@ -3221,18 +3221,15 @@ async function start(): Promise<void> {
   });
   // What an agent's run did to the items (told in its answer, and where its pointer goes): from the steps the canvas stored meanwhile.
   const watchItems = (): (() => Touched) => {
-    const made = new Set<string>(), changed = new Set<string>(), removed = new Set<string>();
-    const off = doc.subscribe((source, ids) => {
-      if (source === "load" || !ids) return;
-      const tx = source === "do" ? doc.lastTransaction : undefined;
-      for (const id of ids) {
-        if (!doc.get(id)) {
-          if (!made.delete(id)) (changed.delete(id), removed.add(id));
-        } else if (tx?.after.has(id) && !tx.before.get(id) && !removed.has(id)) made.add(id);
-        else if (!made.has(id)) changed.add(id);
-      }
-    });
-    return () => (off(), { made: [...made], changed: [...changed], removed: [...removed] });
+    // (told from the ids there were when it started: a step another part stores in between never makes a new item look changed)
+    const was = new Set([...doc.all()].map((o) => o.id));
+    const touched = new Set<string>();
+    const off = doc.subscribe((source, ids) => void (source !== "load" && ids && ids.forEach((id) => touched.add(id))));
+    return () => {
+      off();
+      const t = [...touched];
+      return { made: t.filter((id) => !was.has(id) && doc.get(id)), changed: t.filter((id) => was.has(id) && doc.get(id)), removed: t.filter((id) => was.has(id) && !doc.get(id)) };
+    };
   };
   /** What agents did, newest last (Settings never grows with it: the AI agent button opens it in a list). */
   const agentLog: Array<{ at: number; title: string; ok: boolean; error?: string; ids: string[] }> = [];
