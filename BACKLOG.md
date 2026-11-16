@@ -6,13 +6,13 @@ The work on canvast that is not done yet, and what became of each item. **Priori
 | --- | --- | --- | --- | --- |
 | B1 | README pictures for the newest features: the ZIP and comic book viewer, maybe the rename and move progress notice | high | open | 0.60.13 added *Move a folder*, *Pasted picture name* and the PDF and 3D views again; the ZIP viewer waits for the owner's approval of its look |
 | B2 | The library scrolls smoothly at small thumbnail sizes (size 96: about 40 frames a second since 0.60.13, was under 30; 60 at size 240 and in the list) | high | open | `--scroll` in the *Bench library* workflow; what is left is mostly painting the pictures |
+| B24 | A setting changed just before a reload sometimes comes back as it was (the canvas pattern, the canvas background colour) | high | open | Found by `frames.spec.ts:1487` and `:2453` failing on reload on GitHub (three times); cause not found yet |
 | B3 | Faster test runs: each change runs only the tests whose code it touches, found from recorded coverage | medium | open | Approved, not started |
 | B4 | A vector network can have a fill for each closed region, not one fill for the whole network | medium | open | A limit listed in the README |
 | B5 | Check whether a vector network adds a point where two of its lines cross, so the regions they make are separate | medium | open | The README no longer lists this limit; confirm in the code, then close or keep |
 | B6 | The next release (a minor version), with the patches since the last one | medium | open | On the owner's go |
 | B7 | PhotoCraft: a brush stroke lands where the pointer is on a display scaled above 100% | medium | open | Seen only with an emulated pixel ratio of 1.5; to check on a real scaled display |
 | B8 | Flaky end-to-end tests: check `dock.spec.ts:38` (a panel dropped at the right edge left Tags hidden), watch `frames.spec.ts:1850` | medium | open | 0.60.13 fixed the `tiles.spec.ts` ones (the text font arriving mid-test); a test that fails again is fixed, not re-run |
-| B24 | A setting changed just before a reload sometimes comes back as it was (the canvas pattern, the canvas background colour) | medium | open | Found by `frames.spec.ts:1487` and `:2453` failing on reload on GitHub (three times); cause not found yet, priority to be confirmed by the owner |
 | B9 | Hiding and showing big hidden items faster (about 30 to 60 MB/s today) | low | open | Waits for a decision: encrypting in the desktop app's main process means the key leaves the page |
 | B10 | Speed and memory measured on real devices (an older laptop, a phone), not only on the test machine | low | open | The benchmarks and the qualification matrix exist and were run on the test machine |
 | B11 | The Retroma theme | low | open | Parked on the `retroma-v4` branch until the owner resumes it |
