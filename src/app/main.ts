@@ -3176,13 +3176,10 @@ async function start(): Promise<void> {
     ...settingCommands(SETTINGS_TABS, settings, (tab) => { setView("settings"); settingsView.show(tab); }, refusedToAgents),
   ]);
   registry.setProvider("bars", () => (appView === "canvas" ? barCommands() : []));
-  registry.setProvider("artcraft", () =>
-    PHOTOCRAFT_FEATURES.entry.newDocument && photoCraft.available
-      ? [
-          { id: "artcraft.photocraft.open", group: "ArtCraft", kind: "artcraft", title: "Open PhotoCraft", hint: "A new document in the photo editor", risk: "edit", words: "photo editor new document image edit layers", exec: () => photoCraft.openBlank() },
-          { id: "artcraft.photocraft.close", group: "ArtCraft", kind: "artcraft", title: "Close PhotoCraft", hint: "It asks first when something is not saved", risk: "edit", words: "photo editor quit", exec: () => photoCraft.close() },
-        ]
-      : []);
+  registry.setProvider("artcraft", () => [
+    ...(PHOTOCRAFT_FEATURES.entry.newDocument && photoCraft.available ? [{ id: "artcraft.photocraft.open", group: "ArtCraft", kind: "artcraft", title: "Open PhotoCraft", hint: "A new document in the photo editor", risk: "edit" as const, words: "photo editor new document image edit layers", exec: () => photoCraft.openBlank() }] : []),
+    { id: "artcraft.photocraft.close", group: "ArtCraft", kind: "artcraft", title: "Close PhotoCraft", hint: "It asks first when something is not saved", risk: "edit", words: "photo editor quit", why: () => null, exec: () => photoCraft.close() },
+  ]);
   // Boards and canvases of the navigator, and the fixed shortcuts of Settings > Shortcuts (choosing one opens that list).
   registry.setProvider("navigator", () => {
     const tree = session.tree;
