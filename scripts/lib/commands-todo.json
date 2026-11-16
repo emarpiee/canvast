@@ -71,13 +71,13 @@
     "src/ui/workspace-switch.ts": 6
   },
   "live": {
-    "rule": 9999,
-    "keys": 9999,
+    "rule": 441,
+    "keys": 26,
     "screens": {
-      "canvas": 9999,
-      "library": 9999,
-      "settings": 9999
+      "canvas": 77,
+      "library": 20,
+      "settings": 49
     }
   },
-  "//live": "Counted by tests/e2e/commands.spec.ts on GitHub (the Tests run): commands not following the rule yet, keys without a command, controls without a command per view. They only go down. (9999: not measured yet, set from the first run.)"
+  "//live": "Counted by tests/e2e/commands.spec.ts on GitHub (the Tests run): commands not following the rule yet, keys without a command, controls without a command per view. They only go down."
 }

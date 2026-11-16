@@ -43,10 +43,11 @@ import { mountHud } from "./hud";
 import { installDebugHook } from "./debug-hook";
 import { EditorState } from "./editor-state";
 import type { LayoutCommand } from "./actions";
+import { flattenSelection } from "./actions";
 import { applyBalloonStyle, balloonStyle, balloonsToPaths, canConnectBalloons, connectBalloons, selectedBalloon, selectedLink, selectedShapeText, setBalloonLink, setShapeText } from "./actions";
 import { backdropState, setBackdrop, canSplitPaths, splitPaths, placeCardViews, placeLinesBeside, imageAt, pasteCssPaint, copiedText, setCopiedText, renderedStill, isPlaceholderText, markCopiedPicture, isCopiedPicture, forgetCopiedPicture, applyRotation, showReplaced, arrangeSelection, copySelection, cutSelection, duplicateSelection, pasteObjects, layoutSelection, clearFlag, deleteSelection, groupSelection, importImages, moveAbove, moveLayers, setStackOrder, tagObjects, resetRotation, resetProportions, resettable, resetSize, sizeResets, recolourOldInk, svgWarningOfTargets, svgWarningOfSelection, extractFrame, placePictureBeside, applyLayoutStyle, canTakeLayoutStyle, laidOutSheetOfSelection, arrangeAsLayout, pruneSelection, redo, setFlag, setMedia, setFlagOn, setOpacityOn, setBlendOn, renameLayer, ungroupSelection, undo, selectedPaint, previewPaint, commitPaint, combineSelection, canCombine, selectedOutline, commitOutline, selectedDashNumbers, commitDashNumbers, selectedArrows, commitArrows, selectedMiterAngle, commitMiterAngle, selectedShape, commitShape, selectedCorners, commitCorners, selectedSmoothing, commitSmoothing, selectionPaints, recolour, initialShapeState, setInitialShape, resetToInitialShape, groupJoinMode, addToBooleanGroup, takeOutOfBooleanGroup, convertTextToPath, simplifySelection, canSimplify, outlineStroke, setWidthProfile, canOutlineStroke, makeMask, makeClippingMask, canMakeMask, changeMask, selectTheMask, canReleaseMask, selectedMask, startBrushMask, paintMask, divide, startShapeBuilder, finishShapeBuilder, canDivide, canFillGaps, fillAllGaps, startGapFill, finishGapFill, makeNetwork, releaseNetwork, canMakeNetwork, canReleaseNetwork, strokeToPath, canStrokeToPath, setTextOnPath, canSetOnPath, canSetInShape, setTextInShape, takeTextOffPath, canTakeOffPath, canOutline, booleanSelection, releaseBoolean, flattenBoolean, canExportSvg, exportTarget, buildTarget, exportTargets, exportEachTargets, canSheetEach, sheetEach, svgOfTarget, pdfVectorOfTarget, svgOfSelection, importSvg, setSheetClip, sheetSelection, releaseSheets, selectedPin, setPin, canFitSheet, fitSheet, autoLayoutOf, autoLayoutState, setAutoLayout, autoLayoutShortcut, patchAutoLayout, setSheetLayout, selectedInLayout, setInLayout, sheetRatio, ratioOfSheet, setSheetRatio, sheetScalesContents, setSheetScale, boxOnSheet, moveOnSheet, resizeOnSheet, canDetach, detachSelection, selectedTextStyle, setTextStyle, croppablePicture, isCropped, uncropPicture, selectedFlip, flipSelection, unflipPictures, selectedAdjust, pictureCount, applyGradientMap, paintTargetCount, selectionColours, previewAdjust, commitAdjust, copyAdjustments, pasteAdjustments, canPasteAdjustments, copyRenderedPicture, bakePicture, sizeResetBlock, matchSize, sizable } from "./actions";
 import { attachNavigation } from "../interaction/navigation";
-import { attachTools } from "../interaction/tools";
+import { attachTools, selectEverything } from "../interaction/tools";
 import { createFocusCycle, focusObjects, stepToNeighbour } from "../interaction/item-navigation";
 import { renderFrame, gridStep, setGridLook } from "../render/canvas2d-renderer";
 import type { Theme } from "../render/canvas2d-renderer";
@@ -113,7 +114,7 @@ import { updateThumbs } from "./bookmark-thumbs";
 import { mountDevPanel } from "../ui/dev-panel";
 import { mountAssetsView } from "../ui/assets-view";
 import { SETTINGS_TABS, mountSettingsView } from "../ui/settings-view";
-import { goHome, zoomByStep } from "../interaction/navigation";
+import { goHome, panStep, zoomByStep } from "../interaction/navigation";
 import { mountHintLine } from "../ui/hint-line";
 import { closeMoreMenu, openMoreMenu, setMenuAvoid } from "../ui/more-menu";
 import type { MenuItem } from "../ui/more-menu";
@@ -179,7 +180,7 @@ import { hasShadow, needsNeighbours } from "../doc/adjust";
 import type { Adjust } from "../doc/adjust";
 import { downloadSelection, pickedFiles } from "./download";
 import { mountCommandPalette } from "../ui/command-palette";
-import { commands } from "../commands/registry";
+import { commands, pressCommand } from "../commands/registry";
 import { canvasCommands, OLD_CANVAS_IDS, type CanvasActions } from "./canvas-commands";
 import { Macros } from "../commands/macros";
 import { barCommands } from "../commands/from-bars";
@@ -2697,8 +2698,7 @@ async function start(): Promise<void> {
     if (!e.altKey || !e.shiftKey || e.ctrlKey || e.metaKey || (e.key !== "ArrowLeft" && e.key !== "ArrowRight")) return;
     if (document.body.dataset["view"] !== "canvas" || typing(e.target) || (e.target as HTMLElement | null)?.closest?.("dialog")) return;
     e.preventDefault(); // (not the browser's Back and Forward)
-    if (e.key === "ArrowLeft") history.back();
-    else history.forward();
+    pressCommand(e.key === "ArrowLeft" ? "view.back" : "view.forward", {}, "key");
   });
   // Bookmark keys (Settings > Shortcuts): previous and next, and the first nine by number.
   window.addEventListener("keydown", (e) => {
@@ -2707,7 +2707,11 @@ async function start(): Promise<void> {
     const n = c === "[" ? -1 : c === "]" ? 1 : /^Alt\+[1-9]$/.test(c ?? "") ? 0 : null;
     if (n === null) return;
     e.preventDefault();
-    if (n === 0 ? bookmarkList.goTo(Number(c!.slice(4)) - 1) : bookmarkList.step(n)) return;
+    if (n !== 0) {
+      if (!pressCommand(n < 0 ? "bookmark.prev" : "bookmark.next", {}, "key")) { editor.message = "No bookmarks yet."; editor.changed(); }
+      return;
+    }
+    if (bookmarkList.goTo(Number(c!.slice(4)) - 1)) return; // view-state: (Alt+1 to 9, jumps of the bookmarks panel's own list)
     editor.message = bookmarkList.items.length ? "That bookmark's place no longer exists." : "No bookmarks yet.";
     editor.changed();
   });
@@ -2716,7 +2720,7 @@ async function start(): Promise<void> {
     if (e.ctrlKey || e.metaKey || e.altKey || e.repeat || e.key.toLowerCase() !== "z") return;
     if (document.body.dataset["view"] !== "canvas" || typing(e.target) || (e.target as HTMLElement | null)?.closest?.("dialog")) return;
     e.preventDefault();
-    settings.set("ui.zen", !settings.get("ui.zen"));
+    pressCommand("view.zen", {}, "key");
   });
   // Ctrl+F searches what you are looking at (the canvas, or the library in the Assets view); Ctrl+Shift+F goes to the library's search
   // from anywhere. The browser's own find is not used for these.
@@ -2724,10 +2728,7 @@ async function start(): Promise<void> {
     if (!(e.ctrlKey || e.metaKey) || e.altKey || e.key.toLowerCase() !== "f") return;
     if (document.querySelector("dialog[open]") || appView === "settings") return;
     e.preventDefault();
-    if (e.shiftKey || appView === "assets") {
-      setView("assets");
-      assetsView.focusSearch();
-    } else canvasSearch.open("");
+    pressCommand(e.shiftKey || appView === "assets" ? "find.library" : "find.canvas", {}, "key");
   });
   // Tool buttons say which key picks them (the keys can be changed in Settings).
   const updateToolTitles = (): void => {
@@ -3048,7 +3049,7 @@ async function start(): Promise<void> {
     showHidden: () => clearFlag(doc, editor, "hidden"),
     anyLocked: () => [...doc.all()].some((o) => o.locked),
     unlockAll: () => clearFlag(doc, editor, "locked"),
-    selectAll: () => editor.select(doc.ordered().filter((o) => !o.hidden && !o.locked).map((o) => o.id)),
+    selectAll: () => selectEverything(doc, editor),
     canRecolour: () => newInk(DEFAULT_INK) !== DEFAULT_INK,
     recolour: async () => void (await recolourOldInk(doc, editor)),
     group: () => groupSelection(doc, editor),
@@ -3097,7 +3098,19 @@ async function start(): Promise<void> {
     canExport: () => exportTarget(doc, editor) !== null,
     openExport: () => openExport(),
     svgToLibrary: () => saveSvgToLibrary(),
-    zoom: (step) => zoomByStep(view, step),
+    zoom: (levels) => zoomByStep(view, levels),
+    pan: (dir, far) => panStep(view, dir, far),
+    step: (dir) =>
+      void stepToNeighbour(doc, view, editor, dir, settings.get("nav.mode"), settings.get("nav.arrive") === "focus", (o, unit) => {
+        const gid = unit.length > 1 ? o.groups?.[editor.entered.length] : undefined;
+        return gid ? (o.groupNames?.[gid] ?? "Group") : labelOf(o, assetNames.map).text;
+      }),
+    focus: () => focusCycle.tap(),
+    flatten: () => flattenSelection(doc, editor),
+    search: (prefix) => canvasSearch.open(prefix),
+    searchLibrary: () => { setView("assets"); assetsView.focusSearch(); },
+    palette: () => palette.open(),
+    bookmarkStep: (by) => bookmarkList.step(by),
     home: () => goHome(view),
     fit: (what) => focusCycle.fit(what),
     canBack: () => history.canBack(),
@@ -3166,22 +3179,21 @@ async function start(): Promise<void> {
     if (!(e.ctrlKey || e.metaKey) || e.altKey || (e.key.toLowerCase() !== "k" && !(e.shiftKey && e.key.toLowerCase() === "p"))) return;
     if ((e.target as HTMLElement | null)?.closest?.("dialog")) return;
     e.preventDefault();
-    palette.open();
+    pressCommand("find.palette", {}, "key");
   }, true);
 
   // "/" opens the command palette (not while typing).
   window.addEventListener("keydown", (e) => {
     if (e.key !== "/" || appView !== "canvas" || e.ctrlKey || e.metaKey || e.altKey || typing(e.target) || (e.target as HTMLElement | null)?.closest?.("dialog")) return;
     e.preventDefault();
-    palette.open();
+    pressCommand("find.palette", {}, "key");
   });
 
   // "?" opens the shortcut list (not while typing).
   window.addEventListener("keydown", (e) => {
     if (e.key !== "?" || e.ctrlKey || e.metaKey || e.altKey || typing(e.target) || (e.target as HTMLElement | null)?.closest?.("dialog")) return;
     e.preventDefault();
-    if (appView !== "settings") setView("settings");
-    settingsView.show("shortcuts");
+    pressCommand("find.help", {}, "key");
   });
 
   // Drag-and-drop and paste import.

@@ -19,7 +19,7 @@ import { KEY_COMMANDS } from "../../src/settings/keymap";
 const TODO = JSON.parse(fs.readFileSync(path.join(process.cwd(), "scripts/lib/commands-todo.json"), "utf8")) as { live?: { rule?: number; keys?: number; screens?: Record<string, number> } };
 const live = TODO.live ?? {};
 /** Gestures held down, not actions (a key that is pressed and held while dragging). */
-const GESTURES = new Set(["view.panHold"]);
+const GESTURES = new Set(["view.panHold", /* (a second key for the palette, find.palette) */ "find.slash"]);
 
 const ruleProblems = (app: App) => app.page.evaluate(() => window.__canvastDebug.commandRuleProblems());
 const ids = (app: App) => app.page.evaluate(() => window.__canvastDebug.commandList().map((c) => c.id));

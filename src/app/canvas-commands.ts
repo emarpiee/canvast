@@ -84,7 +84,15 @@ export interface CanvasActions {
   openExport(): void;
   svgToLibrary(): Promise<void>;
 
-  zoom(step: 1 | -1): void;
+  zoom(levels: number): void;
+  pan(dir: "left" | "right" | "up" | "down", far: boolean): void;
+  step(dir: "left" | "right" | "up" | "down"): void;
+  focus(): void;
+  flatten(): void;
+  search(prefix: "" | "#" | "@"): void;
+  searchLibrary(): void;
+  palette(): void;
+  bookmarkStep(by: 1 | -1): boolean;
   home(): void;
   fit(what: "selection" | "all"): void;
   canBack(): boolean;
@@ -111,6 +119,7 @@ export interface CanvasActions {
 }
 
 const IDS: OptionSpec = { name: "ids", type: "ids", doc: "the items to act on (default: the selection)" };
+const LEVELS: OptionSpec = { name: "levels", type: "number", doc: "how far: one level is twice as close (default 1)", min: 0.01, max: 60 };
 
 export function canvasCommands(a: CanvasActions): Command[] {
   const canvas = (): string | null => (a.onCanvas() ? null : REASON.notOnCanvas);
@@ -163,6 +172,7 @@ export function canvasCommands(a: CanvasActions): Command[] {
     item("edit.releaseSheet", "Arrange", "Release the sheet", "Its items stay where they are", () => a.releaseSheet(), when(canvas, a.canReleaseSheet, "No sheet is selected."), { words: "unframe" }),
     item("edit.flipH", "Arrange", "Flip horizontally", "Mirror left to right", () => a.flip("x"), when(canvas, a.canFlip, "Nothing that flips is selected."), { words: "mirror reverse" }),
     item("edit.flipV", "Arrange", "Flip vertically", "Mirror top to bottom", () => a.flip("y"), when(canvas, a.canFlip, "Nothing that flips is selected."), { words: "mirror upside down" }),
+    item("edit.flatten", "Arrange", "Flatten", "Text to paths, a boolean group to one path", () => a.flatten()),
     item("edit.front", "Arrange", "Bring to front", "Above everything", () => a.arrange("front")),
     item("edit.back", "Arrange", "Send to back", "Behind everything", () => a.arrange("back")),
     item("edit.detach", "Arrange", "Detach from what it follows", "It stays where it is", () => a.detach(), when(canvas, a.canDetach, "Nothing selected follows another item.")),
@@ -194,10 +204,21 @@ export function canvasCommands(a: CanvasActions): Command[] {
     cmd("export.open", "Export", "Export… (choose a size)", "Save as a picture file", "edit", when(canvas, a.canExport, "Select what to export, or open a canvas."), () => a.openExport(), { words: "picture png jpeg webp size dpi print sheet image save", record: false }),
     item("export.svgToLibrary", "Export", "Save the selection to the library as SVG", "A new library item", () => a.svgToLibrary(), when(canvas, a.canSvg, "Select shapes or paths."), { words: "vector assets" }),
 
-    cmd("view.zoomIn", "View", "Zoom in", "Closer", "edit", canvas, () => a.zoom(1), { keys: a.keys("view.zoomIn") || "+", record: false }),
-    cmd("view.zoomOut", "View", "Zoom out", "Further away", "edit", canvas, () => a.zoom(-1), { keys: a.keys("view.zoomOut") || "−", record: false }),
+    cmd("view.zoomIn", "View", "Zoom in", "Closer", "edit", canvas, (o) => a.zoom(Number(o["levels"] ?? 1)), { keys: a.keys("view.zoomIn") || "+", record: false, options: [LEVELS] }),
+    cmd("view.zoomOut", "View", "Zoom out", "Further away", "edit", canvas, (o) => a.zoom(-Number(o["levels"] ?? 1)), { keys: a.keys("view.zoomOut") || "−", record: false, options: [LEVELS] }),
+    ...(["left", "right", "up", "down"] as const).map((d) =>
+      cmd(`view.pan${d[0]!.toUpperCase()}${d.slice(1)}`, "View", `Pan ${d}`, `Move the view ${d}`, "edit", canvas, (o) => a.pan(d, o["far"] === true), { record: false, options: [{ name: "far", type: "boolean", doc: "half the view at once, not an eighth" }] }),
+    ),
+    ...(["up", "left", "down", "right"] as const).map((d) => cmd(`nav.${d}`, "View", `Step ${d}`, `To the nearest item ${d === "up" || d === "down" ? (d === "up" ? "above" : "below") : `on the ${d}`}`, "edit", canvas, () => a.step(d), { record: false })),
+    cmd("find.canvas", "Find", "Search the canvas", "By file or layer name", "read", canvas, () => a.search(""), { words: "find name layer file" }),
+    cmd("find.tag", "Find", "Search the canvas by tag", "Items with a tag", "read", canvas, () => a.search("#"), { words: "find tag" }),
+    cmd("find.bookmark", "Find", "Search the canvas for a bookmark", "Go to a bookmark by name", "read", canvas, () => a.search("@"), { words: "find bookmark" }),
+    cmd("find.library", "Find", "Search the library", "Go to the Library and search it", "read", () => null, () => a.searchLibrary(), { words: "find assets files" }),
+    cmd("find.palette", "Find", "The command palette", "Every command, by name", "read", () => null, () => a.palette(), { words: "commands" }),
+    cmd("bookmark.prev", "View", "Go to the previous bookmark", "The bookmark before", "edit", when(canvas, () => a.bookmarkCount() > 0, "There are no bookmarks."), () => (a.bookmarkStep(-1) ? { ok: true } : { ok: false, error: "That bookmark's place no longer exists." }), { record: false }),
+    cmd("bookmark.next", "View", "Go to the next bookmark", "The bookmark after", "edit", when(canvas, () => a.bookmarkCount() > 0, "There are no bookmarks."), () => (a.bookmarkStep(1) ? { ok: true } : { ok: false, error: "That bookmark's place no longer exists." }), { record: false }),
     cmd("view.home", "View", "Return to the origin", "Back to the start", "edit", canvas, () => a.home(), { keys: a.keys("view.home") || "0", words: "home reset", record: false }),
-    cmd("view.focus", "View", "Fit the selection in view", "Zoom to the selected items", "edit", picked, () => a.fit("selection"), { keys: a.keys("view.focus") || "F", record: false }),
+    cmd("view.focus", "View", "Fit the selection in view", "Again: everything visible", "edit", canvas, () => a.focus(), { keys: a.keys("view.focus") || "F", record: false }),
     cmd("view.fitAll", "View", "Fit everything in view", "Zoom to see it all", "edit", canvas, () => a.fit("all"), { record: false }),
     cmd("view.back", "View", "Previous view", "Where the view was before", "edit", when(canvas, a.canBack, "There is no earlier view."), () => a.back(), { words: "back camera", record: false }),
     cmd("view.forward", "View", "Next view", "Where the view went next", "edit", when(canvas, a.canForward, "There is no later view."), () => a.forward(), { words: "forward camera", record: false }),
@@ -247,7 +268,7 @@ export const OLD_CANVAS_IDS: Readonly<Record<string, string>> = {
   "mask:clipping-mask": "mask.clip", "mask:mask-by-opacity": "mask.alpha", "mask:mask-by-brightness": "mask.luminance", "mask:select-the-mask": "mask.select",
   "mask:invert-the-mask": "mask.invert", "mask:release-the-mask": "mask.release", "path:outline-stroke": "path.outline",
   "export:copy-the-selection-as-svg": "export.copySvg", "export:save-the-selection-to-the-library-as-svg": "export.svgToLibrary",
-  "view:zoom-in": "view.zoomIn", "view:zoom-out": "view.zoomOut", "view:return-to-the-origin": "view.home", "view:fit-the-selection-in-view": "view.focus",
+  "find:find-canvas": "find.canvas", "view:zoom-in": "view.zoomIn", "view:zoom-out": "view.zoomOut", "view:return-to-the-origin": "view.home", "view:fit-the-selection-in-view": "view.focus",
   "view:fit-everything-in-view": "view.fitAll", "view:previous-view": "view.back", "view:next-view": "view.forward", "view:go-to-a-random-empty-view": "view.random",
   "view:zen-mode": "view.zen", "view:take-a-screenshot": "view.screenshot", "view:play-the-bookmarks-as-a-tour": "view.tour", "view:bookmark-the-selected-objects": "bookmark.selection",
   "panel:adjust": "panel.adjust", "panel:layers": "panel.layers", "panel:bookmarks": "panel.bookmarks", "panel:pattern": "panel.pattern", "panel:styles": "panel.styles", "panel:tags": "panel.tags",
