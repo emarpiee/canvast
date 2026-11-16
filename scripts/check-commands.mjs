@@ -152,7 +152,8 @@ function problems(path) {
     return MARK.test(lines[l - 1] ?? "") || MARK.test(lines[l - 2] ?? "");
   };
   // handlers
-  for (const m of text.matchAll(/addEventListener\(\s*"(click|dblclick|contextmenu|change|input|submit)"/g)) {
+  for (const m of src.matchAll(/addEventListener\(\s*"(click|dblclick|contextmenu|change|input|submit)"/g)) {
+    if (!text.startsWith("addEventListener", m.index)) continue; // (in a comment or a string)
     const at = m.index + "addEventListener".length;
     const end = close(text, at);
     const body = src.slice(at, end + 1);
