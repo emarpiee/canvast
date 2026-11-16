@@ -9,6 +9,8 @@ import { liveNumber } from "./live";
 import { scrubNumbers } from "../colour-picker/scrub";
 import { panelHtml } from "./panel";
 import { tabFromKey, tabHtml } from "./tabs";
+import { commands, pressCommand } from "../commands/registry";
+import type { Command, OptionSpec } from "../commands/types";
 
 /**
  * The Pattern panel (ADR 0162): pick a generator (a grid of small pictures), change the settings it declares, make it on the picked sheet or
@@ -134,6 +136,7 @@ export function mountPatternPanel(host: HTMLElement, editor: EditorState, action
       paintReadout();
     },
     extra: (s) => lock(s),
+    // view-state: (a snowflake keeps a setting when the settings are made random: the panel's own choice)
     bound: (r, s) => r.querySelector("[data-lock]")!.addEventListener("click", (e) => {
       const on = !locks().has(s.k);
       if (on) locks().add(s.k); else locks().delete(s.k);
@@ -235,43 +238,57 @@ export function mountPatternPanel(host: HTMLElement, editor: EditorState, action
   build();
   render();
 
-  seedBox.addEventListener("change", () => {
-    const x = Math.round(Number(seedBox.value));
-    seed = Number.isFinite(x) ? Math.min(SEED_MAX, Math.max(1, x)) : seed;
+  // The Pattern panel's commands (ADR 0205): choosing a generator, making the pattern, its seed, saving it as a style, done.
+  const newSeedNow = (): void => {
+    const before = seed;
+    seed = newSeed();
     seedBox.value = String(seed);
     again();
+    // a pattern that is exact at these settings looks the same with any seed: say so, and where to change it
+    if (JSON.stringify(generate(gen, values, before, 900, 600)) === JSON.stringify(generate(gen, values, seed, 900, 600))) {
+      editor.message = `The seed changes nothing in ${gen.label} at these settings.${gen.sections.some((x) => x.items.some((i) => i.k === "jitter")) ? " Raise Looseness to let it." : ""}`;
+      editor.changed();
+    }
+  };
+  const randomNow = (): void => {
+    seed = newSeed();
+    const r = randomValues(gen, makeRng(seed), values);
+    for (const k of locks()) if (k in values) r[k] = values[k]!; // (what is marked with a snowflake stays)
+    values = r;
+    kept.set(gen.id, values);
+    build();
+    run();
+  };
+  const pc = (id: string, title: string, hint: string, exec: NonNullable<Command["exec"]>, options: readonly OptionSpec[] = []): Command => ({ id, group: "Pattern", kind: "pattern", title, hint, risk: "edit", options, why: () => null, exec });
+  commands.setProvider("pattern-panel", () => [
+    pc("pattern.choose", "Choose a pattern generator", "Waves, blobs, tiles, guides and more", (o) => { if (!generatorById(String(o["generator"]))) return { ok: false, error: `No generator "${String(o["generator"])}".` }; choose(String(o["generator"])); return { ok: true }; }, [{ name: "generator", type: "text", doc: "the generator's id", required: true }]),
+    pc("pattern.make", "Make the pattern", "On the canvas, at the view", () => run()),
+    pc("pattern.seed", "Set the seed", "The same seed makes the same pattern", (o) => { seed = Math.min(SEED_MAX, Math.max(1, Math.round(Number(o["seed"])))); seedBox.value = String(seed); again(); }, [{ name: "seed", type: "number", doc: "1 or more", required: true, min: 1, max: SEED_MAX }]),
+    pc("pattern.newSeed", "A new seed", "Another pattern with the same settings", () => newSeedNow()),
+    pc("pattern.random", "Random settings", "And a new seed; locked settings stay", () => randomNow()),
+    pc("pattern.resetSettings", "Reset the settings", "The generator's usual ones", () => { values = defaultValues(gen); kept.set(gen.id, values); build(); again(); }),
+    pc("pattern.saveStyle", "Save as a style", "Kept in Styles", () => actions.saveStyle(gen, cleanValues(gen, values), seed)),
+    pc("pattern.done", "Done with the pattern", "Keep it as it is", () => { actions.end(); started = false; seed = newSeed(); build(); editor.changed(); }),
+  ]);
+  seedBox.addEventListener("change", () => {
+    const x = Math.round(Number(seedBox.value));
+    pressCommand("pattern.seed", { seed: Number.isFinite(x) ? Math.min(SEED_MAX, Math.max(1, x)) : seed });
+    seedBox.value = String(seed);
   });
+  // commands: (the panel's buttons run its commands; the tabs and the generator list are what it shows)
   panel.addEventListener("click", (e) => {
     const t = (e.target as HTMLElement).closest<HTMLElement>("button");
     if (!t) return;
     if (t.hasAttribute("data-tab")) goToTab(t.dataset["tab"] as PatternTab);
-    else if (t.hasAttribute("data-close")) { editor.patternOpen = false; editor.changed(); }
+    else if (t.hasAttribute("data-close")) pressCommand("panel.pattern");
     else if (t.hasAttribute("data-pg-pick")) { grid.hidden = !grid.hidden; pick.setAttribute("aria-expanded", String(!grid.hidden)); }
-    else if (t.hasAttribute("data-gen")) { grid.hidden = true; pick.setAttribute("aria-expanded", "false"); choose(t.dataset["gen"]!); }
-    else if (t.hasAttribute("data-pg-make")) run();
-    else if (t.hasAttribute("data-pg-style")) actions.saveStyle(gen, cleanValues(gen, values), seed);
-    else if (t.hasAttribute("data-pg-done")) { actions.end(); started = false; seed = newSeed(); build(); editor.changed(); }
-    else if (t.hasAttribute("data-pg-newseed")) {
-      const before = seed;
-      seed = newSeed();
-      seedBox.value = String(seed);
-      again();
-      // a pattern that is exact at these settings looks the same with any seed: say so, and where to change it
-      if (JSON.stringify(generate(gen, values, before, 900, 600)) === JSON.stringify(generate(gen, values, seed, 900, 600))) {
-        editor.message = `The seed changes nothing in ${gen.label} at these settings.${gen.sections.some((x) => x.items.some((i) => i.k === "jitter")) ? " Raise Looseness to let it." : ""}`;
-        editor.changed();
-      }
-    }
-    else if (t.hasAttribute("data-pg-random")) {
-      seed = newSeed();
-      const r = randomValues(gen, makeRng(seed), values);
-      for (const k of locks()) if (k in values) r[k] = values[k]!; // (what is marked with a snowflake stays)
-      values = r;
-      kept.set(gen.id, values);
-      build();
-      run();
-    }
-    else if (t.hasAttribute("data-pg-reset")) { values = defaultValues(gen); kept.set(gen.id, values); build(); again(); }
+    else if (t.hasAttribute("data-gen")) { grid.hidden = true; pick.setAttribute("aria-expanded", "false"); pressCommand("pattern.choose", { generator: t.dataset["gen"]! }); }
+    else if (t.hasAttribute("data-pg-make")) pressCommand("pattern.make");
+    else if (t.hasAttribute("data-pg-style")) pressCommand("pattern.saveStyle");
+    else if (t.hasAttribute("data-pg-done")) pressCommand("pattern.done");
+    else if (t.hasAttribute("data-pg-newseed")) pressCommand("pattern.newSeed");
+    else if (t.hasAttribute("data-pg-random")) pressCommand("pattern.random");
+    else if (t.hasAttribute("data-pg-reset")) pressCommand("pattern.resetSettings");
   });
   panel.addEventListener("keydown", (e) => {
     const nextTab = tabFromKey(e, ["patterns", "guides"]);

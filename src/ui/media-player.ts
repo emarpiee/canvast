@@ -301,6 +301,7 @@ export function mountMediaPlayer(host: HTMLElement, view: ViewState, doc: Docume
     </div>`;
   scrubNumbers(bar);
   host.append(bar);
+  // view-state: (playing a video or a sound: what it shows)
   bar.querySelector<HTMLSelectElement>("[data-speed]")!.addEventListener("change", (e) => {
     if (sel) actions.setMedia(sel.o.id, { speed: Number((e.target as HTMLSelectElement).value) }, "Playing speed");
   });
@@ -554,15 +555,18 @@ export function mountMediaPlayer(host: HTMLElement, view: ViewState, doc: Docume
     refresh();
   };
 
+  // view-state: (playing a video or a sound: what it shows)
   scrub.addEventListener("input", () => {
     if (!sel) return;
     sel.eng.seek(Number(scrub.value) * sel.eng.len());
     refresh();
   });
+  // view-state: (playing a video or a sound: what it shows)
   scrub.addEventListener("change", () => {
     if (sel && !sel.eng.playing()) actions.setMedia(sel.o.id, { t: sel.eng.pos() }, "Seek media");
   });
   // Volume is the selected player's own (0 to 100; the device setting is only where a new player starts); sliding it to 0 mutes, anything above unmutes.
+  // view-state: (playing a video or a sound: what it shows)
   volume.addEventListener("input", () => {
     const n = Number(volume.value);
     const v = sel ? videoOf(sel) : null;
@@ -573,12 +577,14 @@ export function mountMediaPlayer(host: HTMLElement, view: ViewState, doc: Docume
     }
   });
   // Steps are device settings: a bad value is refused and the field shows the current one again.
+  // view-state: (playing a video or a sound: what it shows)
   bar.addEventListener("change", (e) => {
     const i = e.target as HTMLInputElement;
     const key = i.dataset["step"] as SettingKey | undefined;
     if (!key) return;
     if (!settings.set(key, Number(i.value) as never)) i.value = String(settings.get(key));
   });
+  // view-state: (playing a video or a sound: what it shows)
   bar.addEventListener("click", (e) => {
     const cmd = (e.target as HTMLElement).closest<HTMLElement>("[data-cmd]")?.dataset["cmd"];
     if (!sel || !cmd) return;

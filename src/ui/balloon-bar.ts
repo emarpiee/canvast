@@ -5,6 +5,8 @@ import type { Setting } from "../gen/types";
 import type { TextLook } from "../text/text-style";
 import { esc } from "./format";
 import { ICONS } from "./icons";
+import { commands, pressCommand } from "../commands/registry";
+import type { Command, OptionSpec } from "../commands/types";
 
 /**
  * A speech balloon's options and those of a text in a shape, in the Properties bar (ADR 0198; they were a panel of their own): four groups,
@@ -186,14 +188,34 @@ export function mountBalloonBar(after: HTMLElement, actions: BalloonActions): { 
       wrap(s.k).hidden = !on[groupOf(s.k)] || !cond || (s.k === "which" && tails < 2);
     }
   };
+  // The balloon's commands (ADR 0205): its fields set its look (`live` while a number is dragged), its buttons add or take away a tail and more.
+  const bc = (id: string, title: string, hint: string, exec: NonNullable<Command["exec"]>, options: readonly OptionSpec[] = []): Command => ({ id, group: "Balloon", kind: "balloon", title, hint, risk: "edit", options, why: () => null, exec });
+  commands.setProvider("balloon-bar", () => [
+    bc("balloon.set", "Set the balloon's look", "Its body, tail and the rest, by their keys", (o) => {
+      const patch = o["patch"];
+      if (!patch || typeof patch !== "object" || Array.isArray(patch)) return { ok: false, error: '"patch" is a set of named values.' };
+      const keys = ALL.map(([x]) => x.k);
+      const bad = Object.keys(patch).filter((k) => !keys.includes(k) && k !== "body" && k !== "tail");
+      if (bad.length) return { ok: false, error: `No balloon setting ${bad.join(", ")}.` };
+      put(patch as never);
+      if (o["live"] !== true) flush();
+      return { ok: true };
+    }, [{ name: "patch", type: "json", doc: "what to change", required: true }, { name: "live", type: "boolean", doc: "a step while dragging" }]),
+    bc("balloon.addTail", "Add a tail", "Another speaker", () => { flush(); actions.change((st, box) => withNewTail(box, st), true); }),
+    bc("balloon.removeTail", "Take the tail away", "The one being edited", () => { flush(); const at = ix; actions.change((st) => ({ ...st, tails: st.tails.filter((_, i) => i !== at) }), true); }),
+    bc("balloon.fitText", "Fit the balloon to its words", "Its size follows the text", () => { flush(); actions.setText({ fitShape: true }, true); }),
+    bc("balloon.connect", "Connect the balloons", "One reading line", () => { flush(); actions.connect(); }),
+    bc("balloon.toPath", "Make it a path", "An ordinary shape to edit", () => { flush(); actions.toPath(); }),
+    bc("balloon.saveStyle", "Save the balloon as a style", "Kept in Styles", () => { flush(); actions.saveStyle(); }),
+  ]);
   for (const [s] of ALL) {
     const f = field(s.k);
     if (s.t === "range") {
       f.addEventListener("input", () => {
         const v = Number(f.value);
-        if (f.value !== "" && Number.isFinite(v)) put({ [s.k]: v });
+        if (f.value !== "" && Number.isFinite(v)) pressCommand("balloon.set", { patch: { [s.k]: v }, live: true });
       });
-      f.addEventListener("change", flush);
+      f.addEventListener("change", flush); // view-state: (keeps what the live steps of balloon.set changed)
     } else f.addEventListener("change", () => {
       if (s.k === "which") {
         flush();
@@ -203,26 +225,20 @@ export function mountBalloonBar(after: HTMLElement, actions: BalloonActions): { 
       }
       if (s.k === "preset") {
         const p = BALLOON_PRESETS.find(([id]) => id === f.value);
-        if (p) put({ body: p[2], tail: p[3] });
-        flush();
+        if (p) pressCommand("balloon.set", { patch: { body: p[2], tail: p[3] } });
         f.value = "";
         sync(true);
         return;
       }
-      put({ [s.k]: f.value });
-      flush();
+      pressCommand("balloon.set", { patch: { [s.k]: f.value } });
     });
   }
   row.addEventListener("click", (e) => {
     const id = (e.target as HTMLElement).closest<HTMLElement>("[data-bl]")?.dataset["bl"];
     if (!id) return;
-    flush();
-    if (id === "addtail") actions.change((s, box) => withNewTail(box, s), true);
-    else if (id === "deltail") { const at = ix; actions.change((s) => ({ ...s, tails: s.tails.filter((_, i) => i !== at) }), true); }
-    else if (id === "fit") actions.setText({ fitShape: true }, true);
-    else if (id === "connect") actions.connect();
-    else if (id === "topath") actions.toPath();
-    else if (id === "save") actions.saveStyle();
+    const BL: Record<string, string> = { addtail: "balloon.addTail", deltail: "balloon.removeTail", fit: "balloon.fitText", connect: "balloon.connect", topath: "balloon.toPath", save: "balloon.saveStyle" };
+    if (BL[id]) pressCommand(BL[id]!);
+    else flush();
   });
   /** Fill the controls from what is selected and show those that apply (`force`: also the fields being typed in). */
   const sync = (force = false): void => {

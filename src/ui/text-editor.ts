@@ -422,6 +422,7 @@ export function mountTextEditor(
     else if (box.contains(getSelection()?.anchorNode ?? null)) wordsRange = null; // a caret in the box: no words are selected
     paintFont();
   });
+  // typing: (formatting the text being typed)
   fontSelect.addEventListener("change", () => {
     const hash = fontSelect.value;
     const r = selectedRange()?.cloneRange() ?? wordsRange; // (the selection as it is now, else the last one seen)
@@ -440,6 +441,7 @@ export function mountTextEditor(
   bar.addEventListener("mousedown", (e) => {
     if (!(e.target as HTMLElement).closest("select")) e.preventDefault(); // keep the text selection
   });
+  // typing: (formatting the text being typed)
   bar.addEventListener("click", (e) => {
     const menuBtn = (e.target as HTMLElement).closest<HTMLElement>("[data-format-menu]");
     const menu = menuBtn && FORMAT_MENUS.get(menuBtn.dataset["formatMenu"]!);
