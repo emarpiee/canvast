@@ -10,7 +10,7 @@ import { mkdtempSync, readFileSync, writeFileSync, statSync, rmSync } from "node
 import { tmpdir } from "node:os";
 import { basename, join, resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
-import { FIXED_LABEL, changelogSection, changelogSince, issuesIn, olderThan, releaseNotes } from "./lib/release-notes.mjs";
+import { FIXED_LABEL, changelogSection, changelogSince, issuesIn, notesProblems, olderThan, releaseNotes } from "./lib/release-notes.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const dry = process.argv.includes("--dry-run"), force = process.argv.includes("--force");
@@ -52,13 +52,17 @@ const previous = releases.map((r) => r.tagName).filter((t) => t !== tag && older
 // The desktop app (ADR 0177): its packages are not made or uploaded here. Publishing the release starts the Release packages workflow
 // (.github/workflows/release-packages.yml), which builds them on GitHub's machines from this tag, checks them and adds them.
 const section = changelogSince(readFileSync(join(root, "CHANGELOG.md"), "utf8"), version, previous?.slice(1));
+// The notes start with what a person reads first: a release's section has its summary and highlights (CLAUDE.md, Releases).
+const problems = notesProblems(section, version);
+for (const w of problems.warn) say(`note: ${w}`);
+if (problems.stop.length) stop(`${tag}: ${problems.stop.join("; ")}.`);
 const notes = releaseNotes({ version, section, sha256: sum, size: statSync(file).size, previousTag: previous, repo, desktop: true });
 const dir = mkdtempSync(join(tmpdir(), "canvast-release-"));
 const notesFile = join(dir, "notes.md");
 writeFileSync(notesFile, notes);
 const title = `canvast ${version}`; // (the page title is the version; the notes start with what it is called)
 // The GitHub issues this release fixes ("issue #N" in its bullets): closed once it is published, with where the fix is (close on release).
-const fixedIssues = issuesIn(section.bullets);
+const fixedIssues = issuesIn([...section.bullets, ...section.dev]);
 if (dry) { say(`\n--dry-run: would publish ${tag} “${title}” as the latest release of ${repo}${fixedIssues.length ? `, then close issue${fixedIssues.length === 1 ? "" : "s"} ${fixedIssues.map((n) => `#${n}`).join(", ")}` : ""}.\n\n${notes}`); rmSync(dir, { recursive: true }); process.exit(0); }
 
 // 4. Create it (or, if the tag already has a release, replace its file and notes), always as the latest

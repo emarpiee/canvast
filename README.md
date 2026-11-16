@@ -2889,7 +2889,17 @@ The budget is never loosened to let a change pass. A time over it once is run ag
 4. Publishing starts the `Release packages` workflow (`.github/workflows/release-packages.yml`). On an x86_64 and an ARM machine it builds the app from the tag, checks that its single file is the one released (the build is reproducible), makes the packages with `npm run package:desktop` (which checks each), and adds them with their SHA-256 and the AppImage's `.zsync`. No package is uploaded from the developer's machine; the workflow can also be run by hand for a tag.
 5. When `Release packages` ends, the `Try it online` workflow (`.github/workflows/pages.yml`) checks the released `canvast.html` against its SHA-256 and puts it on GitHub Pages as the [online copy](#trying-it-online). It can be run by hand to publish the latest release again.
 
-`npm run release -- --dry-run` does everything but publish and prints the notes, and which issues it would close. The notes are split into **Features** and **Fixes** from the CHANGELOG: a bullet starting with `**Fixed:**` is a fix; `**Added:**`, `**Changed:**` and `**Removed:**` are features.
+`npm run release -- --dry-run` does everything but publish and prints the notes, and which issues it would close. The notes are made from the CHANGELOG sections since the last release, each line once:
+
+| Part of the notes | From the CHANGELOG |
+| --- | --- |
+| Title and summary | The release's section: its title, and one to three sentences under it (a release without them stops) |
+| ✨ Highlights | Its `### Highlights`: three to six lines |
+| ⚠️ Before you update | Every `### Before you update` since the last release: something renamed, removed, or a change to your data |
+| 👩‍🎨 For users | The plain bullets, as 🆕 New (`**Added:**`), 🔧 Improved (`**Changed:**`, `**Removed:**`) and 🐛 Fixed (`**Fixed:**`), each with a link to its README section (a line without one is named) |
+| 🛠️ For developers | Every `### For developers`: tests, CI, scripts, build, file formats, the API |
+| Left out | `**Fixed before release:**` (a fix to something not released yet) and `**Docs:**` (the README or its pictures, with no change of the app) |
+| ⬇️ Download, full list | The files and their SHA-256, and links to the whole CHANGELOG and to the code's changes |
 
 **Issues close on release**, not on commit: a patch is not something people can download, a release is.
 

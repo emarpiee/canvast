@@ -1,72 +1,81 @@
 # Changelog
 
-## 0.60.13 — Smoother Library scrolling, bookmark button back, steadier tile tests (2026-11-16)
+## 0.60.13 — Smoother Library scrolling, clearer release notes (2026-11-16)
 
-- **Fixed:** scrolling the Library with small thumbnails stuttered: each step put every card already on the screen back in the page, so all of them were styled and laid out again. Only the cards a scroll brings are added now: at the smallest thumbnails, about 40 frames a second instead of under 30, and almost no frame over 50 ms (B2). The waiting shimmer on a card moves without repainting it.
-- **Fixed:** the details of a PDF, comic book or 3D model showed no **Bookmark current page** (or **view**) button when it opened: it came only after something drew the details again.
-- **Added:** README pictures of *Move a folder* and *Pasted picture name*; the PDF and 3D pictures taken again with the bookmark button (B1).
+- **Fixed:** scrolling the Library with small thumbnails stuttered: each step put every card already on the screen back in the page, so all of them were styled and laid out again. Only the cards a scroll brings are added now: at the smallest thumbnails, about 40 frames a second instead of under 30, and almost no frame over 50 ms (B2). The waiting shimmer on a card moves without repainting it. ([The Library](README.md#the-library))
+- **Fixed before release:** the details of a PDF, comic book or 3D model showed no **Bookmark current page** (or **view**) button when it opened: it came only after something drew the details again.
+- **Docs:** README pictures of *Move a folder* and *Pasted picture name*; the PDF and 3D pictures taken again with the bookmark button (B1).
+
+### For developers
+
 - **Added:** `--scroll` in the library benchmark (`scripts/bench-library.mjs`, the *Bench library* workflow): frames per second while scrolling the Library, and where the time goes (script, style, layout, paint).
 - **Fixed:** end-to-end tests start once the text font is in: its arrival drew every tile again, which on a slow machine came in the middle of a test counting tiles (`tiles.spec.ts`) (B8).
-- **Added:** B23 in the backlog: better-formatted release notes.
+- **Changed:** release notes start with a summary (title, a few sentences, ✨ Highlights, ⚠️ Before you update), then 👩‍🎨 For users (🆕 New, 🔧 Improved, 🐛 Fixed, each with its README section) and 🛠️ For developers, each line once; `**Fixed before release:**` and `**Docs:**` bullets stay out of them, and a release without its summary and highlights stops (B23). The unreleased sections since 0.60.0 follow the new form.
 
 ## 0.60.12 — A public backlog, builds for other systems open for contribution (2026-11-16)
+
+### For developers
 
 - **Added:** `BACKLOG.md` beside the CHANGELOG: the work not done yet, each item with an ID, its priority (high, medium, low) and status (open, closed, removed); closed and removed items stay, with the version or the reason. The README's *Contributing and support* and CONTRIBUTING.md point to it.
 - **Added:** *Builds for other systems* in CONTRIBUTING.md: Windows and macOS builds are open for contribution, with a maintainer per system, built and tested on GitHub, signed, and retired if left unmaintained (B13). The README's desktop section and Limitations say so.
 
 ## 0.60.11 — Move folders, Unfiled in Organize, smoother page turning (2026-11-16)
 
-- **Added:** **Move to…** in a folder's ⋯ menu moves it, with its subfolders and items, into another folder or to **Top level**, in the Organize dialog (the folder itself and those inside it are not offered); a folder can also be dragged onto another, or onto the Folders heading for the top. A shown folder cannot go into a hidden one, and a folder hidden by the one it leaves stays hidden.
-- **Changed:** the Organize dialog's first folder choice is **Unfiled** (it was *No folder*), with its own icon, a line under it and what it does beside it; the dialog has more room between its parts, its list in a frame, all from the Density setting.
-- **Changed:** a rename (one item or many), Organize to a folder and items dropped on a folder show a notice with a bar from the start until the files are in their new places; before, nothing showed until it ended.
-- **Added:** with **Saved searches** sorted in your order, a saved search can be dragged to its place among the others (the ⋯ menu's Move up and Move down stay).
-- **Changed:** the details' bookmark button says **Bookmark current page** (or **view**) instead of the page in sight.
-- **Fixed:** turning pages in a PDF or a comic, or turning a 3D model, lagged: the place was written to the library after each turn, which in the desktop app also wrote the library's files and drew the whole library again. The place is now kept when the view closes; bookmarks are still written at once.
+- **Added:** **Move to…** in a folder's ⋯ menu moves it, with its subfolders and items, into another folder or to **Top level**, in the Organize dialog (the folder itself and those inside it are not offered); a folder can also be dragged onto another, or onto the Folders heading for the top. A shown folder cannot go into a hidden one, and a folder hidden by the one it leaves stays hidden. ([Move a folder](README.md#move-a-folder))
+- **Changed:** the Organize dialog's first folder choice is **Unfiled** (it was *No folder*), with its own icon, a line under it and what it does beside it; the dialog has more room between its parts, its list in a frame, all from the Density setting. ([Organize](README.md#organize))
+- **Changed:** a rename (one item or many), Organize to a folder and items dropped on a folder show a notice with a bar from the start until the files are in their new places; before, nothing showed until it ended. ([Folders and tags](README.md#folders-and-tags))
+- **Added:** with **Saved searches** sorted in your order, a saved search can be dragged to its place among the others (the ⋯ menu's Move up and Move down stay). ([Saved searches](README.md#saved-searches))
+- **Changed:** the details' bookmark button says **Bookmark current page** (or **view**) instead of the page in sight. ([PDFs and 3D models](README.md#pdfs-and-3d-models))
+- **Fixed:** turning pages in a PDF or a comic, or turning a 3D model, lagged: the place was written to the library after each turn, which in the desktop app also wrote the library's files and drew the whole library again. The place is now kept when the view closes; bookmarks are still written at once. ([PDFs and 3D models](README.md#pdfs-and-3d-models))
 
 ## 0.60.10 — Library names match the disk, pasted pictures named (2026-11-16)
 
-- **Changed:** in the desktop app the library lists each file by its name on disk, one to one, with Keep file names on or off: with it off an item takes its tidy name, and two items given one name are `name.png` and `name-2.png` in the library as on the disk (they were both `name.png`, and `name-2` found nothing). A file renamed outside the app takes its new name too. A library from before changes in one step on its next write. Hidden items keep their own names.
-- **Added:** **Pasted picture name** (Settings > Saving to the library): a picture pasted from another app, which comes with no name (browsers call it `image.png`), is named by this pattern, `pasted-{yyyy}-{mm}-{dd}-{hhmmss}` by default, with the words of a screenshot's name; on the canvas and in the library's Paste alike. A file copied in a file manager keeps its own name.
-- **Fixed:** files imported from a ZIP or comic book were dropped when the viewer was closed before they were read: an import asked for now always finishes.
+- **Changed:** in the desktop app the library lists each file by its name on disk, one to one, with Keep file names on or off: with it off an item takes its tidy name, and two items given one name are `name.png` and `name-2.png` in the library as on the disk (they were both `name.png`, and `name-2` found nothing). A file renamed outside the app takes its new name too. A library from before changes in one step on its next write. Hidden items keep their own names. ([Names on disk](README.md#names-on-disk))
+- **Added:** **Pasted picture name** (Settings > Saving to the library): a picture pasted from another app, which comes with no name (browsers call it `image.png`), is named by this pattern, `pasted-{yyyy}-{mm}-{dd}-{hhmmss}` by default, with the words of a screenshot's name; on the canvas and in the library's Paste alike. A file copied in a file manager keeps its own name. ([Taking files out](README.md#taking-files-out))
+- **Fixed before release:** files imported from a ZIP or comic book were dropped when the viewer was closed before they were read: an import asked for now always finishes.
+
+### Before you update
+
+- In the desktop app, with **Keep file names** off, the library's names change to the files' tidy names on disk (`Jason Image.png` becomes `jason_image.png`), all in one step at the first start.
 
 ## 0.60.9 — Page turning in PDFs and comics, archive fixes (2026-11-16)
 
-- **Changed:** in a PDF and a comic book (or a ZIP read as pages), once you click in the pages, the arrow keys turn them (Left and Up back, Right and Down on), as a player keeps Left and Right while it has the focus; elsewhere they still step to the library's next item. On a touch screen a swipe to the side turns the page, and a comic's page also turns with a tap (its left part goes back). One rule for both views.
-- **Fixed:** a ZIP or CBZ had no thumbnail and a broken picture in the details: thumbnails were made only for PDFs and 3D models, so the library showed the archive's bytes as a picture. Every kind of file whose card is drawn from its bytes now gets its thumbnail the same way (a note too long to lay out gets its card, not a broken picture); a comic imported before takes its cover's shape.
-- **Fixed:** archives with a WinZip AES password (7-Zip, WinZip) refused the right password.
+- **Changed:** in a PDF and a comic book (or a ZIP read as pages), once you click in the pages, the arrow keys turn them (Left and Up back, Right and Down on), as a player keeps Left and Right while it has the focus; elsewhere they still step to the library's next item. On a touch screen a swipe to the side turns the page, and a comic's page also turns with a tap (its left part goes back). One rule for both views. ([PDFs and 3D models](README.md#pdfs-and-3d-models))
+- **Fixed before release:** a ZIP or CBZ had no thumbnail and a broken picture in the details: thumbnails were made only for PDFs and 3D models, so the library showed the archive's bytes as a picture. Every kind of file whose card is drawn from its bytes now gets its thumbnail the same way (a note too long to lay out gets its card, not a broken picture); a comic imported before takes its cover's shape.
+- **Fixed before release:** archives with a WinZip AES password (7-Zip, WinZip) refused the right password.
 
 ## 0.60.8 — ZIP and comic book viewer (2026-11-16)
 
-- **Added:** a ZIP or a comic book (CBZ) opens in a view of its own, in the library's viewer and in the panel on a canvas. **Files** lists its folders and files (name, size, date, a padlock on one with a password); a double-click opens a folder, shows a picture, a video, a sound or a text inside it, or offers to import a PDF, note or 3D model and open it in its own view. **Import to the library** takes the selected files (all in the folder when none is), into the open folder, hidden in hidden mode. **Pages** reads its pictures one at a time in natural order (page 2 before page 10), with Page Up and Down, Space, a click on the page, zoom, bookmarks and the page it was left at; a CBZ opens there. Its card shows its first picture (a comic's cover), or the page chosen for it on a canvas.
-- **Added:** archives with a password open: the old PKZIP kind and WinZip's AES (128, 192 or 256 bits, what 7-Zip and WinZip make). The password is asked once while the view is open and kept nowhere; a wrong one is said. Stored and Deflate files open; other methods (LZMA, BZIP2, Zstandard…) are listed but say they cannot be opened here.
-- **Changed:** the library's search finds a ZIP or CBZ by the names of the files in it.
+- **Added:** a ZIP or a comic book (CBZ) opens in a view of its own, in the library's viewer and in the panel on a canvas. **Files** lists its folders and files (name, size, date, a padlock on one with a password); a double-click opens a folder, shows a picture, a video, a sound or a text inside it, or offers to import a PDF, note or 3D model and open it in its own view. **Import to the library** takes the selected files (all in the folder when none is), into the open folder, hidden in hidden mode. **Pages** reads its pictures one at a time in natural order (page 2 before page 10), with Page Up and Down, Space, a click on the page, zoom, bookmarks and the page it was left at; a CBZ opens there. Its card shows its first picture (a comic's cover), or the page chosen for it on a canvas. ([The viewer](README.md#the-viewer))
+- **Added:** archives with a password open: the old PKZIP kind and WinZip's AES (128, 192 or 256 bits, what 7-Zip and WinZip make). The password is asked once while the view is open and kept nowhere; a wrong one is said. Stored and Deflate files open; other methods (LZMA, BZIP2, Zstandard…) are listed but say they cannot be opened here. ([The viewer](README.md#the-viewer))
+- **Changed:** the library's search finds a ZIP or CBZ by the names of the files in it. ([Search](README.md#search))
 
 ## 0.60.7 — The Library's reset button in hidden mode (2026-11-16)
 
-- **Fixed:** with a filter of the sidebar on (a folder, Favourites, a tag), hidden mode showed the Reset all filters button with nothing filtered there, and it did nothing: it went by the filter kept for when hidden mode ends. It now says only what is on screen, so it also shows for a hidden folder picked in hidden mode (it did not); the filter left on outside comes back at the end, with the button.
+- **Fixed:** with a filter of the sidebar on (a folder, Favourites, a tag), hidden mode showed the Reset all filters button with nothing filtered there, and it did nothing: it went by the filter kept for when hidden mode ends. It now says only what is on screen, so it also shows for a hidden folder picked in hidden mode (it did not); the filter left on outside comes back at the end, with the button. ([Hidden mode](README.md#hidden-mode))
 
 ## 0.60.6 — The gallery viewer never stays blank (2026-11-16)
 
-- **Fixed:** stepping on from a PDF, a note or a 3D model still opening in the gallery viewer left its empty panel over every item shown after it, a blank page until a restart: the panel is now taken down whenever the viewer moves on.
+- **Fixed:** stepping on from a PDF, a note or a 3D model still opening in the gallery viewer left its empty panel over every item shown after it, a blank page until a restart: the panel is now taken down whenever the viewer moves on. ([The viewer](README.md#the-viewer))
 
 ## 0.60.5 — Big hidden videos play, a frame for big videos, imports in hidden mode hidden (2026-11-16)
 
-- **Added:** a hidden video or sound plays as it is read, of any size, in the gallery and on the canvas, while the Hidden items are open: the desktop app asks the page for each part, decrypted there with the key in memory and never written (it played only after being decrypted whole, and one past the import limit not at all).
-- **Added:** a video past the import limit (a card) shows a frame of it as its thumbnail, in the desktop app.
-- **Fixed:** what was pasted, dropped or imported while hidden mode was on came in shown, outside hidden mode: it is now hidden at once (a dropped folder's folders too), into the folder open in the sidebar, by one rule for every way in.
+- **Added:** a hidden video or sound plays as it is read, of any size, in the gallery and on the canvas, while the Hidden items are open: the desktop app asks the page for each part, decrypted there with the key in memory and never written (it played only after being decrypted whole, and one past the import limit not at all). ([In the desktop app, hidden items are encrypted](README.md#in-the-desktop-app-hidden-items-are-encrypted))
+- **Added:** a video past the import limit (a card) shows a frame of it as its thumbnail, in the desktop app. ([The Library](README.md#the-library))
+- **Fixed:** what was pasted, dropped or imported while hidden mode was on came in shown, outside hidden mode: it is now hidden at once (a dropped folder's folders too), into the folder open in the sidebar, by one rule for every way in. ([Hidden mode](README.md#hidden-mode))
 
 ## 0.60.3 — Several folders at once in the Library (2026-11-16)
 
-- **Added:** the Library's sidebar shows several folders at once: **Ctrl+click** a folder to show it too (or take it out), **Shift+click** to show every folder from the last one clicked to this one, **Ctrl+Shift+click** to add that run. Each with its subfolders; the filter chip names them.
+- **Added:** the Library's sidebar shows several folders at once: **Ctrl+click** a folder to show it too (or take it out), **Shift+click** to show every folder from the last one clicked to this one, **Ctrl+Shift+click** to add that run. Each with its subfolders; the filter chip names them. ([Folders and tags](README.md#folders-and-tags))
 
 ## 0.60.2 — No Tests badge in the README (2026-11-15)
 
-- **Removed:** the Tests badge at the top of the README.
+- **Docs:** the Tests badge at the top of the README is gone.
 
 ## 0.60.1 — PhotoCraft's part of the animation, its limits completed (2026-11-15)
 
-- **Changed:** the animation's PhotoCraft part is a gesture study: thin lines over Delacroix's horse (its line of action, the barrel of its body, its front leg), saved and back on its canvas.
-- **Changed:** the README says a picture pasted in PhotoCraft (from a canvas, the Library or another program) becomes a smart object layer, a copy kept inside the document; its Limitations add that PhotoCraft is tested in Chromium only and keeps its documents in memory while you are in other views (close it with ×).
+- **Docs:** the animation's PhotoCraft part is a gesture study: thin lines over Delacroix's horse (its line of action, the barrel of its body, its front leg), saved and back on its canvas.
+- **Docs:** the README says a picture pasted in PhotoCraft (from a canvas, the Library or another program) becomes a smart object layer, a copy kept inside the document; its Limitations add that PhotoCraft is tested in Chromium only and keeps its documents in memory while you are in other views (close it with ×).
 
 ## 0.60.0 — PhotoCraft inside canvast, the top bar in three sets, the panels' buttons on the right edge, Flip for shapes and paths, standard words (2026-11-15)
 

@@ -5,7 +5,6 @@ The work on canvast that is not done yet, and what became of each item. **Priori
 | ID | Item | Priority | Status | Notes |
 | --- | --- | --- | --- | --- |
 | B1 | README pictures for the newest features: the ZIP and comic book viewer, maybe the rename and move progress notice | high | open | 0.60.13 added *Move a folder*, *Pasted picture name* and the PDF and 3D views again; the ZIP viewer waits for the owner's approval of its look |
-| B23 | Better-formatted release notes on GitHub | high | open | Owner request 2026-11-16; the format to be agreed with the owner |
 | B2 | The library scrolls smoothly at small thumbnail sizes (size 96: about 40 frames a second since 0.60.13, was under 30; 60 at size 240 and in the list) | high | open | `--scroll` in the *Bench library* workflow; what is left is mostly painting the pictures |
 | B3 | Faster test runs: each change runs only the tests whose code it touches, found from recorded coverage | medium | open | Approved, not started |
 | B4 | A vector network can have a fill for each closed region, not one fill for the whole network | medium | open | A limit listed in the README |
@@ -18,6 +17,7 @@ The work on canvast that is not done yet, and what became of each item. **Priori
 | B11 | The Retroma theme | low | open | Parked on the `retroma-v4` branch until the owner resumes it |
 | B12 | Math in notes (formulas) | low | open | On hold |
 | B13 | Builds for Windows and macOS open for contribution, with terms for them | medium | closed | 0.60.12: [Builds for other systems](CONTRIBUTING.md#builds-for-other-systems) |
+| B23 | Better-formatted release notes on GitHub: a summary first, then a part for users and one for developers | high | closed | 0.60.13 |
 | B14 | Choose what goes in a backup (Advanced export) | medium | removed | Found done: 0.55.34 |
 | B15 | A font's "Aa" on its card on a canvas | low | removed | Found done: 0.50.40 |
 | B16 | Search keywords in the library and on the canvas | medium | removed | Found done: 0.50.40 |
