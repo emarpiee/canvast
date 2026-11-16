@@ -529,7 +529,8 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
     else editor.stabilizer = { ...editor.stabilizer, strength: v };
     editor.changed();
   };
-  const prop = (id: string, title: string, hint: string, options: readonly OptionSpec[], exec: NonNullable<Command["exec"]>, why: () => string | null = sel): Command => ({ id, group: "Properties", kind: "selection", title, hint, risk: "edit", options, why, exec });
+  // (what the bar changes is the selection's, or the tool's for what it makes next: the bar's own code knows which, so no reason by default)
+  const prop = (id: string, title: string, hint: string, options: readonly OptionSpec[], exec: NonNullable<Command["exec"]>, why: () => string | null = () => null): Command => ({ id, group: "Properties", kind: "selection", title, hint, risk: "edit", options, why, exec });
   commands.setProvider("properties", () => [
     prop("tools.set", "Set a tool option", "A pen width, a shape's sides or points, the eraser", [{ name: "name", type: "choice", doc: "which option", required: true, choices: TOOL_OPTIONS }, num("value", "its value (px for widths)", 0, 100000), LIVE], (o) => setToolOption(o["name"] as (typeof TOOL_OPTIONS)[number], Number(o["value"]), kept(o)), () => null),
     prop("tools.toggle", "Turn a tool option on or off", "The stabilizer, snapping, erasing parts, a locked width and more", [{ name: "name", type: "choice", doc: "which option", required: true, choices: TOGGLES }], (o) => {

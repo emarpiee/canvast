@@ -84,10 +84,21 @@ test("a command given wrong options says so and changes nothing; an outside call
   });
   expect(report, "every command refuses options that do not fit").toEqual([]);
   expect(await p.evaluate(() => JSON.stringify(window.__canvastDebug.objects())), "and nothing changed").toBe(before);
-  // an outside caller: a risky command waits for the person (here no one answers: refused), a read runs
-  const del = await p.evaluate(() => window.__canvastDebug.runCommand("edit.delete", {}, "agent"));
-  expect(del.ok).toBe(false);
+  // an outside caller: a risky command asks the person first, in canvast; Cancel refuses it, Allow does it
+  const ask = (): Promise<{ ok: boolean }> => p.evaluate(() => window.__canvastDebug.runCommand("edit.delete", {}, "agent"));
+  const refused = ask();
+  const dialog = p.getByRole("dialog").filter({ hasText: "An AI agent wants to" });
+  await expect(dialog).toBeVisible();
+  await dialog.getByRole("button", { name: "Cancel" }).click();
+  expect((await refused).ok).toBe(false);
   expect(await p.evaluate(() => window.__canvastDebug.objects().length)).toBe(1);
+  const allowed = ask();
+  await dialog.getByRole("button", { name: "Allow" }).click();
+  expect((await allowed).ok).toBe(true);
+  await expect.poll(() => p.evaluate(() => window.__canvastDebug.objects().length)).toBe(0);
+  // only the person may: an agent never changes the agents' own settings, whatever it asks
+  const own = await p.evaluate(() => window.__canvastDebug.runCommand("settings.set", { key: "agents.readOnly", value: false }, "agent"));
+  expect(own.ok).toBe(false);
   const unknown = await p.evaluate(() => window.__canvastDebug.runCommand("edit.undoo", {}, "agent"));
   expect(unknown.ok === false && unknown.suggest).toContain("edit.undo");
   expect(app.consoleErrors).toEqual([]);

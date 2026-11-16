@@ -352,6 +352,7 @@ export function findCommands(all: readonly Command[], query: string): Command[] 
   for (const c of all) {
     if (!usable(c)) continue;
     if (c.quiet && !kind) continue;
+    if (!c.takes && c.options?.some((o) => o.required)) continue; // (the palette asks for one value at most: a command that needs more is for a caller that gives them)
     if (kind !== null && kind !== "" && ![kindOf(c), ...(c.kinds ?? [])].some((k) => k.startsWith(kind)) && !c.group.toLowerCase().startsWith(kind)) continue;
     const title = c.title.toLowerCase();
     const hay = `${c.group} ${c.title} ${c.words ?? ""}`.toLowerCase();
