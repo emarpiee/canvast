@@ -2712,9 +2712,7 @@ async function start(): Promise<void> {
       if (!pressCommand(n < 0 ? "bookmark.prev" : "bookmark.next", {}, "key")) { editor.message = "No bookmarks yet."; editor.changed(); }
       return;
     }
-    if (bookmarkList.goTo(Number(c!.slice(4)) - 1)) return; // view-state: (Alt+1 to 9, jumps of the bookmarks panel's own list)
-    editor.message = bookmarkList.items.length ? "That bookmark's place no longer exists." : "No bookmarks yet.";
-    editor.changed();
+    if (!pressCommand(`bookmark.${c!.slice(4)}`, {}, "key")) { editor.message = bookmarkList.items.length ? "That bookmark's place no longer exists." : "No bookmarks yet."; editor.changed(); }
   });
   // The Zen key (Settings > Shortcuts, Z at first) fades the floating bars and panels out and back, on the canvas.
   window.addEventListener("keydown", (e) => {
@@ -3112,6 +3110,7 @@ async function start(): Promise<void> {
     searchLibrary: () => { setView("assets"); assetsView.focusSearch(); },
     palette: () => palette.open(),
     bookmarkStep: (by) => bookmarkList.step(by),
+    bookmarkGo: (i) => bookmarkList.goTo(i),
     home: () => goHome(view),
     fit: (what) => focusCycle.fit(what),
     canBack: () => history.canBack(),

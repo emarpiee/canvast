@@ -19,7 +19,7 @@
     "src/ui/adjust-panel.ts": 2,
     "src/ui/advanced-export.ts": 3,
     "src/ui/archive-view.ts": 7,
-    "src/ui/assets-view.ts": 64,
+    "src/ui/assets-view.ts": 5,
     "src/ui/balloon-bar.ts": 4,
     "src/ui/batch-rename.ts": 4,
     "src/ui/board-filter.ts": 2,
@@ -69,8 +69,8 @@
     "src/ui/workspace-switch.ts": 6
   },
   "live": {
-    "rule": 441,
-    "keys": 26,
+    "rule": 427,
+    "keys": 0,
     "screens": {
       "canvas": 77,
       "library": 20,

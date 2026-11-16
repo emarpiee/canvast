@@ -5664,7 +5664,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     lib("library.import", "Import files", "Pictures, video, audio and other files", "edit", () => fileInput.click(), writable),
     lib("library.importFolder", "Import a folder", "With its subfolders", "edit", () => folderInput.click(), writable),
     lib("library.newNote", "New note", "A markdown note, opened to write in", "edit", () => newNote(), writable),
-    lib("library.slideshowShown", "Slideshow", "The selected items, or everything listed", "edit", () => slideshow(), () => inLibrary() ?? (filtered().length ? null : "Nothing is listed."), { record: false }),
+    lib("library.slideshowShown", "Slideshow", "The selected items, or everything listed", "edit", () => slideshow(), () => inLibrary() ?? (filtered().length ? null : "Nothing is listed.")),
     lib("library.reload", "Reload the library", "Read it again and draw every card anew", "read", () => { relistAll = true; void refresh(); }),
     lib("library.placeOn", "Place on a canvas", "The items on a canvas, a new canvas or a new board", "edit", (o) => {
       const hashes = itemsOf(o);
@@ -5672,18 +5672,18 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       placeOn(hashes, String(o["where"]), String(o["id"] ?? ""));
       return { ok: true };
     }, writable, { options: [HASHES, { name: "where", type: "choice", doc: "a canvas, a new canvas on a board, or a new board", required: true, choices: ["canvas", "new-canvas", "new-board"] }, { name: "id", type: "id", doc: "the canvas, or the board of the new canvas" }] }),
-    lib("library.copy", "Copy", "To paste elsewhere", "edit", (o) => copyItems(itemsOf(o)), () => inLibrary() ?? (picked.size || selected ? null : REASON.noSelection), { options: [HASHES], record: false }),
+    lib("library.copy", "Copy", "To paste elsewhere", "edit", (o) => copyItems(itemsOf(o)), () => inLibrary() ?? (picked.size || selected ? null : REASON.noSelection), { options: [HASHES]}),
     lib("library.copyNames", "Copy names", "The file names, as text", "read", (o) => copyItems(itemsOf(o), "name"), () => inLibrary() ?? (picked.size || selected ? null : REASON.noSelection), { options: [HASHES] }),
-    ...(desktopBridge() ? [lib("library.copyFiles", "Copy files", "The real files, to paste in a file manager", "edit", (o) => entriesOf(itemsOf(o)).then((ents) => copyItemsAsFiles(copyDeps, ents)), () => inLibrary() ?? (picked.size || selected ? null : REASON.noSelection), { options: [HASHES], record: false })] : []),
+    ...(desktopBridge() ? [lib("library.copyFiles", "Copy files", "The real files, to paste in a file manager", "edit", (o) => entriesOf(itemsOf(o)).then((ents) => copyItemsAsFiles(copyDeps, ents)), () => inLibrary() ?? (picked.size || selected ? null : REASON.noSelection), { options: [HASHES]})] : []),
     lib("library.paste", "Paste", "From the clipboard, into the library", "edit", () => pasteFromClipboard(), writable),
-    lib("library.selectAll", "Select everything", "All that is listed", "edit", () => selectAll(), inLibrary, { record: false }),
+    lib("library.selectAll", "Select everything", "All that is listed", "edit", () => selectAll(), inLibrary),
     lib("library.selectSeveral", "Select several", "Tap to add or remove", "edit", () => {
       selecting = severalOn = true;
       markPicked();
       session.editor.message = "Selecting several: tap or click items to add or remove them. Esc ends it.";
       session.editor.changed();
-    }, inLibrary, { record: false }),
-    lib("library.details", "Details panel", "Show or hide it", "edit", () => toggleDetails(), inLibrary, { record: false }),
+    }, inLibrary),
+    lib("library.details", "Details panel", "Show or hide it", "edit", () => toggleDetails(), inLibrary),
     lib("hidden.exit", "Exit hidden mode", "The hidden items leave this screen, still unlocked", "edit", () => exitHidden(), () => (hiddenMode ? null : "Hidden mode is not on.")),
     lib("hidden.stay", "Stay in hidden mode", "When leaving the library, or not", "edit", () => { settings.set("library.hiddenStay", !settings.get("library.hiddenStay")); paintHiddenMode(); }, () => (hiddenMode ? null : "Hidden mode is not on.")),
   ]);

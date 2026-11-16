@@ -232,8 +232,8 @@ export class PanelDock {
     for (const [id, it] of this.items) {
       const shown = (): string | null => (it.el.hidden ? `The ${it.spec.title} panel is not open.` : null);
       for (const side of ["left", "right", "float"] as const)
-        out.push({ id: `panel.move:${id}=${side}`, group: "Panel", title: `${it.spec.title}: ${side === "float" ? "float" : `dock on the ${side}`}`, hint: side === "float" ? "Over the canvas, where you put it" : `In the stack on the ${side}`, risk: "edit", record: false, words: "move place stack side", why: () => shown() ?? (this.where(id) === side ? "It is there already." : null), exec: () => this.move(id, side) });
-      out.push({ id: `panel.fold:${id}`, group: "Panel", title: `${it.spec.title}: fold or unfold`, hint: "Only its title bar, or all of it", risk: "edit", record: false, words: "collapse expand title bar", why: shown, exec: () => this.fold(id, !this.state.get(id)!.c) });
+        out.push({ id: `panel.move:${id}=${side}`, group: "Panel", title: `${it.spec.title}: ${side === "float" ? "float" : `dock on the ${side}`}`, hint: side === "float" ? "Over the canvas, where you put it" : `In the stack on the ${side}`, risk: "edit", words: "move place stack side", why: () => shown() ?? (this.where(id) === side ? "It is there already." : null), exec: () => this.move(id, side) });
+      out.push({ id: `panel.fold:${id}`, group: "Panel", title: `${it.spec.title}: fold or unfold`, hint: "Only its title bar, or all of it", risk: "edit", words: "collapse expand title bar", why: shown, exec: () => this.fold(id, !this.state.get(id)!.c) });
     }
     out.push({ id: "panel.resetLayout", group: "Panel", title: "Reset the panel layout", hint: "Every panel back where it started", risk: "edit", words: "panels dock stack float default", exec: () => this.reset() });
     return out;
