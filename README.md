@@ -2448,7 +2448,7 @@ Watch an agent work as you would watch someone at your desk: where it is, what i
 
 ![Two paintings on a dark canvas and, under them, a note an AI agent has just written, outlined, with the agent's pointer on it labelled AI agent: Make an item](docs/screenshots/agent-pointer.webp)
 
-![The AI agent button left of the Settings button at the top right, its dot lit: an agent is connected](docs/screenshots/agent-button.webp)
+![The AI agent button left of the Settings button at the top right, its dot green: an agent is connected](docs/screenshots/agent-button.webp)
 
 ![What the AI agent did: its last actions newest first, each with its time: Zoom to the selection, Tag items, Put the selection on a sheet and Select items, with Go there beside those whose items are still there](docs/screenshots/agent-activity.webp)
 
@@ -2457,7 +2457,7 @@ Watch an agent work as you would watch someone at your desk: where it is, what i
 | Its pointer | Labelled **AI agent** and what it did, it goes to what the agent made or changed (or to the selection) and fades after a few seconds; those items are outlined for a moment. Your view never moves for it |
 | Work off the view | The pointer waits at the edge of the view, turned toward the place, with a ring pulsing round it |
 | The info bar | Says each action as it happens |
-| The AI agent button | Left of the Settings button while **Let AI agents use canvast** is on; its dot is lit while an agent is connected |
+| The AI agent button | Left of the Settings button while **Let AI agents use canvast** is on; its dot is green while an agent is connected, grey while it waits for one |
 | What it did | The button opens the agent's last actions, newest first: the time, what it did (a batch as one line, its steps counted), why not when it failed, and **Go there** to select and show what it touched |
 | Reduced motion | The pointer jumps instead of gliding, and the ring stays still |
 
