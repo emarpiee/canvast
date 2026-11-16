@@ -10,6 +10,9 @@ import { bindContextMenu } from "./context-menu";
 import { esc, fmtBytes } from "./format";
 import { ICONS } from "./icons";
 import type { MenuItem } from "./more-menu";
+import { commands, pressCommand } from "../commands/registry";
+import { REASON } from "../commands/types";
+import type { Options, OptionSpec } from "../commands/types";
 
 export interface TrashDeps {
   box: HTMLElement;
@@ -169,15 +172,35 @@ export function mountTrashView(deps: TrashDeps): TrashView {
     for (const f of on) await deps.erase(f.path).catch(() => undefined);
     await refresh();
   };
+  // The trash's commands (ADR 0205): restoring, and erasing for good (which an outside caller cannot do).
+  const pickPaths = (o: Options): string | null => {
+    const paths = o["paths"] as string[] | undefined;
+    if (!paths) return picked.size ? null : REASON.noSelection;
+    const known = new Set(files.map((f) => f.path));
+    const bad = paths.filter((x) => !known.has(x));
+    if (bad.length) return `Not in the trash: ${bad.slice(0, 3).join(", ")}.`;
+    picked.clear();
+    for (const x of paths) picked.add(x);
+    showPicks();
+    return null;
+  };
+  const PATHS: OptionSpec = { name: "paths", type: "ids", doc: "the files in the trash (default: the selected)" };
+  commands.setProvider("trash", () => [
+    { id: "trash.restore", group: "Trash", kind: "trash", title: "Restore from the trash", hint: "Put it back where it was", risk: "edit", options: [PATHS], why: () => (deps.readOnly() ? REASON.readOnly : null),
+      exec: async (o) => { const no = pickPaths(o); if (no) return { ok: false, error: no }; await restore(); return { ok: true }; } },
+    { id: "trash.erase", group: "Trash", kind: "trash", title: "Delete from the trash for good", hint: "Cannot be undone", risk: "refused", options: [PATHS], why: () => (deps.readOnly() ? REASON.readOnly : null),
+      exec: async (o) => { const no = pickPaths(o); if (no) return { ok: false, error: no }; await erase(); return { ok: true }; } },
+  ]);
   const act = (e: Event): void => {
     const b = (e.target as HTMLElement).closest<HTMLButtonElement>("button[data-trash]");
     if (!b || b.disabled) return;
     if (b.dataset["trash"] === "more") {
       shown += PAGE;
       drawIfChanged();
-    } else void (b.dataset["trash"] === "restore" ? restore() : erase());
+    } else pressCommand(b.dataset["trash"] === "restore" ? "trash.restore" : "trash.erase");
   };
-  details.addEventListener("click", act);
+  details.addEventListener("click", act); // commands: (act runs the trash's commands)
+  // commands: (act runs the trash's commands; a click on a card picks it: what is selected)
   box.addEventListener("click", (e) => {
     const card = (e.target as HTMLElement).closest<HTMLElement>("[data-testid='trash-card']");
     act(e);
@@ -211,8 +234,8 @@ export function mountTrashView(deps: TrashDeps): TrashView {
         showPicks();
       }
       return [
-        { label: "Restore", hint: "Put it back where it was", icon: ICONS.archiveRestore, run: () => void restore() },
-        { label: "Delete permanently", hint: "Cannot be undone", icon: ICONS.trash2, danger: true, run: () => void erase() },
+        { label: "Restore", hint: "Put it back where it was", icon: ICONS.archiveRestore, command: "trash.restore", run: () => void pressCommand("trash.restore") },
+        { label: "Delete permanently", hint: "Cannot be undone", icon: ICONS.trash2, danger: true, command: "trash.erase", run: () => void pressCommand("trash.erase") },
       ];
     },
   });

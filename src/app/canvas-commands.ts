@@ -255,6 +255,7 @@ export function canvasCommands(a: CanvasActions): Command[] {
     cmd("view.home", "View", "Return to the origin", "Back to the start", "edit", canvas, () => a.home(), { keys: a.keys("view.home") || "0", words: "home reset"}),
     cmd("view.focus", "View", "Fit the selection in view", "Again: everything visible", "edit", canvas, () => a.focus(), { keys: a.keys("view.focus") || "F"}),
     cmd("view.fitAll", "View", "Fit everything in view", "Zoom to see it all", "edit", canvas, () => a.fit("all")),
+    cmd("view.fitSelection", "View", "Zoom to the selection", "The selected items fill the view", "edit", picked, () => a.fit("selection")),
     cmd("view.back", "View", "Previous view", "Where the view was before", "edit", when(canvas, a.canBack, "There is no earlier view."), () => a.back(), { words: "back camera"}),
     cmd("view.forward", "View", "Next view", "Where the view went next", "edit", when(canvas, a.canForward, "There is no later view."), () => a.forward(), { words: "forward camera"}),
     cmd("view.random", "View", "Go to a random empty view", "Somewhere far away and empty", "edit", canvas, () => a.randomView(), { words: "dice random far away"}),

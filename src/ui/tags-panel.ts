@@ -6,6 +6,8 @@ import { esc } from "./format";
 import { ICONS } from "./icons";
 import { panelHtml } from "./panel";
 import { moreButton, openMoreMenu } from "./more-menu";
+import { commands, pressCommand } from "../commands/registry";
+import type { Command, OptionSpec, Risk } from "../commands/types";
 
 /**
  * Floating Tags panel (ADR 0076): the in-canvas tags (ADR 0062) in one place, next to Layers and Bookmarks.
@@ -113,24 +115,26 @@ export function mountTagsPanel(host: HTMLElement, editor: EditorState, doc: Docu
   editor.subscribe(schedule);
   render();
 
+  // The tags' commands (ADR 0205): the panel's chips and menus run them, as the palette, a macro and an outside caller do.
+  const TAG: OptionSpec = { name: "tag", type: "text", doc: "the tag", required: true };
+  const tagged = (tag: string): string[] => doc.ordered().filter((o) => (o.tags ?? []).some((x) => x.toLowerCase() === tag.toLowerCase())).map((o) => o.id);
+  const tc = (id: string, title: string, hint: string, risk: Risk, options: readonly OptionSpec[], exec: NonNullable<Command["exec"]>): Command => ({ id, group: "Tags", kind: "tag", title, hint, risk, options, why: () => null, exec });
+  commands.setProvider("tags", () => [
+    tc("tag.add", "Tag items", "One tag on the items", "edit", [TAG, { name: "ids", type: "ids", doc: "the items (default: the selection)" }], (o) => void actions.tag((o["ids"] as string[] | undefined) ?? [...editor.selection], { add: [String(o["tag"])] })),
+    tc("tag.remove", "Untag items", "Take a tag off the items", "edit", [TAG, { name: "ids", type: "ids", doc: "the items (default: the selection)" }], (o) => void actions.tag((o["ids"] as string[] | undefined) ?? [...editor.selection], { remove: [String(o["tag"])] })),
+    tc("tag.select", "Select by tag", "Everything with the tag", "edit", [TAG, { name: "add", type: "boolean", doc: "add them to what is selected" }], (o) => { editor.entered = []; editor.select(tagged(String(o["tag"])), o["add"] === true); }),
+    tc("tag.rename", "Rename a tag", "On every canvas", "edit", [TAG, { name: "to", type: "text", doc: "the new name", required: true }], (o) => void actions.renameTag(String(o["tag"]), String(o["to"]))),
+    tc("tag.delete", "Delete a tag", "From every canvas; the objects stay", "confirm", [TAG], (o) => void actions.deleteTag(String(o["tag"]))),
+  ]);
   panel.addEventListener("click", (e) => {
     const t = e.target as HTMLElement;
-    if (t.closest("[data-close]")) {
-      editor.tagsOpen = false;
-      editor.changed();
-      return;
-    }
+    if (t.closest("[data-close]")) return void pressCommand("panel.tags");
     const untag = t.closest<HTMLElement>("[data-untag]");
-    if (untag) return void actions.tag([...editor.selection], { remove: [untag.dataset["untag"]!] });
+    if (untag) return void pressCommand("tag.remove", { tag: untag.dataset["untag"]! });
     const add = t.closest<HTMLElement>("[data-add-tag]");
-    if (add) return void actions.tag([...editor.selection], { add: [add.dataset["addTag"]!] });
+    if (add) return void pressCommand("tag.add", { tag: add.dataset["addTag"]! });
     const pick = t.closest<HTMLElement>("[data-select-tag]");
-    if (pick) {
-      const ids = doc.ordered().filter((o) => (o.tags ?? []).some((x) => x.toLowerCase() === pick.dataset["selectTag"])).map((o) => o.id);
-      editor.entered = [];
-      editor.select(ids, e.shiftKey || e.ctrlKey || e.metaKey);
-      return;
-    }
+    if (pick) return void pressCommand("tag.select", { tag: pick.dataset["selectTag"]!, add: e.shiftKey || e.ctrlKey || e.metaKey });
     const more = t.closest<HTMLElement>("[data-tag-more]");
     if (more) {
       const tag = more.dataset["tagMore"]!;
@@ -138,14 +142,15 @@ export function mountTagsPanel(host: HTMLElement, editor: EditorState, doc: Docu
       openMoreMenu(
         more,
         [
-          { label: "Select the objects with this tag", hint: "Everything tagged with it", icon: ICONS.pointer, aria: `Select the items tagged ${tag}`, run: () => { editor.entered = []; editor.select(doc.ordered().filter((o) => (o.tags ?? []).some((x) => x.toLowerCase() === key)).map((o) => o.id)); } },
-          { label: "Rename on every canvas", hint: "Everywhere it is used", icon: ICONS.textCursorInput, aria: `Rename tag ${tag}`, run: () => void askTagName(tag, "canvases").then((to) => to !== null && to.trim() && actions.renameTag(tag, to)) },
-          { label: "Delete from every canvas", hint: "The objects stay", icon: ICONS.trash2, danger: true, aria: `Delete tag ${tag}`, run: () => actions.deleteTag(tag) },
+          { label: "Select the objects with this tag", hint: "Everything tagged with it", icon: ICONS.pointer, aria: `Select the items tagged ${tag}`, command: "tag.select", run: () => void pressCommand("tag.select", { tag: key }) },
+          { label: "Rename on every canvas", hint: "Everywhere it is used", icon: ICONS.textCursorInput, aria: `Rename tag ${tag}`, command: "tag.rename", run: () => void askTagName(tag, "canvases").then((to) => to !== null && to.trim() && pressCommand("tag.rename", { tag, to })) },
+          { label: "Delete from every canvas", hint: "The objects stay", icon: ICONS.trash2, danger: true, aria: `Delete tag ${tag}`, command: "tag.delete", run: () => void pressCommand("tag.delete", { tag }) },
         ],
         `Actions for tag ${tag}`,
       );
     }
   });
+  // view-state: (typing the filter)
   panel.addEventListener("input", (e) => {
     const t = e.target as HTMLInputElement;
     if (t.matches("[data-tag-filter]")) {
