@@ -226,7 +226,7 @@ export async function openArchiveView(el: HTMLElement, file: FileFacts, deps: Vi
       paintMode();
       paintPath(e.name);
       shown.innerHTML = `<div class="archive-note"><p>${kind ? `“${esc(e.name)}” opens in its ${esc(kind.noun)} view once it is in the library.` : `No preview for “${esc(e.name)}” here (${esc(describeFile(e.name, e.type).category)}). Import it to keep it in the library.`}</p>
-        <button type="button" class="assets-btn is-primary" data-view-act="${kind ? "import-open" : "import-one"}" data-path="${esc(e.path)}" data-testid="archive-import-one">${ICONS.arrowDownToLine}<span>${kind ? "Import and open" : "Import to the library"}</span></button></div>`;
+        ${kind ? `<button type="button" class="assets-btn is-primary" data-view-act="import-open" data-path="${esc(e.path)}" data-testid="archive-import-one">${ICONS.arrowDownToLine}<span>Import and open</span></button>` : `<button type="button" class="assets-btn is-primary" data-view-act="import-one" data-path="${esc(e.path)}" data-testid="archive-import-one">${ICONS.arrowDownToLine}<span>Import to the library</span></button>`}</div>`;
       return;
     }
     let blob: Blob | null;
@@ -275,9 +275,11 @@ export async function openArchiveView(el: HTMLElement, file: FileFacts, deps: Vi
       if (!blob) return; // (no password given: nothing is imported)
       out.push(new File([blob], e.name, { type: e.type, lastModified: e.date?.getTime() ?? Date.now() }));
     }
-    if (closed || !out.length) return;
+    // (an import asked for finishes, the view closed meanwhile or not: only what follows it in the view is left out)
+    if (!out.length) return;
     const hashes = await place.importFiles(out);
     await place.refresh();
+    if (closed) return;
     if (thenOpen && hashes[0]) return place.show(hashes[0]);
     say(`${plural(hashes.length, "file")} imported to the library.`);
   };

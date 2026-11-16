@@ -4,6 +4,7 @@
 
 - **Changed:** in the desktop app the library lists each file by its name on disk, one to one, with Keep file names on or off: with it off an item takes its tidy name, and two items given one name are `name.png` and `name-2.png` in the library as on the disk (they were both `name.png`, and `name-2` found nothing). A file renamed outside the app takes its new name too. A library from before changes in one step on its next write. Hidden items keep their own names.
 - **Added:** **Pasted picture name** (Settings > Saving to the library): a picture pasted from another app, which comes with no name (browsers call it `image.png`), is named by this pattern, `pasted-{yyyy}-{mm}-{dd}-{hhmmss}` by default, with the words of a screenshot's name; on the canvas and in the library's Paste alike. A file copied in a file manager keeps its own name.
+- **Fixed:** files imported from a ZIP or comic book were dropped when the viewer was closed before they were read: an import asked for now always finishes.
 
 ## 0.60.9 — Page turning in PDFs and comics, archive fixes (2026-11-16)
 
