@@ -340,6 +340,15 @@ export const SETTINGS_TABS: readonly Tab[] = [
       { key: "library.hiddenStay", label: "Stay in hidden mode when leaving the library", help: "On: hidden mode stays on after you leave the library.", more: "Off (the default): hidden mode ends when you leave the library. On: it stays on until you exit it (Exit in the status bar, or deleting the word), the hidden items are locked, or the app closes. The pin in hidden mode's status bar sets this too.", control: { kind: "toggle" } },
     ],
   },
+  {
+    id: "agents",
+    label: "AI agents",
+    rows: [
+      { key: "agents.on", label: "Let AI agents use canvast", help: "An AI agent on this computer can run canvast's commands. Off: none can.", more: "An AI agent (a program that speaks MCP, such as Claude Desktop or Claude Code) can list and run canvast's commands through the canvas tools on this computer (canvast-tools mcp), once the pairing code below is the one the tools show. Deleting, hidden items, replacing the workspace and writing files ask you first, in canvast; the password, these settings and what opens hidden items are never theirs. While it is on, canvast connects to the tools on this computer only (127.0.0.1), and nowhere else.", control: { kind: "toggle" } },
+      { key: "agents.code", label: "Pairing code", help: "The code the canvas tools show (Connect an AI agent).", more: "Run the canvas tools and choose Connect an AI agent: they show a code and what to put in the agent's settings. Type the code here. A program that does not know it is not answered.", control: { kind: "text", max: 32, placeholder: "the tools' code" } },
+      { key: "agents.readOnly", label: "Agents may only look", help: "On: they can list, search and look, and change nothing.", control: { kind: "toggle" } },
+    ],
+  },
   { id: "about", label: "About and diagnostics" },
   {
     id: "develop",

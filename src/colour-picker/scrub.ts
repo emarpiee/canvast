@@ -108,6 +108,7 @@ export function scrubNumbers(root: HTMLElement, hint = "Drag the field left or r
   root.addEventListener("pointerup", (e) => end(e, false));
   root.addEventListener("pointercancel", (e) => end(e, true));
   // the click that ends a drag on a name would focus its field
+  // view-state: (a chooser's own control: what it picks goes to the command of what opened it)
   root.addEventListener("click", (e) => {
     if ((e.target as HTMLElement).closest("label[data-scrubbable]") && (e.target as HTMLElement).tagName !== "INPUT") e.preventDefault();
   }, true);

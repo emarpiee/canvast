@@ -183,6 +183,7 @@ import { mountCommandPalette } from "../ui/command-palette";
 import { commands, pressCommand } from "../commands/registry";
 import { REASON } from "../commands/types";
 import { canvasCommands, OLD_CANVAS_IDS, type CanvasActions } from "./canvas-commands";
+import { mountAgentLink } from "./agent-link";
 import { Macros } from "../commands/macros";
 import { barCommands } from "../commands/from-bars";
 import { settingCommands } from "../commands/settings-commands";
@@ -191,7 +192,7 @@ import { AssetNames } from "./asset-names";
 import { isLabelled, itemLabels, itemName } from "../render/item-label";
 import { drawReveal, drawRevealOutlines, revealWords } from "../render/reveal";
 import type { ItemLabel } from "../render/item-label";
-import { PRIVACY_KEYS, SETTINGS, SettingsStore } from "../settings/settings";
+import { PRIVACY_KEYS, SETTINGS, SettingsStore, refusedToAgents } from "../settings/settings";
 import { DEFAULT_INK, newInk, setCanvasInk } from "../render/ink";
 import { paintFromText, paintToText } from "../doc/paint";
 
@@ -3141,6 +3142,21 @@ async function start(): Promise<void> {
   registry.setProvider("app", () => canvasCommands(canvasActions));
   for (const [old, now] of Object.entries(OLD_CANVAS_IDS)) registry.alias(old, now);
   registry.onFail((_c, error) => { editor.message = error; editor.changed(); });
+  // An outside caller's risky run asks the person here (ADR 0205); only the person answers. The link to AI agents opens while it is on.
+  registry.setConfirmer((c, options) => confirmDialog({
+    title: `An AI agent wants to: ${c.title}`,
+    lines: [c.hint ?? "", ...(Object.keys(options).length ? [`With: ${JSON.stringify(options).slice(0, 300)}`] : []), "Allow it only if you asked the agent for this."],
+    confirmLabel: "Allow",
+    danger: true,
+  }));
+  const agentLink = mountAgentLink({
+    registry,
+    on: () => settings.get("agents.on"),
+    code: () => settings.get("agents.code"),
+    readOnly: () => settings.get("agents.readOnly"),
+    say: (text) => { editor.message = text; editor.changed(); },
+  });
+  settings.subscribe(() => agentLink.sync());
   // The context menu (right click, or the menu key): the commands that fit what is under the pointer and what is picked, from the same registry.
   mountContextMenu(canvas, registry, {
     active: () => appView === "canvas" && !textEditor.isOpen && performance.now() - editor.fingerListAt > 1500,
@@ -3153,7 +3169,7 @@ async function start(): Promise<void> {
   registry.setProvider("panels", () => dock.commands().map((c): Command => ({ ...c, why: () => (appView === "canvas" ? (c.why?.() ?? null) : REASON.notOnCanvas) })));
   registry.setProvider("settings", () => [
     ...SETTINGS_TABS.map((t): Command => ({ id: `settings.tab:${t.id}`, group: "Settings", kind: "settings", title: t.label, hint: "Open this page of Settings", risk: "read", words: "preferences options", exec: () => { setView("settings"); settingsView.show(t.id); } })),
-    ...settingCommands(SETTINGS_TABS, settings, (tab) => { setView("settings"); settingsView.show(tab); }),
+    ...settingCommands(SETTINGS_TABS, settings, (tab) => { setView("settings"); settingsView.show(tab); }, refusedToAgents),
   ]);
   registry.setProvider("bars", () => (appView === "canvas" ? barCommands() : []));
   registry.setProvider("artcraft", () =>

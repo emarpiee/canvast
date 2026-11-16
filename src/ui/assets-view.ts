@@ -4072,7 +4072,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     "export-all": ["library.exportArchive", "Export as archive", "A .canvast archive of the selected items", "confirm"],
     "export": ["library.export", "Export the item", "A .canvast archive of this item", "confirm"],
     "slideshow-all": ["library.slideshow", "Slideshow of these", "The selected items one after another", "edit"],
-    "delete-all": ["library.deleteUnused", "Delete the unused", "The selected items on no canvas, from the library", "confirm"],
+    "delete-all": ["library.deleteUnused", "Delete the unused", "The selected that no canvas uses", "confirm"],
     "delete-everywhere": ["library.deleteEverywhere", "Delete everywhere", "The items and every use of them", "confirm"],
     "delete": ["library.delete", "Delete the item", "From the library, when nothing uses it", "confirm"],
     "show": ["library.showOnCanvas", "Show where it is used", "The canvas with it, at it", "edit"],
@@ -4937,7 +4937,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     new: ["folder.new", "New folder", "Inside this one (\"\": at the top)", "edit"],
     rename: ["folder.rename", "Rename the folder", "Type its new name", "edit"],
     move: ["folder.move", "Move the folder", "Into another folder, or to the top", "edit"],
-    hide: ["folder.hide", "Hide the folder", "It and everything in it, into the hidden items", "confirm"],
+    hide: ["folder.hide", "Hide the folder", "It and all in it, into the hidden items", "confirm"],
     show: ["folder.unhide", "Unhide the folder", "It and everything in it, shown again", "confirm"],
     export: ["folder.export", "Export the folder", "Its items as a .canvast archive", "confirm"],
     delete: ["folder.delete", "Delete the folder", "Its items stay in the library", "confirm"],
@@ -5666,7 +5666,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     lib("library.newNote", "New note", "A markdown note, opened to write in", "edit", () => newNote(), writable),
     lib("library.slideshowShown", "Slideshow", "The selected items, or everything listed", "edit", () => slideshow(), () => inLibrary() ?? (filtered().length ? null : "Nothing is listed.")),
     lib("library.reload", "Reload the library", "Read it again and draw every card anew", "read", () => { relistAll = true; void refresh(); }),
-    lib("library.placeOn", "Place on a canvas", "The items on a canvas, a new canvas or a new board", "edit", (o) => {
+    lib("library.placeOn", "Place on a canvas", "On a canvas, or a new canvas or board", "edit", (o) => {
       const hashes = itemsOf(o);
       if (!hashes.length) return { ok: false, error: REASON.noSelection };
       placeOn(hashes, String(o["where"]), String(o["id"] ?? ""));
@@ -5684,7 +5684,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       session.editor.changed();
     }, inLibrary),
     lib("library.details", "Details panel", "Show or hide it", "edit", () => toggleDetails(), inLibrary),
-    lib("hidden.exit", "Exit hidden mode", "The hidden items leave this screen, still unlocked", "edit", () => exitHidden(), () => (hiddenMode ? null : "Hidden mode is not on.")),
+    lib("hidden.exit", "Exit hidden mode", "They leave the screen, still unlocked", "edit", () => exitHidden(), () => (hiddenMode ? null : "Hidden mode is not on.")),
     lib("hidden.stay", "Stay in hidden mode", "When leaving the library, or not", "edit", () => { settings.set("library.hiddenStay", !settings.get("library.hiddenStay")); paintHiddenMode(); }, () => (hiddenMode ? null : "Hidden mode is not on.")),
   ]);
   setWay("all");

@@ -76,7 +76,9 @@ export function onLongPress(root: HTMLElement, selector: string, action: (el: HT
   root.addEventListener("pointerdown", down);
   root.addEventListener("pointermove", move);
   for (const t of ["pointerup", "pointercancel", "pointerleave"] as const) root.addEventListener(t, stop);
+  // view-state: (a chooser's own control: what it picks goes to the command of what opened it)
   root.addEventListener("click", click, true);
+  // view-state: (a chooser's own control: what it picks goes to the command of what opened it)
   root.addEventListener("contextmenu", menu);
   root.addEventListener("keydown", key);
   return () => {

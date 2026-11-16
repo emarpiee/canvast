@@ -184,6 +184,7 @@ function saveColourButton(hex: () => string, after: () => void): HTMLButtonEleme
   b.className = "colour-save";
   b.textContent = "Save colour";
   b.title = "Keep this colour in the Styles of the library";
+  // view-state: (a chooser's own control: what it picks goes to the command of what opened it)
   b.addEventListener("click", () => {
     void Promise.resolve(styleHooks?.save(hex())).then(after); // (the list is drawn again once the colour is in it)
   });
@@ -206,6 +207,7 @@ function gradientStyles(now: () => Gradient, use: (g: Gradient) => void, stop: (
     const css = g ? cssOfPaint(g) : null;
     if (css) void copyToClipboard(css).then((ok) => ok && flashCopied(chip));
   });
+  // view-state: (a chooser's own control: what it picks goes to the command of what opened it)
   box.addEventListener("click", (e) => {
     const t = e.target as HTMLElement;
     const chip = t.closest<HTMLElement>("[data-saved]");
@@ -281,6 +283,7 @@ export function openColourPopover(anchor: HTMLElement, o: ColourPopoverOptions):
     none.textContent = o.none.label;
     none.setAttribute("aria-pressed", String(o.none.active));
     none.classList.toggle("is-on", o.none.active);
+    // view-state: (a chooser's own control: what it picks goes to the command of what opened it)
     none.addEventListener("click", () => {
       const on = !none!.classList.contains("is-on");
       none!.classList.toggle("is-on", on);
@@ -594,6 +597,7 @@ export function openPaintPopover(anchor: HTMLElement, o: PaintPopoverOptions): v
       current = picker;
     }
   };
+  // view-state: (a chooser's own control: what it picks goes to the command of what opened it)
   modes.addEventListener("click", (e) => {
     const b = (e.target as HTMLElement).closest<HTMLElement>("[data-mode]");
     if (!b || b.dataset["mode"] === modeOf()) return;
@@ -682,6 +686,7 @@ export function openOutlinePopover(anchor: HTMLElement, o: OutlineOptions): void
   const miter = pop.querySelector<HTMLInputElement>("[data-miter]");
   if (miter) liveNumber(miter, (v, final) => final && v >= 1 && v <= 90 && o.onMiterAngle?.(v));
   for (const f of pop.querySelectorAll<HTMLInputElement>("[data-dash]")) liveNumber(f, (v, final) => final && o.onDashNumbers?.({ [f.dataset["dash"]!]: v }));
+  // view-state: (a chooser's own control: what it picks goes to the command of what opened it)
   pop.addEventListener("click", (e) => {
     const b = (e.target as HTMLElement).closest<HTMLButtonElement>("button[role=radio]");
     if (!b || b.disabled) return;
@@ -791,6 +796,7 @@ export function openTextBoxPopover(anchor: HTMLElement, o: TextBoxOptions): void
       else o.onChange({ indent: v }, final);
     });
   }
+  // view-state: (a chooser's own control: what it picks goes to the command of what opened it)
   pop.addEventListener("click", (e) => {
     const b = (e.target as HTMLElement).closest<HTMLButtonElement>("button[role=radio]");
     if (!b) return;
@@ -868,6 +874,7 @@ export function openTracksPopover(anchor: HTMLElement, o: TracksOptions): void {
       });
     }
   };
+  // view-state: (a chooser's own control: what it picks goes to the command of what opened it)
   pop.addEventListener("click", (e) => {
     const b = (e.target as HTMLElement).closest<HTMLButtonElement>("button[data-track]");
     if (!b) return;
@@ -922,6 +929,7 @@ export function openFontOptionsPopover(anchor: HTMLElement, o: FontOptions): voi
     for (const a of o.axes) if (values[a.tag] !== a.def) out[a.tag] = values[a.tag]!;
     return out;
   };
+  // view-state: (a chooser's own control: what it picks goes to the command of what opened it)
   pop.addEventListener("click", (e) => {
     const t = (e.target as HTMLElement).closest<HTMLButtonElement>('button[role="switch"]');
     if (!t) return;
@@ -944,13 +952,16 @@ export function openFontOptionsPopover(anchor: HTMLElement, o: FontOptions): voi
       o.onChange({ axes: axesNow() }, final);
     };
     liveNumber(num, (v, final) => set(v, final));
+    // view-state: (a chooser's own control: what it picks goes to the command of what opened it)
     range.addEventListener("input", () => {
       num.value = String(Math.round(Number(range.value) * 100) / 100);
       set(Number(range.value), false);
     });
+    // view-state: (a chooser's own control: what it picks goes to the command of what opened it)
     range.addEventListener("change", () => set(Number(range.value), true));
     const name = pop.querySelector<HTMLElement>(`label[for="fo-${a.tag}"]`)!;
     name.title = "Double-click to reset";
+    // view-state: (a chooser's own control: what it picks goes to the command of what opened it)
     name.addEventListener("dblclick", () => {
       num.value = String(a.def);
       set(a.def, true);
@@ -1151,6 +1162,7 @@ function buildAdjustLayer(host: HTMLElement, o: AdjustOptions, layerAt: number, 
     if (!cur.map) closeEditor();
   };
   const mapEdit = pop.querySelector<HTMLElement>("[data-map-edit]")!;
+  // view-state: (a chooser's own control: what it picks goes to the command of what opened it)
   mapEdit.addEventListener("click", openEditor);
   syncMap();
   let frame = 0;
@@ -1182,6 +1194,7 @@ function buildAdjustLayer(host: HTMLElement, o: AdjustOptions, layerAt: number, 
     n.value = String(v);
     r.closest(".adj-row")!.classList.toggle("is-changed", v !== 0);
   };
+  // view-state: (a chooser's own control: what it picks goes to the command of what opened it)
   pop.addEventListener("input", (e) => {
     const t = e.target as HTMLInputElement;
     const key = (t.dataset["adj"] ?? t.dataset["adjNum"]) as AdjustKey | undefined;
@@ -1198,6 +1211,7 @@ function buildAdjustLayer(host: HTMLElement, o: AdjustOptions, layerAt: number, 
     cur = m ? { ...rest, map: m } : rest;
     syncMap();
   };
+  // view-state: (a chooser's own control: what it picks goes to the command of what opened it)
   mapSelect.addEventListener("change", () => {
     const v = mapSelect.value;
     if (v === "keep") return;
@@ -1213,16 +1227,19 @@ function buildAdjustLayer(host: HTMLElement, o: AdjustOptions, layerAt: number, 
   });
   const mapAmount = pop.querySelector<HTMLInputElement>("[data-map-amount]")!;
   const mapOut = pop.querySelector<HTMLElement>("[data-map-out]")!;
+  // view-state: (a chooser's own control: what it picks goes to the command of what opened it)
   mapAmount.addEventListener("input", () => {
     if (!cur.map) return;
     setMap({ stops: cur.map.stops, amount: Number(mapAmount.value) });
     mapOut.textContent = mapAmount.value;
     schedulePreview();
   });
+  // view-state: (a chooser's own control: what it picks goes to the command of what opened it)
   mapAmount.addEventListener("change", () => {
     cancelPreview();
     emitChange("Adjust picture");
   });
+  // view-state: (a chooser's own control: what it picks goes to the command of what opened it)
   pop.addEventListener("dblclick", (e) => {
     const key = (e.target as HTMLElement).closest<HTMLElement>("[data-adj-row]")?.dataset["adjRow"] as AdjustKey | undefined;
     if (!key || !cur[key]) return;
@@ -1231,6 +1248,7 @@ function buildAdjustLayer(host: HTMLElement, o: AdjustOptions, layerAt: number, 
     cur = rest;
     emitChange("Adjust picture");
   });
+  // view-state: (a chooser's own control: what it picks goes to the command of what opened it)
   pop.addEventListener("input", (e) => {
     const t = e.target as HTMLInputElement;
     const k = t.dataset["adjColour"] as "dropColor" | "innerColor" | undefined;
@@ -1238,6 +1256,7 @@ function buildAdjustLayer(host: HTMLElement, o: AdjustOptions, layerAt: number, 
     cur = { ...cur, [k]: t.value };
     schedulePreview();
   });
+  // view-state: (a chooser's own control: what it picks goes to the command of what opened it)
   pop.addEventListener("change", (e) => {
     const t = e.target as HTMLInputElement;
     if (t.hasAttribute("data-adj-blur-type")) {
@@ -1306,6 +1325,7 @@ function buildAdjustLayer(host: HTMLElement, o: AdjustOptions, layerAt: number, 
       go(whole, Math.max(0, idx - 1));
     }
   };
+  // view-state: (a chooser's own control: what it picks goes to the command of what opened it)
   for (const h of [pop, o.subHost, o.footHost]) if (h) h.onclick = onClick; // (replaced, not added, each time the layer is built again)
 
   // ---- levels (ADR 0136) -------------------------------------------------------------------------------------------------------
@@ -1317,17 +1337,20 @@ function buildAdjustLayer(host: HTMLElement, o: AdjustOptions, layerAt: number, 
     lvInput("white").value = String(l?.white ?? 255);
     lvInput("gamma").value = String(l?.gamma ?? 1);
   };
+  // view-state: (a chooser's own control: what it picks goes to the command of what opened it)
   pop.querySelector<HTMLSelectElement>("[data-lv-ch]")!.addEventListener("change", (e) => {
     lvCh = (e.target as HTMLSelectElement).value as Channel;
     syncLevels();
   });
   for (const k of ["black", "white", "gamma"] as const) {
+    // view-state: (a chooser's own control: what it picks goes to the command of what opened it)
     lvInput(k).addEventListener("input", () => {
       const v = Number(lvInput(k).value);
       if (!Number.isFinite(v) || lvInput(k).value === "") return;
       cur = { ...cur, levels: { ...cur.levels, [lvCh]: { ...cur.levels?.[lvCh], [k]: v } } };
       schedulePreview();
     });
+    // view-state: (a chooser's own control: what it picks goes to the command of what opened it)
     lvInput(k).addEventListener("change", () => {
       cancelPreview();
       emitChange("Adjust picture");
@@ -1424,6 +1447,7 @@ function buildAdjustLayer(host: HTMLElement, o: AdjustOptions, layerAt: number, 
     cancelPreview();
     emitChange("Adjust picture");
   });
+  // view-state: (a chooser's own control: what it picks goes to the command of what opened it)
   cv.addEventListener("dblclick", (e) => {
     const i = hit(...local(e as unknown as PointerEvent));
     const pts = points();
@@ -1453,11 +1477,13 @@ function buildAdjustLayer(host: HTMLElement, o: AdjustOptions, layerAt: number, 
     e.preventDefault();
     drawCurve();
   });
+  // view-state: (a chooser's own control: what it picks goes to the command of what opened it)
   pop.querySelector<HTMLSelectElement>("[data-cv-ch]")!.addEventListener("change", (e) => {
     cvCh = (e.target as HTMLSelectElement).value as Channel;
     picked = -1;
     drawCurve();
   });
+  // view-state: (a chooser's own control: what it picks goes to the command of what opened it)
   pop.querySelector<HTMLElement>("[data-cv-reset]")!.addEventListener("click", () => {
     const { [cvCh]: _gone, ...rest } = cur.curves ?? {};
     cur = { ...cur, curves: Object.keys(rest).length ? rest : undefined } as Adjust;
