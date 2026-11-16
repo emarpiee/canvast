@@ -31,7 +31,7 @@ export interface MenuItem {
   /** Names the item for tests and scripts (`data-id`). */
   id?: string;
   /** The id of the command it runs (ADR 0205): every menu row runs one. */
-  command?: string;
+  command: string;
   run(): void;
 }
 

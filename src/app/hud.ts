@@ -10,7 +10,7 @@ import { ICONS } from "../ui/icons";
 import { syncScroll } from "../ui/bar";
 import { openColourPopover } from "../ui/colour-popover";
 import { hexOfCss } from "../ui/text-editor";
-import { commands, pressCommand } from "../commands/registry";
+import { commands, pressCommand, runCommand } from "../commands/registry";
 import { markCommands } from "../commands/from-bars";
 import type { Command } from "../commands/types";
 
@@ -186,6 +186,15 @@ export function mountHud(root: HTMLElement, view: ViewState, stats: FrameStats, 
     exec: (o) => exec(String(o[name])),
   });
   commands.setProvider("view-controls", () => [
+    { id: "view.zoomTo", group: "View", kind: "view", title: "Zoom to a level", hint: "3000, 2^-500 or 10^900", risk: "edit", why: () => null,
+      options: [{ name: "level", type: "text", doc: "the zoom level: a number, 2^n or 10^n", required: true }],
+      exec: (o) => {
+        const level = parseZoomLevel(String(o["level"]));
+        if (level === null) return { ok: false, error: `"${String(o["level"])}" is not a zoom level. Try 3000, 2^-500 or 10^900.` };
+        if (!(Math.abs(level - viewLevel(view)) <= MAX_JUMP_LEVELS)) return { ok: false, error: "Jumps are limited to 2^50 (about 10^15) levels at a time; jump again to go further." };
+        zoomTo(view, level);
+        return { ok: true };
+      } },
     hc("canvas.setPattern", "The canvas pattern", "A grid, dots, a scale or none", "pattern", PATTERNS, (v) => status.setPattern(v as CanvasPattern)),
     hc("view.setNames", "Names on items", "On all, on the selected, or off", "names", NAMES, (v) => status.setItemNames(v as ItemNames)),
     hc("view.setInfo", "The info bar", "Simple, more, technical or hidden", "mode", MODES, (v) => status.setInfoMode(v as InfoMode)),
@@ -199,7 +208,7 @@ export function mountHud(root: HTMLElement, view: ViewState, stats: FrameStats, 
       } },
   ]);
   const HUD_COMMAND: Readonly<Record<string, string>> = { "zoom-in": "view.zoomIn", "zoom-out": "view.zoomOut", "fit-selection": "view.fitSelection", "fit-all": "view.fitAll", "random-view": "view.random", "cam-back": "view.back", "cam-fwd": "view.forward", home: "view.home", zen: "view.zen" };
-  markCommands(root, [...Object.entries(HUD_COMMAND).map(([a, id]) => [`[data-action="${a}"]`, id] as const), ['[data-action="pattern"]', "canvas.setPattern"], ['[data-action="names"]', "view.setNames"], ['[data-action="info"]', "view.setInfo"], ['[data-action="background"]', "canvas.setBackground"]]);
+  markCommands(root, [['[data-testid="zoom-readout"]', "view.zoomTo"], ...Object.entries(HUD_COMMAND).map(([a, id]) => [`[data-action="${a}"]`, id] as const), ['[data-action="pattern"]', "canvas.setPattern"], ['[data-action="names"]', "view.setNames"], ['[data-action="info"]', "view.setInfo"], ['[data-action="background"]', "canvas.setBackground"]]);
   root.querySelector(".hud-controls")!.addEventListener("click", (e) => {
     const action = (e.target as HTMLElement).closest("button")?.dataset["action"] ?? "";
     if (HUD_COMMAND[action]) pressCommand(HUD_COMMAND[action]!);
@@ -355,18 +364,11 @@ export function mountHud(root: HTMLElement, view: ViewState, stats: FrameStats, 
       e.preventDefault();
     } else if (e.key === "Enter") {
       e.preventDefault();
-      const level = parseZoomLevel(zoomInput.value);
-      if (level === null) {
-        status.notify(`"${zoomInput.value}" is not a zoom level. Try 3000, 2^-500 or 10^900.`);
-        return;
-      }
-      if (!(Math.abs(level - viewLevel(view)) <= MAX_JUMP_LEVELS)) {
-        status.notify(`Jumps are limited to 2^50 (about 10^15) levels at a time; jump again to go further.`);
-        return;
-      }
-      zoomTo(view, level);
-      closeInput();
-      document.getElementById("canvas")?.focus();
+      void runCommand("view.zoomTo", { level: zoomInput.value }).then((r) => {
+        if (!r.ok) return status.notify(r.error);
+        closeInput();
+        document.getElementById("canvas")?.focus();
+      });
     }
   });
   zoomInput.addEventListener("blur", closeInput);
