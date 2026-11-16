@@ -58,6 +58,7 @@ import snowflakeSvg from "lucide-static/icons/snowflake.svg";
 import dice5Svg from "lucide-static/icons/dice-5.svg";
 import shuffleSvg from "lucide-static/icons/shuffle.svg";
 import sparklesSvg from "lucide-static/icons/sparkles.svg";
+import botSvg from "lucide-static/icons/bot.svg";
 import imageUpSvg from "lucide-static/icons/image-up.svg";
 import arrowRightLeftSvg from "lucide-static/icons/arrow-right-left.svg";
 import cornerUpRightSvg from "lucide-static/icons/corner-up-right.svg";
@@ -740,6 +741,8 @@ export const ICONS = {
   dice5: clean(dice5Svg),
   shuffle: clean(shuffleSvg),
   sparkles: clean(sparklesSvg),
+  /** AI agents (Settings > AI agents, ADR 0205). */
+  tabAgents: clean(botSvg),
   mountainSnow: clean(mountainSnowSvg),
   snowflake: clean(snowflakeSvg),
   imageUp: clean(imageUpSvg),

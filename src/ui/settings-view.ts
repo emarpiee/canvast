@@ -114,7 +114,7 @@ function cardsOf(rows: readonly Row[]): Array<{ title: string; rows: Row[] }> {
 
 /** The tabs in the sidebar, in groups. */
 /** The icon of each tab (Screenshot shares the camera of the Screenshot button). */
-const TAB_ICON: Record<string, keyof typeof ICONS> = { drawing: "tabDrawing", navigation: "tabNavigation", shortcuts: "tabShortcuts", media: "tabMedia", library: "tabLibrary", notes: "tabNotes", saving: "tabSaving", screenshot: "camera", appearance: "tabAppearance", panels: "tabPanels", performance: "tabPerformance", storage: "tabStorage", sharing: "tabSharing", privacy: "tabPrivacy", about: "tabAbout", develop: "tabDevelop", photocraft: "photoCraft" };
+const TAB_ICON: Record<string, keyof typeof ICONS> = { drawing: "tabDrawing", navigation: "tabNavigation", shortcuts: "tabShortcuts", media: "tabMedia", library: "tabLibrary", notes: "tabNotes", saving: "tabSaving", screenshot: "camera", appearance: "tabAppearance", panels: "tabPanels", performance: "tabPerformance", storage: "tabStorage", sharing: "tabSharing", privacy: "tabPrivacy", agents: "tabAgents", about: "tabAbout", develop: "tabDevelop", photocraft: "photoCraft" };
 
 const TAB_GROUPS: ReadonlyArray<readonly [title: string, ids: readonly string[]]> = [
   ["Working", ["drawing", "navigation", "shortcuts"]],
@@ -123,7 +123,7 @@ const TAB_GROUPS: ReadonlyArray<readonly [title: string, ids: readonly string[]]
   ["Interface", ["appearance", "performance"]],
   // (ArtCraft's tools, each a tab: PhotoCraft today)
   ["ArtCraft", ["photocraft"]],
-  ["App", ["storage", "sharing", "privacy", "about", "develop"]],
+  ["App", ["storage", "sharing", "privacy", "agents", "about", "develop"]],
 ];
 
 const SCOPE_LABEL = { device: "This device", workspace: "This workspace", board: "This board" } as const;
