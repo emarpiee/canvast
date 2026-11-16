@@ -15,6 +15,14 @@ const CONTROLS = "button, input:not([type=hidden]):not([type=file]), select";
 let reveal: ((el: HTMLElement) => void) | null = null;
 export const setControlRevealer = (fn: (el: HTMLElement) => void): void => void (reveal = fn);
 
+/**
+ * Put on each control of a bar the id of the command it runs (`data-command`), from a table of selectors (ADR 0205): the bar is then made of
+ * commands, the live audit finds it, and the reading of the bar below leaves it to that command. Called again when a bar is drawn again.
+ */
+export function markCommands(root: ParentNode, table: ReadonlyArray<readonly [selector: string, id: string]>): void {
+  for (const [sel, id] of table) for (const el of root.querySelectorAll<HTMLElement>(sel)) if (el.dataset["command"] !== id) el.dataset["command"] = id;
+}
+
 function usable(el: HTMLElement): boolean {
   if ((el as HTMLButtonElement).disabled) return false;
   const parked = el.closest<HTMLElement>("[data-parked]");
@@ -41,6 +49,7 @@ export function barCommands(root: ParentNode = document): Command[] {
     const group = bar.dataset["cmdGroup"]!;
     for (const el of bar.querySelectorAll<HTMLElement>(CONTROLS)) {
       if (el.closest("[data-cmd-group]") !== bar || !usable(el)) continue;
+      if (el.closest("[data-command], [data-view-state]")) continue; // (a control that runs a command of its own is that command, not a second one)
       const label = labelOf(el);
       const title = shortTitle(label);
       if (!title) continue;

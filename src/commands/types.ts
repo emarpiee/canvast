@@ -90,6 +90,8 @@ export interface Command {
   record?: boolean;
   /** A long command: it reports progress and can be cancelled. */
   job?: boolean;
+  /** A `confirm` command that shows the person its own dialog first (Delete the item?): an outside caller's run is asked there, not twice. */
+  asks?: boolean;
   /** Why it cannot run now, or null when it can. */
   why?: () => string | null;
   /** (Old form of `why`) false when it cannot be done now. */

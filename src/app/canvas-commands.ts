@@ -168,7 +168,7 @@ export function canvasCommands(a: CanvasActions): Command[] {
     cmd("edit.paste", "Edit", "Paste", "From the clipboard", "edit", canvas, onItems(() => a.paste()), { keys: "Ctrl+V" }),
     item("edit.duplicate", "Edit", "Duplicate", "A copy beside it", () => a.duplicate(), picked, { words: "copy" }),
     item("edit.rename", "Edit", "Rename", "Give it a new name", () => a.rename(), writable(when(canvas, a.canRename, "No picture is selected.")), { words: "file name picture image library layer" }),
-    cmd("edit.deleteEverywhere", "Edit", "Delete everywhere", "From every canvas and the library", "confirm", writable(when(picked, a.canDeleteEverywhere, "No library file is selected.")), onItems(() => a.deleteEverywhere()), { options: [IDS], words: "remove erase library every canvas file" }),
+    cmd("edit.deleteEverywhere", "Edit", "Delete everywhere", "From every canvas and the library", "confirm", writable(when(picked, a.canDeleteEverywhere, "No library file is selected.")), onItems(() => a.deleteEverywhere()), { options: [IDS], words: "remove erase library every canvas file", asks: true }),
     cmd("edit.delete", "Edit", "Delete the selection", "From this canvas", "confirm", picked, onItems(() => a.deleteSelection()), { options: [IDS], words: "remove erase" }),
     cmd("edit.showHidden", "Edit", "Show all hidden", "Items hidden on this canvas", "edit", when(canvas, a.anyHidden, "Nothing is hidden on this canvas."), () => a.showHidden(), { words: "unhide reveal eye" }),
     cmd("edit.unlockAll", "Edit", "Unlock all", "So they can be moved", "edit", when(canvas, a.anyLocked, "Nothing is locked."), () => a.unlockAll(), { words: "unlock locked" }),

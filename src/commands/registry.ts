@@ -133,7 +133,7 @@ export class CommandRegistry {
     if (ctx.caller === "agent") {
       if (risk === "refused") return { ok: false, error: `"${c.title}" can only be done by the person, in the app.` };
       if (this.readOnlyCallers && risk !== "read") return { ok: false, error: "Outside callers may only read now (Settings: the connection is read-only)." };
-      if (risk === "confirm") {
+      if (risk === "confirm" && !c.asks) {
         const ask = this.confirmer ? this.confirmer(c, options, ctx.caller).catch(() => false) : Promise.resolve(false);
         return ask.then((yes) => (yes ? this.perform(c, options, ctx) : { ok: false, error: `The person did not allow "${c.title}".` }));
       }

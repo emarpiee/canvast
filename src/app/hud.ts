@@ -11,6 +11,7 @@ import { syncScroll } from "../ui/bar";
 import { openColourPopover } from "../ui/colour-popover";
 import { hexOfCss } from "../ui/text-editor";
 import { commands, pressCommand } from "../commands/registry";
+import { markCommands } from "../commands/from-bars";
 import type { Command } from "../commands/types";
 
 /** Simple: zoom and whether it is saved, in plain words. More: adds position, objects and how smoothly it runs. Technical: the numbers. Hidden: nothing. */
@@ -198,6 +199,7 @@ export function mountHud(root: HTMLElement, view: ViewState, stats: FrameStats, 
       } },
   ]);
   const HUD_COMMAND: Readonly<Record<string, string>> = { "zoom-in": "view.zoomIn", "zoom-out": "view.zoomOut", "fit-selection": "view.fitSelection", "fit-all": "view.fitAll", "random-view": "view.random", "cam-back": "view.back", "cam-fwd": "view.forward", home: "view.home", zen: "view.zen" };
+  markCommands(root, [...Object.entries(HUD_COMMAND).map(([a, id]) => [`[data-action="${a}"]`, id] as const), ['[data-action="pattern"]', "canvas.setPattern"], ['[data-action="names"]', "view.setNames"], ['[data-action="info"]', "view.setInfo"], ['[data-action="background"]', "canvas.setBackground"]]);
   root.querySelector(".hud-controls")!.addEventListener("click", (e) => {
     const action = (e.target as HTMLElement).closest("button")?.dataset["action"] ?? "";
     if (HUD_COMMAND[action]) pressCommand(HUD_COMMAND[action]!);

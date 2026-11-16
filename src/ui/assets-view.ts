@@ -4093,9 +4093,11 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     "show-file": ["library.showFile", "Show the file", "In this computer's file manager", "edit"],
     "add-mark": ["library.addBookmark", "Bookmark this page or view", "In the file's view", "edit"],
   };
+  /** The details' commands that show the person their own dialog first (ADR 0205: an agent's run is asked there, once). */
+  const ASKS = new Set(["delete", "delete-all", "delete-everywhere"]);
   const panelData: OptionSpec = { name: "data", type: "json", doc: "what the button carries: canvas (an id), tag, index" };
   commands.setProvider("library-panel", () => Object.entries(PANEL_COMMANDS).map(([action, [id, title, hint, risk]]): Command => ({
-    id, group: "Library", kind: "library", title, hint, risk,
+    id, group: "Library", kind: "library", title, hint, risk, ...(ASKS.has(action) ? { asks: true } : {}),
     options: [{ name: "hash", type: "id", doc: "the item (default: the one shown in the details)" }, { name: "hashes", type: "ids", doc: "the items (default: the selected)" }, panelData, { name: "on", type: "boolean", doc: "on or off (default: the other of what it is now)" }],
     why: () => (!visible ? "This works in the Library." : session.readOnly && risk !== "read" && action !== "download" && action !== "show" ? REASON.readOnly : !selected ? REASON.noSelection : null),
     exec: (o) => {
@@ -4945,7 +4947,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     delete: ["folder.delete", "Delete the folder", "Its items stay in the library", "confirm"],
   };
   commands.setProvider("library-folders", () => Object.entries(FOLDER_COMMANDS).map(([action, [id, title, hint, risk]]): Command => ({
-    id, group: "Library", kind: "library", title, hint, risk,
+    id, group: "Library", kind: "library", title, hint, risk, ...(action === "hide" || action === "show" || action === "delete" ? { asks: true } : {}),
     options: [{ name: "id", type: "id", doc: "the folder", required: action !== "new" }],
     why: () => (!listing ? "The Library is not open yet." : session.readOnly && action !== "conceal" && action !== "pin" && action !== "export" ? REASON.readOnly : null),
     exec: (o) => {

@@ -4,6 +4,7 @@ import { RATIO_PRESETS, formatRatio, parseRatio } from "../app/export-size";
 import { esc } from "./format";
 import { openMoreMenu } from "./more-menu";
 import { commands, pressCommand } from "../commands/registry";
+import { markCommands } from "../commands/from-bars";
 import { REASON } from "../commands/types";
 import type { Command, Options, OptionSpec, Result } from "../commands/types";
 import type { MenuItem } from "./more-menu";
@@ -34,7 +35,7 @@ import type { LayoutCommand } from "../app/actions";
 import type { AlignKey, SortKey } from "../doc/arrange";
 import type { PenKind } from "../interaction/pens";
 import { ICONS } from "./icons";
-import { TOOL_COMMAND } from "../settings/shortcuts";
+import { TOOL_COMMAND, TOOL_ORDER } from "../settings/shortcuts";
 import { newInk, swatchBackground } from "../render/ink";
 import { penFromSlider, sliderFromPen } from "../interaction/pen-width";
 
@@ -247,6 +248,25 @@ export interface PropertiesBar {
   onUpdate(fn: () => void): void;
   refresh(): void;
 }
+
+/** Each control of the bars and the command it runs (ADR 0205: markCommands). */
+const BAR_COMMANDS: ReadonlyArray<readonly [string, string]> = [
+  ...TOOL_ORDER.map((t) => [`[data-tool="${t}"]`, TOOL_COMMAND[t]] as const),
+  ["[data-bookmarks]", "panel.bookmarks"], ["[data-styles]", "panel.styles"], ["[data-tags]", "panel.tags"], ["[data-layers]", "panel.layers"], ["[data-pattern-panel]", "panel.pattern"], ["[data-adjust-panel]", "panel.adjust"],
+  ["[data-size]", "tools.set"], ["[data-shape-width]", "tools.set"], ["[data-sides]", "tools.set"], ["[data-tips]", "tools.set"], ["[data-width]", "tools.set"], ["[data-eraser-size]", "tools.set"], ["[data-strength]", "tools.set"],
+  ["[data-stab]", "tools.toggle"], ["[data-erase-parts]", "tools.toggle"], ["[data-erase-groups]", "tools.toggle"], ["[data-box-axis]", "tools.toggle"], ["[data-ignore-fill]", "tools.toggle"], ["[data-snap]", "tools.toggle"], ["[data-follow]", "tools.toggle"], ["[data-lock-radius]", "tools.toggle"], ["[data-lock]", "tools.toggle"],
+  ["[data-pen-kind]", "tools.choose"], ["[data-shape-kind]", "tools.choose"], ["[data-color]", "tools.choose"], ["[data-colour-open]", "tools.choose"], ["[data-filter]", "tools.choose"],
+  ["[data-mask-ink=show]", "mask.paintWhite"], ["[data-mask-ink=hide]", "mask.paintBlack"], ["[data-mask-ink=done]", "mask.paintDone"],
+  ["[data-text-font]", "text.setStyle"], ["[data-text-size]", "text.setStyle"], ["[data-text-align]", "text.setStyle"], ["[data-text-fit]", "text.setStyle"], ["[data-text-colour]", "text.setStyle"], ["[data-text-outline]", "text.setStyle"], ["[data-text-outline-w]", "text.setStyle"], ["[data-text-font-options]", "text.setStyle"], ["[data-text-box]", "text.setStyle"], ["[data-text-line]", "text.setStyle"], ["[data-text-track]", "text.setStyle"],
+  ["[data-pin-h]", "item.setPin"], ["[data-pin-v]", "item.setPin"], ["[data-on-x]", "item.moveOnSheet"], ["[data-on-y]", "item.moveOnSheet"], ["[data-on-w]", "item.resizeOnSheet"], ["[data-on-h]", "item.resizeOnSheet"],
+  ["[data-sheet-ratio]", "sheet.setRatio"], ["[data-sheet-preset]", "sheet.setRatio"], ["[data-sheet-turn]", "sheet.turn"], ["[data-sheet-scale]", "sheet.toggleScale"],
+  ["[data-auto-layout] input, [data-auto-layout] select, [data-layout-flow], [data-layout-overflow], [data-layout-tracks]", "sheet.setLayout"], ["[data-layout-styles]", "layout.applyStyle"], ["[data-layout-pad-each]", "sheet.setLayout"],
+  ["[data-in-span], [data-in-min], [data-in-max], [data-in-fill], [data-in-free]", "item.setInLayout"],
+  ["[data-crop]", "picture.crop"], ["[data-uncrop]", "picture.uncrop"], ["[data-flip=x]", "edit.flipH"], ["[data-flip=y]", "edit.flipV"], ["[data-unflip]", "item.unflip"],
+  ["[data-sel-radius]", "shape.setCorners"], ["[data-sel-sides], [data-sel-tips], [data-sel-inner]", "shape.set"], ["[data-sel-smooth]", "path.setSmoothing"], ["[data-outline-w]", "item.setStrokeWidth"],
+  ["[data-paint]", "paint.set"], ["[data-outline-options]", "paint.set"], ["[data-sel-colour]", "paint.replace"], ["[data-sel-more]", "paint.replace"],
+  ['[data-action="import"]', "canvas.importFiles"], ['[data-action="search"]', "find.canvas"], ['[data-action="screenshot"]', "view.screenshot"], ['[data-action="undo"]', "edit.undo"], ['[data-action="redo"]', "edit.redo"],
+];
 
 export function mountToolbar(root: HTMLElement, editor: EditorState, doc: DocumentStore, actions: ToolbarActions): PropertiesBar {
   root.innerHTML = `
@@ -1157,6 +1177,8 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
   pickGroup.addEventListener("click", onClick); // commands: (onClick runs the bar's commands)
 
   const update = (): void => {
+    markCommands(root, BAR_COMMANDS);
+    for (const b of qa<HTMLElement>("[data-subject]")) b.dataset["viewState"] = ""; // (which kind of the selection the bar shows)
     balloonBar.sync(); // (before the groups are sorted: what applies is shown)
     for (const b of qa<HTMLElement>("[data-tool]")) {
       // (Shape and Path are one place on the rail: the Shape button stays lit on the Path tool, which is chosen in the options beside the shapes)
