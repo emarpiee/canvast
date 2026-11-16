@@ -60,7 +60,7 @@
     "src/ui/tags-panel.ts": 5,
     "src/ui/text-editor.ts": 3,
     "src/ui/texture-editor.ts": 10,
-    "src/ui/toolbar.ts": 46,
+    "src/ui/toolbar.ts": 4,
     "src/ui/trash-view.ts": 4,
     "src/ui/tree-chooser.ts": 3,
     "src/ui/view-state.ts": 2,

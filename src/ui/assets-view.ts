@@ -48,6 +48,9 @@ import { ICONS } from "./icons";
 import { editableInPhotoCraft } from "../artcraft/photocraft/app";
 import { clearRect, MENU_GAP, moreButton, openMoreMenu, pressAs } from "./more-menu";
 import type { MenuItem } from "./more-menu";
+import { commands, pressCommand } from "../commands/registry";
+import { REASON } from "../commands/types";
+import type { Command, OptionSpec, Risk } from "../commands/types";
 import { bindContextMenu, grouped as groupedMenu } from "./context-menu";
 import { openTreeChooser } from "./tree-chooser";
 import type { ChoiceNode, ChoiceState, ChoiceTab, ChooserView } from "./tree-chooser";
@@ -3793,14 +3796,11 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     if (chip && !target.closest("button") && !session.readOnly) return void renameTagDialog(chip.dataset["tagLabel"]!);
     if (selected && !session.readOnly && (e.target as HTMLElement).closest(".asset-insp-head h2") && entryOf(selected)) void renameAssetsDialog([selected]);
   });
-  inspector.addEventListener("click", (e) => {
-    const b = (e.target as HTMLElement).closest<HTMLButtonElement>("button");
-    if (!b || b.disabled || !selected) return;
-    const hash = selected;
-    const group = [...picked];
-    // (listed a page at a time: the details of picked items not drawn yet are fetched first, then the button does what it does)
-    if (pagesNow() && [hash, ...group].some((h) => !pagedCache.has(h))) return void ensure([hash, ...group]).then(() => b.isConnected && b.click());
-    const action = b.dataset["action"];
+  /** What a button of the details panel works on (ADR 0205): the same whether it is clicked or run by id. */
+  interface PanelCtx { hash: string; group: string[]; data: Readonly<Record<string, string | undefined>>; pressed: boolean; anchor: HTMLElement }
+  const panelAct = (action: string, c: PanelCtx): void => {
+    const { hash, group } = c;
+    const b = c.anchor; // (the button, or the panel when it runs by id: where a menu or a dialog opens)
     /** What the panel is about: every picked asset, or the one shown. */
     const pickedGroup = (): string[] => (picked.size > 1 ? group : [hash]);
     switch (action) {
@@ -3820,7 +3820,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
         break;
       }
       case "favorite-all": {
-        const on = b.getAttribute("aria-pressed") !== "true";
+        const on = !c.pressed;
         void session.organize((c) => c.updateMetaEach(group.map((hash) => ({ hash, change: { favorite: on } }))), on ? "Favourites" : "Not favourites");
         break;
       }
@@ -3852,7 +3852,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
         void showSlide(hash);
         break;
       case "show": {
-        const p = places.find((x) => x.canvasId === b.dataset["canvas"]);
+        const p = places.find((x) => x.canvasId === c.data["canvas"]);
         if (p) {
           showCanvas();
           void session.reveal(p.canvasId, p.ids);
@@ -3872,7 +3872,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
         openPlaceMenu(b, [hash]);
         break;
       case "hide-all": {
-        const on = b.getAttribute("aria-pressed") !== "true";
+        const on = !c.pressed;
         void readyForHidden(session, on).then((ready) => void (ready && session.organize((c) => c.updateMetaEach(group.map((h) => ({ hash: h, change: { hidden: on } }))), on ? "Hidden" : "Not hidden").then((ok) => {
           if (ok) void moveThumbs(group, on);
           if (ok) void select(null); // (they leave the list, hidden or shown: nothing stays picked)
@@ -3880,7 +3880,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
         break;
       }
       case "hide": {
-        const on = b.getAttribute("aria-pressed") !== "true";
+        const on = !c.pressed;
         void readyForHidden(session, on).then((ready) => void (ready && session.organize((c) => c.updateMeta(hash, { hidden: on }), on ? "Hidden" : "Not hidden").then((ok) => {
           if (ok) void moveThumbs([hash], on);
           if (ok) void select(null);
@@ -3889,7 +3889,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       }
       case "favorite": {
         // The button shows the stored state it would change; set the opposite explicitly.
-        const on = b.getAttribute("aria-pressed") !== "true";
+        const on = !c.pressed;
         void session.organize((c) => c.updateMeta(hash, { favorite: on }));
         break;
       }
@@ -3902,18 +3902,18 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
         break;
       }
       case "go-copy":
-        void view.reveal([b.dataset["hash"]!]);
+        void view.reveal([c.data["hash"]!]);
         break;
       case "go-mark": {
         // Opens at it, when it is not open.
-        const hash = inspector.dataset["hash"], at = b.dataset["at"]!;
+        const hash = inspector.dataset["hash"], at = c.data["at"]!;
         if (!hash) break;
         if (note?.hash === hash) (note.goTo?.(at), viewer.focus());
         else void keepViewState(session, hash, { ...viewStateOf(entryOf(hash)), at }).then(() => showSlide(hash));
         break;
       }
       case "mark-more": {
-        const hash = inspector.dataset["hash"], at = b.dataset["at"]!, e = hash ? entryOf(hash) : undefined;
+        const hash = inspector.dataset["hash"], at = c.data["at"]!, e = hash ? entryOf(hash) : undefined;
         const mark = e && viewStateOf(e).marks.find((m) => m.at === at);
         if (!hash || !mark) break;
         // (an open view holds the list; else it is written here)
@@ -3928,7 +3928,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
         void note?.toggleMark?.();
         break;
       case "field-type": {
-        const now = notesNow().fields[Number(b.dataset["index"])];
+        const now = notesNow().fields[Number(c.data["index"])];
         if (!now?.key.trim()) break;
         const type = propType(now.key, now.value);
         openMoreMenu(b, PROP_TYPES.map((t) => ({ label: t.label, hint: t.expects, icon: PROP_ICON[t.id], checked: t.id === type, id: `prop-type-${t.id}`, run: () => pinType(now.key, t.id) })), "Property type");
@@ -3943,19 +3943,19 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       }
       case "field-remove": {
         const now = notesNow();
-        now.fields.splice(Number(b.dataset["index"]), 1);
+        now.fields.splice(Number(c.data["index"]), 1);
         saveNotes(hash, now, "Removed a property");
         break;
       }
       case "adopt-tag": {
-        const tag = b.dataset["tag"]!;
+        const tag = c.data["tag"]!;
         void session.organize((c) => c.updateMeta(hash, { addTags: [tag] }));
         break;
       }
       case "untag":
       case "tag-all": {
         // one asset, or every picked one (the panel is about all of them), in one write
-        const tag = b.dataset["tag"]!;
+        const tag = c.data["tag"]!;
         const change = action === "untag" ? { removeTags: [tag] } : { addTags: [tag] };
         void session.organize((c) => c.updateMetaEach(pickedGroup().map((h) => ({ hash: h, change }))), `${action === "untag" ? "Removed" : "Added"} #${tag}`);
         break;
@@ -3981,7 +3981,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
         void renameAssetsDialog(filtered().filter((h) => picked.has(h)));
         break;
       case "open-linked":
-        void showSlide(b.dataset["hash"]!);
+        void showSlide(c.data["hash"]!);
         break;
       case "open-tab":
         void openOriginalInTab(assets, hash);
@@ -4023,7 +4023,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
         void runExport(session, { kind: "assets", hashes: [hash] });
         break;
       case "show-more": {
-        const list = b.dataset["list"]!;
+        const list = c.data["list"]!;
         if (!openLists.delete(list)) openLists.add(list);
         renderInspector();
         break;
@@ -4053,6 +4053,62 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
         break;
       }
     }
+  };
+  /** The details panel's buttons that are commands (the others only show something, or edit the form in place). */
+  const PANEL_COMMANDS: Readonly<Record<string, readonly [id: string, title: string, hint: string, risk: Risk]>> = {
+    "place": ["library.place", "Place on the canvas", "The item, on the open canvas", "edit"],
+    "place-all": ["library.placeAll", "Place them on the canvas", "The selected items, in a grid", "edit"],
+    "favorite": ["library.favorite", "Favourite", "Add it to the favourites, or take it out", "edit"],
+    "favorite-all": ["library.favoriteAll", "Favourites", "Add them to the favourites, or take them out", "edit"],
+    "hide": ["library.hide", "Hide", "Into the hidden items, or back out", "confirm"],
+    "hide-all": ["library.hideAll", "Hide them", "Into the hidden items, or back out", "confirm"],
+    "export-files-all": ["library.exportFiles", "Export the files as ZIP", "A plain ZIP of the selected items' files", "confirm"],
+    "export-all": ["library.exportArchive", "Export as archive", "A .canvast archive of the selected items", "confirm"],
+    "export": ["library.export", "Export the item", "A .canvast archive of this item", "confirm"],
+    "slideshow-all": ["library.slideshow", "Slideshow of these", "The selected items one after another", "edit"],
+    "delete-all": ["library.deleteUnused", "Delete the unused", "The selected items on no canvas, from the library", "confirm"],
+    "delete-everywhere": ["library.deleteEverywhere", "Delete everywhere", "The items and every use of them", "confirm"],
+    "delete": ["library.delete", "Delete the item", "From the library, when nothing uses it", "confirm"],
+    "show": ["library.showOnCanvas", "Show where it is used", "The canvas with it, at it", "edit"],
+    "adopt-tag": ["library.adoptTag", "Add the suggested tag", "A tag it has on a canvas, on the item", "edit"],
+    "tag-all": ["library.tag", "Tag them", "One tag on every selected item", "edit"],
+    "untag": ["library.untag", "Remove the tag", "From every selected item", "edit"],
+    "field-remove": ["library.removeProperty", "Remove the property", "One property of its note", "edit"],
+    "organize": ["library.organize", "Organize", "Folders and tags of the selected items", "edit"],
+    "download": ["library.download", "Download the file", "Its file, to this device", "confirm"],
+    "rename": ["library.rename", "Rename the item", "Give it a new name", "edit"],
+    "rename-all": ["library.renameAll", "Rename them", "Enumerate, replace or add text", "edit"],
+    "open-tab": ["library.openTab", "Open in a new tab", "The file, as the browser shows it", "edit"],
+    "photocraft": ["library.photocraft", "Edit in PhotoCraft", "The picture in the photo editor", "edit"],
+    "thumb": ["library.thumbnail", "Choose a thumbnail", "A picture of your own for its card", "edit"],
+    "thumb-all": ["library.thumbnailAll", "Choose a thumbnail for them", "One picture for every selected card", "edit"],
+    "open-app": ["library.openApp", "Open in its app", "The file, in this computer's app for it", "confirm"],
+    "show-file": ["library.showFile", "Show the file", "In this computer's file manager", "edit"],
+    "add-mark": ["library.addBookmark", "Bookmark this page or view", "In the file's view", "edit"],
+  };
+  const panelData: OptionSpec = { name: "data", type: "json", doc: "what the button carries: canvas (an id), tag, index" };
+  commands.setProvider("library-panel", () => Object.entries(PANEL_COMMANDS).map(([action, [id, title, hint, risk]]): Command => ({
+    id, group: "Library", kind: "library", title, hint, risk,
+    options: [{ name: "hash", type: "id", doc: "the item (default: the one shown in the details)" }, { name: "hashes", type: "ids", doc: "the items (default: the selected)" }, panelData, { name: "on", type: "boolean", doc: "on or off (default: the other of what it is now)" }],
+    why: () => (!visible ? "This works in the Library." : session.readOnly && risk !== "read" && action !== "download" && action !== "show" ? REASON.readOnly : !selected ? REASON.noSelection : null),
+    exec: (o) => {
+      const hash = (o["hash"] as string | undefined) ?? selected!;
+      const anchor = inspector.querySelector<HTMLElement>(`[data-action="${action}"]`) ?? inspector;
+      const pressed = o["on"] === undefined ? anchor.getAttribute("aria-pressed") === "true" : o["on"] !== true;
+      panelAct(action, { hash, group: (o["hashes"] as string[] | undefined) ?? [...picked], data: { ...anchor.dataset, ...((o["data"] as Record<string, string>) ?? {}) }, pressed, anchor });
+    },
+  })));
+  inspector.addEventListener("click", (e) => {
+    const b = (e.target as HTMLElement).closest<HTMLButtonElement>("button");
+    if (!b || b.disabled || !selected) return;
+    const hash = selected;
+    const group = [...picked];
+    // (listed a page at a time: the details of picked items not drawn yet are fetched first, then the button does what it does)
+    if (pagesNow() && [hash, ...group].some((h) => !pagedCache.has(h))) return void ensure([hash, ...group]).then(() => b.isConnected && b.click());
+    const action = b.dataset["action"] ?? "";
+    const id = PANEL_COMMANDS[action]?.[0];
+    if (id) return void pressCommand(id, { hash, hashes: group, data: { ...b.dataset } as Record<string, string>, on: b.getAttribute("aria-pressed") !== "true" });
+    panelAct(action, { hash, group, data: { ...b.dataset }, pressed: b.getAttribute("aria-pressed") === "true", anchor: b }); // view-state: (what only shows something or edits the form in place)
   });
   /** Counts presses and clicks anywhere: a field that would take the focus back after a write first checks that none came in between. */
   let inputs = 0;
