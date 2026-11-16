@@ -39,6 +39,27 @@ A file that shows the problem (a small `.canvast` backup) helps even more. A **s
 | Tests from a snapshot | Every test runs from its own build (`npm run test:snap`), never from `dist/` |
 | Plain words | The interface says what things do in common words; the README describes only what the app does now |
 
+## What is planned
+
+[BACKLOG.md](BACKLOG.md) lists the work that is not done yet, each item with its priority and status. Before asking for a feature or starting a change, look there: it may be planned, or dropped with the reason. A pull request for an item names its ID (`B7`).
+
+## Builds for other systems
+
+The desktop app is made, tested and shipped for Linux. **Builds for Windows and macOS are open for contribution**, on these terms:
+
+| Term | |
+| --- | --- |
+| A maintainer | Each system has someone who builds it, tests it on that system and answers its issues. A build with no maintainer is not shipped |
+| Built on GitHub | It is made and checked by a workflow on GitHub's own Windows or macOS machines, as the Linux packages are (`release-packages.yml`): never on a personal computer |
+| The same rules | The same code, tests and checks; the end-to-end suite runs on that system too. What only that system needs stays in the desktop shell (`desktop/`), behind the bridge the app already uses |
+| No step back on Linux | A change for another system that breaks or slows the Linux app is not merged |
+| Signing | A build that the system warns about or blocks unsigned (macOS notarization, Windows SmartScreen) is signed, with the maintainer's certificate and the cost theirs, before it is shipped |
+| Releases | It is attached to the same releases, from the same version, and listed under *Installation* in the README |
+| Support | Bugs on that system go to its maintainer; the README says what is verified there and what is not (Limitations) |
+| Retiring | A build whose maintainer leaves, or that fails its checks for two releases, stops being shipped; the README says so |
+
+Open an issue first to say which system you would take on: the details are settled there before any work starts.
+
 ## Supporting the developer
 
 If canvast helps your work, you can support its development through [PayPal](https://paypal.me/emarpiee).

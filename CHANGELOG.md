@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.60.12 — A public backlog, builds for other systems open for contribution (2026-11-16)
+
+- **Added:** `BACKLOG.md` beside the CHANGELOG: the work not done yet, each item with an ID, its priority (high, medium, low) and status (open, closed, removed); closed and removed items stay, with the version or the reason. The README's *Contributing and support* and CONTRIBUTING.md point to it.
+- **Added:** *Builds for other systems* in CONTRIBUTING.md: Windows and macOS builds are open for contribution, with a maintainer per system, built and tested on GitHub, signed, and retired if left unmaintained (B13). The README's desktop section and Limitations say so.
+
 ## 0.60.11 — Move folders, Unfiled in Organize, smoother page turning (2026-11-16)
 
 - **Added:** **Move to…** in a folder's ⋯ menu moves it, with its subfolders and items, into another folder or to **Top level**, in the Organize dialog (the folder itself and those inside it are not offered); a folder can also be dragged onto another, or onto the Folders heading for the top. A shown folder cannot go into a hidden one, and a folder hidden by the one it leaves stays hidden.
