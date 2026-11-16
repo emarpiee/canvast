@@ -5,6 +5,7 @@ The work on canvast that is not done yet, and what became of each item. **Priori
 | ID | Item | Priority | Status | Notes |
 | --- | --- | --- | --- | --- |
 | B1 | README pictures for the newest features (the ZIP and comic book viewer, folder *Move to…*, *Pasted picture name* in Settings, maybe the rename and move progress notice), and new ones for the PDF, 3D and sidebar pictures that show an older look | high | open | The ZIP viewer's section and pictures wait for the owner's approval of its look |
+| B23 | Better-formatted release notes on GitHub | high | open | Owner request 2026-11-16; the format to be agreed with the owner |
 | B2 | The library scrolls smoothly at large thumbnail sizes (measured at 35 frames a second at size 96) | high | open | Benchmark on the `bench-scroll` branch |
 | B3 | Faster test runs: each change runs only the tests whose code it touches, found from recorded coverage | medium | open | Approved, not started |
 | B4 | A vector network can have a fill for each closed region, not one fill for the whole network | medium | open | A limit listed in the README |
