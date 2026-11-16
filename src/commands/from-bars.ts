@@ -43,26 +43,33 @@ export function keysIn(tooltip: string): string | undefined {
   return k && k.length <= 24 && /^(?:Ctrl|Alt|Shift|Meta|Cmd|Esc|Enter|Delete|Space|[A-Z0-9+\-−/[\]]{1,3})(?:[+\s]|$)/.test(k) ? k : undefined;
 }
 
+const slugOf = (s: string): string => s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+
 export function barCommands(root: ParentNode = document): Command[] {
   const out: Command[] = [];
   for (const bar of root.querySelectorAll<HTMLElement>("[data-cmd-group]")) {
     const group = bar.dataset["cmdGroup"]!;
     for (const el of bar.querySelectorAll<HTMLElement>(CONTROLS)) {
       if (el.closest("[data-cmd-group]") !== bar || !usable(el)) continue;
-      if (el.closest("[data-command], [data-view-state]")) continue; // (a control that runs a command of its own is that command, not a second one)
       const label = labelOf(el);
       const title = shortTitle(label);
       if (!title) continue;
       const field = el instanceof HTMLInputElement || el instanceof HTMLSelectElement;
       const tooltip = el.title || label;
+      const runs = el.closest<HTMLElement>("[data-command]")?.dataset["command"];
       out.push({
+        id: `bar.${slugOf(group)}:${slugOf(title)}`,
+        hint: tooltip.length > 60 ? `${tooltip.slice(0, 57)}…` : tooltip,
+        risk: "edit",
+        paletteOnly: true,
+        ...(runs ? { paletteOf: runs } : {}),
         title: field ? `Edit ${title.toLowerCase()}` : title,
         group,
         kind: "toolbar",
         ...(keysIn(tooltip) ? { keys: keysIn(tooltip)! } : {}),
         words: `${label} ${field ? "field" : "button"}`,
         enabled: () => usable(el),
-        run: () => {
+        exec: () => {
           if (el.closest("[data-parked]")) reveal?.(el);
           if (field) {
             el.focus();

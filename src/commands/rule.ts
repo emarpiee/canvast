@@ -17,7 +17,7 @@ export function ruleProblems(all: readonly ResolvedCommand[]): Array<{ id: strin
     if (!c.hint) missing.push("a hint");
     if (!c.risk) missing.push("a risk");
     if (!c.exec && !c.takes) missing.push("exec");
-    if (c.risk && c.risk !== "confirm" && c.risk !== "refused" && c.risk !== "read" && RISKY.test(c.title) && !/^(show|select|go to|open|lock)\b/i.test(c.title)) missing.push("risk confirm (it deletes or touches hidden items)");
+    if (!c.paletteOnly && c.risk && c.risk !== "confirm" && c.risk !== "refused" && c.risk !== "read" && RISKY.test(c.title) && !/^(show|select|go to|open|lock)\b/i.test(c.title)) missing.push("risk confirm (it deletes or touches hidden items)");
     if (missing.length) out.push({ id: c.id, source: c.source, missing });
   }
   return out;

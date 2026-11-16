@@ -184,7 +184,7 @@ export function mountTrashView(deps: TrashDeps): TrashView {
     showPicks();
     return null;
   };
-  const PATHS: OptionSpec = { name: "paths", type: "ids", doc: "the files in the trash (default: the selected)" };
+  const PATHS: OptionSpec = { name: "paths", type: "ids", doc: "the files in the trash", required: true };
   commands.setProvider("trash", () => [
     { id: "trash.restore", group: "Trash", kind: "trash", title: "Restore from the trash", hint: "Put it back where it was", risk: "edit", options: [PATHS], why: () => (deps.readOnly() ? REASON.readOnly : null),
       exec: async (o) => { const no = pickPaths(o); if (no) return { ok: false, error: no }; await restore(); return { ok: true }; } },
@@ -197,7 +197,7 @@ export function mountTrashView(deps: TrashDeps): TrashView {
     if (b.dataset["trash"] === "more") {
       shown += PAGE;
       drawIfChanged();
-    } else pressCommand(b.dataset["trash"] === "restore" ? "trash.restore" : "trash.erase");
+    } else pressCommand(b.dataset["trash"] === "restore" ? "trash.restore" : "trash.erase", { paths: [...picked] });
   };
   details.addEventListener("click", act); // commands: (act runs the trash's commands)
   // commands: (act runs the trash's commands; a click on a card picks it: what is selected)
@@ -234,8 +234,8 @@ export function mountTrashView(deps: TrashDeps): TrashView {
         showPicks();
       }
       return [
-        { label: "Restore", hint: "Put it back where it was", icon: ICONS.archiveRestore, command: "trash.restore", run: () => void pressCommand("trash.restore") },
-        { label: "Delete permanently", hint: "Cannot be undone", icon: ICONS.trash2, danger: true, command: "trash.erase", run: () => void pressCommand("trash.erase") },
+        { label: "Restore", hint: "Put it back where it was", icon: ICONS.archiveRestore, command: "trash.restore", run: () => void pressCommand("trash.restore", { paths: [...picked] }) },
+        { label: "Delete permanently", hint: "Cannot be undone", icon: ICONS.trash2, danger: true, command: "trash.erase", run: () => void pressCommand("trash.erase", { paths: [...picked] }) },
       ];
     },
   });

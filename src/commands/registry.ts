@@ -54,7 +54,7 @@ export class CommandRegistry {
         const kind = kindOf(c);
         const key = (kind === "settings" ? "s:" : "") + c.title.toLowerCase();
         const first = byTitle.get(key);
-        if (first && !c.id) {
+        if (first && (!c.id || c.paletteOnly)) { // (a bar's button of the same name as a command is that command, also found under the bar's kind)
           if (!first.kinds!.includes(kind)) first.kinds!.push(kind);
           continue;
         }
@@ -90,7 +90,7 @@ export class CommandRegistry {
   list(filter = ""): CommandRow[] {
     const f = filter.toLowerCase();
     return this.all()
-      .filter((c) => !f || `${c.id} ${c.title} ${c.group} ${c.words ?? ""}`.toLowerCase().includes(f))
+      .filter((c) => !c.paletteOnly && (!f || `${c.id} ${c.title} ${c.group} ${c.words ?? ""}`.toLowerCase().includes(f)))
       .map((c): CommandRow => {
         const reason = this.reasonOf(c);
         return {
@@ -131,6 +131,7 @@ export class CommandRegistry {
     if (reason) return { ok: false, error: reason };
     const risk = c.risk ?? "edit";
     if (ctx.caller === "agent") {
+      if (c.paletteOnly) return { ok: false, error: `"${c.title}" is a control of the bar: run its command (${c.paletteOf ?? "see command_list"}).` };
       if (risk === "refused") return { ok: false, error: `"${c.title}" can only be done by the person, in the app.` };
       if (this.readOnlyCallers && risk !== "read") return { ok: false, error: "Outside callers may only read now (Settings: the connection is read-only)." };
       if (risk === "confirm" && !c.asks) {

@@ -90,6 +90,10 @@ export interface Command {
   record?: boolean;
   /** A long command: it reports progress and can be cancelled. */
   job?: boolean;
+  /** A way to a control from the palette (a bar's button by its own name): not listed for an outside caller, which runs the control's command. */
+  paletteOnly?: boolean;
+  /** (A palette-only entry) the command its control runs. */
+  paletteOf?: string;
   /** A `confirm` command that shows the person its own dialog first (Delete the item?): an outside caller's run is asked there, not twice. */
   asks?: boolean;
   /** Why it cannot run now, or null when it can. */
