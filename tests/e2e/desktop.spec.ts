@@ -509,22 +509,22 @@ test("a big library (past the size library.json is kept for) writes only what ch
   // item's file changed outside the app always is), the one removed is missing.
   ({ app, page } = await launch(ws, "device-b"));
   try {
-    await expect.poll(listing, { timeout: 15_000 }).toEqual([["Pic 0.png", true], ["Pic 1.png", false], ...["Renamed One.png", "Pic 3.png", "Pic 4.png", "Pic 5.png"].map((n) => [n, true])].sort());
+    await expect.poll(listing, { timeout: 15_000 }).toEqual([["pic_0.png", true], ["pic_1.png", false], ...["renamed_one.png", "pic_3.png", "pic_4.png", "pic_5.png"].map((n) => [n, true])].sort());
     // Listed a page at a time (as if past 20,000 items: the library never comes to the page whole): the same cards, missing ones marked,
     // the same search, and an item picked shows its details; a rename shows on its card.
     await page.evaluate(() => window.__canvastDebug.libraryPaging(1));
     await page.getByTestId("view-assets").click();
     await expect(page.getByTestId("assets-count")).toHaveText("6 items");
     const names = () => page.locator('[data-testid="asset-card"] .asset-name').allTextContents().then((n) => n.sort());
-    await expect.poll(names).toEqual(["Pic 0.png", "Pic 1.png", "Pic 3.png", "Pic 4.png", "Pic 5.png", "Renamed One.png"]);
+    await expect.poll(names).toEqual(["pic_0.png", "pic_1.png", "pic_3.png", "pic_4.png", "pic_5.png", "renamed_one.png"]);
     await expect(page.locator('[data-testid="asset-card"].is-missing')).toHaveCount(1);
     await page.getByTestId("assets-search").fill("renamed");
     await expect(page.getByTestId("assets-count")).toHaveText("1 of 6 items");
     await page.getByTestId("asset-card").first().click();
-    await expect(page.getByTestId("asset-inspector")).toContainText("Renamed One.png");
-    await page.evaluate((h) => window.__canvastDebug.libraryOp("rename", h, "Again.png"), createHash("sha256").update(pics[2]!).digest("hex"));
+    await expect(page.getByTestId("asset-inspector")).toContainText("renamed_one.png");
+    await page.evaluate((h) => window.__canvastDebug.libraryOp("rename", h, "again.png"), createHash("sha256").update(pics[2]!).digest("hex"));
     await page.getByTestId("assets-search").fill("");
-    await expect.poll(names).toEqual(["Again.png", "Pic 0.png", "Pic 1.png", "Pic 3.png", "Pic 4.png", "Pic 5.png"]);
+    await expect.poll(names).toEqual(["again.png", "pic_0.png", "pic_1.png", "pic_3.png", "pic_4.png", "pic_5.png"]);
     // A property: suggested and sorted by where the library is, too.
     const setProp = async (name: string, key: string, value: string): Promise<void> => {
       await page.locator(`[data-testid="asset-card"][title="${name}"]`).click();
@@ -534,17 +534,17 @@ test("a big library (past the size library.json is kept for) writes only what ch
       await page.locator(".field-value").last().blur();
       await expect(page.locator(".field-value").last()).toHaveValue(value);
     };
-    await setProp("Pic 3.png", "rank", "10");
-    await setProp("Pic 4.png", "rank", "9");
-    await page.locator('[data-testid="asset-card"][title="Pic 5.png"]').click();
+    await setProp("pic_3.png", "rank", "10");
+    await setProp("pic_4.png", "rank", "9");
+    await page.locator('[data-testid="asset-card"][title="pic_5.png"]').click();
     await page.getByTestId("asset-field-add").click();
     await page.locator(".field-key").last().fill("rank");
     await page.locator(".field-value").last().focus();
     await expect.poll(() => page.getByTestId("field-value-suggest").locator("option").evaluateAll((l) => l.map((o) => (o as HTMLOptionElement).value).sort())).toEqual(["10", "9"]);
     await page.getByTestId("assets-sort").selectOption("prop:rank");
-    await expect.poll(() => page.locator('[data-testid="asset-card"] .asset-name').allTextContents().then((n) => n.slice(0, 2))).toEqual(["Pic 4.png", "Pic 3.png"]);
+    await expect.poll(() => page.locator('[data-testid="asset-card"] .asset-name').allTextContents().then((n) => n.slice(0, 2))).toEqual(["pic_4.png", "pic_3.png"]);
     // A list's items stay whole: in the library's files, and read again.
-    await page.locator('[data-testid="asset-card"][title="Pic 3.png"]').click();
+    await page.locator('[data-testid="asset-card"][title="pic_3.png"]').click();
     await page.getByTestId("asset-field-add").click();
     await page.locator(".field-key").last().fill("aliases");
     await page.locator(".field-key").last().blur();
@@ -554,7 +554,7 @@ test("a big library (past the size library.json is kept for) writes only what ch
     await page.reload();
     await page.waitForFunction(() => typeof window.__canvastDebug !== "undefined");
     await page.getByTestId("view-assets").click();
-    await page.locator('[data-testid="asset-card"][title="Pic 3.png"]').click();
+    await page.locator('[data-testid="asset-card"][title="pic_3.png"]').click();
     await expect(page.locator(".field-item")).toHaveText(["Smith, John×"]);
   } finally {
     await app.close();
@@ -1633,10 +1633,10 @@ test("library files changed outside the app: a renamed or moved file is found by
   try {
     await expect.poll(listing, { timeout: 15_000 }).toEqual([
       ["hand_copy.png", "poses", true, 0], // (the copy stays an item of its own)
-      ["loomis_hands.png", "anatomy", true, 1],
-      ["pose_one.png", "poses", true, 0],
       ["huge_art.kra", "poses", false, 0], // (their files removed above: missing)
       ["huge_scan.tif", "poses", false, 0],
+      ["loomis_hands.png", "anatomy", true, 1],
+      ["pose_one.png", "poses", true, 0],
       ["while_closed.png", "poses", true, 0],
     ]);
     expect(readdirSync(join(`${ws}-userdata`, "library-looks"))).toHaveLength(1);
