@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.60.23 — Honest answers to AI agents (2026-11-17)
+
+- **Fixed:** with the Select tool and nothing selected, setting a fill or outline said it was done but changed nothing; it now says nothing is selected (an AI agent drew 308 shapes with no paint this way). ([AI agents](README.md#ai-agents))
+- **Fixed:** Undo and Redo with nothing to take back say so instead of answering done; the history starts when the app is opened. ([AI agents](README.md#ai-agents))
+
 ## 0.60.22 — AI agents draw with less (2026-11-17)
 
 - **Added:** an AI agent can give a new shape its fill and outline (`item.create` with `fill` and `stroke`), select nothing (`select.none`), and read each item's fill and outline and a pattern's settings with its size on the view (`read.items`). ([AI agents](README.md#ai-agents))
