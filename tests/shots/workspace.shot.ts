@@ -153,6 +153,39 @@ test("ai-agents", async ({ scene: s }) => {
   await s.shot("ai-agents", await s.around({ els: ['[data-panel="agents"]'], pad: 8 }));
 });
 
+// (an AI agent at work, as a real link shows it: agentRun answers through the link's own code, so its pointer, the button and the list are drawn)
+const agentScene = async (s: Parameters<Parameters<typeof test>[2]>[0]["scene"]): Promise<string[]> => {
+  const art = await s.art("hokusai-under", "vangogh");
+  await s.canvas("Moodboard");
+  const placed = await s.placeRow(art);
+  await s.p.evaluate(() => window.__canvastDebug.setSetting("agents.on", true));
+  await s.p.evaluate(() => window.__canvastDebug.agentShown(true));
+  return placed;
+};
+
+test("agent-pointer", async ({ scene: s }) => {
+  await s.look({ theme: "dark", hue: 220 });
+  const placed = await agentScene(s);
+  const box = await s.box(placed);
+  // the agent labels the references it was asked to sort: a note under them, in its own words
+  const r = (await s.p.evaluate(({ x, y }) => window.__canvastDebug.agentRun("item.create", { kind: "text", x, y, w: 360, text: "Warm light from the left; keep the shadows blue" }), { x: box!.minX, y: box!.maxY + 24 })) as { ok: boolean; made?: string[] };
+  expect(r.ok).toBe(true);
+  await s.settle(300);
+  await s.shot("agent-pointer", await s.around({ objects: [...placed, ...(r.made ?? [])], pad: 72 }));
+});
+
+test("agent-activity", async ({ scene: s }) => {
+  await s.look({ theme: "light", hue: 220 });
+  const placed = await agentScene(s);
+  for (const [id, options] of [["select.items", { ids: placed }], ["edit.sheet", {}], ["tag.add", { tag: "light study", ids: placed }], ["view.fitSelection", {}]] as const) await s.p.evaluate(({ id, options }) => window.__canvastDebug.agentRun(id, options), { id, options });
+  await s.settle(300);
+  await s.shot("agent-button", await s.around({ els: [".view-settings"], pad: 12 }));
+  await s.p.getByTestId("agent-chip").click();
+  await expect(s.p.getByTestId("agent-activity-dialog")).toBeVisible();
+  await s.settle();
+  await s.shot("agent-activity", await s.around({ els: ['[data-testid="agent-activity-dialog"]'], pad: 12 }));
+});
+
 test("paste-name", async ({ scene: s }) => {
   await s.look({ theme: "light", hue: 40 });
   await s.p.getByTestId("view-settings").click();

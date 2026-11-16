@@ -2315,7 +2315,7 @@ node scripts/hidden-items.mjs encrypt ~/Art/my-workspace ~/decrypted/sketch.png
 | [Context menus](#context-menus) | What fits where you are |
 | [The info bar](#the-info-bar) | Zoom, position, saving, and what the app is doing |
 | [Settings](#settings) | Where each is kept, and the groups |
-| [AI agents](#ai-agents) | Let an AI agent on this computer use canvast, off until you turn it on |
+| [AI agents](#ai-agents) | Let an AI agent on this computer use canvast (alpha), off until you turn it on, and see what it does |
 | [Accessibility](#accessibility) | Keyboard, screen readers, motion, contrast |
 | [Keyboard and pointer reference](#keyboard-and-pointer-reference) | Every default shortcut |
 
@@ -2428,6 +2428,8 @@ Make the app yours: theme, theme colour, density and the canvas.
 
 Let an AI agent (a program that speaks MCP, such as Claude Desktop or Claude Code) arrange a board, tag a folder of references or export pictures for you, while you watch and allow what matters.
 
+> **Alpha.** AI agents are new and still changing. Every action is a command, but many commands still work only on what is selected, some answers are still being made clearer, and canvast must be open for an agent to use it. Options and answers may change between versions; a command that is renamed keeps answering to its old name.
+
 ![Settings, AI agents: Let AI agents use canvast turned on, a pairing code typed, and Agents may only look off](docs/screenshots/ai-agents.webp)
 
 | | |
@@ -2439,6 +2441,25 @@ Let an AI agent (a program that speaks MCP, such as Claude Desktop or Claude Cod
 | What it never does | Passwords, unlocking hidden items, these settings, sharing on the network and erasing the trash for good stay yours |
 | Only look | **Agents may only look**: it can list, search and read, and changes nothing |
 | Where it connects | To the canvast tools on this computer only (127.0.0.1), and only while it is on |
+
+#### Seeing what an agent does
+
+Watch an agent work as you would watch someone at your desk: where it is, what it just did, and what it did before.
+
+![Two paintings on a dark canvas and, under them, a note an AI agent has just written, outlined, with the agent's pointer on it labelled AI agent: Make an item](docs/screenshots/agent-pointer.webp)
+
+![The AI agent button left of the Settings button at the top right, its dot lit: an agent is connected](docs/screenshots/agent-button.webp)
+
+![What the AI agent did: its last actions newest first, each with its time: Zoom to the selection, Tag items, Put the selection on a sheet and Select items, with Go there beside those whose items are still there](docs/screenshots/agent-activity.webp)
+
+| | |
+| --- | --- |
+| Its pointer | Labelled **AI agent** and what it did, it goes to what the agent made or changed (or to the selection) and fades after a few seconds; those items are outlined for a moment. Your view never moves for it |
+| Work off the view | The pointer waits at the edge of the view, turned toward the place, with a ring pulsing round it |
+| The info bar | Says each action as it happens |
+| The AI agent button | Left of the Settings button while **Let AI agents use canvast** is on; its dot is lit while an agent is connected |
+| What it did | The button opens the agent's last actions, newest first: the time, what it did (a batch as one line, its steps counted), why not when it failed, and **Go there** to select and show what it touched |
+| Reduced motion | The pointer jumps instead of gliding, and the ring stays still |
 
 ### Accessibility
 
@@ -2510,7 +2531,10 @@ What canvast does not do today, for both versions, then each. **The limits that 
 | ZIPs | A text inside is shown up to 2 MB (a bigger one is imported to be read); one import takes at most 5,000 files; comic books as `.cbr` or `.cb7` are not read (a card says to open them in a comic reader) |
 | Text | No Indic shaping; other computers can wrap missing characters differently |
 | Partial backups | ⚠️ An Advanced export can only be added, never used to update a workspace. Links in notes to items left out find nothing until those items are there |
+| AI agents | In alpha: command options and answers may change between versions; many commands work only on what is selected |
+| AI agents | canvast must be open: an agent cannot use it without a window |
 | AI agents | The canvast tools need Node.js 20 or later; one agent at a time; a command that waits for you times out for the agent after two minutes |
+| AI agents | Off the view, the pointer finds only items in the canvas's own space, not items deep inside a nested frame (the info bar and the list still say what it did) |
 | Concealed folders | A view filter, not privacy: no password, nothing encrypted, the files stay readable on the disk. The canvas's font list and texture picker still offer their items |
 | Adjustment shapes | In an SVG, what is under one is written again through its filter; made into shapes again, it comes back as a plain path |
 | Saturation in SVG and video | An SVG and a playing video or GIF keep a colour's luminance when they take its colour away or place it on a gradient map, not how light it looks: the grey of a strong colour can differ a little from the canvas's |
@@ -2813,7 +2837,7 @@ Two parts of canvast are made to be used on their own, with no dependency on the
 
 ### Commands
 
-Every action of canvast is a command with a fixed name (`edit.undo`, `library.move`, `export.picture`), and the buttons, menus, keys, the command palette, macros and AI agents all run it by that name. An agent reads the list and runs commands through the canvast tools (`canvast-tools mcp`), an MCP server on its standard input and output:
+Every action of canvast is a command with a fixed name (`edit.undo`, `library.move`, `export.picture`), and the buttons, menus, keys, the command palette, macros and AI agents all run it by that name. The link to AI agents is in alpha ([AI agents](#ai-agents)): its options and answers may still change. An agent reads the list and runs commands through the canvast tools (`canvast-tools mcp`), an MCP server on its standard input and output:
 
 | MCP tool | What it does |
 | --- | --- |

@@ -244,7 +244,7 @@ export class EditorState {
   /** The things a Layers row (hovered or focused) stands for: they show their outline on the canvas (see `interaction/reveal.ts`). */
   revealIds: ReadonlySet<string> | null = null;
   /** Where an AI agent last worked (ADR 0205): its pointer is drawn there, over what it made or changed, outlined, until `until` (ms). */
-  agentMark: { ids: readonly string[]; title: string; at: number; until: number; from: { x: number; y: number } | null } | null = null;
+  agentMark: { ids: readonly string[]; title: string; at: number; until: number; from: { x: number; y: number } | null; off?: boolean } | null = null;
   /** A clipping mask (a sheet) that has been gone into by a double click: what is on it is picked one by one, as in an entered group. */
   openMask: string | null = null;
   /** Where the pointer is on the canvas (CSS px from its corner), or null when it is elsewhere: pasted things land there. Not a change: nothing redraws for it. */

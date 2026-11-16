@@ -1,6 +1,6 @@
 /**
  * Where an AI agent works (ADR 0205): a pointer with its name and what it did, drawn over the canvas where it made or changed something, so
- * the person sees it. When that place is off the view, the pointer waits at the view's edge and points the way. The view never moves for it.
+ * the person sees it. When that place is off the view, the pointer waits at the view's edge, points the way and pulses. The view never moves for it.
  */
 import { LABEL_FONT } from "./item-label";
 import type { SceneTheme } from "./scene-renderer";
@@ -8,10 +8,22 @@ import type { SceneTheme } from "./scene-renderer";
 const EDGE = 28;
 
 /** Draw the pointer at `p` (screen px), or at the view's edge toward it when it is off the view; `alpha` fades it out. */
-export function drawAgentPointer(ctx: CanvasRenderingContext2D, p: { x: number; y: number }, view: { width: number; height: number }, label: string, theme: SceneTheme, alpha: number): void {
+export function drawAgentPointer(ctx: CanvasRenderingContext2D, p: { x: number; y: number }, view: { width: number; height: number }, label: string, theme: SceneTheme, alpha: number, now = 0): boolean {
   const x = Math.min(Math.max(p.x, EDGE), view.width - EDGE);
   const y = Math.min(Math.max(p.y, EDGE), view.height - EDGE);
   const off = x !== p.x || y !== p.y;
+  if (off) {
+    // (off the view: a ring pulses round it at the edge, so the eye finds it)
+    const t = (now % 1200) / 1200;
+    ctx.save();
+    ctx.globalAlpha = Math.max(0, Math.min(1, alpha)) * (1 - t);
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = theme.selection;
+    ctx.beginPath();
+    ctx.arc(x, y, 10 + 22 * t, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
+  }
   ctx.save();
   ctx.globalAlpha = Math.max(0, Math.min(1, alpha));
   ctx.translate(x, y);
@@ -53,4 +65,5 @@ export function drawAgentPointer(ctx: CanvasRenderingContext2D, p: { x: number; 
   ctx.textBaseline = "middle";
   ctx.fillText(text, lx + 6, ly + h / 2 + 0.5);
   ctx.restore();
+  return off;
 }

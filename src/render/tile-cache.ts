@@ -389,7 +389,6 @@ export class TileCache {
       }
     }
     const buildStart = performance.now();
-    this.renderedTotal += missing.length;
     // (over a backdrop, a few tiles a frame, from the middle of the view outwards)
     const backEdge = this.back ? this.extent(this.back, cam, vp, dpr) : null;
     if (backEdge && missing.length > 1) {
@@ -397,7 +396,10 @@ export class TileCache {
       const far = ([i, j]: [number, number]): number => ((i + 0.5) * td - ci) ** 2 + ((j + 0.5) * td - cj) ** 2;
       missing.sort((a, b) => far(a) - far(b));
     }
-    const visible = missing.length ? this.buildTiles(g, missing, dx, dy, vp, dpr, query, drawObjects, reach, backEdge ? BUILD_MS : Infinity).visible : 0;
+    const done = missing.length ? this.buildTiles(g, missing, dx, dy, vp, dpr, query, drawObjects, reach, backEdge ? BUILD_MS : Infinity) : { built: 0, visible: 0 };
+    // (the tiles built, not the ones missing: over a backdrop a frame builds only what its time allows, and the rest is still missing next frame)
+    this.renderedTotal += done.built;
+    const visible = done.visible;
     // The backdrop, scaled, under the tiles still to build (clipped to them: nothing shows twice), and what it does not reach (zooming
     // out) drawn exactly there; gone once the set is whole.
     const stillMissing = needed.filter(([i, j]) => !g.tiles.has(`${i},${j}`));
