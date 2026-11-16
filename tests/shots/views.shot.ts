@@ -194,9 +194,13 @@ test("zip-view", async ({ scene: s }) => {
   await s.p.locator('[data-testid="asset-card"][title="degas_dancer_studies.zip"]').dblclick();
   await expect(s.p.getByTestId("archive-view")).toBeVisible();
   const row = s.p.getByTestId("archive-row");
+  await expect(row.first()).toBeVisible();
   if ((await row.count()) === 1) await row.first().dblclick(); // (its folder: opened)
-  await row.filter({ hasText: "dancer_adjusting_her_slipper" }).first().dblclick(); // (a double-click opens a file inside the view)
-  await expect(s.p.getByTestId("archive-file").locator("img")).toBeVisible({ timeout: 20_000 });
+  await expect(row).toHaveCount(5);
+  // (the two studies wanted, picked: Import takes them)
+  await row.filter({ hasText: "dancer_with_a_fan" }).first().click();
+  await row.filter({ hasText: "dancer_adjusting_her_slipper" }).first().click({ modifiers: ["Control"] });
+  await expect(s.p.locator('[data-testid="archive-row"][aria-selected="true"]')).toHaveCount(2);
   await s.settle(800);
   await s.shot("zip-view");
 });

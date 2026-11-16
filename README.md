@@ -84,7 +84,7 @@ Collect drawings by different masters on one board to compare how each handles t
 | [**Reference boards**](#reference-boards) | Collect pictures, video and files on a canvas; crop, flip and adjust them without touching the files; lay them out on sheets by rules (auto layout); find what lies under what |
 | [**Drawing and vector editing**](#drawing-and-vector-editing) | Pressure pens, shapes, Bézier paths and node editing, boolean shapes, masks, gradients and pattern fills, 38 patterns and 55 composition guides, a colour picker for everything and saved styles, layers |
 | [**Comics and storyboards**](#comics-and-storyboards) | Pages and panels as sheets with real ratios, speech balloons with tails and connectors, rich text with your own fonts, pages exported to PDF |
-| [**The Library**](#the-library) | Every file once, in folders and tags, with a search that knows sizes, ratios, colours and dates, a viewer, previews of art files, PDFs and 3D models (lit, or drawn as line art), similar images and safe deletion |
+| [**The Library**](#the-library) | Every file once, in folders and tags, with a search that knows sizes, ratios, colours and dates, a viewer, previews of art files, PDFs, 3D models (lit, or drawn as line art), ZIPs and comic books, similar images and safe deletion |
 | [**Notes**](#notes) | Markdown, text and rich text notes in a full editor, with `[[links]]`, backlinks, properties, templates, and cards on a canvas |
 | [**Exporting and sharing**](#exporting-and-sharing) | PNG, WebP, JPEG, SVG and PDF at any size; copy to other apps; share the workspace on your local network |
 | [**Integration**](#integration) | PhotoCraft, the open-source photo editor of ArtCraft, inside the app: open pictures, art files and sheets in it, and Save puts the edit back into the file |
@@ -1093,7 +1093,7 @@ A ZIP or a comic book (`.cbz`) opens in a view of its own, in the viewer and in 
 
 Look through a reference pack you downloaded, and take only the studies you want into the library.
 
-![A ZIP of Degas's dancer studies open in the Library's ZIP view: its files listed, one picture open beside them, and Import in the bar](docs/screenshots/zip-view.webp)
+![A ZIP of Degas's dancer studies open in the Library's ZIP view: its files listed, two of the studies selected, and Import in the bar](docs/screenshots/zip-view.webp)
 
 | | |
 | --- | --- |
@@ -2348,7 +2348,7 @@ Open the panels from the right edge: they dock beside the column of their button
 
 ### The command palette
 
-`Ctrl/⌘+K` runs any command by name, takes a value where one is needed (`@kind` narrows the list), and records and replays **macros**. `/` on the canvas opens it too.
+`Ctrl/⌘+K` runs any command by name, takes a value where one is needed (`@kind` narrows the list), and records and replays **macros**: **Record a macro**, then do it with the buttons, menus, keys or the palette, then **Save the macro**; a slider's steps are left out, the value it ends on is kept. `/` on the canvas opens it too.
 
 Run any command by name: typing flip finds the flip commands for the selected print.
 

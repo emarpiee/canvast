@@ -150,7 +150,7 @@ test("ai-agents", async ({ scene: s }) => {
   await s.p.locator('[data-row="agents.on"] input').check();
   await expect(s.p.locator('[data-row="agents.on"] input')).toBeChecked();
   await s.settle();
-  await s.shot("ai-agents", await s.around({ els: ['[data-panel="agents"]'] }));
+  await s.shot("ai-agents", await s.around({ els: ['[data-panel="agents"]'], pad: 8 }));
 });
 
 test("paste-name", async ({ scene: s }) => {

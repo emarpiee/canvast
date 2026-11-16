@@ -2,6 +2,7 @@
 
 ## 0.60.16 — AI agents with less setup (2026-11-17)
 
+- **Docs:** README: *ZIPs and comic books* (its section, picture and limits), AI agents' picture and its row in Settings, every MCP client and its file, macros recording the buttons, menus and keys; the tools' menu and Organize pictures taken again (B1).
 - **Changed:** the desktop app pairs with the canvast tools on the same computer by itself: with **Pairing code** left empty, it uses the code the tools made. ([AI agents](README.md#ai-agents))
 
 ### For developers
