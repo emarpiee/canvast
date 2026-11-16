@@ -69,6 +69,7 @@ note("first open: page heap", await heap(s.page));
 
 // ---- scrolling the Library view (--scroll) ----
 const scrollRows = [];
+const timeRows = [];
 async function scrollPass(page, mode, size, pass) {
   await page.locator(`.assets-view [data-layout="${mode}"], [data-layout="${mode}"]`).first().click();
   await page.locator(".assets-size input").evaluate((el, v) => { el.value = String(v); el.dispatchEvent(new Event("input", { bubbles: true })); }, size);
@@ -81,6 +82,17 @@ async function scrollPass(page, mode, size, pass) {
     const tick = (t) => { w.__frames.push(t - last); last = t; if (w.__on) requestAnimationFrame(tick); };
     requestAnimationFrame(tick);
   });
+  // Where the time goes: the page's own counters (script, style, layout, and the rest of each task: paint and decoding), and for the
+  // smallest thumbnails a profile of the script, its busiest functions with the code around them.
+  const cdp = await page.context().newCDPSession(page);
+  await cdp.send("Performance.enable");
+  const before = Object.fromEntries((await cdp.send("Performance.getMetrics")).metrics.map((m) => [m.name, m.value]));
+  const profiling = mode === "grid" && size === 96;
+  if (profiling) {
+    await cdp.send("Profiler.enable");
+    await cdp.send("Profiler.setSamplingInterval", { interval: 200 });
+    await cdp.send("Profiler.start");
+  }
   const t0 = performance.now();
   const STEPS = 250, DELTA = 200; // (a wheel notch every 16 ms: a fast, steady scroll of about 50,000 px)
   for (let i = 0; i < STEPS; i++) { await page.mouse.wheel(0, DELTA); await page.waitForTimeout(16); }
@@ -91,6 +103,37 @@ async function scrollPass(page, mode, size, pass) {
     const sc = document.querySelector(".assets-scroll");
     return { fps: f.length / (sum / 1000), p95: f[Math.floor(f.length * 0.95)] ?? 0, worst: f[f.length - 1] ?? 0, long: f.filter((x) => x > 50).length, top: sc.scrollTop, height: sc.scrollHeight };
   });
+  const after = Object.fromEntries((await cdp.send("Performance.getMetrics")).metrics.map((m) => [m.name, m.value]));
+  const d = (k) => ((after[k] ?? 0) - (before[k] ?? 0)) * 1000;
+  const task = d("TaskDuration"), script = d("ScriptDuration"), style = d("RecalcStyleDuration"), lay = d("LayoutDuration");
+  console.log(`  time in ${secs.toFixed(1)} s of scrolling: tasks ${task.toFixed(0)} ms = script ${script.toFixed(0)}, style ${style.toFixed(0)} (${after.RecalcStyleCount - before.RecalcStyleCount}x), layout ${lay.toFixed(0)} (${after.LayoutCount - before.LayoutCount}x), the rest (paint, decoding, other) ${(task - script - style - lay).toFixed(0)}; nodes ${after.Nodes}`);
+  timeRows.push([`${mode === "grid" ? "Thumbnails" : "List"}, size ${size}`, pass, task.toFixed(0), script.toFixed(0), style.toFixed(0), lay.toFixed(0), (task - script - style - lay).toFixed(0)]);
+  if (profiling) {
+    const { profile } = await cdp.send("Profiler.stop");
+    const dt = new Map();
+    const deltas = profile.timeDeltas ?? [];
+    for (let i = 0; i < (profile.samples ?? []).length; i++) dt.set(profile.samples[i], (dt.get(profile.samples[i]) ?? 0) + (deltas[i] ?? 0) / 1000);
+    const self = new Map();
+    for (const n of profile.nodes) {
+      const f = n.callFrame;
+      const key = `${f.functionName || "(anonymous)"} @${f.lineNumber}:${f.columnNumber}|${f.url}`;
+      self.set(key, (self.get(key) ?? 0) + (dt.get(n.id) ?? 0));
+    }
+    const sources = new Map();
+    const near = (url, line, col) => {
+      if (!url.startsWith("file://")) return "";
+      if (!sources.has(url)) { try { sources.set(url, readFileSync(decodeURIComponent(new URL(url).pathname), "utf8").split("\n")); } catch { sources.set(url, []); } }
+      const text = sources.get(url)[line] ?? "";
+      return text.slice(Math.max(0, col - 60), col + 100).replace(/\s+/g, " ");
+    };
+    console.log(`  profile, ${pass} (self time, ms):`);
+    for (const [key, ms] of [...self].sort((a, b) => b[1] - a[1]).slice(0, 18)) {
+      const [name, url] = key.split("|");
+      const [, line, col] = name.match(/@(\d+):(\d+)$/) ?? [];
+      console.log(`    ${ms.toFixed(0).padStart(6)}  ${name.padEnd(36)} ${url ? near(url, Number(line), Number(col)) : ""}`);
+    }
+  }
+  await cdp.detach();
   // the cards in view once the wheel stops: how long until each shows its picture
   const t1 = performance.now();
   const waiting = () => page.evaluate(() => {
@@ -137,5 +180,6 @@ note("one rename, until written to the folder", ms(t));
 await s.app.close();
 
 console.log(`\n| ${N.toLocaleString()} items | time |\n| --- | --- |\n${results.map(([a, b]) => `| ${a} | ${b} |`).join("\n")}`);
+if (timeRows.length) console.log(`\n| Where the time went (ms) | Pass | Tasks | Script | Style | Layout | Paint, decoding, other |\n| --- | --- | --- | --- | --- | --- | --- |\n${timeRows.map((r) => `| ${r.join(" | ")} |`).join("\n")}`);
 if (scrollRows.length) console.log(`\n| Scrolling ${N.toLocaleString()} items | Pass | FPS | Slowest 5 % | Slowest | Frames over 50 ms | Speed | Cards waiting at stop | Until all shown |\n| --- | --- | --- | --- | --- | --- | --- | --- | --- |\n${scrollRows.map((r) => `| ${r.join(" | ")} |`).join("\n")}`);
 if (!args.includes("--keep")) for (const d of [dir, `${dir}-device-a`]) rmSync(d, { recursive: true, force: true });
