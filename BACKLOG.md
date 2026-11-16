@@ -18,6 +18,7 @@ The work on canvast that is not done yet, and what became of each item. **Priori
 | B10 | Speed and memory measured on real devices (an older laptop, a phone), not only on the test machine | low | open | The benchmarks and the qualification matrix exist and were run on the test machine |
 | B11 | The Retroma theme | low | open | Parked on the `retroma-v4` branch until the owner resumes it |
 | B12 | Math in notes (formulas) | low | open | On hold |
+| B26 | The Layers panel's row buttons show which state they are in: today some icons (such as the clipping and the frame toggles) look the same whether on or off | low | open | Icon audit of every Layers panel toggle first |
 | B13 | Builds for Windows and macOS open for contribution, with terms for them | medium | closed | 0.60.12: [Builds for other systems](CONTRIBUTING.md#builds-for-other-systems) |
 | B23 | Better-formatted release notes on GitHub: a summary first, then a part for users and one for developers | high | closed | 0.60.13 |
 | B14 | Choose what goes in a backup (Advanced export) | medium | removed | Found done: 0.55.34 |
