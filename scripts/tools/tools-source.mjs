@@ -5,6 +5,7 @@
 //   node canvast-tools.mjs encrypt <workspace> <file>…
 //   node canvast-tools.mjs share <folder> [--hidden] [--write] [--devices | --only-devices] [--port N] [--password P] [--dotfiles]
 //   node canvast-tools.mjs devices              the saved devices that may sign in to a shared folder
+//   node canvast-tools.mjs mcp                  the link to AI agents: an MCP server for canvast (ADR 0205)
 // ⚠️ This is the tools' SOURCE: it needs the rest of the repository and does not run on its own. The file to run (or give anyone) is
 // the built one, dist-tools/canvast-tools.mjs (`npm run build:tools`), or canvast-tools.mjs from a release.
 // The released file is built from this one and the app's own code (desktop/share-dav.ts, desktop/self-cert.ts) by
@@ -20,6 +21,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { davHandle, READ_ONLY } from "../../desktop/share-dav.ts";
 import { makeSelfCert } from "../../desktop/self-cert.ts";
 import { askPassword, decryptHidden, encryptHidden, hiddenFolder } from "../hidden-items.mjs";
+import { AGENT_PORT, newCode, startBridge } from "./agent-bridge.mjs";
 
 // ---- where the tools keep their own things: the saved devices and the certificate (never in a shared folder) ----
 export const configDir = () =>
@@ -360,7 +362,39 @@ const HELP = `canvast tools: your canvast workspace (or any folder) without the 
       --devices        your saved devices may sign in too; --only-devices: only they
       --port N         the port (8484, or a free one); --password P: this run's password (a new one without it)
       --dotfiles       names starting with a dot are shared too
-  devices                                        add, rename, change or delete the saved devices`;
+  devices                                        add, rename, change or delete the saved devices
+  mcp                                            the link to AI agents (an MCP server for canvast; the menu's Connect an AI agent says how)`;
+/** This build's version (written in by the build; "dev" from the source). */
+const TOOLS_VERSION = typeof __TOOLS_VERSION__ === "string" ? __TOOLS_VERSION__ : "dev";
+
+// ---- the link to AI agents (ADR 0205): the pairing code is kept with the tools' own things ----
+export const agentCode = () => {
+  const file = join(configDir(), "agents.json");
+  const had = readJson(file, {}).code;
+  if (typeof had === "string" && had) return had;
+  const code = newCode();
+  keep(file, { code });
+  return code;
+};
+const thisFile = () => resolve(process.argv[1] ?? "canvast-tools.mjs");
+function agentFlow() {
+  const code = agentCode();
+  console.log(`\nConnect an AI agent to canvast
+  1. In canvast: Settings > AI agents. Turn on "Let AI agents use canvast" and type this pairing code:
+
+       ${code}
+
+  2. In the AI agent (an MCP client), add canvast as an MCP server that runs:
+
+       node "${thisFile()}" mcp
+
+     Claude Code:     claude mcp add canvast -- node "${thisFile()}" mcp
+     Claude Desktop:  {"mcpServers": {"canvast": {"command": "node", "args": ["${thisFile().replace(/\\/g, "\\\\")}", "mcp"]}}}
+
+  The agent starts and stops it. canvast connects to it on this computer only (127.0.0.1:${AGENT_PORT}).
+  Deleting, hidden items, replacing the workspace and writing files ask you first in canvast; the password and these settings are never the agent's.
+  A new code: delete ${join(configDir(), "agents.json")} and choose this again.`);
+}
 
 async function main(args) {
   const [mode, ...rest] = args;
@@ -384,11 +418,17 @@ async function main(args) {
     printShare({ ...s, devices: o.devices || o.only }, resolve(folder), o.write);
     return new Promise(() => {});
   }
+  if (mode === "mcp") {
+    // (the agent's: the standard output is the protocol's, so everything said goes to the standard error)
+    await startBridge({ code: agentCode(), version: TOOLS_VERSION });
+    process.stderr.write(`canvast tools: waiting for canvast on 127.0.0.1:${AGENT_PORT} (Settings > AI agents, pairing code ${agentCode()}).\n`);
+    return new Promise(() => {});
+  }
   const t = terminal();
   if (mode === "devices") return (await devicesFlow(t), t.rl.close());
   if (mode) return (console.error(HELP), process.exit(2));
   for (;;) {
-    console.log("\ncanvast tools\n  1) Open my hidden items (decrypt them into a folder)\n  2) Hide files into a workspace (encrypt)\n  3) Share a folder with another device (phone, laptop)\n  4) Saved devices for sharing\n  5) Help\n  0) Quit");
+    console.log("\ncanvast tools\n  1) Open my hidden items (decrypt them into a folder)\n  2) Hide files into a workspace (encrypt)\n  3) Share a folder with another device (phone, laptop)\n  4) Saved devices for sharing\n  5) Help\n  6) Connect an AI agent\n  0) Quit");
     const c = await t.ask("Choose: ");
     if (c === "0" || c === "q") return t.rl.close();
     if (c === "1") await decryptFlow(t);
@@ -396,6 +436,7 @@ async function main(args) {
     if (c === "3") await shareFlow(t);
     if (c === "4") await devicesFlow(t);
     if (c === "5") console.log(`\n${HELP}`);
+    if (c === "6") agentFlow();
   }
 }
 

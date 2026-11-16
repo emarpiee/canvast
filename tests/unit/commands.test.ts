@@ -4,6 +4,7 @@ import { keysIn, shortTitle } from "../../src/commands/from-bars";
 import { settingCommands } from "../../src/commands/settings-commands";
 import type { Command } from "../../src/commands/types";
 import { Macros } from "../../src/commands/macros";
+import { answer } from "../../src/app/agent-link";
 
 const c = (group: string, title: string, extra: Partial<Command> = {}): Command => ({ group, title, run: () => undefined, ...extra });
 
@@ -177,5 +178,26 @@ describe("the command contract (ADR 0205)", () => {
     log.length = 0;
     expect(await m.play("two", "agent")).toBe(1); // (an outside caller's macro: the risky step is not allowed, no one was asked)
     expect(log).toEqual(["rename A"]);
+  });
+});
+
+describe("the link to AI agents, the app's side (ADR 0205)", () => {
+  it("answers list, run and batch as the agent's runs; read-only refuses all but reads; an unknown method says so", async () => {
+    const r = new CommandRegistry();
+    const log: string[] = [];
+    r.setProvider("app", () => [
+      { id: "a.read", title: "Read", group: "G", hint: "h", risk: "read", exec: () => ({ ok: true, value: 1 }) },
+      { id: "a.edit", title: "Edit", group: "G", hint: "h", risk: "edit", exec: () => void log.push("edit") },
+      { id: "a.pass", title: "Password", group: "G", hint: "h", risk: "refused", exec: () => void log.push("pass") },
+    ]);
+    expect(((await answer(r, "list", {}, false)) as Array<{ id: string }>).map((c) => c.id)).toEqual(["a.read", "a.edit", "a.pass"]);
+    expect(await answer(r, "run", { id: "a.edit" }, false)).toEqual({ ok: true });
+    expect(((await answer(r, "run", { id: "a.pass" }, false)) as { ok: boolean }).ok).toBe(false);
+    expect(((await answer(r, "run", { id: "a.edit" }, true)) as { ok: boolean }).ok).toBe(false);
+    expect(await answer(r, "run", { id: "a.read" }, true)).toEqual({ ok: true, value: 1 });
+    expect(await answer(r, "batch", { steps: [{ id: "a.edit" }, { id: "a.edit" }] }, false)).toMatchObject({ ok: true, completed: 2 });
+    await expect(answer(r, "drop", {}, false)).rejects.toThrow("no method");
+    await expect(answer(r, "run", {}, false)).rejects.toThrow("id");
+    expect(log).toEqual(["edit", "edit", "edit"]);
   });
 });
