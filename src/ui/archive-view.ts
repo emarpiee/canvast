@@ -161,12 +161,20 @@ export async function openArchiveView(el: HTMLElement, file: FileFacts, deps: Vi
       <span class="archive-date">${e.date ? esc(e.date.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })) : ""}</span>
     </div>`;
   };
+  const paintSummary = (): void => {
+    const files = archive.entries.filter((e) => !e.dir).length;
+    summary.textContent = `${plural(files, "file")}${picked.size ? ` · ${picked.size} selected` : ""}${archive.locked ? " · with a password" : ""}`;
+  };
   const paintFiles = (): void => {
     const rows = inFolder();
     list.innerHTML = rows.length ? rows.map(rowHtml).join("") : `<p class="archive-empty">${archive.entries.length ? "This folder is empty." : "This archive is empty."}</p>`;
     paintPath();
-    const files = archive.entries.filter((e) => !e.dir).length;
-    summary.textContent = `${plural(files, "file")}${picked.size ? ` · ${picked.size} selected` : ""}${archive.locked ? " · with a password" : ""}`;
+    paintSummary();
+  };
+  /** The selection shown on the rows as they are (drawn again, a double-click's second press would land on a new row and be no double-click). */
+  const paintPicked = (): void => {
+    for (const row of list.querySelectorAll<HTMLElement>(".archive-row")) row.setAttribute("aria-selected", String(picked.has(row.dataset["path"]!)));
+    paintSummary();
   };
   const openFolder = (dir: string): void => {
     folder = dir;
@@ -188,7 +196,7 @@ export async function openArchiveView(el: HTMLElement, file: FileFacts, deps: Vi
       for (const p of rows.slice(Math.min(a, b), Math.max(a, b) + 1)) picked.add(p);
     }
     if (how !== "range") anchor = path;
-    paintFiles();
+    paintPicked();
     list.querySelector<HTMLElement>(`[data-path="${CSS.escape(path)}"]`)?.scrollIntoView({ block: "nearest" });
   };
 
@@ -411,7 +419,7 @@ export async function openArchiveView(el: HTMLElement, file: FileFacts, deps: Vi
     const at = rows.findIndex((r) => r.path === anchor);
     if ((e.ctrlKey || e.metaKey) && (e.key === "a" || e.key === "A")) {
       for (const r of rows) picked.add(r.path);
-      paintFiles();
+      paintPicked();
       return true;
     }
     if (e.ctrlKey || e.metaKey || e.altKey) return false;
