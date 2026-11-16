@@ -16,3 +16,6 @@ test-builds/
 # Rendered video and its recorded footage (made again by the Showcase GIF workflow)
 docs/media/
 
+
+# Claude Code settings of one person, for this repo only
+.claude/settings.local.json
