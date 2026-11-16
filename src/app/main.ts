@@ -3242,10 +3242,14 @@ async function start(): Promise<void> {
     const ids = [...(r.made ?? []), ...(r.changed ?? [])];
     const done = method === "batch" && r.results ? (p.steps ?? []).slice(0, r.results.length).map((st, i) => ({ title: title(st.id), res: r.results![i]! })) : [];
     const steps = method === "run" ? [{ title: title(p.id), res: r }] : done.length ? done : [{ title: method === "batch" ? "Several commands" : "Read the list of commands", res: r.ok === false ? r : { ok: true } }];
-    for (const st of steps) agentLog.push({ at: Date.now(), title: st.title, ok: st.res.ok !== false, ...(st.res.error ? { error: st.res.error } : {}), ids });
+    if (method === "list") return;
+    // (one row a call: a batch's steps are counted by kind, so a long batch is one line)
+    const counts = new Map<string, number>();
+    for (const st of steps) counts.set(st.title, (counts.get(st.title) ?? 0) + 1);
+    const failed = steps.find((st) => st.res.ok === false);
+    agentLog.push({ at: Date.now(), title: [...counts].map(([t, n]) => (n > 1 ? `${t} ×${n}` : t)).join(" · "), ok: r.ok !== false && !failed, ...((failed?.res.error ?? r.error) ? { error: failed?.res.error ?? r.error } : {}), ids });
     if (agentLog.length > 500) agentLog.splice(0, agentLog.length - 500);
     agentList?.refresh();
-    if (method === "list") return;
     const last = steps[steps.length - 1];
     const words = steps.length > 1 ? `${last?.title ?? ""} (${plural(steps.length, "step")})` : (last?.title ?? "");
     editor.message = r.ok === false ? `AI agent: ${words}: ${r.error ?? last?.res.error ?? "not done"}` : `AI agent: ${words}`;
@@ -3285,7 +3289,7 @@ async function start(): Promise<void> {
         title: "What the AI agent did",
         testid: "agent-activity-dialog",
         lines: [agentLink.connected ? "An AI agent is connected. Turn it off in Settings > AI agents." : "No AI agent is connected now (Settings > AI agents)."],
-        body: () => `<ul class="set-errors">${agentLog.map((e, i) => ({ e, i })).reverse().map(({ e, i }) => `<li><time>${new Date(e.at).toLocaleTimeString()}</time> ${e.ok ? "" : "❌ "}${esc(e.title)}${e.error ? `: ${esc(e.error)}` : ""}${e.ids.length && e.ids.some((id) => doc.get(id)) ? ` <button type="button" class="set-done" data-agent-go="${i}">Go there</button>` : ""}</li>`).join("") || "<li>Nothing yet.</li>"}</ul>`,
+        body: () => `<ul class="confirm-list agent-log">${agentLog.map((e, i) => ({ e, i })).reverse().map(({ e, i }) => `<li><time>${new Date(e.at).toLocaleTimeString()}</time><span class="agent-log-what">${e.ok ? "" : "❌ "}${esc(e.title)}${e.error ? `: ${esc(e.error)}` : ""}</span>${e.ids.length && e.ids.some((id) => doc.get(id)) ? `<button type="button" class="set-done" data-agent-go="${i}">Go there</button>` : ""}</li>`).join("") || "<li>Nothing yet.</li>"}</ul>`,
         onClick: (t, _refresh, close) => {
           const i = t.closest<HTMLElement>("[data-agent-go]")?.dataset["agentGo"];
           const e = i === undefined ? undefined : agentLog[Number(i)];

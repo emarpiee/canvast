@@ -704,6 +704,14 @@ dialog.confirm {
   font: var(--text-md)/1.45 var(--font-ui);
 }
 dialog.confirm::backdrop { background: var(--hud-scrim); }
+/* A list dialog (listDialog): its title and Close stay, its list scrolls between them. */
+dialog.list-dialog[open] { display: flex; flex-direction: column; }
+dialog.list-dialog [data-list-body] { flex: 1; min-height: 0; overflow-y: auto; }
+dialog.list-dialog .confirm-actions { flex: none; }
+.agent-log li { display: flex; align-items: center; gap: var(--s-6); min-height: var(--list-h); }
+.agent-log time { flex: none; color: var(--hud-muted); font-variant-numeric: tabular-nums; }
+.agent-log .agent-log-what { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.agent-log button { flex: none; }
 dialog.lock-screen::backdrop { background: var(--canvas-bg); }
 /* the lock screen: a centred card, the mark and the name over the question, a full-width field and button */
 dialog.lock-screen { box-sizing: border-box; width: min(var(--lock-w), calc(100vw - var(--sp-12))); max-width: none; padding: var(--s-13) var(--s-12) var(--s-12); text-align: center; }
@@ -2651,6 +2659,8 @@ dialog.rename-dialog { width: min(var(--dlg-l), calc(100vw - 2 * var(--edge))); 
 .set-reset:disabled { opacity: 0.4; }
 /* The tabs are a framed panel of rows like the library sidebar's. */
 .set-tabs { align-self: flex-start; width: 232px; padding: var(--s-6); gap: var(--s-1); background: var(--hud-bg); border: 1px solid var(--hud-border); border-radius: var(--r-lg); }
+/* (a short window: the tabs scroll in their card, as the page beside them does) */
+.set-tabs { max-height: 100%; overflow-y: auto; box-sizing: border-box; }
 .set-tabs button { min-height: var(--list-h); padding: 0 var(--s-6); font: var(--font-control); border-radius: var(--r-md); }
 .set-tabs button[aria-selected="true"] { font-weight: var(--weight-semibold); }
 /* The panel is one framed card; its rows keep one rhythm, with a line between them. */

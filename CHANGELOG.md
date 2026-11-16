@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.60.21 — Settings on short windows (2026-11-17)
+
+- **Fixed:** on a short window, the list of Settings' pages could not scroll, so its last pages could not be reached. ([Settings](README.md#settings))
+- **Fixed before release:** what the AI agent did is one row a call (a batch's steps counted by kind), in a list that scrolls inside its dialog. ([AI agents](README.md#ai-agents))
+
 ## 0.60.20 — AI agent answers (2026-11-17)
 
 - **Fixed before release:** an AI agent's answer could name an item it had just made as changed (the first of a batch): what a run made, changed or removed is now told from the items there were when it started. ([AI agents](README.md#ai-agents))
