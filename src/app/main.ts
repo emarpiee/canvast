@@ -183,7 +183,7 @@ import { hasShadow, needsNeighbours } from "../doc/adjust";
 import type { Adjust } from "../doc/adjust";
 import { downloadSelection, pickedFiles } from "./download";
 import { mountCommandPalette } from "../ui/command-palette";
-import { commands, pressCommand } from "../commands/registry";
+import { commands, MAX_BATCH, pressCommand } from "../commands/registry";
 import { REASON } from "../commands/types";
 import { canvasCommands, ITEMS_MAX, OLD_CANVAS_IDS, type CanvasActions, type ItemRow } from "./canvas-commands";
 import type { ShapeKind } from "../doc/path";
@@ -3082,14 +3082,31 @@ async function start(): Promise<void> {
       const r = (n: number): number => Math.round(n * 10) / 10;
       const rows = src.slice(0, ITEMS_MAX).map((o): ItemRow => {
         const b = boxes.get(o.id);
-        return { id: o.id, kind: o.kind === "path" && (o as PathObject).container ? "sheet" : o.kind === "path" && (o as PathObject).shape ? (o as PathObject).shape! : o.kind, name: labelOf(o, assetNames.map).text, box: b ? { x: r(b.minX), y: r(b.minY), w: r(b.maxX - b.minX), h: r(b.maxY - b.minY) } : null, selected: editor.selection.has(o.id), ...(o.hidden ? { hidden: true } : {}), ...(o.locked ? { locked: true } : {}) };
+        const path = o.kind === "path" ? (o as PathObject) : null;
+        return {
+          id: o.id, kind: path?.container ? "sheet" : path?.shape ? path.shape : o.kind, name: labelOf(o, assetNames.map).text,
+          box: b ? { x: r(b.minX), y: r(b.minY), w: r(b.maxX - b.minX), h: r(b.maxY - b.minY) } : null, selected: editor.selection.has(o.id),
+          ...(o.hidden ? { hidden: true } : {}), ...(o.locked ? { locked: true } : {}),
+          ...(path ? { fill: path.fill, stroke: path.stroke } : {}),
+          // (one unit of a pattern's settings on the view: its unit level against the camera's)
+          ...(o.gen ? { pattern: { generator: o.gen.id, settings: o.gen.v, unitPx: r(2 ** (view.camera.zi + o.unit + view.camera.zf)) } } : {}),
+        };
       });
       return { rows, total: src.length };
     },
     viewSize: () => ({ width: view.viewport.width, height: view.viewport.height }),
-    make: (kind, b, text) => {
+    make: (kind, b, text, paint) => {
       if (kind === "text") return textEditor.add(text, screenToWorld(view.camera, view.viewport, { x: b.x, y: b.y }), { widthPx: Math.max(40, Math.abs(b.w)) });
-      return makeShape?.(kind === "sheet" ? "sheet" : "shape", kind === "sheet" ? "rect" : kind, { x: b.x, y: b.y }, { x: b.x + b.w, y: b.y + b.h }) ?? false;
+      // (the paint asked for is the tool's for this one shape only: the person's own choice comes back after)
+      const was = { fill: editor.shapeFill, stroke: editor.shapeStroke };
+      if (paint.fill !== undefined) editor.shapeFill = paint.fill;
+      if (paint.stroke !== undefined) editor.shapeStroke = paint.stroke;
+      try {
+        return makeShape?.(kind === "sheet" ? "sheet" : "shape", kind === "sheet" ? "rect" : kind, { x: b.x, y: b.y }, { x: b.x + b.w, y: b.y + b.h }) ?? false;
+      } finally {
+        editor.shapeFill = was.fill;
+        editor.shapeStroke = was.stroke;
+      }
     },
     keys: keysOf,
     tools: TOOL_ORDER.map((t) => ({ id: TOOL_COMMAND[t], title: TOOL_NAME[t], use: () => editor.setTool(t) })),
@@ -3237,10 +3254,13 @@ async function start(): Promise<void> {
   /** Its pointer moves to what it touched, or to the selection; the info bar says what it did. */
   const agentRan = (method: string, params: unknown, result: unknown): void => {
     const p = (params ?? {}) as { id?: unknown; steps?: Array<{ id?: unknown }> };
-    const r = (result ?? {}) as { ok?: boolean; error?: string; made?: string[]; changed?: string[]; results?: Array<{ ok: boolean; error?: string }> };
+    const r = (result ?? {}) as { ok?: boolean; error?: string; made?: string[]; changed?: string[]; results?: Array<{ ok: boolean; error?: string; step?: number }> };
     const title = (id: unknown): string => registry.get(String(id))?.title ?? String(id);
     const ids = [...(r.made ?? []), ...(r.changed ?? [])];
-    const done = method === "batch" && r.results ? (p.steps ?? []).slice(0, r.results.length).map((st, i) => ({ title: title(st.id), res: r.results![i]! })) : [];
+    // (a batch's answer lists every step, or by default only those that failed or read something, each by its number)
+    const said = new Map((r.results ?? []).map((x, i) => [x.step ?? i, x]));
+    const stop = (p as { stopOnError?: unknown }).stopOnError === false ? undefined : [...said].find(([, x]) => x.ok === false)?.[0];
+    const done = method === "batch" ? (p.steps ?? []).slice(0, stop === undefined ? MAX_BATCH : stop + 1).map((st, i) => ({ title: title(st.id), res: said.get(i) ?? { ok: true } })) : [];
     const steps = method === "run" ? [{ title: title(p.id), res: r }] : done.length ? done : [{ title: method === "batch" ? "Several commands" : "Read the list of commands", res: r.ok === false ? r : { ok: true } }];
     if (method === "list") return;
     // (one row a call: a batch's steps are counted by kind, so a long batch is one line)

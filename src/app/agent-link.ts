@@ -41,7 +41,7 @@ export interface AgentLink {
 /** How a request is answered: the one place an agent's call becomes a command's run. */
 export async function answer(registry: CommandRegistry, method: string, params: unknown, readOnly: boolean, watch?: Watch): Promise<unknown> {
   registry.readOnlyCallers = readOnly;
-  const p = (params ?? {}) as { id?: unknown; options?: unknown; steps?: unknown; filter?: unknown; stopOnError?: unknown };
+  const p = (params ?? {}) as { id?: unknown; options?: unknown; steps?: unknown; filter?: unknown; stopOnError?: unknown; details?: unknown };
   if (method === "list") return registry.list(typeof p.filter === "string" ? p.filter : "");
   // (what the run did to the items, told in its answer when the command does not say it itself: the agent sees what it made)
   const told = async <R extends { ok: boolean }>(run: Promise<R>): Promise<R> => {
@@ -60,7 +60,12 @@ export async function answer(registry: CommandRegistry, method: string, params: 
   if (method === "batch") {
     if (!Array.isArray(p.steps)) throw new Error('"batch" needs its steps: [{ id, options }].');
     if (p.steps.length > MAX_BATCH) throw new Error(`A batch has at most ${MAX_BATCH} steps.`);
-    return told(registry.batch(p.steps as Array<{ id: string; options?: Options }>, { caller: "agent" }, p.stopOnError !== false));
+    const r = await told(registry.batch(p.steps as Array<{ id: string; options?: Options }>, { caller: "agent" }, p.stopOnError !== false));
+    if (p.details === true) return r;
+    // (short by default: only the steps that failed or have something to say, by their number; what was made is told once for the batch)
+    const { results, ...rest } = r as typeof r & { results: Array<Record<string, unknown>> };
+    const said = results.flatMap((x, step) => (x["ok"] === false || x["value"] !== undefined || x["note"] !== undefined ? [{ step, ...x, made: undefined, changed: undefined }] : []));
+    return { ...rest, ...(said.length ? { results: said } : {}) };
   }
   throw new Error(`There is no method "${method}": list, run or batch.`);
 }

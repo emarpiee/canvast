@@ -1,5 +1,6 @@
 import type { Command, Options, OptionSpec, Result, Risk } from "../commands/types";
 import { REASON } from "../commands/types";
+import { isPaint, type Paint } from "../doc/paint";
 
 /**
  * The commands of the canvas (ADR 0205): tools, edit, arrange, shape, mask, path, export, view, panels, go to and workspace. Each has a
@@ -9,7 +10,13 @@ import { REASON } from "../commands/types";
 export type Panel = "adjust" | "layers" | "bookmarks" | "pattern" | "styles" | "tags";
 
 /** One item as an outside caller reads it: `box` is its place on the view in px (null when it is off the view). */
-export interface ItemRow { id: string; kind: string; name: string; box: { x: number; y: number; w: number; h: number } | null; selected: boolean; hidden?: boolean; locked?: boolean }
+export interface ItemRow {
+  id: string; kind: string; name: string; box: { x: number; y: number; w: number; h: number } | null; selected: boolean; hidden?: boolean; locked?: boolean;
+  /** A shape's or a sheet's paint (a colour, a gradient), null for none. */
+  fill?: Paint | null; stroke?: Paint | null;
+  /** What made a pattern's piece: its generator, settings, and how many px of the view one unit of its settings is now (a Pixel Grid's cell: size × unitPx). */
+  pattern?: { generator: string; settings: Readonly<Record<string, number | string | boolean>>; unitPx: number };
+}
 export const ITEMS_MAX = 1000;
 export const MAKE_KINDS = ["rect", "ellipse", "line", "polygon", "star", "sheet", "text"] as const;
 export type MakeKind = (typeof MAKE_KINDS)[number];
@@ -34,7 +41,7 @@ export interface CanvasActions {
   /** The view's size in px (where `item.create` places things). */
   viewSize(): { width: number; height: number };
   /** Make a shape, a sheet or a text in the box `b` (px of the view), as its tool makes it, selected. Whether it could. */
-  make(kind: MakeKind, b: { x: number; y: number; w: number; h: number }, text: string): boolean;
+  make(kind: MakeKind, b: { x: number; y: number; w: number; h: number }, text: string, paint: { fill?: Paint | null; stroke?: Paint | null }): boolean;
   tools: ReadonlyArray<{ id: string; title: string; use(): void }>;
 
   undo(): void;
@@ -195,6 +202,7 @@ export function canvasCommands(a: CanvasActions): Command[] {
     ...(["hidden", "locked"] as const).map((flag) => cmd(flag === "hidden" ? "item.unhide" : "item.unlock", "Edit", flag === "hidden" ? "Show items" : "Unlock items", flag === "hidden" ? "Hidden items on this canvas, shown again" : "So they can be moved", "edit", canvas, (o) => a.clearFlagOn(o["ids"] as string[], flag), { options: [{ name: "ids", type: "ids", doc: "the items", required: true }] })),
     cmd("library.reveal", "Go to", "Show in the Library", "These files, in the Library", "edit", () => null, (o) => a.revealInLibrary(o["hashes"] as string[]), { options: [{ name: "hashes", type: "ids", doc: "the library files", required: true }] }),
     cmd("edit.selectAll", "Edit", "Select everything", "All on this canvas", "edit", canvas, () => a.selectAll(), { words: "all"}),
+    cmd("select.none", "Edit", "Select nothing", "Nothing stays selected", "edit", canvas, () => a.select([]), { words: "deselect clear none" }),
     cmd("item.create", "Edit", "Make an item", "A shape, a sheet or a text, at a place on the view", "edit", writable(canvas), (o) => {
       const v = a.viewSize();
       const kind = o["kind"] as MakeKind;
@@ -205,8 +213,15 @@ export function canvasCommands(a: CanvasActions): Command[] {
       const text = typeof o["text"] === "string" ? o["text"].trim() : "";
       if (kind === "text" && !text) return { ok: false, error: "A text needs its words (text)." };
       if (kind !== "text" && Math.hypot(w, h) < 4) return { ok: false, error: "Too small to make: give w and h of a few px at least." };
+      const paint: { fill?: Paint | null; stroke?: Paint | null } = {};
+      for (const k of ["fill", "stroke"] as const) {
+        const v = o[k];
+        if (v === undefined) continue;
+        if (v !== null && !isPaint(v)) return { ok: false, error: `${k} is a colour (#rrggbb), a gradient or null for none.` };
+        paint[k] = v as Paint | null;
+      }
       const before = a.itemIds();
-      if (!a.make(kind, { x, y, w, h }, text)) return { ok: false, error: "Nothing could be made now (a tool is in use, or the canvas cannot be changed)." };
+      if (!a.make(kind, { x, y, w, h }, text, paint)) return { ok: false, error: "Nothing could be made now (a tool is in use, or the canvas cannot be changed)." };
       const made = [...a.itemIds()].filter((id) => !before.has(id));
       return made.length ? { ok: true, made } : { ok: false, error: "Nothing was made." };
     }, { options: [
@@ -216,6 +231,8 @@ export function canvasCommands(a: CanvasActions): Command[] {
       { name: "w", type: "number", doc: "its width in px (default 240; a line goes from x, y to x + w, y + h)", min: -100000, max: 100000 },
       { name: "h", type: "number", doc: "its height in px (default 160)", min: -100000, max: 100000 },
       { name: "text", type: "text", doc: "a text's words (Markdown)" },
+      { name: "fill", type: "json", doc: "its fill: a colour (#rrggbb), a gradient, or null for none (default: the shape tool's)" },
+      { name: "stroke", type: "json", doc: "its outline: a colour, a gradient, or null for none (default: the shape tool's)" },
     ], words: "add new draw create shape rectangle ellipse line star sheet frame text" }),
     cmd("read.items", "Read", "List the items", "Their id, kind, name and place on the view", "read", canvas, (o) => {
       const { rows, total } = a.items(o["all"] === true ? "all" : "view");

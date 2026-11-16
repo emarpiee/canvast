@@ -78,8 +78,8 @@ export const TOOLS = [
   {
     name: "command_batch",
     title: "Run several canvast commands",
-    description: "Run commands in order; stops at the first that fails unless stop_on_error is false. Not one undo step: what ran stays. At most 256 steps.",
-    inputSchema: { type: "object", properties: { steps: { type: "array", items: { type: "object", properties: { id: { type: "string" }, options: { type: "object" } }, required: ["id"] } }, stop_on_error: { type: "boolean" } }, required: ["steps"], additionalProperties: false },
+    description: "Run commands in order; stops at the first that fails unless stop_on_error is false. Not one undo step: what ran stays. At most 256 steps. The answer is short: how many ran, what the batch made, changed or removed, and only the steps that failed or read something (by their number); details: true gives every step's answer.",
+    inputSchema: { type: "object", properties: { steps: { type: "array", items: { type: "object", properties: { id: { type: "string" }, options: { type: "object" } }, required: ["id"] } }, stop_on_error: { type: "boolean" }, details: { type: "boolean", description: "every step's answer, not only the failed ones and those that read something" } }, required: ["steps"], additionalProperties: false },
     annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false },
   },
 ];
@@ -111,7 +111,7 @@ export async function handleMcp(msg, app, version = "0") {
       return text(r, !r?.ok);
     }
     if (!Array.isArray(args.steps)) return text("command_batch needs steps.", true);
-    const r = await app("batch", { steps: args.steps, stopOnError: args.stop_on_error !== false });
+    const r = await app("batch", { steps: args.steps, stopOnError: args.stop_on_error !== false, details: args.details === true });
     return text(r, !r?.ok);
   } catch (e) {
     return text(e.message, true);

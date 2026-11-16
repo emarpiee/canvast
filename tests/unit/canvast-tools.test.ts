@@ -139,7 +139,7 @@ describe("canvast tools: the link to AI agents (mcp, ADR 0205)", () => {
     expect((await handleMcp({ jsonrpc: "2.0", id: 4, method: "tools/call", params: { name: "command_run", arguments: { id: "edit.undo" } } }, app))?.result.isError).toBe(false);
     expect((await handleMcp({ jsonrpc: "2.0", id: 5, method: "tools/call", params: { name: "command_run", arguments: { id: "x" } } }, app))?.result.isError).toBe(true);
     expect((await handleMcp({ jsonrpc: "2.0", id: 6, method: "tools/call", params: { name: "command_batch", arguments: { steps: [{ id: "a" }], stop_on_error: false } } }, app))?.result.isError).toBe(false);
-    expect(calls.at(-1)).toEqual(["batch", { steps: [{ id: "a" }], stopOnError: false }]);
+    expect(calls.at(-1)).toEqual(["batch", { steps: [{ id: "a" }], stopOnError: false, details: false }]);
     expect((await handleMcp({ jsonrpc: "2.0", id: 7, method: "tools/call", params: { name: "command_run", arguments: { id: "a", evil: 1 } } }, app))?.error.code).toBe(-32602);
     expect((await handleMcp({ jsonrpc: "2.0", id: 8, method: "tools/call", params: { name: "nope" } }, app))?.error.code).toBe(-32602);
     expect((await handleMcp({ jsonrpc: "2.0", id: 9, method: "nope" }, app))?.error.code).toBe(-32601);

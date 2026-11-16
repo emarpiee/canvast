@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.60.22 — AI agents draw with less (2026-11-17)
+
+- **Added:** an AI agent can give a new shape its fill and outline (`item.create` with `fill` and `stroke`), select nothing (`select.none`), and read each item's fill and outline and a pattern's settings with its size on the view (`read.items`). ([AI agents](README.md#ai-agents))
+- **Changed:** a batch's answer is short: how many ran, what it made, changed or removed, and only the steps that failed or read something; `details: true` gives every step. ([AI agents](README.md#ai-agents))
+
 ## 0.60.21 — Settings on short windows (2026-11-17)
 
 - **Fixed:** on a short window, the list of Settings' pages could not scroll, so its last pages could not be reached. ([Settings](README.md#settings))
