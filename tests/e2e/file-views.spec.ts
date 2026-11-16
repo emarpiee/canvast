@@ -107,12 +107,13 @@ test("a PDF: its first page in the library, its shape on a card; it opens in the
   });
   expect(await edges()).toEqual([true, true]);
   await p.getByTestId("view-fit").click();
+  // The details offer to bookmark the page from the start (one label: they are not drawn again for each page).
+  await detailsShown(p);
+  await expect(p.getByTestId("asset-add-bookmark")).toHaveText("Bookmark current page");
   // A bookmark, in the details and off again.
   await p.getByTestId("view-mark").click();
   await expect(p.getByTestId("view-mark")).toHaveAttribute("aria-pressed", "true");
-  await detailsShown(p);
   await expect(p.getByTestId("asset-bookmarks")).toContainText("Page 2");
-  await expect(p.getByTestId("asset-add-bookmark")).toHaveText("Bookmark current page"); // (one label: the details are not drawn again for each page)
   // Renamed and deleted by its ⋯, in the view's own list and in the details: one list.
   await p.getByTestId("view-marks").click();
   await p.locator(".pop-menu .more-btn").first().click();

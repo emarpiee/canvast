@@ -145,7 +145,7 @@ test("paste-name", async ({ scene: s }) => {
   await s.p.getByRole("tab", { name: "Saving to the library" }).click();
   // (references pasted while working on a canvas, named after it)
   const row = s.p.locator('[data-row="library.pasteName"]');
-  await row.locator("input").fill("ref-{canvas}-{yyyymmdd}-{hhmmss}");
+  await row.locator("input").fill("ref-{canvas}-{yyyymmdd}");
   await row.locator("input").press("Tab");
   await s.settle();
   await s.shot("paste-name", await s.around({ els: ['[data-row="library.pasteName"]'], pad: 24 }));

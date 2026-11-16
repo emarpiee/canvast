@@ -1246,7 +1246,7 @@ A picture pasted with no file name of its own (copied in a browser or another ap
 
 Name the references you paste after the canvas they are for.
 
-![Settings, Saving to the library: Pasted picture name set to ref-{canvas}-{yyyymmdd}-{hhmmss}](docs/screenshots/paste-name.webp)
+![Settings, Saving to the library: Pasted picture name set to ref-{canvas}-{yyyymmdd}](docs/screenshots/paste-name.webp)
 
 ### Deleting and Trash
 
