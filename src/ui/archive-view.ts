@@ -15,6 +15,8 @@ import { pageKey, swipePages } from "./page-turn";
 import { openMoreMenu } from "./more-menu";
 import { markActions, toggledMark, viewKeeper, viewStateOf } from "./view-state";
 import type { MarksChange, ViewState } from "./view-state";
+import { commands, pressCommand } from "../commands/registry";
+import type { Command, OptionSpec } from "../commands/types";
 
 /** A page's longer side on a new card, in pixels (as a PDF's). */
 export const ARCHIVE_CARD_EDGE = 1600;
@@ -365,7 +367,21 @@ export async function openArchiveView(el: HTMLElement, file: FileFacts, deps: Vi
   };
 
   // ---- the bar, the list, the path
-  // view-state: (pages and zoom: what the view shows)
+  // The archive view's commands (ADR 0205): bookmarks, its card, importing what is in it.
+  const av = (id: string, title: string, hint: string, exec: NonNullable<Command["exec"]>, options: readonly OptionSpec[] = []): Command => ({ id, group: "ZIP and comics", kind: "archive", title, hint, risk: "edit", options, why: () => (root.isConnected ? null : "No ZIP or comic book is open."), exec });
+  commands.setProvider("archive-view", () => [
+    av("archive.goTo", "Go to a page", "Of the open comic book", (o) => void showPage(Number(o["page"])), [{ name: "page", type: "number", doc: "the page, from 1", required: true, min: 1, max: 1000000 }]),
+    av("archive.bookmark", "Bookmark this page", "Or take its bookmark away", () => void toggleMark()),
+    av("archive.showOnCard", "Show this page on its card", "On the canvas", () => showOnCard()),
+    av("archive.import", "Import from the ZIP", "The page, the selected files or the folder", () => void importEntries(mode === "pages" ? [pages[current - 1]!] : picked.size ? [...picked].map(entryAt).filter((x): x is ArchiveEntry => !!x) : inFolder())),
+    av("archive.importFile", "Import a file from the ZIP", "Into the library, opened or not", (o) => {
+      const one = entryAt(String(o["path"]));
+      if (!one) return { ok: false, error: `No file "${String(o["path"])}" in it.` };
+      void importEntries([one], o["open"] === true);
+      return { ok: true };
+    }, [{ name: "path", type: "text", doc: "its path in the ZIP", required: true }, { name: "open", type: "boolean", doc: "open it once imported" }]),
+  ]);
+  // commands: (bookmarks, the card and importing run commands; the rest turns pages and zooms: what the view shows)
   root.addEventListener("click", (e) => {
     const t = e.target as HTMLElement;
     const crumb = t.closest<HTMLElement>("button.archive-crumb");
@@ -379,19 +395,17 @@ export async function openArchiveView(el: HTMLElement, file: FileFacts, deps: Vi
       case "out": return setZoom(-1);
       case "in": return setZoom(1);
       case "fit": return setZoom(0);
-      case "mark": return void toggleMark();
-      case "card": return showOnCard();
+      case "mark": return void pressCommand("archive.bookmark");
+      case "card": return void pressCommand("archive.showOnCard");
       case "marks": {
-        const items = state.marks.map((m) => ({ label: m.label, hint: `Bookmark, page ${m.at}`, icon: ICONS.bookmark, run: () => void showPage(Number(m.at)), more: markActions(m, changeMarks) }));
-        return openMoreMenu(b!, items.length ? items : [{ label: "No bookmarks yet", hint: "Bookmark a page with the button beside this", icon: ICONS.bookmark, run: () => undefined }], "Go to");
+        const items = state.marks.map((m) => ({ label: m.label, hint: `Bookmark, page ${m.at}`, icon: ICONS.bookmark, command: "archive.goTo", run: () => void pressCommand("archive.goTo", { page: Number(m.at) }), more: markActions(m, changeMarks) }));
+        return openMoreMenu(b!, items.length ? items : [{ label: "No bookmarks yet", hint: "Bookmark a page with the button beside this", icon: ICONS.bookmark, command: "archive.bookmark", disabled: true, run: () => undefined }], "Go to");
       }
       case "import":
-        return void importEntries(mode === "pages" ? [pages[current - 1]!] : picked.size ? [...picked].map(entryAt).filter((x): x is ArchiveEntry => !!x) : inFolder());
+        return void pressCommand("archive.import");
       case "import-one":
-      case "import-open": {
-        const one = entryAt(b!.dataset["path"] ?? "");
-        return void (one && importEntries([one], b!.dataset["viewAct"] === "import-open"));
-      }
+      case "import-open":
+        return void pressCommand("archive.importFile", { path: b!.dataset["path"] ?? "", open: b!.dataset["viewAct"] === "import-open" });
     }
   });
   // view-state: (pages and zoom: what the view shows)

@@ -11,6 +11,8 @@ import { pageKey, swipePages } from "./page-turn";
 import { openMoreMenu } from "./more-menu";
 import { markActions, toggledMark, viewKeeper, viewStateOf } from "./view-state";
 import type { MarksChange, ViewState } from "./view-state";
+import { commands, pressCommand } from "../commands/registry";
+import type { Command, OptionSpec } from "../commands/types";
 
 const ZOOM_STEP = 1.25;
 const ZOOM_MIN = 0.25;
@@ -394,26 +396,31 @@ export async function openPdfView(el: HTMLElement, file: FileFacts, deps: ViewDe
     const items = await Promise.all(list.map(async (n) => ({ preview: String(n), size: pageFit(pageSize(await pdf.getPage(n)), PDF_CARD_EDGE) })));
     place.placeViews?.(items);
   };
-  // view-state: (pages, links, find and zoom: what the view shows)
+  // The PDF view's commands (ADR 0205): its bar and its Go to menu run them, as the palette, a macro and an outside caller do.
+  const pv = (id: string, title: string, hint: string, exec: NonNullable<Command["exec"]>, options: readonly OptionSpec[] = []): Command => ({ id, group: "PDF", kind: "pdf", title, hint, risk: "edit", options, why: () => (root.isConnected ? null : "No PDF is open."), exec });
+  commands.setProvider("pdf-view", () => [
+    pv("pdf.goTo", "Go to a page", "Of the open PDF", (o) => void show(Number(o["page"])), [{ name: "page", type: "number", doc: "the page, from 1", required: true, min: 1, max: 1000000 }]),
+    pv("pdf.bookmark", "Bookmark this page", "Or take its bookmark away", () => void toggleMark()),
+    pv("pdf.placePages", "Place pages on the canvas", "The open PDF's pages", () => void placePages()),
+    pv("pdf.extractPage", "Extract this page", "Into the library, as its own file", () => void extractPage()),
+    pv("pdf.showOnCard", "Show this page on its card", "On the canvas", () => showOnCard()),
+  ]);
+  const PDF_ACT: Readonly<Record<string, string>> = { mark: "pdf.bookmark", place: "pdf.placePages", extract: "pdf.extractPage", card: "pdf.showOnCard" };
   root.addEventListener("click", (e) => {
     const b = (e.target as HTMLElement).closest<HTMLElement>("[data-view-act]");
-    switch (b?.dataset["viewAct"]) {
+    const act = b?.dataset["viewAct"] ?? "";
+    if (PDF_ACT[act]) return void pressCommand(PDF_ACT[act]!);
+    switch (act) {
+      // (turning the pages and the zoom: what the view shows)
       case "prev": return show(current - 1);
       case "next": return show(current + 1);
       case "out": return setZoom(-1);
       case "in": return setZoom(1);
       case "fit": return setZoom(0);
-      case "mark": return void toggleMark();
-      case "place":
-        return void placePages();
-      case "extract":
-        return void extractPage();
-      case "card":
-        return showOnCard();
       case "marks":
         return void outline().then((contents) => {
-          const items = [...state.marks.map((m) => ({ label: m.label, hint: `Bookmark, page ${m.at}`, icon: ICONS.bookmark, run: () => show(Number(m.at)), more: markActions(m, changeMarks) })), ...contents.map((c) => ({ label: c.label, hint: `Page ${c.page}`, icon: ICONS.tableOfContents, run: () => show(c.page) }))];
-          openMoreMenu(b, items.length ? items : [{ label: "No bookmarks yet", hint: "Bookmark a page with the button beside this", icon: ICONS.bookmark, run: () => undefined }], "Go to");
+          const items = [...state.marks.map((m) => ({ label: m.label, hint: `Bookmark, page ${m.at}`, icon: ICONS.bookmark, command: "pdf.goTo", run: () => void pressCommand("pdf.goTo", { page: Number(m.at) }), more: markActions(m, changeMarks) })), ...contents.map((c) => ({ label: c.label, hint: `Page ${c.page}`, icon: ICONS.tableOfContents, command: "pdf.goTo", run: () => void pressCommand("pdf.goTo", { page: c.page }) }))];
+          openMoreMenu(b!, items.length ? items : [{ label: "No bookmarks yet", hint: "Bookmark a page with the button beside this", icon: ICONS.bookmark, command: "pdf.bookmark", disabled: true, run: () => undefined }], "Go to");
         });
     }
   });

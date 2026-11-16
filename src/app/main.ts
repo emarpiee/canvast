@@ -151,7 +151,7 @@ import { randomEmptyView, viewIsEmpty } from "../interaction/random-view";
 import { renderExport } from "./export-render";
 import type { ExportTarget } from "./export-render";
 import * as D from "../core/dyadic";
-import { openExportDialog, exportAgain, exportedBefore, exportPresetSummary, type ExportPreset } from "../ui/export-dialog";
+import { openExportDialog, exportAgain, setExportChoices, exportedBefore, exportPresetSummary, type ExportPreset } from "../ui/export-dialog";
 import { mountViewSwitch } from "../ui/view-switch";
 import { followFrameSetting, mountWindowRow } from "../ui/window-frame";
 import { followScrolling } from "../ui/scrollbars";
@@ -3101,6 +3101,7 @@ async function start(): Promise<void> {
     },
     canExport: () => exportTarget(doc, editor) !== null,
     openExport: () => openExport(),
+    exportNow: (change) => { setExportChoices(change); openExport(true); },
     svgToLibrary: () => saveSvgToLibrary(),
     zoom: (levels) => zoomByStep(view, levels),
     pan: (dir, far) => panStep(view, dir, far),

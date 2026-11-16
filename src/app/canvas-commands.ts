@@ -88,6 +88,8 @@ export interface CanvasActions {
   copySvg(): Promise<void>;
   canExport(): boolean;
   openExport(): void;
+  /** Export with these choices and no dialog (as Export again): format, background, quality, padding, and what is done with it. */
+  exportNow(change: Readonly<Record<string, unknown>>): void;
   svgToLibrary(): Promise<void>;
 
   zoom(levels: number): void;
@@ -219,6 +221,21 @@ export function canvasCommands(a: CanvasActions): Command[] {
 
     item("export.copySvg", "Export", "Copy the selection as SVG", "Vector text to paste", () => a.copySvg(), when(canvas, a.canSvg, "Select shapes or paths."), { words: "vector clipboard text"}),
     cmd("export.open", "Export", "Export… (choose a size)", "Save as a picture file", "edit", when(canvas, a.canExport, "Select what to export, or open a canvas."), () => a.openExport(), { words: "picture png jpeg webp size dpi print sheet image save"}),
+    cmd("export.picture", "Export", "Export the selection as a picture", "With these choices, no dialog", "confirm", when(canvas, a.canExport, "Select what to export, or open a canvas."), (o) => {
+      const change: Record<string, unknown> = {};
+      if (o["format"]) change["format"] = o["format"];
+      if (o["background"]) change["bg"] = o["background"];
+      if (o["quality"] !== undefined) change["quality"] = o["quality"];
+      if (o["padding"] !== undefined) change["pad"] = o["padding"];
+      if (o["action"]) change["action"] = o["action"];
+      a.exportNow(change);
+    }, { options: [
+      { name: "format", type: "choice", doc: "the file's kind", choices: ["png", "webp", "jpeg", "svg", "pdf"] },
+      { name: "background", type: "text", doc: "transparent, white, black or #rrggbb" },
+      { name: "quality", type: "number", doc: "JPEG and WebP quality", min: 10, max: 100 },
+      { name: "padding", type: "number", doc: "room around it, in px", min: 0, max: 1000 },
+      { name: "action", type: "choice", doc: "download it, copy it, or put it in the library", choices: ["download", "copy", "library"] },
+    ] }),
     item("export.svgToLibrary", "Export", "Save the selection to the library as SVG", "A new library item", () => a.svgToLibrary(), when(canvas, a.canSvg, "Select shapes or paths."), { words: "vector assets" }),
 
     cmd("view.zoomIn", "View", "Zoom in", "Closer", "edit", canvas, (o) => a.zoom(Number(o["levels"] ?? 1)), { keys: a.keys("view.zoomIn") || "+", options: [LEVELS] }),
