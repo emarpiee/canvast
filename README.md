@@ -2411,7 +2411,7 @@ Let an AI agent (a program that speaks MCP, such as Claude Desktop or Claude Cod
 | | |
 | --- | --- |
 | Turn it on | **Settings > AI agents > Let AI agents use canvast**. Off until you turn it on |
-| Pairing | Run the [canvast tools](#canvast-tools-without-the-app) and choose **Connect an AI agent**: they show a pairing code and what to put in the agent's settings. Type the code in **Pairing code** |
+| Pairing | Run the [canvast tools](#canvast-tools-without-the-app) and choose **Connect an AI agent**: they show a pairing code and what to put in the agent's settings. Type the code in **Pairing code**. The desktop app finds the code of the canvast tools on the same computer by itself: leave the field empty |
 | What it can do | Every action of canvast is a command with a name: the agent lists them, then runs them with their options (which items, which colour, which folder) and reads what happened |
 | What asks you first | Deleting, hidden items, replacing the workspace and writing files to the disk: canvast shows **An AI agent wants to…** with **Allow** and **Cancel** |
 | What it never does | Passwords, unlocking hidden items, these settings, sharing on the network and erasing the trash for good stay yours |
@@ -2797,6 +2797,8 @@ Every action of canvast is a command with a fixed name (`edit.undo`, `library.mo
 | `command_list` | Every command: its id, name, hint, options (name, type, whether needed), risk, and whether it can run now and why not |
 | `command_run` | One command by id with its options; the answer says what it made or changed, or why not |
 | `command_batch` | Several in order, stopping at the first that fails (or not); not one undo step |
+
+**From this repository**, an agent needs no setup of its own: `.mcp.json` (Claude Code), `.cursor/mcp.json` (Cursor) and `.vscode/mcp.json` (VS Code) start `node scripts/mcp.mjs`, which builds the canvast tools when they are missing or older than their source and runs `canvast-tools mcp`. Any other MCP client: the same command. Allow it when the client asks, then turn on Settings > AI agents (in the desktop app, nothing more; in a browser, with the code `node dist-tools/canvast-tools.mjs` shows under **Connect an AI agent**). One agent at a time: the tools listen on one port.
 
 | Risk | Means |
 | --- | --- |

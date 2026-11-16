@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "canvast": {
+      "command": "node",
+      "args": ["scripts/mcp.mjs"]
+    }
+  }
+}

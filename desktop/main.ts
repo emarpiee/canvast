@@ -14,6 +14,7 @@ import { createReadStream, existsSync, mkdirSync, readFileSync, readdirSync, ren
 import { lstat, mkdir, open, type FileHandle, readFile, readdir, realpath, rename, rm, rmdir, stat, unlink, utimes, writeFile } from "node:fs/promises";
 import { basename, dirname, join, resolve, sep } from "node:path";
 import { cleanWholeName } from "../src/doc/file-names";
+import { agentsFile } from "./tools-home";
 import { BOARDS_DIR, isSafeRelativePath } from "../src/storage/workspace-names";
 import { readItem } from "../src/storage/library-mirror";
 import { SEAL_OVERHEAD, isHiddenFile } from "../src/storage/hidden-vault";
@@ -513,6 +514,16 @@ function installFileCalls(win: BrowserWindow, root: string, partition: string): 
   // workspace, and only at safe relative paths under the folder made there. Each file is read back and its SHA-256 answered.
   const exports = new Map<string, string>();
   // What each of the app's processes holds in memory (MB), for Information shown: Technical: the page, the GPU and the app itself.
+  // The pairing code the canvast tools made on this computer (ADR 0205): Settings > AI agents uses it when none is typed. Only the code.
+  ipcMain.handle("canvast:agentCode", (e) => {
+    own(e);
+    try {
+      const code = (JSON.parse(readFileSync(agentsFile(), "utf8")) as { code?: unknown }).code;
+      return typeof code === "string" && /^[A-Z0-9-]{4,32}$/.test(code) ? code : null;
+    } catch {
+      return null;
+    }
+  });
   ipcMain.handle("canvast:memory", (e) => {
     own(e);
     return app.getAppMetrics().map((m) => ({ type: m.type, mb: Math.round(m.memory.workingSetSize / 1024) }));

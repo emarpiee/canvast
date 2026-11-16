@@ -14,19 +14,18 @@ import { randomBytes, randomUUID } from "node:crypto";
 import { chmodSync, closeSync, existsSync, lstatSync, mkdirSync, openSync, readFileSync, readSync, renameSync, writeFileSync } from "node:fs";
 import { mkdir, readdir, rename, stat, writeFile } from "node:fs/promises";
 import { createServer } from "node:https";
-import { homedir, networkInterfaces, platform } from "node:os";
+import { networkInterfaces } from "node:os";
 import { basename, dirname, join, resolve, sep } from "node:path";
 import readline from "node:readline/promises";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { davHandle, READ_ONLY } from "../../desktop/share-dav.ts";
 import { makeSelfCert } from "../../desktop/self-cert.ts";
+import { toolsHome } from "../../desktop/tools-home.ts";
 import { askPassword, decryptHidden, encryptHidden, hiddenFolder } from "../hidden-items.mjs";
 import { AGENT_PORT, newCode, startBridge } from "./agent-bridge.mjs";
 
 // ---- where the tools keep their own things: the saved devices and the certificate (never in a shared folder) ----
-export const configDir = () =>
-  process.env.CANVAST_TOOLS_HOME ??
-  (platform() === "win32" ? join(process.env.APPDATA ?? homedir(), "canvast-tools") : platform() === "darwin" ? join(homedir(), "Library", "Application Support", "canvast-tools") : join(process.env.XDG_CONFIG_HOME ?? join(homedir(), ".config"), "canvast-tools"));
+export const configDir = () => toolsHome(); // (one place with the desktop app's: desktop/tools-home.ts)
 /** Written whole or not at all, readable by this user only. */
 function keep(file, data) {
   mkdirSync(dirname(file), { recursive: true });

@@ -3154,14 +3154,26 @@ async function start(): Promise<void> {
     confirmLabel: "Allow",
     danger: true,
   }));
+  // The desktop app pairs by itself: the canvast tools on this computer keep their code where the app can read it (desktop/tools-home.ts).
+  let toolsCode = "";
+  const readToolsCode = (): void => void desktopBridge()?.agentCode?.().then((c) => {
+    if (c && c !== toolsCode) {
+      toolsCode = c;
+      agentLink.sync();
+    }
+  });
   const agentLink = mountAgentLink({
     registry,
     on: () => settings.get("agents.on"),
-    code: () => settings.get("agents.code"),
+    code: () => settings.get("agents.code") || toolsCode, // (typed, or the desktop app's: the code the canvast tools made on this computer)
     readOnly: () => settings.get("agents.readOnly"),
     say: (text) => { editor.message = text; editor.changed(); },
   });
-  settings.subscribe(() => agentLink.sync());
+  settings.subscribe(() => {
+    if (settings.get("agents.on")) readToolsCode(); // (the tools may have made their code since)
+    agentLink.sync();
+  });
+  if (settings.get("agents.on")) readToolsCode();
   // The context menu (right click, or the menu key): the commands that fit what is under the pointer and what is picked, from the same registry.
   mountContextMenu(canvas, registry, {
     active: () => appView === "canvas" && !textEditor.isOpen && performance.now() - editor.fingerListAt > 1500,
