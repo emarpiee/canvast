@@ -598,10 +598,10 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
     prop("picture.crop", "Crop", "Start cropping the selected picture, or finish", [], () => { const id = [...editor.selection][0]; editor.cropId = editor.cropId ? null : (id ?? null); editor.changed(); }),
     prop("picture.uncrop", "Uncrop", "The whole picture again", [], () => actions.uncrop()),
     prop("item.unflip", "Unflip", "Not mirrored any more", [], () => actions.unflip()),
-    prop("library.import", "Import files", "Pictures, fonts, notes and more into the library", [], () => input.click(), () => null),
+    prop("canvas.importFiles", "Import files", "Pictures, fonts, notes and more: into the library and onto the canvas", [], () => input.click(), () => null),
     prop("text.importFont", "Add a font file", "Import a font and set the text in it", [], () => fontInput.click()),
   ]);
-  // view-state: (the file picker of library.import: it takes the files chosen)
+  // view-state: (the file picker of canvas.importFiles: it takes the files chosen)
   input.addEventListener("change", () => {
     if (input.files?.length) actions.importFiles([...input.files]);
     input.value = "";
@@ -1146,7 +1146,7 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
       pressCommand("tools.toggle", { name: "lockWidth" });
     } else if (d["filter"]) {
       pressCommand("tools.choose", { name: "lassoFilter", value: d["filter"] });
-    } else if (d["action"] === "import") pressCommand("library.import");
+    } else if (d["action"] === "import") pressCommand("canvas.importFiles");
     else if (d["action"] === "search") pressCommand("find.canvas");
     else if (d["action"] === "screenshot") pressCommand("view.screenshot");
     else if (d["action"] === "undo") pressCommand("edit.undo");
