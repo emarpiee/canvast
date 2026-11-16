@@ -59,10 +59,7 @@ export class CommandRegistry {
           continue;
         }
         let id = c.id ?? `${kind}:${slug(c.title)}`;
-        if (ids.has(id)) {
-          if (c.id) continue; // (a fixed id is given once; a second is a mistake the commands test reports)
-          for (let n = 2; ids.has(id); n++) id = `${kind}:${slug(c.title)}-${n}`;
-        }
+        for (let n = 2; ids.has(id); n++) id = `${c.id ?? `${kind}:${slug(c.title)}`}-${n}`; // (a fixed id given twice is a mistake the live audit reports)
         ids.add(id);
         const r: ResolvedCommand = { ...c, id, kind, kinds: [kind, ...(c.kinds ?? [])], source, ...(c.id ? {} : { auto: true }) };
         mine.set(key, r);
