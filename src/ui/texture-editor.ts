@@ -167,10 +167,14 @@ export function createTextureEditor(o: TextureEditorOptions): { el: HTMLElement;
     t = t ? { ...t, src, avg, mode: src.kind === "objects" ? "tile" : t.mode } : null;
     o.onSource(src, avg);
   };
+  // view-state: (a chooser's own control: what it gives goes to the command that opened it)
   q("[data-tex-pick]").addEventListener("click", () => void take(hooks!.pickSource(o.kind)));
+  // view-state: (a chooser's own control: what it gives goes to the command that opened it)
   el.querySelector<HTMLElement>("[data-tex-lib]")?.addEventListener("click", (e) => void take(hooks!.chooseFromLibrary(e.currentTarget as HTMLElement)));
   const file = el.querySelector<HTMLInputElement>("[data-tex-input]");
+  // view-state: (a chooser's own control: what it gives goes to the command that opened it)
   el.querySelector("[data-tex-file]")?.addEventListener("click", () => file!.click());
+  // view-state: (a chooser's own control: what it gives goes to the command that opened it)
   file?.addEventListener("change", () => {
     const f = file.files?.[0];
     if (f) void take(hooks!.importFile(f));
@@ -181,7 +185,9 @@ export function createTextureEditor(o: TextureEditorOptions): { el: HTMLElement;
   const between = (lo: number, hi: number): number => lo + Math.random() * (hi - lo);
   // Reset: as a new texture of this source; a double-click on a name: only that setting.
   const usual = (now: TexturePaint): TexturePaint => newTexture(now.src, hooks?.avg(now.src) ?? "#808080");
+  // view-state: (a chooser's own control: what it gives goes to the command that opened it)
   q("[data-tex-reset]").addEventListener("click", () => void (t && change(usual(t), true)));
+  // view-state: (a chooser's own control: what it gives goes to the command that opened it)
   el.addEventListener("dblclick", (e) => {
     const key = (e.target as HTMLElement).closest(".adj-label") && (e.target as HTMLElement).closest<HTMLElement>("[data-tex-row]")?.dataset["texRow"];
     if (!key || !t) return;
@@ -190,6 +196,7 @@ export function createTextureEditor(o: TextureEditorOptions): { el: HTMLElement;
     if (field) change(field.set(t, field.get(usual(t))), true);
     else if (choice) change(choice.set(t, choice.get(usual(t))), true);
   });
+  // view-state: (a chooser's own control: what it gives goes to the command that opened it)
   q("[data-tex-random]").addEventListener("click", () => {
     if (!t) return;
     const mode: TextureMode = o.kind === "image" ? pickOf(TEXTURE_MODES) : "tile";
@@ -209,6 +216,7 @@ export function createTextureEditor(o: TextureEditorOptions): { el: HTMLElement;
       true,
     );
   });
+  // view-state: (a chooser's own control: what it gives goes to the command that opened it)
   q("[data-tex-newseed]")?.addEventListener("click", () => {
     if (t) change(withVary(t, { seed: newSeed() }), true);
   });
@@ -217,11 +225,13 @@ export function createTextureEditor(o: TextureEditorOptions): { el: HTMLElement;
     sync();
     (final ? o.onChange : o.onInput)(next);
   };
+  // view-state: (a chooser's own control: what it gives goes to the command that opened it)
   el.addEventListener("input", (e) => {
     const i = (e.target as HTMLElement).closest<HTMLInputElement>("[data-tex-num]");
     const f = i && NUMBERS.find((x) => x.key === i.dataset["texNum"]);
     if (t && f && i.value !== "" && Number.isFinite(Number(i.value))) change(f.set(t, Number(i.value)), false);
   });
+  // view-state: (a chooser's own control: what it gives goes to the command that opened it)
   el.addEventListener("change", (e) => {
     const target = e.target as HTMLElement;
     const i = target.closest<HTMLInputElement>("[data-tex-num]");

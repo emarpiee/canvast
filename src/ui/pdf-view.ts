@@ -178,6 +178,7 @@ export async function openPdfView(el: HTMLElement, file: FileFacts, deps: ViewDe
       link.setAttribute("aria-label", a.url ? `Link to ${a.url}` : "Link to a page");
       link.title = a.url ?? "Go to this page";
       Object.assign(link.style, { left: `${Math.min(x1, x2)}px`, top: `${Math.min(y1, y2)}px`, width: `${Math.abs(x2 - x1)}px`, height: `${Math.abs(y2 - y1)}px` });
+      // view-state: (pages, links, find and zoom: what the view shows)
       link.addEventListener("click", () => void follow(a.url, a.dest));
       s.el.append(link);
     }
@@ -246,6 +247,7 @@ export async function openPdfView(el: HTMLElement, file: FileFacts, deps: ViewDe
       void find(e.shiftKey ? -1 : 1, current + (e.shiftKey ? -1 : found.textContent?.startsWith("Page") ? 1 : 0));
     }
   });
+  // view-state: (pages, links, find and zoom: what the view shows)
   finder.addEventListener("input", () => void find(1, current));
   const near = new Set<Slot>();
   const watcher = new IntersectionObserver(
@@ -392,6 +394,7 @@ export async function openPdfView(el: HTMLElement, file: FileFacts, deps: ViewDe
     const items = await Promise.all(list.map(async (n) => ({ preview: String(n), size: pageFit(pageSize(await pdf.getPage(n)), PDF_CARD_EDGE) })));
     place.placeViews?.(items);
   };
+  // view-state: (pages, links, find and zoom: what the view shows)
   root.addEventListener("click", (e) => {
     const b = (e.target as HTMLElement).closest<HTMLElement>("[data-view-act]");
     switch (b?.dataset["viewAct"]) {
@@ -414,6 +417,7 @@ export async function openPdfView(el: HTMLElement, file: FileFacts, deps: ViewDe
         });
     }
   });
+  // view-state: (pages, links, find and zoom: what the view shows)
   input.addEventListener("change", () => show(Number(input.value) || current));
   input.addEventListener("blur", paintBar);
   const resized = new ResizeObserver(() => {

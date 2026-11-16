@@ -327,6 +327,7 @@ export async function openArchiveView(el: HTMLElement, file: FileFacts, deps: Vi
     fitImg();
   };
   // A click on the page's left part goes back, elsewhere on: as a comic's page is turned.
+  // view-state: (pages and zoom: what the view shows)
   pagesBox.addEventListener("click", (e) => {
     if (e.target !== img && e.target !== pagesBox) return;
     const r = pagesBox.getBoundingClientRect();
@@ -364,6 +365,7 @@ export async function openArchiveView(el: HTMLElement, file: FileFacts, deps: Vi
   };
 
   // ---- the bar, the list, the path
+  // view-state: (pages and zoom: what the view shows)
   root.addEventListener("click", (e) => {
     const t = e.target as HTMLElement;
     const crumb = t.closest<HTMLElement>("button.archive-crumb");
@@ -392,15 +394,18 @@ export async function openArchiveView(el: HTMLElement, file: FileFacts, deps: Vi
       }
     }
   });
+  // view-state: (pages and zoom: what the view shows)
   list.addEventListener("click", (e) => {
     const row = (e.target as HTMLElement).closest<HTMLElement>(".archive-row");
     if (row) pick(row.dataset["path"]!, e.shiftKey ? "range" : e.ctrlKey || e.metaKey ? "toggle" : "one");
   });
+  // view-state: (pages and zoom: what the view shows)
   list.addEventListener("dblclick", (e) => {
     const row = (e.target as HTMLElement).closest<HTMLElement>(".archive-row");
     const entry = row && entryAt(row.dataset["path"]!);
     if (entry) void openEntry(entry);
   });
+  // view-state: (pages and zoom: what the view shows)
   input.addEventListener("change", () => void showPage(Number(input.value) || current));
   input.addEventListener("blur", paintBar);
   const resized = new ResizeObserver(() => {

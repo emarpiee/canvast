@@ -148,6 +148,7 @@ export async function openModelView(el: HTMLElement, file: FileFacts, deps: View
     for (const b of side.querySelectorAll<HTMLElement>("[data-tab]")) b.setAttribute("aria-selected", String(b.dataset["tab"] === id));
     build();
   };
+  // view-state: (turning, zoom and the view's own look)
   side.addEventListener("click", (e) => {
     const b = (e.target as HTMLElement).closest<HTMLElement>("[data-tab]");
     if (b) showTab(b.dataset["tab"]!);
@@ -224,6 +225,7 @@ export async function openModelView(el: HTMLElement, file: FileFacts, deps: View
     showCamera();
     changed();
   };
+  // view-state: (turning, zoom and the view's own look)
   box.addEventListener("dblclick", (e) => {
     e.stopPropagation();
     toFirst();
@@ -330,6 +332,7 @@ export async function openModelView(el: HTMLElement, file: FileFacts, deps: View
       [...root.querySelectorAll<HTMLButtonElement>(".view-bar [data-minor]")].map((x): MenuItem => ({ label: x.getAttribute("aria-label")!, hint: x.dataset["hint"] ?? x.title, icon: x.innerHTML, ...(x.getAttribute("aria-pressed") === "true" ? { checked: true } : {}), run: () => x.click() })),
       "More of this view",
     );
+  // view-state: (turning, zoom and the view's own look)
   root.addEventListener("click", (e) => {
     const b = (e.target as HTMLElement).closest<HTMLElement>("[data-view-act]");
     switch (b?.dataset["viewAct"]) {
