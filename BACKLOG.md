@@ -4,7 +4,6 @@ The work on canvast that is not done yet, and what became of each item. **Priori
 
 | ID | Item | Priority | Status | Notes |
 | --- | --- | --- | --- | --- |
-| B1 | README pictures for the newest features: the ZIP and comic book viewer, maybe the rename and move progress notice | high | open | 0.60.13 added *Move a folder*, *Pasted picture name* and the PDF and 3D views again; the ZIP viewer waits for the owner's approval of its look |
 | B2 | The library scrolls smoothly at small thumbnail sizes (size 96: about 40 frames a second since 0.60.13, was under 30; 60 at size 240 and in the list) | high | open | `--scroll` in the *Bench library* workflow; what is left is mostly painting the pictures |
 | B24 | A setting changed just before a reload sometimes comes back as it was (the canvas pattern, the canvas background colour) | high | open | Found by `frames.spec.ts:1487` and `:2453` failing on reload on GitHub (three times); cause not found yet |
 | B3 | Faster test runs: each change runs only the tests whose code it touches, found from recorded coverage | medium | open | Approved, not started |
@@ -19,6 +18,7 @@ The work on canvast that is not done yet, and what became of each item. **Priori
 | B11 | The Retroma theme | low | open | Parked on the `retroma-v4` branch until the owner resumes it |
 | B12 | Math in notes (formulas) | low | open | On hold |
 | B26 | The Layers panel's row buttons show which state they are in: today some icons (such as the clipping and the frame toggles) look the same whether on or off | low | open | Icon audit of every Layers panel toggle first |
+| B1 | README pictures for the newest features: the ZIP and comic book viewer, maybe the rename and move progress notice | high | closed | 0.60.16: the ZIP and comic book view's section and picture (a progress notice is too brief to picture) |
 | B13 | Builds for Windows and macOS open for contribution, with terms for them | medium | closed | 0.60.12: [Builds for other systems](CONTRIBUTING.md#builds-for-other-systems) |
 | B23 | Better-formatted release notes on GitHub: a summary first, then a part for users and one for developers | high | closed | 0.60.13 |
 | B25 | Every action in the app can be run as a command (by name, with its options), ready for an MCP server: first a check of the whole app, then a report of which actions are commands already and what moving the rest takes | high | closed | 0.60.15: every action is a command (none left outside the rule), with the link to AI agents |

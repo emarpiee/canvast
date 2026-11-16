@@ -118,6 +118,8 @@ export type WindowFrame = "system" | "off";
 export interface DesktopBridge {
   /** What each of the app's processes holds in memory (MB): its kind (Browser, Tab, GPU, Utility) and size. */
   memory?(): Promise<Array<{ type: string; mb: number }>>;
+  /** The pairing code the canvast tools made on this computer, for the link to AI agents (null: none yet). */
+  agentCode?(): Promise<string | null>;
   /** The workspace folder this window is open on. */
   workspace(): Promise<DesktopWorkspace | null>;
   /** A file's bytes, or null when there is no such file. */

@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.60.16 — AI agents with less setup (2026-11-17)
+
+- **Docs:** README: *ZIPs and comic books* (its section, picture and limits), AI agents' picture and its row in Settings, every MCP client and its file, macros recording the buttons, menus and keys; the tools' menu and Organize pictures taken again (B1).
+- **Changed:** the desktop app pairs with the canvast tools on the same computer by itself: with **Pairing code** left empty, it uses the code the tools made. ([AI agents](README.md#ai-agents))
+
+### For developers
+
+- **Added:** an agent working in this repository needs no setup: `.mcp.json` (Claude Code), `.codex/config.toml` (Codex CLI, once the project is trusted), `.cursor/mcp.json` (Cursor) and `.vscode/mcp.json` (VS Code) start `node scripts/mcp.mjs`, which builds the canvast tools when they are missing or older than their source and runs `canvast-tools mcp`, keeping the standard output for the protocol.
+- **Changed:** the canvast tools' own folder is one module for the tools and the desktop app (`desktop/tools-home.ts`).
+
 ## 0.60.15 — Every action a command, all of it (2026-11-17)
 
 - **Added:** an AI agent can now do everything a person can in canvast, through its commands: export pictures with chosen settings and no dialog, work with boards and canvases, layers, tags, the trash, bookmarks, the Library's folders and sidebar, styles, the Pattern panel, balloons, the 3D, PDF and ZIP views, and every setting but its own and the private ones. ([AI agents](README.md#ai-agents)) (B25)

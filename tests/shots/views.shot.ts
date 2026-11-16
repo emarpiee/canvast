@@ -1,6 +1,8 @@
 // README pictures of PDFs and 3D models in the Library, and the question a backup's import asks: a study handout on reading a
 // woodblock print, a turned vase for a lighting study, and the import choice (manifest.ts).
+import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import { writeZip } from "../../src/storage/zip";
 import { test, expect, type Scene } from "./scene";
 
 // (the 3D view needs WebGL: the software rasterizer on runners without a GPU)
@@ -177,4 +179,29 @@ test("import-choice", async ({ scene: s }) => {
   await s.p.getByTestId("set-import-input").setInputFiles(resolve("showcase.canvast"));
   await expect(s.p.getByTestId("choose-dialog").filter({ hasText: "How to import" })).toBeVisible({ timeout: 60_000 });
   await s.shot("import-choice");
+});
+
+test("zip-view", async ({ scene: s }) => {
+  await s.look({ theme: "dark", hue: 300 });
+  // (a reference pack as one downloads it: four of Degas's dancer studies, public domain, and a note on where they come from)
+  const art = ["degas-dancer_with_a_fan.jpg", "degas-dancer_onstage.jpg", "degas-dancer.jpg", "degas-dancer_adjusting_her_slipper.jpg"];
+  const zip = await writeZip([
+    ...art.map((f) => ({ name: `dancers/${f.replace(/^degas-/, "")}`, data: new Blob([new Uint8Array(readFileSync(resolve("scripts/showcase/art", f)))]) })),
+    { name: "dancers/sources.txt", data: new Blob(["Edgar Degas, dancer studies. Public domain."]) },
+  ]);
+  await s.library([{ name: "degas_dancer_studies.zip", mimeType: "application/zip", buffer: Buffer.from(await zip.arrayBuffer()) }]);
+  await s.p.getByTestId("view-assets").click();
+  await s.p.locator('[data-testid="asset-card"][title="degas_dancer_studies.zip"]').dblclick();
+  await expect(s.p.getByTestId("archive-view")).toBeVisible();
+  const row = s.p.getByTestId("archive-row");
+  await expect(row.first()).toBeVisible();
+  if ((await row.count()) === 1) await row.first().dblclick(); // (its folder: opened)
+  await expect(row).toHaveCount(5);
+  // (the two studies wanted, picked: Import takes them)
+  await row.filter({ hasText: "dancer_with_a_fan" }).first().click();
+  await row.filter({ hasText: "dancer_adjusting_her_slipper" }).first().click({ modifiers: ["Control"] });
+  await expect(s.p.locator('[data-testid="archive-row"][aria-selected="true"]')).toHaveCount(2);
+  await s.settle(800);
+  // (the view's bar, its path and the files: what the picture is about; the details beside it are the Library's)
+  await s.shot("zip-view", await s.around({ els: ['[data-testid="archive-view"] .view-bar', '[data-testid="archive-row"] >> nth=-1'], pad: 12 }));
 });
