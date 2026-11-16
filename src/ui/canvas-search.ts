@@ -254,6 +254,7 @@ export function mountCanvasSearch(host: HTMLElement, deps: SearchDeps): { open(p
     deps.focus(ids);
   };
 
+  // view-state: (searching the canvas: what is found and shown)
   input.addEventListener("input", () => {
     // A first "/" or "@" chooses the way and is not part of the search. A "#" stays: it is a search word (`#tag`, `-#tag`).
     const c = input.value[0];
@@ -264,6 +265,7 @@ export function mountCanvasSearch(host: HTMLElement, deps: SearchDeps): { open(p
     active = 0;
     compute();
   });
+  // view-state: (searching the canvas: what is found and shown)
   root.querySelector(".cs-modes")!.addEventListener("click", (e) => {
     const t = (e.target as HTMLElement).closest<HTMLElement>("[data-m]");
     if (!t) return;
@@ -298,6 +300,7 @@ export function mountCanvasSearch(host: HTMLElement, deps: SearchDeps): { open(p
     }
     e.stopPropagation(); // typing here never reaches the canvas shortcuts
   });
+  // view-state: (searching the canvas: what is found and shown)
   list.addEventListener("click", (e) => {
     const li = (e.target as HTMLElement).closest<HTMLElement>("[data-i]");
     if (!li) return;
@@ -308,10 +311,12 @@ export function mountCanvasSearch(host: HTMLElement, deps: SearchDeps): { open(p
     } else go(r);
     input.focus();
   });
+  // view-state: (searching the canvas: what is found and shown)
   allBox.addEventListener("change", () => {
     toggle(results, allBox.checked);
     input.focus();
   });
+  // view-state: (searching the canvas: what is found and shown)
   clearBtn.addEventListener("click", () => {
     input.value = "";
     active = 0;

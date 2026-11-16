@@ -13,7 +13,7 @@ import type { EditorState } from "./editor-state";
  */
 export interface Progress {
   update(fraction: number | null, detail?: string): void;
-  done(result?: string, action?: { label: string; run(): void }): void;
+  done(result?: string, action?: { label: string; /** The command it runs (ADR 0205). */ command?: string; run(): void }): void;
   fail(text: string): void;
 }
 
@@ -28,7 +28,7 @@ export function beginProgress(editor: EditorState, channel: string, label: strin
     editor.progressNow = { channel, text, fraction: fraction === null ? null : Math.min(1, Math.max(0, fraction)) };
     editor.changed();
   };
-  const end = (message: string | undefined, action?: { label: string; run(): void }): void => {
+  const end = (message: string | undefined, action?: { label: string; /** The command it runs (ADR 0205). */ command?: string; run(): void }): void => {
     if (ended) return;
     ended = true;
     editor.progressDone.add(channel);

@@ -6,6 +6,7 @@ import { setAdjustPreviewing } from "../render/adjust-image";
 import { buildAdjustPanel, closeAdjustChild } from "./colour-popover";
 import { ICONS } from "./icons";
 import { panelHtml } from "./panel";
+import { commands, pressCommand } from "../commands/registry";
 
 /**
  * The Adjust panel (ADR 0118, 0123): the non-destructive adjustments of the picked pictures, as a panel of the dock instead of a popover,
@@ -44,7 +45,12 @@ export function mountAdjustPanel(host: HTMLElement, editor: EditorState, actions
   const resetBtn = panel.querySelector<HTMLElement>("[data-reset]")!;
   const backdropRow = panel.querySelector<HTMLElement>("[data-adj-backdrop]")!;
   const backdropBox = backdropRow.querySelector<HTMLInputElement>("input")!;
-  backdropBox.addEventListener("change", () => actions.setBackdrop(backdropBox.checked));
+  // The Adjust panel's commands (ADR 0205): its backdrop switch and its Reset (its sliders are the adjustments' own popover).
+  commands.setProvider("adjust-panel", () => [
+    { id: "adjust.setBackdrop", group: "Adjust", kind: "adjust", title: "Adjust what is behind", hint: "The shape adjusts what is under it, or not", risk: "edit", why: () => null, options: [{ name: "on", type: "boolean", doc: "on or off", required: true }], exec: (o) => actions.setBackdrop(o["on"] === true) },
+    { id: "adjust.reset", group: "Adjust", kind: "adjust", title: "Reset the adjustments shown", hint: "In the Adjust panel", risk: "edit", why: () => (shown?.handle ? null : "Nothing is being adjusted."), exec: () => shown?.handle?.reset() },
+  ]);
+  backdropBox.addEventListener("change", () => void pressCommand("adjust.setBackdrop", { on: backdropBox.checked }));
   let scheduled = false;
 
   /** An unfinished slider is not kept, and the picture is drawn in full again. */
@@ -116,10 +122,8 @@ export function mountAdjustPanel(host: HTMLElement, editor: EditorState, actions
   render();
 
   panel.addEventListener("click", (e) => {
-    if ((e.target as HTMLElement).closest("[data-reset]")) return shown?.handle?.reset();
-    if (!(e.target as HTMLElement).closest("[data-close]")) return;
-    editor.adjustOpen = false;
-    editor.changed();
+    if ((e.target as HTMLElement).closest("[data-reset]")) return void pressCommand("adjust.reset");
+    if ((e.target as HTMLElement).closest("[data-close]")) pressCommand("panel.adjust");
   });
   panel.addEventListener("keydown", (e) => {
     const t = e.target as HTMLElement;

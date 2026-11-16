@@ -3,6 +3,7 @@ import type { CatalogEntry } from "../assets/asset-catalog";
 import { promptDialog } from "./confirm";
 import { ICONS } from "./icons";
 import type { MenuItem } from "./more-menu";
+import { commands, pressCommand } from "../commands/registry";
 
 /** A place in a file its viewer can go back to: `at` as its kind of file reads it (a PDF's page), `label` what the row says. */
 export interface ViewMark {
@@ -59,19 +60,36 @@ export function toggledMark(s: ViewState, mark: ViewMark, order: (at: string) =>
 /** A change to the list of bookmarks, whoever holds it. */
 export type MarksChange = (change: (marks: ViewMark[]) => ViewMark[]) => void;
 
-/** What a bookmark's ⋯ offers, in a view's menu and in the details alike. */
+/** The bookmarks whose menu was opened last (a view's, or a file's in the details): what the bookmark commands change. */
+let holder: MarksChange | null = null;
+commands.setProvider("file-bookmarks", () => (holder ? [
+  { id: "file.renameBookmark", group: "Bookmarks", kind: "bookmark", title: "Rename a file's bookmark", hint: "Its name in the list", risk: "edit", why: () => null,
+    options: [{ name: "at", type: "text", doc: "the bookmark's place", required: true }, { name: "name", type: "text", doc: "its new name", required: true }],
+    exec: (o) => {
+      const label = String(o["name"]).trim().slice(0, 120);
+      if (!label) return { ok: false, error: "A name is needed." };
+      holder!((marks) => marks.map((m) => (m.at === o["at"] ? { ...m, label } : m)));
+      return { ok: true };
+    } },
+  { id: "file.deleteBookmark", group: "Bookmarks", kind: "bookmark", title: "Delete a file's bookmark", hint: "Only this bookmark", risk: "confirm", why: () => null,
+    options: [{ name: "at", type: "text", doc: "the bookmark's place", required: true }],
+    exec: (o) => void holder!((marks) => marks.filter((m) => m.at !== o["at"])) },
+] : []));
+
+/** What a bookmark's ⋯ offers, in a view's menu and in the details alike: each row runs a command (ADR 0205). */
 export function markActions(mark: ViewMark, change: MarksChange): MenuItem[] {
+  holder = change;
   return [
     {
       id: "mark-rename",
       label: "Rename",
       hint: "Its name in the list",
       icon: ICONS.textCursorInput,
+      command: "file.renameBookmark",
       run: () => void promptDialog({ title: "Rename this bookmark", lines: [], value: mark.label, confirmLabel: "Rename" }).then((name) => {
-        const label = name?.trim().slice(0, 120);
-        if (label) change((marks) => marks.map((m) => (m.at === mark.at ? { ...m, label } : m)));
+        if (name?.trim()) pressCommand("file.renameBookmark", { at: mark.at, name });
       }),
     },
-    { id: "mark-delete", label: "Delete", hint: "Only this bookmark", icon: ICONS.trash, danger: true, run: () => change((marks) => marks.filter((m) => m.at !== mark.at)) },
+    { id: "mark-delete", label: "Delete", hint: "Only this bookmark", icon: ICONS.trash, danger: true, command: "file.deleteBookmark", run: () => void pressCommand("file.deleteBookmark", { at: mark.at }) },
   ];
 }

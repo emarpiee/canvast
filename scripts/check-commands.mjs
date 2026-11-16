@@ -11,10 +11,9 @@
 //             `risk:` and `exec:` or `takes:` (not the old `run:`)
 //   import    a command file (src/commands/) that imports the interface (src/ui/): commands work without the page drawn
 //
-// Actions that were there before the rule are counted per file in scripts/lib/commands-todo.json. That list only shrinks: a file with
-// more than its count fails (a new action that skips the rule), a file with fewer fails until its count is lowered (`--shrink` lowers
-// them), and a file not on the list may have none. When the list is empty the rule holds everywhere.
-import { readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
+// Every action of the app follows the rule: there is no allowance. (While the app was moved to commands, scripts/lib/commands-todo.json
+// counted what was left per file; it emptied in 0.60.15 and went.)
+import { existsSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
 import { join, relative } from "node:path";
 
 const ROOT = new URL("..", import.meta.url).pathname;
@@ -132,7 +131,7 @@ function topKeys(text, from, to) {
     if (c === "{" || c === "(" || c === "[") depth++;
     else if (c === "}" || c === ")" || c === "]") depth--;
     else if (depth === 0) {
-      const m = /^(?:\.\.\.)?([A-Za-z_$][\w$]*)\s*(:|\(|,|\s*})/.exec(text.slice(i, i + 64));
+      const m = /^(?:\.\.\.)?([A-Za-z_$][\w$]*)\??\s*(:|\(|,|\s*})/.exec(text.slice(i, i + 64)); // (an optional key too: command?:)
       const prev = text.slice(Math.max(from + 1, i - 1), i);
       if (m && (i === from + 1 || /[\s,{]/.test(prev))) {
         keys.add(m[1]);
@@ -201,7 +200,7 @@ function importProblems() {
 
 const shrink = process.argv.includes("--shrink");
 const list = process.argv.includes("--list");
-const todo = JSON.parse(readFileSync(TODO, "utf8"));
+const todo = existsSync(TODO) ? JSON.parse(readFileSync(TODO, "utf8")) : { files: {} }; // (the list of actions made before the rule: gone once it was empty)
 const listed = todo.files ?? {};
 const errors = [...importProblems()];
 const counts = {};

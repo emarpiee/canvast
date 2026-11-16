@@ -15,6 +15,14 @@ const CONTROLS = "button, input:not([type=hidden]):not([type=file]), select";
 let reveal: ((el: HTMLElement) => void) | null = null;
 export const setControlRevealer = (fn: (el: HTMLElement) => void): void => void (reveal = fn);
 
+/**
+ * Put on each control of a bar the id of the command it runs (`data-command`), from a table of selectors (ADR 0205): the bar is then made of
+ * commands, the live audit finds it, and the reading of the bar below leaves it to that command. Called again when a bar is drawn again.
+ */
+export function markCommands(root: ParentNode, table: ReadonlyArray<readonly [selector: string, id: string]>): void {
+  for (const [sel, id] of table) for (const el of root.querySelectorAll<HTMLElement>(sel)) if (el.dataset["command"] !== id) el.dataset["command"] = id;
+}
+
 function usable(el: HTMLElement): boolean {
   if ((el as HTMLButtonElement).disabled) return false;
   const parked = el.closest<HTMLElement>("[data-parked]");
@@ -35,6 +43,8 @@ export function keysIn(tooltip: string): string | undefined {
   return k && k.length <= 24 && /^(?:Ctrl|Alt|Shift|Meta|Cmd|Esc|Enter|Delete|Space|[A-Z0-9+\-−/[\]]{1,3})(?:[+\s]|$)/.test(k) ? k : undefined;
 }
 
+const slugOf = (s: string): string => s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+
 export function barCommands(root: ParentNode = document): Command[] {
   const out: Command[] = [];
   for (const bar of root.querySelectorAll<HTMLElement>("[data-cmd-group]")) {
@@ -46,14 +56,20 @@ export function barCommands(root: ParentNode = document): Command[] {
       if (!title) continue;
       const field = el instanceof HTMLInputElement || el instanceof HTMLSelectElement;
       const tooltip = el.title || label;
+      const runs = el.closest<HTMLElement>("[data-command]")?.dataset["command"];
       out.push({
+        id: `bar.${slugOf(group)}:${slugOf(title)}`,
+        hint: tooltip.length > 60 ? `${tooltip.slice(0, 57)}…` : tooltip,
+        risk: "edit",
+        paletteOnly: true,
+        ...(runs ? { paletteOf: runs } : {}),
         title: field ? `Edit ${title.toLowerCase()}` : title,
         group,
         kind: "toolbar",
         ...(keysIn(tooltip) ? { keys: keysIn(tooltip)! } : {}),
         words: `${label} ${field ? "field" : "button"}`,
         enabled: () => usable(el),
-        run: () => {
+        exec: () => {
           if (el.closest("[data-parked]")) reveal?.(el);
           if (field) {
             el.focus();

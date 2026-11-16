@@ -29,6 +29,7 @@ import { BUILT_IN_PATTERNS, DEFAULT_PATTERN, EXPORT_TOKENS, SIZE_RULES, VARIANTS
 import { dateOf } from "../doc/name-pattern";
 import { dateRowHtml, patternChipsHtml, wireDateRow, wirePatternChips, type DateChoice } from "./name-pattern-ui";
 import type { SizeRule, Variant } from "../app/export-names";
+import { commands, pressCommand } from "../commands/registry";
 
 export interface ExportDeps {
   /** What is exported: one target, or one for each of several sheets (they leave together, as a ZIP or the pages of a PDF). */
@@ -142,6 +143,11 @@ export function openExportDialog(deps: ExportDeps): void {
   // (a PDF of several things is a page for each, unless asked for as one picture)
   if (deps.each?.length && loadPrefs().format === "pdf") return openEach(deps);
   openDialog(deps);
+}
+
+/** The export choices an outside caller may set (ADR 0205): kept as the dialog's, so the next dialog shows them. */
+export function setExportChoices(change: Readonly<Record<string, unknown>>): void {
+  savePrefs(loadPrefsFrom({ ...loadPrefs(), ...change }));
 }
 
 /** Export these targets again as they were last time, with no dialog (the last action: download, copy or the library). */
@@ -479,6 +485,7 @@ function openDialog(deps: ExportDeps, again = false): void {
     chips.innerHTML = suggestions.map((c, i) => `<button type="button" class="ex-chip${c.exact ? " is-exact" : ""}" data-chip="${i}" aria-pressed="false" title="${esc(c.title)}: ${c.h ? `${c.w} × ${c.h}` : c.w} px${c.dpi ? ` at ${c.dpi} ppi` : ""}"><b>${esc(c.label)}</b><span>${c.h ? `${c.w} × ${c.h}` : `${c.w} px`}</span></button>`).join("");
   };
   buildChips();
+  // view-state: (a choice of the export: the dialog's own, used when it runs export.dialogRun)
   chips.addEventListener("click", (e) => {
     const b = (e.target as HTMLElement).closest<HTMLElement>("[data-chip]");
     if (!b) return;
@@ -533,6 +540,7 @@ function openDialog(deps: ExportDeps, again = false): void {
     dragging = -1;
   });
   minis?.addEventListener("dragend", () => (dragging = -1));
+  // view-state: (a choice of the export: the dialog's own, used when it runs export.dialogRun)
   dlg.querySelector("[data-ex-minis]")?.addEventListener("click", (e) => {
     const b = (e.target as HTMLElement).closest<HTMLButtonElement>("[data-move]");
     const at = Number(b?.closest<HTMLElement>("[data-mini]")?.dataset["mini"]);
@@ -633,8 +641,11 @@ function openDialog(deps: ExportDeps, again = false): void {
     if (which === "w") hIn.value = shown(fromPx(px().h, prefs.unit, prefs.dpi), prefs.unit);
     else wIn.value = shown(fromPx(px().w, prefs.unit, prefs.dpi), prefs.unit);
   };
+  // view-state: (a choice of the export: the dialog's own, used when it runs export.dialogRun)
   wIn.addEventListener("input", () => fromField("w"));
+  // view-state: (a choice of the export: the dialog's own, used when it runs export.dialogRun)
   hIn.addEventListener("input", () => fromField("h"));
+  // view-state: (a choice of the export: the dialog's own, used when it runs export.dialogRun)
   for (const el of [wIn, hIn]) el.addEventListener("change", () => { refresh(); void refreshThumb(); });
   dlg.addEventListener("keydown", (e) => {
     // arrows step a field by what is natural for its unit (shift: ten times)
@@ -647,12 +658,14 @@ function openDialog(deps: ExportDeps, again = false): void {
       fromField(el === wIn ? "w" : "h");
     }
   });
+  // view-state: (a choice of the export: the dialog's own, used when it runs export.dialogRun)
   q("[data-ex-units]").addEventListener("click", (e) => {
     const b = (e.target as HTMLElement).closest<HTMLElement>("[data-unit]");
     if (!b) return;
     prefs.unit = b.dataset["unit"] as Unit;
     refresh();
   });
+  // view-state: (a choice of the export: the dialog's own, used when it runs export.dialogRun)
   dpiSel.addEventListener("change", () => {
     const old = prefs.dpi;
     prefs.dpi = Number(dpiSel.value);
@@ -664,6 +677,7 @@ function openDialog(deps: ExportDeps, again = false): void {
     refresh();
     void refreshThumb();
   });
+  // view-state: (a choice of the export: the dialog's own, used when it runs export.dialogRun)
   q("[data-ex-formats]").addEventListener("click", (e) => {
     const b = (e.target as HTMLElement).closest<HTMLElement>("[data-format]");
     if (!b) return;
@@ -676,6 +690,7 @@ function openDialog(deps: ExportDeps, again = false): void {
     refresh();
     void refreshThumb();
   };
+  // view-state: (a choice of the export: the dialog's own, used when it runs export.dialogRun)
   q("[data-ex-bgs]").addEventListener("click", (e) => {
     const b = (e.target as HTMLElement).closest<HTMLButtonElement>("[data-bg]");
     if (!b || b.disabled) return;
@@ -685,13 +700,16 @@ function openDialog(deps: ExportDeps, again = false): void {
     setBg(v as Background);
   });
   const padIn = q<HTMLInputElement>('[data-ex="pad"]');
+  // view-state: (a choice of the export: the dialog's own, used when it runs export.dialogRun)
   padIn.addEventListener("input", () => {
     const v = Number(padIn.value);
     prefs.pad = v > 0 && Number.isFinite(v) ? Math.min(1000, v) : 0;
     if (scaleK !== null) widthPx = scaledWidth(scaleK);
     refresh();
   });
+  // view-state: (a choice of the export: the dialog's own, used when it runs export.dialogRun)
   padIn.addEventListener("change", () => void refreshThumb());
+  // view-state: (a choice of the export: the dialog's own, used when it runs export.dialogRun)
   q("[data-ex-padunits]").addEventListener("click", (e) => {
     const b = (e.target as HTMLElement).closest<HTMLElement>("[data-padunit]");
     if (!b) return;
@@ -744,6 +762,7 @@ function openDialog(deps: ExportDeps, again = false): void {
     refresh();
     void refreshThumb();
   };
+  // view-state: (a choice of the export: the dialog's own, used when it runs export.dialogRun)
   presetSel?.addEventListener("change", () => {
     const v = presetSel.value;
     presetSel.value = "";
@@ -763,20 +782,24 @@ function openDialog(deps: ExportDeps, again = false): void {
     showPresets();
   });
   showPresets();
+  // view-state: (a choice of the export: the dialog's own, used when it runs export.dialogRun)
   qIn.addEventListener("input", () => {
     prefs.quality = Number(qIn.value);
     q("[data-ex-qout]").textContent = `${prefs.quality}%`;
   });
+  // view-state: (a choice of the export: the dialog's own, used when it runs export.dialogRun)
   nameIn.addEventListener("input", () => {
     prefs.pattern = nameIn.value.trim() === DEFAULT_PATTERN ? "" : nameIn.value;
     refreshName();
   });
+  // view-state: (a choice of the export: the dialog's own, used when it runs export.dialogRun)
   packIn.addEventListener("input", () => {
     packTouched = true;
     refreshName();
   });
   wirePatternChips(dlg, nameIn);
   const startIn = q<HTMLInputElement>('[data-ex="start"]');
+  // view-state: (a choice of the export: the dialog's own, used when it runs export.dialogRun)
   startIn.addEventListener("input", () => {
     const v = Math.floor(Number(startIn.value));
     prefs.start = Number.isFinite(v) && v >= 0 ? Math.min(1e9, v) : 1;
@@ -789,6 +812,7 @@ function openDialog(deps: ExportDeps, again = false): void {
     fmtSel.innerHTML = `<option value="">Formats…</option><optgroup label="Built in">${BUILT_IN_PATTERNS.map((pt) => `<option value="b:${esc(pt)}">${esc(pt)}</option>`).join("")}</optgroup>${saved.length ? `<optgroup label="Saved">${saved.map((s) => `<option value="b:${esc(s.pattern)}">${esc(s.name)} · ${esc(s.pattern)}</option>`).join("")}</optgroup>` : ""}${deps.names ? `<optgroup label="This format"><option value="save">Save it as a name format…</option>${saved.length ? `<option value="manage">Manage name formats…</option>` : ""}</optgroup>` : ""}`;
     fmtSel.value = "";
   };
+  // view-state: (a choice of the export: the dialog's own, used when it runs export.dialogRun)
   fmtSel.addEventListener("change", () => {
     const v = fmtSel.value;
     fmtSel.value = "";
@@ -804,6 +828,7 @@ function openDialog(deps: ExportDeps, again = false): void {
   });
   showFormats();
   // Output of several: files of their own (a ZIP), the pages of one PDF, or all as one picture (the other dialog).
+  // view-state: (a choice of the export: the dialog's own, used when it runs export.dialogRun)
   dlg.querySelector("[data-ex-outputs]")?.addEventListener("click", (e) => {
     const b = (e.target as HTMLElement).closest<HTMLElement>("[data-output]");
     if (!b) return;
@@ -824,6 +849,7 @@ function openDialog(deps: ExportDeps, again = false): void {
       openEach(deps);
     }
   });
+  // view-state: (a choice of the export: the dialog's own, used when it runs export.dialogRun)
   dlg.querySelector("[data-ex-rules]")?.addEventListener("click", (e) => {
     const b = (e.target as HTMLElement).closest<HTMLElement>("[data-rule]");
     if (!b) return;
@@ -832,6 +858,7 @@ function openDialog(deps: ExportDeps, again = false): void {
     buildChips();
     refresh();
   });
+  // view-state: (a choice of the export: the dialog's own, used when it runs export.dialogRun)
   q("[data-ex-variants]").addEventListener("click", (e) => {
     const b = (e.target as HTMLElement).closest<HTMLElement>("[data-variant]");
     if (!b) return;
@@ -855,6 +882,7 @@ function openDialog(deps: ExportDeps, again = false): void {
   minisBox?.addEventListener("mousedown", (e) => {
     if (e.shiftKey && (e.target as HTMLElement).closest("[data-mini]")) e.preventDefault(); // (no text selected by a Shift+click)
   });
+  // view-state: (a choice of the export: the dialog's own, used when it runs export.dialogRun)
   minisBox?.addEventListener("click", (e) => {
     const el = e.target as HTMLElement;
     const fig = el.closest<HTMLElement>("[data-mini]");
@@ -880,6 +908,7 @@ function openDialog(deps: ExportDeps, again = false): void {
     f.preventDefault();
     ticked();
   });
+  // view-state: (a choice of the export: the dialog's own, used when it runs export.dialogRun)
   dlg.querySelector("[data-ex-pick]")?.addEventListener("click", (e) => {
     const b = (e.target as HTMLElement).closest<HTMLElement>("[data-ex]");
     if (!b || (b.dataset["ex"] !== "all" && b.dataset["ex"] !== "none")) return;
@@ -887,6 +916,7 @@ function openDialog(deps: ExportDeps, again = false): void {
     ticked();
   });
   // A picture's own name: its caption is a button that becomes a field.
+  // view-state: (a choice of the export: the dialog's own, used when it runs export.dialogRun)
   dlg.querySelector("[data-ex-minis]")?.addEventListener("click", (e) => {
     const cap = (e.target as HTMLElement).closest<HTMLElement>("[data-rename]");
     const i = Number(cap?.closest<HTMLElement>("[data-mini]")?.dataset["mini"]);
@@ -1036,6 +1066,13 @@ function openDialog(deps: ExportDeps, again = false): void {
     }
   };
 
+  // The dialog's Download, Copy and Save to library run a command (ADR 0205) while it is open: its fields are that command's choices.
+  commands.setProvider("export-dialog", () => (dlg.isConnected && dlg.open ? [{
+    id: "export.dialogRun", group: "Export", kind: "export", title: "Export with the dialog's choices", hint: "Download, copy or save to the library", risk: "confirm",
+    options: [{ name: "action", type: "choice", doc: "what to do with it", required: true, choices: ["download", "copy", "library"] }],
+    why: () => null, exec: (o) => run(o["action"] as "download" | "copy" | "library"),
+  }] : []));
+  dlg.addEventListener("close", () => commands.removeProvider("export-dialog"));
   dlg.addEventListener("click", (e) => {
     const b = (e.target as HTMLElement).closest<HTMLElement>("[data-ex]");
     if (!b) return;
@@ -1045,7 +1082,7 @@ function openDialog(deps: ExportDeps, again = false): void {
       return k === "each" ? openEach(deps) : openTogether(deps);
     }
     if (k === "close") dlg.close();
-    else if (k === "download" || k === "copy" || k === "library") void run(k);
+    else if (k === "download" || k === "copy" || k === "library") pressCommand("export.dialogRun", { action: k });
   });
   // Enter exports as last time (Download at first); Ctrl+C copies, unless words are selected in a field.
   dlg.addEventListener("keydown", (e) => {

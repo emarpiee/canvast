@@ -10,6 +10,9 @@ import { ICONS } from "../ui/icons";
 import { syncScroll } from "../ui/bar";
 import { openColourPopover } from "../ui/colour-popover";
 import { hexOfCss } from "../ui/text-editor";
+import { commands, pressCommand, runCommand } from "../commands/registry";
+import { markCommands } from "../commands/from-bars";
+import type { Command } from "../commands/types";
 
 /** Simple: zoom and whether it is saved, in plain words. More: adds position, objects and how smoothly it runs. Technical: the numbers. Hidden: nothing. */
 export type InfoMode = "simple" | "more" | "technical" | "hidden";
@@ -176,20 +179,42 @@ export function mountHud(root: HTMLElement, view: ViewState, stats: FrameStats, 
   status.subscribeCamera(syncCam);
   view.subscribe(syncCam);
   syncCam();
+  // The view controls' commands (ADR 0205): the canvas's pattern and background, the names on items, what the info bar shows.
+  const hc = (id: string, title: string, hint: string, name: string, choices: readonly string[], exec: (v: string) => void): Command => ({
+    id, group: "View", kind: "view", title, hint, risk: "edit", why: () => null,
+    options: [{ name, type: "choice", doc: choices.join(", "), required: true, choices }],
+    exec: (o) => exec(String(o[name])),
+  });
+  commands.setProvider("view-controls", () => [
+    { id: "view.zoomTo", group: "View", kind: "view", title: "Zoom to a level", hint: "3000, 2^-500 or 10^900", risk: "edit", why: () => null,
+      options: [{ name: "level", type: "text", doc: "the zoom level: a number, 2^n or 10^n", required: true }],
+      exec: (o) => {
+        const level = parseZoomLevel(String(o["level"]));
+        if (level === null) return { ok: false, error: `"${String(o["level"])}" is not a zoom level. Try 3000, 2^-500 or 10^900.` };
+        if (!(Math.abs(level - viewLevel(view)) <= MAX_JUMP_LEVELS)) return { ok: false, error: "Jumps are limited to 2^50 (about 10^15) levels at a time; jump again to go further." };
+        zoomTo(view, level);
+        return { ok: true };
+      } },
+    hc("canvas.setPattern", "The canvas pattern", "A grid, dots, a scale or none", "pattern", PATTERNS, (v) => status.setPattern(v as CanvasPattern)),
+    hc("view.setNames", "Names on items", "On all, on the selected, or off", "names", NAMES, (v) => status.setItemNames(v as ItemNames)),
+    hc("view.setInfo", "The info bar", "Simple, more, technical or hidden", "mode", MODES, (v) => status.setInfoMode(v as InfoMode)),
+    { id: "canvas.setBackground", group: "View", kind: "view", title: "The canvas background colour", hint: "A colour, or empty for the theme's", risk: "edit", why: () => null,
+      options: [{ name: "colour", type: "text", doc: "#rrggbb, or empty for the theme's", required: true }],
+      exec: (o) => {
+        const c = String(o["colour"]).toLowerCase();
+        if (c !== "" && !/^#[0-9a-f]{6}$/.test(c)) return { ok: false, error: '"colour" is #rrggbb, or empty.' };
+        status.setBackground(c);
+        return { ok: true };
+      } },
+  ]);
+  const HUD_COMMAND: Readonly<Record<string, string>> = { "zoom-in": "view.zoomIn", "zoom-out": "view.zoomOut", "fit-selection": "view.fitSelection", "fit-all": "view.fitAll", "random-view": "view.random", "cam-back": "view.back", "cam-fwd": "view.forward", home: "view.home", zen: "view.zen" };
+  markCommands(root, [['[data-testid="zoom-readout"]', "view.zoomTo"], ...Object.entries(HUD_COMMAND).map(([a, id]) => [`[data-action="${a}"]`, id] as const), ['[data-action="pattern"]', "canvas.setPattern"], ['[data-action="names"]', "view.setNames"], ['[data-action="info"]', "view.setInfo"], ['[data-action="background"]', "canvas.setBackground"]]);
   root.querySelector(".hud-controls")!.addEventListener("click", (e) => {
-    const action = (e.target as HTMLElement).closest("button")?.dataset["action"];
-    if (action === "zoom-in") zoomByStep(view, 1);
-    else if (action === "zoom-out") zoomByStep(view, -1);
-    else if (action === "fit-selection") status.fit("selection");
-    else if (action === "fit-all") status.fit("all");
-    else if (action === "random-view") status.randomView();
-    else if (action === "cam-back") status.cameraBack();
-    else if (action === "cam-fwd") status.cameraForward();
-    else if (action === "home") goHome(view);
-    else if (action === "zen") status.toggleZen();
-    else if (action === "pattern") status.setPattern(PATTERNS[(PATTERNS.indexOf(status.pattern()) + 1) % PATTERNS.length]!);
-    else if (action === "names") status.setItemNames(NAMES[(NAMES.indexOf(status.itemNames()) + 1) % NAMES.length]!);
-    else if (action === "info") status.setInfoMode(MODES[(MODES.indexOf(status.infoMode()) + 1) % MODES.length]!);
+    const action = (e.target as HTMLElement).closest("button")?.dataset["action"] ?? "";
+    if (HUD_COMMAND[action]) pressCommand(HUD_COMMAND[action]!);
+    else if (action === "pattern") pressCommand("canvas.setPattern", { pattern: PATTERNS[(PATTERNS.indexOf(status.pattern()) + 1) % PATTERNS.length]! });
+    else if (action === "names") pressCommand("view.setNames", { names: NAMES[(NAMES.indexOf(status.itemNames()) + 1) % NAMES.length]! });
+    else if (action === "info") pressCommand("view.setInfo", { mode: MODES[(MODES.indexOf(status.infoMode()) + 1) % MODES.length]! });
   });
 
   // Frames per second (app/fps-meter.ts): the display's frame rate, counted only while a view that shows it is on.
@@ -296,14 +321,15 @@ export function mountHud(root: HTMLElement, view: ViewState, stats: FrameStats, 
     }, BACKGROUND_HOLD_MS);
   });
   for (const ev of ["pointerup", "pointerleave", "pointercancel"]) bgButton.addEventListener(ev, () => window.clearTimeout(holdTimer));
-  bgButton.addEventListener("contextmenu", (e) => e.preventDefault()); // (a long touch and a right click: the hold above is what they do)
+  bgButton.addEventListener("contextmenu", (e) => e.preventDefault()); // view-state: (a long touch and a right click: the hold above is what they do)
+  // view-state: (opens the colour chooser; what it picks runs canvas.setBackground)
   bgButton.addEventListener("click", (e) => {
     e.stopPropagation();
     if (held) { held = false; return; }
     openColourPopover(bgButton, {
       name: "Canvas background colour",
       value: status.background() || hexOfCss(getComputedStyle(document.body).backgroundColor),
-      onInput: (hex) => status.setBackground(hex.slice(0, 7).toLowerCase()),
+      onInput: (hex) => void pressCommand("canvas.setBackground", { colour: hex.slice(0, 7).toLowerCase() }),
     });
   });
   // The names button: its icon, what it does now and what the next click does.
@@ -324,6 +350,7 @@ export function mountHud(root: HTMLElement, view: ViewState, stats: FrameStats, 
     zoomInput.hidden = true;
     zoomEl.hidden = false;
   };
+  // view-state: (a field to type a zoom level in)
   zoomEl.addEventListener("click", () => {
     zoomInput.value = viewLevel(view).toFixed(2);
     zoomEl.hidden = true;
@@ -337,18 +364,11 @@ export function mountHud(root: HTMLElement, view: ViewState, stats: FrameStats, 
       e.preventDefault();
     } else if (e.key === "Enter") {
       e.preventDefault();
-      const level = parseZoomLevel(zoomInput.value);
-      if (level === null) {
-        status.notify(`"${zoomInput.value}" is not a zoom level. Try 3000, 2^-500 or 10^900.`);
-        return;
-      }
-      if (!(Math.abs(level - viewLevel(view)) <= MAX_JUMP_LEVELS)) {
-        status.notify(`Jumps are limited to 2^50 (about 10^15) levels at a time; jump again to go further.`);
-        return;
-      }
-      zoomTo(view, level);
-      closeInput();
-      document.getElementById("canvas")?.focus();
+      void runCommand("view.zoomTo", { level: zoomInput.value }).then((r) => {
+        if (!r.ok) return status.notify(r.error);
+        closeInput();
+        document.getElementById("canvas")?.focus();
+      });
     }
   });
   zoomInput.addEventListener("blur", closeInput);

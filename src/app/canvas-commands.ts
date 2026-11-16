@@ -88,6 +88,8 @@ export interface CanvasActions {
   copySvg(): Promise<void>;
   canExport(): boolean;
   openExport(): void;
+  /** Export with these choices and no dialog (as Export again): format, background, quality, padding, and what is done with it. */
+  exportNow(change: Readonly<Record<string, unknown>>): void;
   svgToLibrary(): Promise<void>;
 
   zoom(levels: number): void;
@@ -166,7 +168,7 @@ export function canvasCommands(a: CanvasActions): Command[] {
     cmd("edit.paste", "Edit", "Paste", "From the clipboard", "edit", canvas, onItems(() => a.paste()), { keys: "Ctrl+V" }),
     item("edit.duplicate", "Edit", "Duplicate", "A copy beside it", () => a.duplicate(), picked, { words: "copy" }),
     item("edit.rename", "Edit", "Rename", "Give it a new name", () => a.rename(), writable(when(canvas, a.canRename, "No picture is selected.")), { words: "file name picture image library layer" }),
-    cmd("edit.deleteEverywhere", "Edit", "Delete everywhere", "From every canvas and the library", "confirm", writable(when(picked, a.canDeleteEverywhere, "No library file is selected.")), onItems(() => a.deleteEverywhere()), { options: [IDS], words: "remove erase library every canvas file" }),
+    cmd("edit.deleteEverywhere", "Edit", "Delete everywhere", "From every canvas and the library", "confirm", writable(when(picked, a.canDeleteEverywhere, "No library file is selected.")), onItems(() => a.deleteEverywhere()), { options: [IDS], words: "remove erase library every canvas file", asks: true }),
     cmd("edit.delete", "Edit", "Delete the selection", "From this canvas", "confirm", picked, onItems(() => a.deleteSelection()), { options: [IDS], words: "remove erase" }),
     cmd("edit.showHidden", "Edit", "Show all hidden", "Items hidden on this canvas", "edit", when(canvas, a.anyHidden, "Nothing is hidden on this canvas."), () => a.showHidden(), { words: "unhide reveal eye" }),
     cmd("edit.unlockAll", "Edit", "Unlock all", "So they can be moved", "edit", when(canvas, a.anyLocked, "Nothing is locked."), () => a.unlockAll(), { words: "unlock locked" }),
@@ -219,6 +221,21 @@ export function canvasCommands(a: CanvasActions): Command[] {
 
     item("export.copySvg", "Export", "Copy the selection as SVG", "Vector text to paste", () => a.copySvg(), when(canvas, a.canSvg, "Select shapes or paths."), { words: "vector clipboard text"}),
     cmd("export.open", "Export", "Export… (choose a size)", "Save as a picture file", "edit", when(canvas, a.canExport, "Select what to export, or open a canvas."), () => a.openExport(), { words: "picture png jpeg webp size dpi print sheet image save"}),
+    cmd("export.picture", "Export", "Export the selection as a picture", "With these choices, no dialog", "confirm", when(canvas, a.canExport, "Select what to export, or open a canvas."), (o) => {
+      const change: Record<string, unknown> = {};
+      if (o["format"]) change["format"] = o["format"];
+      if (o["background"]) change["bg"] = o["background"];
+      if (o["quality"] !== undefined) change["quality"] = o["quality"];
+      if (o["padding"] !== undefined) change["pad"] = o["padding"];
+      if (o["action"]) change["action"] = o["action"];
+      a.exportNow(change);
+    }, { options: [
+      { name: "format", type: "choice", doc: "the file's kind", choices: ["png", "webp", "jpeg", "svg", "pdf"] },
+      { name: "background", type: "text", doc: "transparent, white, black or #rrggbb" },
+      { name: "quality", type: "number", doc: "JPEG and WebP quality", min: 10, max: 100 },
+      { name: "padding", type: "number", doc: "room around it, in px", min: 0, max: 1000 },
+      { name: "action", type: "choice", doc: "download it, copy it, or put it in the library", choices: ["download", "copy", "library"] },
+    ] }),
     item("export.svgToLibrary", "Export", "Save the selection to the library as SVG", "A new library item", () => a.svgToLibrary(), when(canvas, a.canSvg, "Select shapes or paths."), { words: "vector assets" }),
 
     cmd("view.zoomIn", "View", "Zoom in", "Closer", "edit", canvas, (o) => a.zoom(Number(o["levels"] ?? 1)), { keys: a.keys("view.zoomIn") || "+", options: [LEVELS] }),
@@ -238,6 +255,7 @@ export function canvasCommands(a: CanvasActions): Command[] {
     cmd("view.home", "View", "Return to the origin", "Back to the start", "edit", canvas, () => a.home(), { keys: a.keys("view.home") || "0", words: "home reset"}),
     cmd("view.focus", "View", "Fit the selection in view", "Again: everything visible", "edit", canvas, () => a.focus(), { keys: a.keys("view.focus") || "F"}),
     cmd("view.fitAll", "View", "Fit everything in view", "Zoom to see it all", "edit", canvas, () => a.fit("all")),
+    cmd("view.fitSelection", "View", "Zoom to the selection", "The selected items fill the view", "edit", picked, () => a.fit("selection")),
     cmd("view.back", "View", "Previous view", "Where the view was before", "edit", when(canvas, a.canBack, "There is no earlier view."), () => a.back(), { words: "back camera"}),
     cmd("view.forward", "View", "Next view", "Where the view went next", "edit", when(canvas, a.canForward, "There is no later view."), () => a.forward(), { words: "forward camera"}),
     cmd("view.random", "View", "Go to a random empty view", "Somewhere far away and empty", "edit", canvas, () => a.randomView(), { words: "dice random far away"}),

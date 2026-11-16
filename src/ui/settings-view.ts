@@ -25,6 +25,7 @@ import { commands, pressCommand, runCommand } from "../commands/registry";
 import type { Command, OptionSpec, Risk } from "../commands/types";
 import { photoCraftVersion } from "../artcraft/photocraft/payload";
 import { PREFS_KEY as PHOTOCRAFT_PREFS } from "../artcraft/photocraft/prefs";
+import { markCommands } from "../commands/from-bars";
 
 /** The desktop build (ADR 0177): the workspace is a folder, so what Settings says about storage, privacy and the page differs. */
 /** A row for something that is not a stored setting (Sharing's), with the settings rows' look. */
@@ -345,8 +346,8 @@ export const SETTINGS_TABS: readonly Tab[] = [
     id: "agents",
     label: "AI agents",
     rows: [
-      { key: "agents.on", label: "Let AI agents use canvast", help: "An AI agent on this computer can run canvast's commands. Off: none can.", more: "An AI agent (a program that speaks MCP, such as Claude Desktop or Claude Code) can list and run canvast's commands through the canvas tools on this computer (canvast-tools mcp), once the pairing code below is the one the tools show. Deleting, hidden items, replacing the workspace and writing files ask you first, in canvast; the password, these settings and what opens hidden items are never theirs. While it is on, canvast connects to the tools on this computer only (127.0.0.1), and nowhere else.", control: { kind: "toggle" } },
-      { key: "agents.code", label: "Pairing code", help: "The code the canvas tools show (Connect an AI agent).", more: "Run the canvas tools and choose Connect an AI agent: they show a code and what to put in the agent's settings. Type the code here. A program that does not know it is not answered.", control: { kind: "text", max: 32, placeholder: "the tools' code" } },
+      { key: "agents.on", label: "Let AI agents use canvast", help: "An AI agent on this computer can run canvast's commands. Off: none can.", more: "An AI agent (a program that speaks MCP, such as Claude Desktop or Claude Code) can list and run canvast's commands through the canvast tools on this computer (canvast-tools mcp), once the pairing code below is the one the tools show. Deleting, hidden items, replacing the workspace and writing files ask you first, in canvast; the password, these settings and what opens hidden items are never theirs. While it is on, canvast connects to the tools on this computer only (127.0.0.1), and nowhere else.", control: { kind: "toggle" } },
+      { key: "agents.code", label: "Pairing code", help: "The code the canvast tools show (Connect an AI agent).", more: "Run the canvast tools and choose Connect an AI agent: they show a code and what to put in the agent's settings. Type the code here. A program that does not know it is not answered.", control: { kind: "text", max: 32, placeholder: "the tools' code" } },
       { key: "agents.readOnly", label: "Agents may only look", help: "On: they can list, search and look, and change nothing.", control: { kind: "toggle" } },
     ],
   },
@@ -568,6 +569,7 @@ export function mountSettingsView(root: HTMLElement, settings: SettingsStore, ke
   };
   const errorLine = (e: { at: number; what: string }): string => `<li><time>${new Date(e.at).toLocaleTimeString()}</time> ${esc(e.what)}</li>`;
   onErrorLog(showErrors);
+  // view-state: (lists to read: concealed folders, errors, about)
   root.addEventListener("click", (e) => {
     if ((e.target as HTMLElement).closest("[data-concealed-show]") && backup?.concealedFolders) {
       void backup.concealedFolders().then((names) => listDialog({ title: "Concealed folders", testid: "concealed-dialog", lines: ["Their items are listed only when the folder is opened. Reveal one from its ⋯ menu in the Library."], body: () => `<ul class="set-errors">${names.map((n) => `<li>${esc(n)}</li>`).join("") || "<li>None</li>"}</ul>` }));
@@ -837,7 +839,11 @@ export function mountSettingsView(root: HTMLElement, settings: SettingsStore, ke
   };
   const all = [...SETTINGS_TABS.flatMap((t) => t.rows ?? []), ...(DESKTOP ? [DELETE_TO_ROW, TRASH_DAYS_ROW] : [])];
   /** Show the stored values in the controls (never while one is being typed into: only called on a change). */
+  /** Each control of Settings and the command it runs (ADR 0205). */
+  const SETTINGS_CONTROLS: ReadonlyArray<readonly [string, string]> = [["[data-set]", "settings.set"], ["[data-colour]", "settings.set"], ["[data-adaptive]", "settings.set"], ["[data-preset]", "settings.set"], ["[data-reset]", "settings.reset"], ["[data-change-key]", "keys.set"], ["[data-key-remove]", "keys.set"], ["[data-key-yes]", "keys.set"], ["[data-key-reset]", "keys.reset"], ["[data-keys-reset-all]", "keys.resetAll"], ["[data-pw]", "password.set"], ["[data-library-split]", "settings.librarySplit"], ["[data-photocraft-reset]", "photocraft.resetPrefs"], ["[data-switch-workspace]", "workspace.switch"]];
   const refresh = (): void => {
+    markCommands(root, SETTINGS_CONTROLS);
+    for (const b of root.querySelectorAll<HTMLElement>("[data-done], [data-key-no], [data-concealed-show], [data-about], [data-reload]")) b.dataset["viewState"] = "";
     renderKeys();
     search();
     // Privacy › Concealed folders: how many, and the list (a list that grows opens in a dialog, never on the page).

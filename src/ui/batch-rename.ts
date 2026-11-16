@@ -135,6 +135,7 @@ export function openBatchRename(items: readonly RenameItem[], opts: RenameOption
       q<HTMLElement>(".rn-h").textContent = `Preview (${changed === items.length ? `all ${items.length} change` : `${changed} of ${items.length} change`})`;
     }
   };
+  // view-state: (a dialog's own control: what it gives goes to the command that opened it)
   dlg.querySelector<HTMLElement>('[data-rn="full"]')?.addEventListener("click", (e) => {
     whole = true;
     field("one").value += one0.ext;
@@ -143,7 +144,9 @@ export function openBatchRename(items: readonly RenameItem[], opts: RenameOption
     field("one").focus();
     refresh();
   });
+  // view-state: (a dialog's own control: what it gives goes to the command that opened it)
   dlg.addEventListener("input", refresh);
+  // view-state: (a dialog's own control: what it gives goes to the command that opened it)
   dlg.addEventListener("change", refresh);
 
   return new Promise((resolve) => {
@@ -155,6 +158,7 @@ export function openBatchRename(items: readonly RenameItem[], opts: RenameOption
       answer = out.length ? out : null;
       dlg.close();
     };
+    // view-state: (a dialog's own control: what it gives goes to the command that opened it)
     dlg.addEventListener("click", (e) => {
       const b = (e.target as HTMLElement).closest("button");
       if (!b) return;

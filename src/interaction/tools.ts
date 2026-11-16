@@ -2927,6 +2927,7 @@ export function attachTools(
     if ("pointerId" in g && g.pointerId === e.pointerId) onPointerUp(new PointerEvent("pointercancel", { pointerId: e.pointerId, clientX: e.clientX, clientY: e.clientY }));
   };
   el.addEventListener("lostpointercapture", onLostCapture);
+  // view-state: (a double-click on the canvas edits what is under it: the tools' own gesture)
   el.addEventListener("dblclick", onDoubleClick);
   // Moving onto a bar or panel over the canvas ends the hover (the resize cursor must not stay on the canvas).
   const onLeave = (): void => {

@@ -54,7 +54,10 @@ reason when a command cannot run, jobs with progress and cancel, and files only 
 those. It does not take its remote driving of the interface (pointer, keys, dialogs over the control channel): our tests have real input
 (Playwright), and an outside caller works through commands, where the rule and the person's confirmation apply.
 
-## Not yet
+## Done (0.60.15)
 
-The commands of the canvas are in `src/app/canvas-commands.ts`, reached through `CanvasActions`; the other parts register theirs as they
-move (the list says how many are left). The control channel and MCP come after every action is a command.
+Every action is a command: the list of actions made before the rule emptied and went, and the live audit allows none (0 commands
+outside the rule, 0 keys, 0 controls without a command on the canvas, in the Library and in Settings). The bars are made of commands
+(`markCommands` puts each control's command id on it from one table); a menu row does not compile without `command`; a `confirm` command
+that shows its own dialog says `asks`, so an agent's run is asked once. The canvas's commands are in `src/app/canvas-commands.ts`; the
+other parts register theirs where their state lives (`commands.setProvider`), and none of them clicks a button to act.

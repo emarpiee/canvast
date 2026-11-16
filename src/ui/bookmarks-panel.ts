@@ -114,7 +114,7 @@ export function mountBookmarksPanel(host: HTMLElement, editor: EditorState, list
     bm("bookmark.rename", "Rename a bookmark", "Give it a new name", [BM, { name: "name", type: "text", doc: "the new name", required: true }], withBm((id, o) => void list.rename(id, String(o["name"])))),
     bm("bookmark.update", "Update a bookmark to this view", "Where you are now", [BM], withBm((id) => void list.update(id, capture()).then(() => { editor.message = "Bookmark updated to this view."; editor.changed(); }))),
     bm("bookmark.move", "Move a bookmark", "Its place in the list and the tour", [BM, { name: "to", type: "number", doc: "its new place, from 0", required: true, min: 0, max: 100000 }], withBm((id, o) => void list.move(id, Number(o["to"])))),
-    bm("bookmark.delete", "Delete a bookmark", "Remove it from the list", [BM], withBm((id) => void list.remove(id))),
+    bm("bookmark.delete", "Delete a bookmark", "Remove it from the list", [BM], withBm((id) => void list.remove(id)), "confirm"),
     bm("bookmark.pictures", "Update the bookmarks' pictures", "Draw them again, or only the missing", [{ name: "bookmarks", type: "ids", doc: "which (default: all)" }, { name: "missing", type: "boolean", doc: "only those with no picture" }], (o) => {
       const ids = (o["bookmarks"] as string[] | undefined) ?? (o["missing"] === true ? list.items.filter((b) => !b.thumb).map((b) => b.id) : undefined);
       thumbs.update(ids);

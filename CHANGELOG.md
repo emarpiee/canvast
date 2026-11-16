@@ -1,8 +1,20 @@
 # Changelog
 
+## 0.60.15 — Every action a command, all of it (2026-11-17)
+
+- **Added:** an AI agent can now do everything a person can in canvast, through its commands: export pictures with chosen settings and no dialog, work with boards and canvases, layers, tags, the trash, bookmarks, the Library's folders and sidebar, styles, the Pattern panel, balloons, the 3D, PDF and ZIP views, and every setting but its own and the private ones. ([AI agents](README.md#ai-agents)) (B25)
+- **Changed:** an agent is asked once, in canvast, before what deletes or touches hidden items: a command that shows its own dialog (Delete the item?) is asked there, not twice; deleting a bookmark asks too. Sharing on the network, the library folder, erasing the trash for good and passwords stay yours alone. ([AI agents](README.md#ai-agents))
+- **Docs:** the README's AI agents, Commands and the canvast tools' Connect an AI agent.
+
+### For developers
+
+- **Changed:** every action is a command: the list of actions made before the rule emptied and went, `check:commands` allows none, and the live audit reads 0 commands outside the rule, 0 keys and 0 controls without a command on the canvas, in the Library and in Settings. The bars are made of commands (`markCommands` puts each control's command id on it from one table, and the old reading of bars leaves them be); a menu row does not compile without `command`; `asks` marks a `confirm` command that shows its own dialog (ADR 0205) (B25).
+- **Added:** `export.picture` (an export with its choices and no dialog), `view.zoomTo`, `view.fitSelection`, `select.items`, the navigator's `canvas.*` and `board.*`, `layer.*`, `tag.*`, `trash.*`, `bookmark.*`, `file.*Bookmark`, `model.*`, `pdf.*`, `archive.*`, `pattern.*`, `balloon.*`, `adjust.*`, `share.*` and `libraryFolder.*` (the person's only), `workspace.open` and more: `command_list` lists them all.
+- **Fixed:** `check:commands` reads an optional key (`command?:`) of a type; the rule check takes `=` in an id and asks `confirm` only of titles that delete for good or touch hidden items.
+
 ## 0.60.14 — Every action a command, and a link to AI agents (2026-11-16)
 
-- **Added:** **Settings > AI agents** (off until you turn it on): an AI agent on this computer (a program that speaks MCP, such as Claude Desktop or Claude Code) can list and run canvast's commands through the canvas tools (`canvast-tools mcp`), once you type the pairing code the tools show. Deleting, hidden items, replacing the workspace and writing files ask you first, in canvast; the password, these settings and what opens hidden items are never the agent's; **Agents may only look** lets it read and change nothing (B25).
+- **Added:** **Settings > AI agents** (off until you turn it on): an AI agent on this computer (a program that speaks MCP, such as Claude Desktop or Claude Code) can list and run canvast's commands through the canvast tools (`canvast-tools mcp`), once you type the pairing code the tools show. Deleting, hidden items, replacing the workspace and writing files ask you first, in canvast; the password, these settings and what opens hidden items are never the agent's; **Agents may only look** lets it read and change nothing (B25).
 - **Changed:** the keys run the same commands as the buttons, the menus and the command palette, and a macro records whatever ran a command (a button, a menu row, a key), not only the palette; a step dragged live (a slider) is left out, the value it ends on is kept.
 
 ### For developers

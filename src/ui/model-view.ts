@@ -17,6 +17,8 @@ import type { Section, Setting } from "../gen/types";
 import { markActions, toggledMark, viewKeeper, viewStateOf } from "./view-state";
 import { modelViewInFront, setModelViewInFront } from "./model-front";
 import type { MarksChange, ViewState } from "./view-state";
+import { commands, pressCommand } from "../commands/registry";
+import type { Command, OptionSpec, Risk } from "../commands/types";
 
 /** The cards of a turnaround. */
 const TURNAROUND = 8;
@@ -208,7 +210,7 @@ export async function openModelView(el: HTMLElement, file: FileFacts, deps: View
       if (!pointers.size) drag = null;
       settle();
     });
-  box.addEventListener("contextmenu", (e) => e.preventDefault());
+  box.addEventListener("contextmenu", (e) => e.preventDefault()); // view-state: (no browser menu over the model)
   let wheelTimer: ReturnType<typeof setTimeout> | undefined;
   box.addEventListener("wheel", (e) => {
     e.preventDefault();
@@ -309,59 +311,71 @@ export async function openModelView(el: HTMLElement, file: FileFacts, deps: View
       const name = `${file.name.replace(/\.[^.]+$/, "")} lines.svg`;
       if (await saveFile(name, new Blob([svg], { type: "image/svg+xml" }))) say(`Saved ${name}.`);
     });
+  // The 3D view's commands (ADR 0205): its bar and menus run them by id, as the palette, a macro and an outside caller do.
+  const open = (): string | null => (root.isConnected ? null : "No 3D model is open.");
+  const mv = (id: string, title: string, hint: string, exec: NonNullable<Command["exec"]>, options: readonly OptionSpec[] = [], risk: Risk = "edit"): Command => ({ id, group: "3D view", kind: "model", title, hint, risk, options, why: open, exec });
+  const turnaround = (): void => {
+    const fit = modelCardFit(box.clientWidth / Math.max(1, box.clientHeight));
+    place.placeViews?.(Array.from({ length: TURNAROUND }, (_, i) => ({ preview: writeLook({ ...look, yaw: wrap((look["yaw"] as number) + (360 * i) / TURNAROUND) }) || "{}", size: fit })));
+  };
+  commands.setProvider("model-view", () => [
+    mv("model.fit", "Fit the model", "The whole model in view", () => toFirst()),
+    mv("model.resetLook", "Reset the view", "Its usual look and lights", () => { look = defaultLook(first); build(); changed(); }),
+    mv("model.lights", "Light the model", "A lighting preset", (o) => {
+      const p = LIGHT_PRESETS.find((x) => x.label === o["preset"] || x.id === o["preset"]);
+      if (!p) return { ok: false, error: `No lighting "${String(o["preset"])}": ${LIGHT_PRESETS.map((x) => x.label).join(", ")}.` };
+      look = { ...look, ...p.look };
+      showTab("light");
+      changed();
+      return { ok: true };
+    }, [{ name: "preset", type: "text", doc: "its name", required: true }]),
+    mv("model.lineStyle", "Use a line style", "A preset or a saved line style", (o) => {
+      const pre = LINE_PRESETS.find((x) => x.label === o["style"] || x.id === o["style"]);
+      const saved = deps.session.styles.of(LINE_STYLE_KIND.id).find((x) => x.name === o["style"] || x.id === o["style"]);
+      if (pre) useLineStyle(pre.look, pre.label);
+      else if (saved) useLineStyle(saved.data as ModelLook, saved.name);
+      else return { ok: false, error: `No line style "${String(o["style"])}".` };
+      return { ok: true };
+    }, [{ name: "style", type: "text", doc: "a preset's or a saved style's name", required: true }]),
+    mv("model.saveLineStyle", "Save these lines as a style", "Kept in Styles, for any model", () => void deps.session.styles.add(LINE_STYLE_KIND.id, "", cleanLineStyle(look)).then((made) => say(made ? `Saved the line style “${made.name}” in Styles.` : "The line style could not be saved."))),
+    mv("model.bookmark", "Bookmark this view", "Or take the bookmark away", () => void toggleMark()),
+    mv("model.goTo", "Go to a bookmarked view", "Its turn and zoom", (o) => void go(String(o["at"])), [{ name: "at", type: "text", doc: "the bookmark's place", required: true }]),
+    mv("model.turnaround", "Place a turnaround", "Views all round it, on the canvas", () => turnaround()),
+    mv("model.placeLines", "Place its lines", "This view's lines, on the canvas", () => placeLines()),
+    mv("model.saveSvg", "Save the lines as SVG", "A file of this view's lines", () => saveSvg(), [], "confirm"),
+    mv("model.showOnCard", "Show this view on its card", "On the canvas", () => showOnCard()),
+  ]);
   const styleMenu = (b: HTMLElement): void => {
     const saved = deps.session.styles.of(LINE_STYLE_KIND.id);
     const items: MenuItem[] = [
-      ...LINE_PRESETS.map((p) => ({ label: p.label, hint: p.hint, icon: ICONS.draftingCompass, id: `line-${p.id}`, run: () => useLineStyle(p.look, p.label) })),
-      ...saved.map((s, i) => ({ label: s.name, hint: LINE_STYLE_KIND.summary(s.data), icon: ICONS.draftingCompass, sep: i === 0, run: () => useLineStyle(s.data as ModelLook, s.name) })),
-      {
-        label: "Save these lines as a style",
-        hint: "Kept in Styles, for any model",
-        icon: ICONS.save,
-        sep: true,
-        run: () =>
-          void deps.session.styles.add(LINE_STYLE_KIND.id, "", cleanLineStyle(look)).then((made) => say(made ? `Saved the line style “${made.name}” in Styles.` : "The line style could not be saved.")),
-      },
+      ...LINE_PRESETS.map((p) => ({ label: p.label, hint: p.hint, icon: ICONS.draftingCompass, id: `line-${p.id}`, command: "model.lineStyle", run: () => void pressCommand("model.lineStyle", { style: p.id }) })),
+      ...saved.map((s, i) => ({ label: s.name, hint: LINE_STYLE_KIND.summary(s.data), icon: ICONS.draftingCompass, sep: i === 0, command: "model.lineStyle", run: () => void pressCommand("model.lineStyle", { style: s.id }) })),
+      { label: "Save these lines as a style", hint: "Kept in Styles, for any model", icon: ICONS.save, sep: true, command: "model.saveLineStyle", run: () => void pressCommand("model.saveLineStyle") },
     ];
     openMoreMenu(b, items, "Line styles");
   };
-  /** What a narrow view keeps in its More menu: the bar's own buttons, by their names. */
+  /** What a narrow view keeps in its More menu: the bar's own buttons, by their names (each runs what its button runs). */
   const moreMenu = (b: HTMLElement): void =>
     openMoreMenu(
       b,
-      [...root.querySelectorAll<HTMLButtonElement>(".view-bar [data-minor]")].map((x): MenuItem => ({ label: x.getAttribute("aria-label")!, hint: x.dataset["hint"] ?? x.title, icon: x.innerHTML, ...(x.getAttribute("aria-pressed") === "true" ? { checked: true } : {}), run: () => x.click() })),
+      [...root.querySelectorAll<HTMLButtonElement>(".view-bar [data-minor]")].map((x): MenuItem => ({ label: x.getAttribute("aria-label")!, hint: x.dataset["hint"] ?? x.title, icon: x.innerHTML, ...(x.getAttribute("aria-pressed") === "true" ? { checked: true } : {}), command: VIEW_ACT[x.dataset["viewAct"] ?? ""] ?? "model.fit", run: () => x.click() })),
       "More of this view",
     );
-  // view-state: (turning, zoom and the view's own look)
+  const VIEW_ACT: Readonly<Record<string, string>> = { fit: "model.fit", reset: "model.resetLook", mark: "model.bookmark", turn: "model.turnaround", lines: "model.placeLines", svg: "model.saveSvg", card: "model.showOnCard" };
   root.addEventListener("click", (e) => {
     const b = (e.target as HTMLElement).closest<HTMLElement>("[data-view-act]");
-    switch (b?.dataset["viewAct"]) {
-      case "fit": return toFirst();
-      case "reset":
-        look = defaultLook(first);
-        build();
-        return changed();
+    const act = b?.dataset["viewAct"] ?? "";
+    if (VIEW_ACT[act]) return void pressCommand(VIEW_ACT[act]!);
+    switch (act) {
       case "lights":
-        return openMoreMenu(b, LIGHT_PRESETS.map((p) => ({ label: p.label, hint: p.hint, icon: ICONS.lightbulb, run: () => {
-          look = { ...look, ...p.look };
-          showTab("light");
-          changed();
-        } })), "Lighting");
-      case "styles": return styleMenu(b);
-      case "more": return moreMenu(b);
-      case "mark": return void toggleMark();
+        return openMoreMenu(b!, LIGHT_PRESETS.map((p) => ({ label: p.label, hint: p.hint, icon: ICONS.lightbulb, command: "model.lights", run: () => void pressCommand("model.lights", { preset: p.id }) })), "Lighting");
+      case "styles": return styleMenu(b!);
+      case "more": return moreMenu(b!);
       case "marks":
-        return openMoreMenu(b, state.marks.length ? state.marks.map((m) => ({ label: m.label, hint: "A bookmarked view", icon: ICONS.bookmark, run: () => go(m.at), more: markActions(m, changeMarks) })) : [{ label: "No bookmarks yet", hint: "Bookmark a view with the button beside this", icon: ICONS.bookmark, run: () => undefined }], "Go to");
-      case "turn": {
-        const fit = modelCardFit(box.clientWidth / Math.max(1, box.clientHeight));
-        return place.placeViews?.(Array.from({ length: TURNAROUND }, (_, i) => ({ preview: writeLook({ ...look, yaw: wrap((look["yaw"] as number) + (360 * i) / TURNAROUND) }) || "{}", size: fit })));
-      }
-      case "lines": return void placeLines();
-      case "svg": return void saveSvg();
-      case "card": return showOnCard();
+        return openMoreMenu(b!, state.marks.length ? state.marks.map((m) => ({ label: m.label, hint: "A bookmarked view", icon: ICONS.bookmark, command: "model.goTo", run: () => void pressCommand("model.goTo", { at: m.at }), more: markActions(m, changeMarks) })) : [{ label: "No bookmarks yet", hint: "Bookmark a view with the button beside this", icon: ICONS.bookmark, command: "model.bookmark", disabled: true, run: () => undefined }], "Go to");
       case "side": {
-        side.hidden = !side.hidden;
-        b.setAttribute("aria-pressed", String(!side.hidden));
+        side.hidden = !side.hidden; // (the settings beside the view: what it shows)
+        b!.setAttribute("aria-pressed", String(!side.hidden));
         return;
       }
     }

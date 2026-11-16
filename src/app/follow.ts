@@ -54,6 +54,7 @@ export function followHost(view: ViewState, session: Sess, canvas: HTMLElement, 
     latest = JSON.parse((e as MessageEvent<string>).data) as Where;
     if (on) void go(latest);
   });
+  // view-state: (the view follows what is selected, or not)
   button.addEventListener("click", () => set(!on));
   // (the guest moving the view itself: it stops following)
   for (const type of ["pointerdown", "wheel", "keydown"] as const) canvas.addEventListener(type, () => on && set(false), { passive: true });

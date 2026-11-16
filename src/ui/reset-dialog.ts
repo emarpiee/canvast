@@ -45,9 +45,11 @@ export function confirmReset(d: ResetDeps): Promise<boolean> {
   });
   const ok = dlg.querySelector<HTMLButtonElement>('[value="ok"]')!;
   const word = dlg.querySelector<HTMLInputElement>('[data-testid="reset-word"]')!;
+  // view-state: (the reset dialog: the person types a word to confirm; never an agent's)
   word.addEventListener("input", () => (ok.disabled = word.value.trim() !== RESET_WORD));
   return new Promise((resolve) => {
     let answer = false;
+    // view-state: (the reset dialog: the person types a word to confirm; never an agent's)
     dlg.addEventListener("click", async (e) => {
       const b = (e.target as HTMLElement).closest("button");
       if (!b) return;

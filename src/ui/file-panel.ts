@@ -85,7 +85,7 @@ export function mountFilePanel(
     el.querySelector(".panel-head h2")?.setAttribute("title", name0);
     // view-state: (closes the panel)
     el.querySelector("[data-close]")!.addEventListener("click", () => void leave());
-    el.querySelector("[data-rename]")?.addEventListener("click", () => void rename());
+    el.querySelector("[data-rename]")?.addEventListener("click", () => void rename()); // view-state: (opens the rename dialog of this file)
     el.hidden = false;
     try {
       note = await k.open(el.querySelector<HTMLElement>(".viewer-note > div")!, { hash, name: name0, blob: rec.blob }, deps, { ...place, ...card });

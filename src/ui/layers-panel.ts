@@ -19,6 +19,8 @@ import { esc } from "./format";
 import { ICONS } from "./icons";
 import { panelHtml } from "./panel";
 import { swatchBackground } from "../render/ink";
+import { commands, pressCommand } from "../commands/registry";
+import type { Command, Options, OptionSpec } from "../commands/types";
 
 /**
  * Floating Layers panel (ADR 0024), like the layers list of a design tool:
@@ -332,7 +334,7 @@ export function mountLayersPanel(host: HTMLElement, editor: EditorState, doc: Do
     const r = renaming;
     if (!r) return;
     renaming = null;
-    if (commit) actions.rename(r.key, r.value);
+    if (commit) pressCommand("layer.rename", { key: r.key, name: r.value });
     render();
   };
   // Two quick presses on the same name start a rename. Not `dblclick`: the first press selects the row, the panel redraws its rows, and
@@ -399,6 +401,23 @@ export function mountLayersPanel(host: HTMLElement, editor: EditorState, doc: Do
       sliding = false;
       schedule();
     });
+  // The layers' commands (ADR 0205): the panel's buttons, its rows' switches and its drags run them, as the palette, a macro and an outside caller do.
+  const IDS: OptionSpec = { name: "ids", type: "ids", doc: "the items (default: the selection)", required: false };
+  const idsOf = (o: Options): string[] => (o["ids"] as string[] | undefined) ?? [...editor.selection];
+  const lc = (id: string, title: string, hint: string, options: readonly OptionSpec[], exec: NonNullable<Command["exec"]>): Command => ({ id, group: "Layers", kind: "layer", title, hint, risk: "edit", options, why: () => null, exec });
+  const sheetOf = (o: Options): string | null => { const f = doc.get(String(o["id"])); return isContainer(f) ? f.id : null; };
+  commands.setProvider("layers", () => [
+    lc("layer.setHidden", "Hide or show items", "On this canvas", [IDS, { name: "hidden", type: "boolean", doc: "hidden, or shown", required: true }], (o) => actions.setFlagOn(idsOf(o), "hidden", o["hidden"] === true)),
+    lc("layer.setLocked", "Lock or unlock items", "So they cannot be moved, or can", [IDS, { name: "locked", type: "boolean", doc: "locked, or not", required: true }], (o) => actions.setFlagOn(idsOf(o), "locked", o["locked"] === true)),
+    lc("layer.setOpacity", "Set the opacity", "Of the items, from 0 to 1", [IDS, { name: "opacity", type: "number", doc: "0 (clear) to 1 (solid)", required: true, min: 0, max: 1 }, { name: "live", type: "boolean", doc: "a step while dragging" }], (o) => actions.setOpacity(idsOf(o), Number(o["opacity"]), o["live"] !== true)),
+    lc("layer.setBlend", "Set the blend mode", "How the items mix with what is under them", [IDS, { name: "blend", type: "choice", doc: "a blend mode, or normal", required: true, choices: ["normal", ...BLEND_MODES] }], (o) => actions.setBlend(idsOf(o), o["blend"] === "normal" ? null : (o["blend"] as BlendMode))),
+    lc("layer.setClip", "Clip the sheet", "What is on it shows only inside it, or all of it", [{ name: "id", type: "id", doc: "the sheet", required: true }, { name: "clip", type: "boolean", doc: "clip, or not", required: true }], (o) => { const id = sheetOf(o); if (!id) return { ok: false, error: "That is not a sheet." }; actions.setClip(id, o["clip"] === true); return { ok: true }; }),
+    lc("layer.setAutoLayout", "Auto layout on a sheet", "On or off", [{ name: "id", type: "id", doc: "the sheet", required: true }, { name: "on", type: "boolean", doc: "on, or off", required: true }], (o) => { const id = sheetOf(o); if (!id) return { ok: false, error: "That is not a sheet." }; actions.setLayout(id, o["on"] === true); return { ok: true }; }),
+    lc("layer.sortByName", "Sort the layers by name", "A to Z, or Z to A", [{ name: "dir", type: "choice", doc: "asc or desc", required: true, choices: ["asc", "desc"] }], (o) => { const dir = o["dir"] === "desc" ? "desc" : "asc"; actions.setOrder(sortedByName(doc.ordered(), names, dir).map((x) => x.id), `Sort layers by name, ${dir === "asc" ? "A to Z" : "Z to A"}`); }),
+    lc("layer.rename", "Rename a layer", "Its name in the Layers list", [{ name: "key", type: "id", doc: "the item or group", required: true }, { name: "name", type: "text", doc: "the new name", required: true }], (o) => actions.rename(String(o["key"]), String(o["name"]))),
+    lc("layer.move", "Move layers", "Before, after or inside another", [{ name: "keys", type: "ids", doc: "the items or groups", required: true }, { name: "target", type: "id", doc: "the item or group they go by", required: true }, { name: "place", type: "choice", doc: "before, after or inside", required: true, choices: ["before", "after", "inside"] }], (o) => actions.moveLayers(o["keys"] as string[], String(o["target"]), o["place"] as LayerPlace)),
+  ]);
+  // commands: (the opacity runs layer.setOpacity; a name and the filter are typed)
   panel.addEventListener("input", (e) => {
     const t = e.target as HTMLInputElement;
     if (t.matches("[data-rename]") && renaming) renaming.value = t.value;
@@ -410,14 +429,14 @@ export function mountLayersPanel(host: HTMLElement, editor: EditorState, doc: Do
     }
     if (t.matches("[data-opacity]")) {
       t.parentElement!.querySelector("output")!.textContent = `${t.value}%`;
-      actions.setOpacity([...editor.selection], Number(t.value) / 100, false); // live: the canvas follows the slider
+      pressCommand("layer.setOpacity", { opacity: Number(t.value) / 100, live: true }); // live: the canvas follows the slider
     }
   });
   // `change` fires once, when the slider is released: one undo step per drag.
   panel.addEventListener("change", (e) => {
     const t = e.target as HTMLInputElement;
-    if (t.matches("[data-opacity]")) actions.setOpacity([...editor.selection], Number(t.value) / 100);
-    if (t.matches("[data-blend]")) actions.setBlend([...editor.selection], (t.value || null) as BlendMode | null);
+    if (t.matches("[data-opacity]")) pressCommand("layer.setOpacity", { opacity: Number(t.value) / 100 });
+    if (t.matches("[data-blend]")) pressCommand("layer.setBlend", { blend: t.value || "normal" });
   });
 
   // Pointing at a row (or tabbing to it) shows the outline of what it stands for on the canvas, whatever its paint (interaction/reveal.ts).
@@ -439,8 +458,8 @@ export function mountLayersPanel(host: HTMLElement, editor: EditorState, doc: Do
         const o = sel[0]!;
         renaming = { key: o.id, value: labelOf(o, names).text };
         render();
-      } else if (doBtn.dataset["do"] === "hide") actions.setFlagOn(ids, "hidden", !sel.every((o) => o.hidden));
-      else if (doBtn.dataset["do"] === "lock") actions.setFlagOn(ids, "locked", !sel.every((o) => o.locked));
+      } else if (doBtn.dataset["do"] === "hide") pressCommand("layer.setHidden", { ids, hidden: !sel.every((o) => o.hidden) });
+      else if (doBtn.dataset["do"] === "lock") pressCommand("layer.setLocked", { ids, locked: !sel.every((o) => o.locked) });
       return;
     }
     if (t.closest("[data-more]")) {
@@ -455,8 +474,7 @@ export function mountLayersPanel(host: HTMLElement, editor: EditorState, doc: Do
     }
     const sortBtn = t.closest<HTMLElement>("[data-sort]");
     if (sortBtn) {
-      const dir = sortBtn.dataset["sort"] === "desc" ? "desc" : "asc";
-      actions.setOrder(sortedByName(doc.ordered(), names, dir).map((o) => o.id), `Sort layers by name, ${dir === "asc" ? "A to Z" : "Z to A"}`);
+      pressCommand("layer.sortByName", { dir: sortBtn.dataset["sort"] === "desc" ? "desc" : "asc" });
       sortOpen = false;
       render();
       return;
@@ -468,11 +486,7 @@ export function mountLayersPanel(host: HTMLElement, editor: EditorState, doc: Do
       render();
       return;
     }
-    if (t.closest("[data-close]")) {
-      editor.layersOpen = false;
-      editor.changed();
-      return;
-    }
+    if (t.closest("[data-close]")) return void pressCommand("panel.layers");
     const li = t.closest<HTMLElement>("li.layer");
     if (!li) return;
     const key = li.dataset["key"]!;
@@ -484,14 +498,14 @@ export function mountLayersPanel(host: HTMLElement, editor: EditorState, doc: Do
       render();
     } else if (t.closest("[data-clip]")) {
       const f = doc.get(key);
-      if (isContainer(f)) actions.setClip(f.id, !f.container.clip);
+      if (isContainer(f)) pressCommand("layer.setClip", { id: f.id, clip: !f.container.clip });
     } else if (t.closest("[data-auto-layout]")) {
       const f = doc.get(key);
-      if (isContainer(f)) actions.setLayout(f.id, !f.container.layout);
+      if (isContainer(f)) pressCommand("layer.setAutoLayout", { id: f.id, on: !f.container.layout });
     } else if (t.closest("[data-eye]")) {
-      actions.setFlagOn(objs.map((o) => o.id), "hidden", !objs.some((o) => o.hidden)); // (any part hidden: all shown)
+      pressCommand("layer.setHidden", { ids: objs.map((o) => o.id), hidden: !objs.some((o) => o.hidden) }); // (any part hidden: all shown)
     } else if (t.closest("[data-lock]")) {
-      actions.setFlagOn(objs.map((o) => o.id), "locked", !objs.some((o) => o.locked));
+      pressCommand("layer.setLocked", { ids: objs.map((o) => o.id), locked: !objs.some((o) => o.locked) });
     } else {
       // A shape inside a boolean group is edited from inside it: its row takes you in (the group itself and everything else, out).
       const inside = !li.dataset["group"] || li.dataset["group"] === "false" ? objs[0] : undefined;
@@ -503,14 +517,14 @@ export function mountLayersPanel(host: HTMLElement, editor: EditorState, doc: Do
         const a = rowKeys.indexOf(anchorKey);
         const b = rowKeys.indexOf(key);
         const range = rowKeys.slice(Math.min(a, b), Math.max(a, b) + 1).flatMap((k) => members(k).filter((o) => !o.hidden).map((o) => o.id));
-        editor.select(e.ctrlKey || e.metaKey ? [...editor.selection, ...range] : range);
+        pressCommand("select.items", { ids: range, add: e.ctrlKey || e.metaKey });
       } else if (e.ctrlKey || e.metaKey) {
         // Ctrl or Cmd: this row in or out of the selection.
         const all = ids.length > 0 && ids.every((id) => editor.selection.has(id));
-        editor.select(all ? [...editor.selection].filter((id) => !ids.includes(id)) : [...editor.selection, ...ids]);
+        pressCommand("select.items", { ids: all ? [...editor.selection].filter((id) => !ids.includes(id)) : [...editor.selection, ...ids] });
         anchorKey = key;
       } else {
-        editor.select(ids);
+        pressCommand("select.items", { ids });
         anchorKey = key;
       }
     }
@@ -562,6 +576,6 @@ export function mountLayersPanel(host: HTMLElement, editor: EditorState, doc: Do
     draggedKey = null;
     if (!li || !key || li.dataset["key"] === key) return;
     e.preventDefault();
-    actions.moveLayers([key], li.dataset["key"]!, placeAt(li, e.clientY));
+    pressCommand("layer.move", { keys: [key], target: li.dataset["key"]!, place: placeAt(li, e.clientY) });
   });
 }

@@ -49,6 +49,7 @@ import { editableInPhotoCraft } from "../artcraft/photocraft/app";
 import { clearRect, MENU_GAP, moreButton, openMoreMenu, pressAs } from "./more-menu";
 import type { MenuItem } from "./more-menu";
 import { commands, pressCommand } from "../commands/registry";
+import { markCommands } from "../commands/from-bars";
 import { REASON } from "../commands/types";
 import type { Command, Options, OptionSpec, Risk } from "../commands/types";
 import { bindContextMenu, grouped as groupedMenu } from "./context-menu";
@@ -494,6 +495,9 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   };
   const fileInput = root.querySelector<HTMLInputElement>('[data-testid="assets-import-input"]')!;
   const importBtn = root.querySelector<HTMLButtonElement>('[data-action="import"]')!;
+  // The Library bar's buttons and the command each runs (ADR 0205); sorting, the layout and the sidebar's sections only change what is shown.
+  markCommands(root, [['[data-action="import"]', "library.import"], ['[data-action="slideshow"]', "library.slideshowShown"], ['.assets-bar [data-action="details"]', "library.details"], ['[data-action="reload-library"]', "library.reload"], ['[data-action="exit-hidden"]', "hidden.exit"], ['[data-action="lock-hidden"]', "hidden.lock"], ['[data-action="hidden-stay"]', "hidden.stay"]]);
+  for (const el of root.querySelectorAll<HTMLElement>('[data-action="sort-dir"], [data-action="reset-filters"], [data-action="show-all"], [data-action="to-top"], [data-action="columns"], .assets-controls [data-layout]')) el.dataset["viewState"] = "";
   const side = root.querySelector<HTMLElement>(".assets-side")!;
 
   // What the user chose to hide (the details panel, the viewer's controls) is remembered on this device.
@@ -2019,6 +2023,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     // The button that was pressed may have just been hidden: keep the keyboard in the viewer.
     if (!viewer.hidden) viewer.focus();
   };
+  // commands: (the viewer's own controls show; Favourite and Place press the details' buttons, which run their commands)
   viewer.addEventListener("click", (e) => {
     const t = e.target as HTMLElement;
     const film1 = t.closest<HTMLElement>(".film-item");
@@ -2724,7 +2729,13 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     return n;
   };
   let lastSideHtml = "";
+  /** The sidebar: its rows filter what is listed (view state); New folder is a command (ADR 0205). */
+  const markSide = (): void => {
+    for (const el of side.querySelectorAll<HTMLElement>(".side-item, .side-sec-toggle, [data-side-sort]")) el.dataset["viewState"] = "";
+    markCommands(side, [['[data-folder-action="new"]', "folder.new"], ["[data-folder-action=rename]", "folder.rename"], ["[data-folder-action=move]", "folder.move"]]);
+  };
   const renderSide = (): void => {
+    requestAnimationFrame(markSide);
     if (!listing) return;
     // (a hidden folder's name typed in the box does not outlast the Hidden items; a folder being named is not searched away)
     if (sideFindHidden !== hiddenMode) {
@@ -2740,7 +2751,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     /** A row's "more" button: it opens the shared menu with these rows, and a right click on the row does too. */
     const more = (kind: SideKind, id: string, name: string, items: SideRow[]): string => {
       if (ro) return "";
-      sideRows.set(`${kind}:${id}`, { label: `Actions for ${kindWord[kind]} ${name}`, items: items.map((i) => ({ label: i.label, hint: i.hint, icon: i.icon, aria: i.aria, ...(i.danger ? { danger: true } : {}), run: () => pressAs(side, { [i.attr]: i.value, "data-id": id, "data-key": id }) })) });
+      sideRows.set(`${kind}:${id}`, { label: `Actions for ${kindWord[kind]} ${name}`, items: items.map((i) => ({ label: i.label, hint: i.hint, icon: i.icon, aria: i.aria, ...(i.danger ? { danger: true } : {}), command: i.attr === "data-folder-action" ? (FOLDER_COMMANDS[i.value]?.[0] ?? "library.sideAction") : i.value === "delete" ? "library.sideDelete" : "library.sideAction", run: () => pressAs(side, { [i.attr]: i.value, "data-id": id, "data-key": id }) })) });
       return `<button type="button" class="side-more" data-side-more data-kind="${kind}" data-id="${esc(id)}" aria-haspopup="menu" aria-expanded="false" aria-label="More actions for ${kindWord[kind]} ${esc(name)}" title="More">${ICONS.ellipsis}</button>`;
     };
     const picked = pickedKeys(scope);
@@ -3937,7 +3948,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
         const now = notesNow().fields[Number(c.data["index"])];
         if (!now?.key.trim()) break;
         const type = propType(now.key, now.value);
-        openMoreMenu(b, PROP_TYPES.map((t) => ({ label: t.label, hint: t.expects, icon: PROP_ICON[t.id], checked: t.id === type, id: `prop-type-${t.id}`, run: () => pinType(now.key, t.id) })), "Property type");
+        openMoreMenu(b, PROP_TYPES.map((t) => ({ label: t.label, hint: t.expects, icon: PROP_ICON[t.id], checked: t.id === type, id: `prop-type-${t.id}`, command: "library.propertyType", run: () => void pressCommand("library.propertyType", { key: now.key, type: t.id }) })), "Property type");
         break;
       }
       case "item-remove": {
@@ -4092,9 +4103,11 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     "show-file": ["library.showFile", "Show the file", "In this computer's file manager", "edit"],
     "add-mark": ["library.addBookmark", "Bookmark this page or view", "In the file's view", "edit"],
   };
+  /** The details' commands that show the person their own dialog first (ADR 0205: an agent's run is asked there, once). */
+  const ASKS = new Set(["delete", "delete-all", "delete-everywhere"]);
   const panelData: OptionSpec = { name: "data", type: "json", doc: "what the button carries: canvas (an id), tag, index" };
   commands.setProvider("library-panel", () => Object.entries(PANEL_COMMANDS).map(([action, [id, title, hint, risk]]): Command => ({
-    id, group: "Library", kind: "library", title, hint, risk,
+    id, group: "Library", kind: "library", title, hint, risk, ...(ASKS.has(action) ? { asks: true } : {}),
     options: [{ name: "hash", type: "id", doc: "the item (default: the one shown in the details)" }, { name: "hashes", type: "ids", doc: "the items (default: the selected)" }, panelData, { name: "on", type: "boolean", doc: "on or off (default: the other of what it is now)" }],
     why: () => (!visible ? "This works in the Library." : session.readOnly && risk !== "read" && action !== "download" && action !== "show" ? REASON.readOnly : !selected ? REASON.noSelection : null),
     exec: (o) => {
@@ -4944,7 +4957,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     delete: ["folder.delete", "Delete the folder", "Its items stay in the library", "confirm"],
   };
   commands.setProvider("library-folders", () => Object.entries(FOLDER_COMMANDS).map(([action, [id, title, hint, risk]]): Command => ({
-    id, group: "Library", kind: "library", title, hint, risk,
+    id, group: "Library", kind: "library", title, hint, risk, ...(action === "hide" || action === "show" || action === "delete" ? { asks: true } : {}),
     options: [{ name: "id", type: "id", doc: "the folder", required: action !== "new" }],
     why: () => (!listing ? "The Library is not open yet." : session.readOnly && action !== "conceal" && action !== "pin" && action !== "export" ? REASON.readOnly : null),
     exec: (o) => {
@@ -5153,7 +5166,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
         const b = inspector.querySelector<HTMLButtonElement>(`[data-action="${action}"]`);
         if (!b || b.hidden) return [];
         const text = label ?? (b.getAttribute("aria-label") || b.textContent?.trim() || action);
-        return [{ id: action, label: text, hint, icon: b.querySelector("svg")?.outerHTML ?? icon, danger: b.classList.contains("is-danger"), disabled: b.disabled, run: () => b.click() }];
+        return [{ id: action, label: text, hint, icon: b.querySelector("svg")?.outerHTML ?? icon, danger: b.classList.contains("is-danger"), disabled: b.disabled, command: PANEL_COMMANDS[action]?.[0] ?? "library.details", run: () => b.click() }]; // (the details' button, which runs its command)
       }),
     );
   // Copy and paste with the system clipboard. Copy puts the picture (as PNG, the one picture type every program takes) alone, because a program that is offered a
@@ -5685,6 +5698,16 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       session.editor.changed();
     }, inLibrary),
     lib("library.details", "Details panel", "Show or hide it", "edit", () => toggleDetails(), inLibrary),
+    // (a row of the sidebar: a tag, a canvas tag or a saved search: what its ⋯ menu offers, run as its own button does)
+    lib("library.sideAction", "A sidebar row's action", "Rename, move or look at a tag, canvas tag or saved search", "edit", (o) => {
+      if (o["action"] === "delete") return { ok: false, error: "Deleting is library.sideDelete." };
+      pressAs(side, { [`data-${String(o["kind"])}-action`]: String(o["action"]), "data-id": String(o["id"]) });
+      return { ok: true };
+    }, inLibrary, { options: [{ name: "kind", type: "choice", doc: "tag, ctag (a canvas tag) or saved (a saved search)", required: true, choices: ["tag", "ctag", "saved"] }, { name: "action", type: "choice", doc: "what to do", required: true, choices: ["rename", "look", "up", "down"] }, { name: "id", type: "text", doc: "the row's id", required: true }] }),
+    lib("library.sideDelete", "Delete a sidebar row", "A tag, a canvas tag or a saved search", "confirm", (o) => void pressAs(side, { [`data-${String(o["kind"])}-action`]: "delete", "data-id": String(o["id"]) }), writable,
+      { asks: true, options: [{ name: "kind", type: "choice", doc: "tag, ctag (a canvas tag) or saved (a saved search)", required: true, choices: ["tag", "ctag", "saved"] }, { name: "id", type: "text", doc: "the row's id", required: true }] }),
+    lib("library.propertyType", "Set a property's type", "How a note's property is read", "edit", (o) => void pinType(String(o["key"]), o["type"] as never), writable,
+      { options: [{ name: "key", type: "text", doc: "the property's name", required: true }, { name: "type", type: "choice", doc: "its type", required: true, choices: PROP_TYPES.map((t) => t.id) }] }),
     lib("hidden.exit", "Exit hidden mode", "They leave the screen, still unlocked", "edit", () => exitHidden(), () => (hiddenMode ? null : "Hidden mode is not on.")),
     lib("hidden.stay", "Stay in hidden mode", "When leaving the library, or not", "edit", () => { settings.set("library.hiddenStay", !settings.get("library.hiddenStay")); paintHiddenMode(); }, () => (hiddenMode ? null : "Hidden mode is not on.")),
   ]);
@@ -5769,6 +5792,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   for (const el of [usageSel, sortSel]) el.addEventListener("input", () => render()); // view-state: (the filters)
   // Typing redraws the results once the typing pauses, not on every letter (a large library would make each key wait for the whole grid).
   let typingTimer = 0;
+  // view-state: (typing the search)
   search.addEventListener("input", () => {
     clearTimeout(typingTimer);
     typingTimer = window.setTimeout(render, SEARCH_PAUSE_MS);
@@ -5896,6 +5920,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   importBtn.addEventListener("click", () => void pressCommand("library.import"));
   const folderInput = root.querySelector<HTMLInputElement>('[data-testid="assets-import-folder-input"]')!;
   const importMenu = root.querySelector<HTMLElement>('[data-action="import-menu"]')!;
+  // view-state: (opens the import menu; its rows are commands)
   importMenu.addEventListener("click", () =>
     openMoreMenu(importMenu, [
       { label: "Import files", icon: ICONS.arrowDownToLine, hint: "Pictures, video, audio and other files", command: "library.import", run: () => void pressCommand("library.import") },

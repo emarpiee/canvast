@@ -135,6 +135,10 @@ describe("the command contract (ADR 0205)", () => {
     expect((await r.execute("item.delete", {}, { caller: "agent" })).ok).toBe(true);
     expect(asked).toBe(2);
     expect((await r.execute("item.delete", {}, { caller: "ui" })).ok).toBe(true); // (the person's own run asks in its own way)
+    r.setProvider("asks", () => [{ id: "item.deleteAsks", title: "Delete, asking", group: "Edit", hint: "h", risk: "confirm", asks: true, exec: () => void log.push("asked itself") }]);
+    expect((await r.execute("item.deleteAsks", {}, { caller: "agent" })).ok).toBe(true); // (its own dialog asks the person: not twice)
+    expect(asked).toBe(2);
+    log.pop();
     expect(asked).toBe(2);
     r.readOnlyCallers = true;
     expect((await r.execute("item.rename", { name: "z" }, { caller: "agent" })).ok).toBe(false);

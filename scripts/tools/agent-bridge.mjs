@@ -1,4 +1,4 @@
-// The canvas tools' link to AI agents (ADR 0205): `canvast-tools mcp`. An AI agent (an MCP client: Claude Desktop, Claude Code, …) starts
+// The canvast tools' link to AI agents (ADR 0205): `canvast-tools mcp`. An AI agent (an MCP client: Claude Desktop, Claude Code, …) starts
 // it and talks MCP to it over its standard input and output; canvast (the app, in a browser or the desktop app) connects to it on this
 // computer (ws://127.0.0.1:47380) once Settings > AI agents is on and has the pairing code these tools show. A call of the agent goes on to
 // the app as `{ id, method, params }` (list, run, batch) and its answer comes back. Nothing else is listened to: only 127.0.0.1, only a

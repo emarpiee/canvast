@@ -2066,6 +2066,7 @@ canvast tools
   3) Share a folder with another device (phone, laptop)
   4) Saved devices for sharing
   5) Help
+  6) Connect an AI agent
   0) Quit
 ```
 
@@ -2075,6 +2076,7 @@ canvast tools
 | **Hide files into a workspace** | Encrypts files into the workspace's `.hidden` folder; canvast lists them as hidden items. Close canvast on that workspace first | Yes: only `.hidden` and `hidden.json` |
 | **Share a folder** | Shares **any folder** with devices on your network, as a folder their file manager opens (WebDAV over HTTPS): a canvast workspace (its *Library*, and *Hidden* if you choose) or any other folder of yours | Only if you allow changes |
 | **Saved devices** | Devices with their own name, user name, password and rights, kept between runs | No |
+| **Connect an AI agent** | Shows the pairing code for Settings > [AI agents](#ai-agents) and what to put in the agent's settings. The agent then starts the tools itself, as `node canvast-tools.mjs mcp` | No |
 
 #### Sharing a folder with the tools
 
@@ -2294,6 +2296,7 @@ node scripts/hidden-items.mjs encrypt ~/Art/my-workspace ~/decrypted/sketch.png
 | [Context menus](#context-menus) | What fits where you are |
 | [The info bar](#the-info-bar) | Zoom, position, saving, and what the app is doing |
 | [Settings](#settings) | Where each is kept, and the groups |
+| [AI agents](#ai-agents) | Let an AI agent on this computer use canvast, off until you turn it on |
 | [Accessibility](#accessibility) | Keyboard, screen readers, motion, contrast |
 | [Keyboard and pointer reference](#keyboard-and-pointer-reference) | Every default shortcut |
 
@@ -2401,6 +2404,20 @@ Make the app yours: theme, theme colour, density and the canvas.
 | About and diagnostics | Version and diagnostics |
 | Develop | Developer tools (see [Building from source](#building-from-source)) |
 
+### AI agents
+
+Let an AI agent (a program that speaks MCP, such as Claude Desktop or Claude Code) arrange a board, tag a folder of references or export pictures for you, while you watch and allow what matters.
+
+| | |
+| --- | --- |
+| Turn it on | **Settings > AI agents > Let AI agents use canvast**. Off until you turn it on |
+| Pairing | Run the [canvast tools](#canvast-tools-without-the-app) and choose **Connect an AI agent**: they show a pairing code and what to put in the agent's settings. Type the code in **Pairing code** |
+| What it can do | Every action of canvast is a command with a name: the agent lists them, then runs them with their options (which items, which colour, which folder) and reads what happened |
+| What asks you first | Deleting, hidden items, replacing the workspace and writing files to the disk: canvast shows **An AI agent wants to…** with **Allow** and **Cancel** |
+| What it never does | Passwords, unlocking hidden items, these settings, sharing on the network and erasing the trash for good stay yours |
+| Only look | **Agents may only look**: it can list, search and read, and changes nothing |
+| Where it connects | To the canvast tools on this computer only (127.0.0.1), and only while it is on |
+
 ### Accessibility
 
 | | |
@@ -2470,6 +2487,7 @@ What canvast does not do today, for both versions, then each. **The limits that 
 | Place in a file | A PDF's page, a comic's page or a model's view is kept when its view closes, not at each turn |
 | Text | No Indic shaping; other computers can wrap missing characters differently |
 | Partial backups | ⚠️ An Advanced export can only be added, never used to update a workspace. Links in notes to items left out find nothing until those items are there |
+| AI agents | The canvast tools need Node.js 20 or later; one agent at a time; a command that waits for you times out for the agent after two minutes |
 | Concealed folders | A view filter, not privacy: no password, nothing encrypted, the files stay readable on the disk. The canvas's font list and texture picker still offer their items |
 | Adjustment shapes | In an SVG, what is under one is written again through its filter; made into shapes again, it comes back as a plain path |
 | Saturation in SVG and video | An SVG and a playing video or GIF keep a colour's luminance when they take its colour away or place it on a gradient map, not how light it looks: the grey of a strong colour can differ a little from the canvas's |
@@ -2735,7 +2753,7 @@ The colour picker can be built alone with `npm run build:picker`, and the patter
 
 ## API and file formats
 
-canvast has no network API: it never opens a connection, apart from the desktop app's read-only sharing while you turn it on. Other programs work with it through its files, which are documented and versioned, and through the entry points below. Each format names itself (`format`) and its `version`; a newer version than an app reads is refused, never half-read.
+canvast has no network API of its own: it never opens a connection, apart from the desktop app's read-only sharing and the link to [AI agents](#ai-agents), each only while you turn it on. Other programs work with it through its files, which are documented and versioned, and through the entry points below. Each format names itself (`format`) and its `version`; a newer version than an app reads is refused, never half-read.
 
 ### File formats
 
@@ -2769,6 +2787,23 @@ Two parts of canvast are made to be used on their own, with no dependency on the
 | --- | --- | --- |
 | The colour picker | `npm run build:picker` | [src/colour-picker/README.md](src/colour-picker/README.md) |
 | The pattern generators | `npm run build:patterns` (a script with the global `CanvastPatterns`, an ES module, TypeScript declarations and a demo page in `dist-patterns/`) | [src/gen/README.md](src/gen/README.md) |
+
+### Commands
+
+Every action of canvast is a command with a fixed name (`edit.undo`, `library.move`, `export.picture`), and the buttons, menus, keys, the command palette, macros and AI agents all run it by that name. An agent reads the list and runs commands through the canvast tools (`canvast-tools mcp`), an MCP server on its standard input and output:
+
+| MCP tool | What it does |
+| --- | --- |
+| `command_list` | Every command: its id, name, hint, options (name, type, whether needed), risk, and whether it can run now and why not |
+| `command_run` | One command by id with its options; the answer says what it made or changed, or why not |
+| `command_batch` | Several in order, stopping at the first that fails (or not); not one undo step |
+
+| Risk | Means |
+| --- | --- |
+| `read` | It only reads |
+| `edit` | It changes what can be undone or put back |
+| `confirm` | canvast asks you before an agent's run |
+| `refused` | Never an agent's |
 
 ### Automation hook
 

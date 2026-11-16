@@ -9,14 +9,14 @@ export type AppView = "canvas" | "assets" | "settings" | "photocraft";
  */
 export function mountViewSwitch(root: HTMLElement, onSelect: (v: AppView) => void, /** The PhotoCraft tab beside Library (Settings > ArtCraft > PhotoCraft). */ photoCraft = false): (v: AppView) => void {
   root.innerHTML = `
-    <div class="view-switch" data-cmd-group="Navigate" role="tablist" aria-label="View">
+    <div class="view-switch" data-cmd-group="Navigate" role="tablist" aria-label="View" data-view-state>
       <button type="button" role="tab" data-view="assets" data-testid="view-assets" title="Library">${ICONS.images}<span>Library</span></button>
     </div>
-    <div class="view-settings" data-cmd-group="Navigate"><button type="button" data-view="settings" data-testid="view-settings" aria-pressed="false" aria-label="Settings" title="Settings">${ICONS.settings}</button></div>`;
+    <div class="view-settings" data-cmd-group="Navigate" data-view-state><button type="button" data-view="settings" data-testid="view-settings" aria-pressed="false" aria-label="Settings" title="Settings">${ICONS.settings}</button></div>`;
   // PhotoCraft's set, after the canvas's (#photocraft-switch): its tab, and its × while it runs
   const pc = photoCraft ? document.getElementById("photocraft-switch") : null;
   if (pc) {
-    pc.innerHTML = `<div class="view-switch pc-switch" data-cmd-group="Navigate" role="tablist" aria-label="PhotoCraft"><button type="button" role="tab" data-view="photocraft" data-testid="view-photocraft" aria-label="PhotoCraft" title="PhotoCraft, the photo editor (it keeps running while you are in another view)">${ICONS.photoCraft}</button><button type="button" class="view-close" data-photocraft-close data-testid="photocraft-close" hidden aria-label="Close PhotoCraft (it asks first when something is not saved)" title="Close PhotoCraft">${ICONS.x}</button></div>`;
+    pc.innerHTML = `<div class="view-switch pc-switch" data-cmd-group="Navigate" role="tablist" aria-label="PhotoCraft" data-view-state><button type="button" role="tab" data-view="photocraft" data-testid="view-photocraft" aria-label="PhotoCraft" title="PhotoCraft, the photo editor (it keeps running while you are in another view)">${ICONS.photoCraft}</button><button type="button" class="view-close" data-photocraft-close data-testid="photocraft-close" hidden aria-label="Close PhotoCraft (it asks first when something is not saved)" title="Close PhotoCraft">${ICONS.x}</button></div>`;
     // view-state: (which view shows: also the commands go.canvas, go.library and the Settings pages)
     pc.addEventListener("click", (e) => {
       const t = (e.target as HTMLElement).closest<HTMLButtonElement>('[role="tab"]');

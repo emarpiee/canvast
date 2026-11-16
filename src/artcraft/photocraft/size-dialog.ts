@@ -61,14 +61,17 @@ export function chooseProjectSize(o: { title: string; ratio: number; world: { w:
     result.textContent = s ? `${s.w} × ${s.h} px${s.capped ? " (made smaller: the largest a picture may be)" : ""}` : "Give a size above 0.";
     dlg.querySelector<HTMLButtonElement>('[value="ok"]')!.disabled = !s;
   };
+  // view-state: (a dialog's own control: what it gives goes to the command that opened it)
   rule.addEventListener("change", () => {
     value.value = rule.value === "scale" ? "2" : "2048";
     show();
   });
+  // view-state: (a dialog's own control: what it gives goes to the command that opened it)
   value.addEventListener("input", show);
   show();
   return new Promise((resolve) => {
     let answer: SizeChoice | null = null;
+    // view-state: (a dialog's own control: what it gives goes to the command that opened it)
     dlg.addEventListener("click", (e) => {
       const b = (e.target as HTMLElement).closest("button");
       if (!b) return;

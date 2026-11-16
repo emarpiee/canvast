@@ -10,6 +10,9 @@ import { ARCHIVE_ACCEPT, runExport, runExportFiles, runImport } from "./archive-
 import { ICONS } from "./icons";
 import type { AppView } from "./view-switch";
 import { canSwitchWorkspace, openWorkspaceSwitcher } from "./workspace-switch";
+import { commands, pressCommand } from "../commands/registry";
+import { REASON } from "../commands/types";
+import type { Command, Options, OptionSpec, Risk, RunContext } from "../commands/types";
 
 /**
  * Board › Canvas navigator (top-left, the first control) and the read-only banner (ADR 0079).
@@ -23,8 +26,8 @@ export function mountNavigator(root: HTMLElement, session: Session, openCanvasVi
   root.innerHTML = `
     <div class="nav">
       <div class="nav-pill" data-cmd-group="Navigate" data-testid="workspace-nav" data-active="true">
-        <button type="button" class="nav-crumb" data-testid="view-canvas" aria-current="page" aria-label="Canvas view" title="Canvas view">${ICONS.infinity}</button>
-        <button type="button" class="nav-name-btn" data-testid="workspace-chevron" aria-haspopup="true" aria-expanded="false" title="Switch board or canvas"><span class="nav-crumb-text"></span>${ICONS.chevronDown}</button>
+        <button type="button" class="nav-crumb" data-view-state data-testid="view-canvas" aria-current="page" aria-label="Canvas view" title="Canvas view">${ICONS.infinity}</button>
+        <button type="button" class="nav-name-btn" data-view-state data-testid="workspace-chevron" aria-haspopup="true" aria-expanded="false" title="Switch board or canvas"><span class="nav-crumb-text"></span>${ICONS.chevronDown}</button>
       </div>
       <div class="nav-menu" role="menu" data-testid="workspace-menu" hidden></div>
     </div>
@@ -58,7 +61,7 @@ export function mountNavigator(root: HTMLElement, session: Session, openCanvasVi
     const boards = tree.boards;
     const actions = (kind: "board" | "canvas", id: string, name: string, canDelete: boolean, why: string, first: boolean, last: boolean, here: string): string => {
       const row = (action: string, label: string, hint: string, icon: string, aria: string, more: Partial<MenuItem> = {}, attrs: Record<string, string> = {}): MenuItem => ({
-        label, hint, icon, aria, ...more, run: () => pressAs(menu, { "data-action": action, "data-id": id, ...attrs }),
+        label, hint, icon, aria, ...more, command: NAV_COMMAND[action]?.[0] ?? "canvas.renameId", run: () => pressAs(menu, { "data-action": action, "data-id": id, ...attrs }), // (as the row's button: its command)
       });
       rowMenus.set(`${kind}:${id}`, {
         label: `Actions for ${kind} ${name}`,
@@ -153,8 +156,8 @@ export function mountNavigator(root: HTMLElement, session: Session, openCanvasVi
   };
 
   // The infinity button is the Canvas view's tab: from another view it goes there; on the canvas it opens the menu. The name with its arrow (one control, floating without a box) always opens the menu.
-  crumb.addEventListener("click", () => (view === "canvas" ? setOpen(menu.hidden === true) : openCanvasView()));
-  chev.addEventListener("click", () => setOpen(menu.hidden === true));
+  crumb.addEventListener("click", () => (view === "canvas" ? setOpen(menu.hidden === true) : openCanvasView())); // view-state: (opens the list, or the canvas view)
+  chev.addEventListener("click", () => setOpen(menu.hidden === true)); // view-state: (opens the list)
   root.addEventListener("keydown", (e) => {
     if (e.key === "Escape" && !menu.hidden && !renaming) {
       setOpen(false);
@@ -166,6 +169,7 @@ export function mountNavigator(root: HTMLElement, session: Session, openCanvasVi
     if (!menu.hidden && !root.contains(e.target as Node) && !(e.target as HTMLElement).closest?.(".pop-menu")) setOpen(false);
   });
 
+  // view-state: (the file picker of workspace.import)
   menu.addEventListener("change", (e) => {
     const input = e.target as HTMLInputElement;
     if (input.dataset["testid"] !== "nav-import-input") return;
@@ -184,94 +188,72 @@ export function mountNavigator(root: HTMLElement, session: Session, openCanvasVi
       if (row) openMoreMenu(b, row.items, row.label);
       return;
     }
-    switch (b.dataset["action"]) {
-      case "open":
-        void session.openCanvas(id).then(() => setOpen(false));
-        break;
-      case "new-board":
-        void session.newBoard().then(() => setOpen(false));
-        break;
-      case "new-canvas":
-        void session.newCanvas(id).then(() => setOpen(false));
-        break;
-      case "rename-board":
-        renaming = { kind: "board", id };
-        renderMenu();
-        break;
-      case "rename-workspace":
-        renaming = { kind: "workspace", id };
-        renderMenu();
-        break;
-      case "rename-canvas":
-        renaming = { kind: "canvas", id };
-        renderMenu();
-        break;
-      case "export-workspace":
-        setOpen(false);
-        void runExport(session, { kind: "workspace" });
-        break;
-      case "export-files-workspace":
-        setOpen(false);
-        void runExportFiles(session, { kind: "workspace" });
-        break;
-      case "export-files-board":
-        setOpen(false);
-        void runExportFiles(session, { kind: "board", boardId: id });
-        break;
-      case "export-files-canvas":
-        setOpen(false);
-        void runExportFiles(session, { kind: "canvas", canvasId: id });
-        break;
-      case "import-archive":
-        menu.querySelector<HTMLInputElement>('[data-testid="nav-import-input"]')?.click();
-        break;
-      case "switch-workspace":
-        void openWorkspaceSwitcher(b);
-        break;
-      case "export-board":
-        setOpen(false);
-        void runExport(session, { kind: "board", boardId: id });
-        break;
-      case "export-canvas":
-        setOpen(false);
-        void runExport(session, { kind: "canvas", canvasId: id });
-        break;
-      case "duplicate-canvas":
-        setOpen(false);
-        void session.duplicateCanvas(id);
-        break;
-      case "duplicate-board":
-        setOpen(false);
-        void session.duplicateBoard(id);
-        break;
-      case "up-canvas":
-      case "down-canvas": {
-        const entry = session.tree?.boards.find((bd) => bd.canvases.some((c) => c.id === id));
-        const at = entry?.canvases.findIndex((c) => c.id === id) ?? -1;
-        if (entry && at >= 0) void session.moveCanvas(id, entry.board.id, at + (b.dataset["action"] === "up-canvas" ? -1 : 1));
-        break;
-      }
-      case "up-board":
-      case "down-board": {
-        const at = session.tree?.boards.findIndex((bd) => bd.board.id === id) ?? -1;
-        if (at >= 0) void session.moveBoard(id, at + (b.dataset["action"] === "up-board" ? -1 : 1));
-        break;
-      }
-      case "to-board": {
-        const target = session.tree?.boards.find((bd) => bd.board.id === b.dataset["board"]);
-        if (target) void session.moveCanvas(id, target.board.id, target.canvases.length);
-        setOpen(false);
-        break;
-      }
-      case "delete-canvas":
-        void confirmDeleteCanvas(id);
-        break;
-      case "delete-board":
-        void confirmDeleteBoard(id);
-        break;
+    const action = b.dataset["action"] ?? "";
+    // (renaming opens a field in the list; the switcher is a menu of its own: what they lead to are commands)
+    if (action === "rename-board" || action === "rename-workspace" || action === "rename-canvas") {
+      renaming = { kind: action.slice(7) as "board" | "workspace" | "canvas", id };
+      return renderMenu();
     }
+    if (action === "switch-workspace") return void openWorkspaceSwitcher(b);
+    if (action === "import-archive") return void pressCommand("workspace.import");
+    const cmd = NAV_COMMAND[action];
+    if (!cmd) return;
+    if (!["up-canvas", "down-canvas", "up-board", "down-board"].includes(action)) setOpen(false);
+    pressCommand(cmd[0], { ...(cmd[1] ? {} : { id }), ...(action.startsWith("up-") ? { by: -1 } : action.startsWith("down-") ? { by: 1 } : {}), ...(action === "to-board" ? { board: b.dataset["board"] ?? "" } : {}) });
   });
 
+  // The boards' and canvases' commands (ADR 0205): the navigator's rows and menus run them, as the palette, a macro and an outside caller do.
+  /** Navigator action → its command, and whether it takes no id. */
+  const NAV_COMMAND: Readonly<Record<string, readonly [string, boolean?]>> = {
+    open: ["canvas.openId"], "new-board": ["workspace.newBoard", true], "new-canvas": ["canvas.newIn"], "export-workspace": ["workspace.backup", true],
+    "export-files-workspace": ["workspace.exportFiles", true], "export-files-board": ["board.exportFiles"], "export-files-canvas": ["canvas.exportFiles"],
+    "export-board": ["board.export"], "export-canvas": ["canvas.export"], "duplicate-canvas": ["canvas.duplicate"], "duplicate-board": ["board.duplicate"],
+    "up-canvas": ["canvas.moveBy"], "down-canvas": ["canvas.moveBy"], "up-board": ["board.moveBy"], "down-board": ["board.moveBy"], "to-board": ["canvas.moveTo"],
+    "delete-canvas": ["canvas.delete"], "delete-board": ["board.delete"],
+  };
+  const ID: OptionSpec = { name: "id", type: "id", doc: "the canvas or board", required: true };
+  const boardOf = (canvasId: string) => session.tree?.boards.find((bd) => bd.canvases.some((c) => c.id === canvasId));
+  const hasCanvas = (o: Options): string | null => (boardOf(String(o["id"])) ? null : `There is no canvas "${String(o["id"])}".`);
+  const hasBoard = (o: Options): string | null => (session.tree?.boards.some((bd) => bd.board.id === o["id"]) ? null : `There is no board "${String(o["id"])}".`);
+  const nav = (id: string, title: string, hint: string, risk: Risk, options: readonly OptionSpec[], exec: (o: Options, ctx: RunContext) => Promise<unknown> | unknown, check?: (o: Options) => string | null): Command => ({
+    id, group: "Boards and canvases", kind: "canvas", title, hint, risk, options, why: () => (session.tree ? null : REASON.noWorkspace),
+    exec: async (o, ctx) => {
+      const no = check?.(o);
+      if (no) return { ok: false, error: no };
+      await exec(o, ctx);
+      return { ok: true };
+    },
+  });
+  commands.setProvider("navigator-actions", () => [
+    nav("canvas.openId", "Open a canvas", "By its id", "edit", [ID], (o) => session.openCanvas(String(o["id"])), hasCanvas),
+    nav("canvas.newIn", "New canvas on a board", "An empty canvas", "edit", [{ ...ID, doc: "the board" }], (o) => session.newCanvas(String(o["id"])), hasBoard),
+    nav("canvas.renameId", "Rename a canvas", "By its id", "edit", [ID, { name: "name", type: "text", doc: "the new name", required: true }], (o) => session.renameCanvas(String(o["id"]), String(o["name"])), hasCanvas),
+    nav("board.renameId", "Rename a board", "By its id", "edit", [ID, { name: "name", type: "text", doc: "the new name", required: true }], (o) => session.renameBoard(String(o["id"]), String(o["name"])), hasBoard),
+    nav("workspace.rename", "Rename the workspace", "Its name", "edit", [{ name: "name", type: "text", doc: "the new name", required: true }], (o) => session.renameWorkspace(String(o["name"]))),
+    nav("canvas.duplicate", "Duplicate a canvas", "A copy on the same board", "edit", [ID], (o) => session.duplicateCanvas(String(o["id"])), hasCanvas),
+    nav("board.duplicate", "Duplicate a board", "A copy with its canvases", "edit", [ID], (o) => session.duplicateBoard(String(o["id"])), hasBoard),
+    nav("canvas.moveBy", "Move a canvas up or down", "In its board's list", "edit", [ID, { name: "by", type: "number", doc: "-1 up, 1 down", required: true, min: -1000, max: 1000 }], (o) => {
+      const entry = boardOf(String(o["id"]))!;
+      const at = entry.canvases.findIndex((c) => c.id === o["id"]);
+      return session.moveCanvas(String(o["id"]), entry.board.id, at + Number(o["by"]));
+    }, hasCanvas),
+    nav("board.moveBy", "Move a board up or down", "In the list", "edit", [ID, { name: "by", type: "number", doc: "-1 up, 1 down", required: true, min: -1000, max: 1000 }], (o) => {
+      const at = session.tree!.boards.findIndex((bd) => bd.board.id === o["id"]);
+      return session.moveBoard(String(o["id"]), at + Number(o["by"]));
+    }, hasBoard),
+    nav("canvas.moveTo", "Move a canvas to a board", "At the end of it", "edit", [ID, { name: "board", type: "id", doc: "the board", required: true }], (o) => {
+      const target = session.tree!.boards.find((bd) => bd.board.id === o["board"]);
+      return target ? session.moveCanvas(String(o["id"]), target.board.id, target.canvases.length) : undefined;
+    }, (o) => hasCanvas(o) ?? (session.tree?.boards.some((bd) => bd.board.id === o["board"]) ? null : `There is no board "${String(o["board"])}".`)),
+    nav("canvas.delete", "Delete a canvas", "Its pictures stay in the library", "confirm", [ID], (o, ctx) => (ctx.caller === "agent" ? session.deleteCanvas(String(o["id"])) : confirmDeleteCanvas(String(o["id"]))), hasCanvas),
+    nav("board.delete", "Delete a board", "With its canvases", "confirm", [ID], (o, ctx) => (ctx.caller === "agent" ? session.deleteBoard(String(o["id"])) : confirmDeleteBoard(String(o["id"]))), hasBoard),
+    nav("canvas.export", "Export a canvas", "As a .canvast archive", "confirm", [ID], (o) => runExport(session, { kind: "canvas", canvasId: String(o["id"]) }), hasCanvas),
+    nav("board.export", "Export a board", "As a .canvast archive", "confirm", [ID], (o) => runExport(session, { kind: "board", boardId: String(o["id"]) }), hasBoard),
+    nav("canvas.exportFiles", "Export a canvas's files", "A ZIP of its library files", "confirm", [ID], (o) => runExportFiles(session, { kind: "canvas", canvasId: String(o["id"]) }), hasCanvas),
+    nav("board.exportFiles", "Export a board's files", "A ZIP of its library files", "confirm", [ID], (o) => runExportFiles(session, { kind: "board", boardId: String(o["id"]) }), hasBoard),
+    nav("workspace.exportFiles", "Export the workspace's files", "A ZIP of every library file", "confirm", [], () => runExportFiles(session, { kind: "workspace" })),
+    nav("workspace.import", "Import a .canvast archive", "Boards, canvases and files from a backup", "confirm", [], () => menu.querySelector<HTMLInputElement>('[data-testid="nav-import-input"]')?.click()),
+  ]);
   const KEPT = "Pictures placed on it stay in the library. This cannot be undone.";
   const confirmDeleteCanvas = async (id: string): Promise<void> => {
     const entry = session.tree?.boards.find((b) => b.canvases.some((c) => c.id === id));
@@ -305,9 +287,9 @@ export function mountNavigator(root: HTMLElement, session: Session, openCanvasVi
     if (e.key === "Enter") {
       const { rename, id } = input.dataset;
       renaming = null;
-      if (rename === "board") void session.renameBoard(id!, input.value);
-      else if (rename === "workspace") void session.renameWorkspace(input.value);
-      else void session.renameCanvas(id!, input.value);
+      if (rename === "board") pressCommand("board.renameId", { id: id!, name: input.value });
+      else if (rename === "workspace") pressCommand("workspace.rename", { name: input.value });
+      else pressCommand("canvas.renameId", { id: id!, name: input.value });
       e.preventDefault();
     } else if (e.key === "Escape") {
       renaming = null;
@@ -316,6 +298,7 @@ export function mountNavigator(root: HTMLElement, session: Session, openCanvasVi
       e.stopPropagation();
     }
   });
+  // view-state: (this tab takes over writing the workspace from another tab: the person's own, on the spot)
   banner.querySelector('[data-action="take-over"]')?.addEventListener("click", () => void session.takeOver());
 
   session.subscribe(render);

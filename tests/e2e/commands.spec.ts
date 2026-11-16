@@ -1,5 +1,3 @@
-import fs from "node:fs";
-import path from "node:path";
 import { expect, test } from "./harness";
 import type { App } from "./harness";
 import { KEY_COMMANDS } from "../../src/settings/keymap";
@@ -16,8 +14,8 @@ import { KEY_COMMANDS } from "../../src/settings/keymap";
  *   screens   every button, menu row and switch shown on the canvas, in the Library and in Settings runs a command (`data-command`), or
  *             only changes what is shown (`data-view-state`), or opens a menu of commands (`aria-haspopup`)
  */
-const TODO = JSON.parse(fs.readFileSync(path.join(process.cwd(), "scripts/lib/commands-todo.json"), "utf8")) as { live?: { rule?: number; keys?: number; screens?: Record<string, number> } };
-const live = TODO.live ?? {};
+/** No allowance: every command follows the rule and every control runs one (the list of what was left emptied in 0.60.15). */
+const live: { rule?: number; keys?: number; screens?: Record<string, number> } = {};
 /** Gestures held down, not actions (a key that is pressed and held while dragging). */
 const GESTURES = new Set(["view.panHold", /* (a second key for the palette, find.palette) */ "find.slash"]);
 

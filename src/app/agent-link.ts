@@ -3,7 +3,7 @@ import { MAX_BATCH } from "../commands/registry";
 import type { Options } from "../commands/types";
 
 /**
- * The link to AI agents (ADR 0205). An agent (an MCP client) talks to the canvas tools on this computer (`canvast-tools mcp`), and the
+ * The link to AI agents (ADR 0205). An agent (an MCP client) talks to the canvast tools on this computer (`canvast-tools mcp`), and the
  * tools pass its calls on to this page over one connection to 127.0.0.1, which the page opens only while Settings > AI agents is on and
  * with the pairing code the tools showed. The page is the one that connects (a page cannot be a server); the tools answer only it.
  *
