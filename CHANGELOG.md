@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.61.0 — Every action a command, and AI agents (2026-11-17)
+
+Every action of canvast is now a command with a fixed name, so the buttons, menus, keys, macros and, new in this release, an AI agent can all run it. Agents connect through the canvast tools on your computer, ask before anything risky, and show you where they work; this link is in alpha. ZIP archives and comic books open in the Library too.
+
+### Highlights
+
+- **AI agents (alpha):** turn on Settings > AI agents and an agent such as Claude Code can draw, arrange, tag and export for you; deleting and hidden items ask you first. ([AI agents](README.md#ai-agents))
+- **See what an agent does:** its pointer goes to what it made or changed, a button by Settings shows when one is connected, and it lists what the agent did. ([Seeing what an agent does](README.md#seeing-what-an-agent-does))
+- **Every action is a command:** each button, menu row, key and switch runs a named command, so macros record them all and the command palette finds them. ([Commands](README.md#commands))
+- **ZIPs and comic books** open in the Library: their pictures as pages, or their files to take out. ([ZIPs and comic books](README.md#zips-and-comic-books))
+- **Settings scroll on a short window**, and panning and zooming are held to their standard more reliably.
+
 ## 0.60.24 — AI agents in alpha (2026-11-17)
 
 - **Changed:** when an AI agent works off the view, its pointer waits at the edge longer, with a ring pulsing round it (still under reduced motion). ([Seeing what an agent does](README.md#seeing-what-an-agent-does))
