@@ -141,7 +141,15 @@ export function createPhotoCraft(deps: PhotoCraftDeps): PhotoCraftApp {
    * document, a copy (Save a Copy, or Save As under another name), or a file of a kind canvast cannot write is a new item: its type
    * asked when it is a layered file, placed beside the picture, sheet or pictures it came from.
    */
-  async function saved(name: string, blob: Blob): Promise<void> {
+  // (one save at a time: a save that came while another was being written waits for it, so it replaces the version that one made, never
+  // the one before it, which is gone by then: "not in the library", and two of the file)
+  let saving: Promise<void> = Promise.resolve();
+  function saved(name: string, blob: Blob): Promise<void> {
+    const next = saving.then(() => saveNow(name, blob));
+    saving = next.catch(() => undefined);
+    return next;
+  }
+  async function saveNow(name: string, blob: Blob): Promise<void> {
     savedCount++;
     const key = stem(name);
     const prev = savedAs.get(key);

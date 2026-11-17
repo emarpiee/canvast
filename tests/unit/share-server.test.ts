@@ -1,7 +1,7 @@
 import { X509Certificate } from "node:crypto";
 import { request } from "node:https";
 import { afterEach, describe, expect, it } from "vitest";
-import { makeSelfCert } from "../../desktop/self-cert";
+import { certReadable, makeSelfCert } from "../../desktop/self-cert";
 import type { ShareCall, ShareDevice, ShareServer } from "../../desktop/share-server";
 import { guestPage, pathAllowed, startShare } from "../../desktop/share-server";
 
@@ -15,6 +15,15 @@ describe("self-signed certificate", () => {
     expect(x.subjectAltName).toContain("DNS:localhost");
     expect(cert.fingerprint).toBe(x.fingerprint256);
     expect(new Date(x.validTo).getTime()).toBeGreaterThan(Date.now() + 9 * 365 * 86_400_000);
+  });
+});
+
+describe("self-signed certificates, many of them", () => {
+  it("every one is valid DER: a random serial number never starts with a zero byte (it failed about one in 256)", () => {
+    for (let i = 0; i < 300; i++) expect(() => new X509Certificate(makeSelfCert().cert)).not.toThrow();
+    // (one kept from before, that cannot be read, is made again)
+    expect(certReadable({ cert: "-----BEGIN CERTIFICATE-----\nAAAA\n-----END CERTIFICATE-----" })).toBe(false);
+    expect(certReadable(cert)).toBe(true);
   });
 });
 

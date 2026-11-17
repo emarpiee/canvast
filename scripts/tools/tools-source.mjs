@@ -19,7 +19,7 @@ import { basename, dirname, join, resolve, sep } from "node:path";
 import readline from "node:readline/promises";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { davHandle, READ_ONLY } from "../../desktop/share-dav.ts";
-import { makeSelfCert } from "../../desktop/self-cert.ts";
+import { certReadable, makeSelfCert } from "../../desktop/self-cert.ts";
 import { toolsHome } from "../../desktop/tools-home.ts";
 import { askPassword, decryptHidden, encryptHidden, hiddenFolder } from "../hidden-items.mjs";
 import { AGENT_PORT, newCode, startBridge } from "./agent-bridge.mjs";
@@ -164,7 +164,7 @@ export async function shareFolder(folder, { hiddenPassword = null, write = false
   // (the same certificate every run, so a device trusts it once)
   const certFile = join(configDir(), "certificate.json");
   let cert = readJson(certFile, null);
-  if (!cert?.key || !cert?.cert) keep(certFile, (cert = makeSelfCert("canvast tools", 10, addresses())));
+  if (!cert?.key || !certReadable(cert)) keep(certFile, (cert = makeSelfCert("canvast tools", 10, addresses())));
   const seenBy = new Set();
   const seen = (req, who, what, detail) => {
     const from = (req.socket.remoteAddress ?? "").replace(/^::ffff:/, "");

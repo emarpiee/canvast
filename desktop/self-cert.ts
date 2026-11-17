@@ -2,7 +2,7 @@
  * A self-signed TLS certificate for the sharing server (ADR 0184), made with Node's own crypto: an EC P-256 key and an X.509 v3
  * certificate written in DER by hand (a few ASN.1 shapes; no dependency). Its SHA-256 fingerprint is what a guest compares or pins.
  */
-import { createHash, createPublicKey, generateKeyPairSync, randomBytes, sign } from "node:crypto";
+import { X509Certificate, createHash, createPublicKey, generateKeyPairSync, randomBytes, sign } from "node:crypto";
 
 const len = (n: number): Buffer => (n < 0x80 ? Buffer.from([n]) : n < 0x100 ? Buffer.from([0x81, n]) : Buffer.from([0x82, n >> 8, n & 0xff]));
 const tlv = (tag: number, ...body: Buffer[]): Buffer => {
@@ -33,12 +33,21 @@ export interface SelfCert {
 }
 
 /** A new certificate for `name` (its common name), valid from a day ago for `years`, for `localhost` and the given addresses. */
+/** Whether a kept certificate can be read (one made before 0.61.1 could not, about one in 256: it is made again). */
+export const certReadable = (c: { cert?: unknown } | null | undefined): boolean => {
+  try {
+    return typeof c?.cert === "string" && !!new X509Certificate(c.cert);
+  } catch {
+    return false;
+  }
+};
+
 export function makeSelfCert(name = "canvast", years = 10, ips: readonly string[] = []): SelfCert {
   const { privateKey } = generateKeyPairSync("ec", { namedCurve: "prime256v1" });
   const spki = createPublicKey(privateKey).export({ type: "spki", format: "der" });
   const cn = seq(tlv(0x31, seq(oid("2.5.4.3"), tlv(0x0c, Buffer.from(name, "utf8")))));
   const serial = randomBytes(16);
-  serial[0]! &= 0x7f; // (positive)
+  serial[0] = (serial[0]! & 0x7f) | 0x40; // (positive, and never a leading zero byte: DER refuses one, "illegal padding", about one certificate in 256)
   const from = new Date(Date.now() - 86_400_000);
   const until = new Date(from.getTime() + years * 365.25 * 86_400_000);
   const ipBytes = ips.flatMap((ip) => (/^\d+\.\d+\.\d+\.\d+$/.test(ip) ? [Buffer.from(ip.split(".").map(Number))] : []));
