@@ -48,7 +48,8 @@ writeFileSync(join(root, "dist/canvast.html.sha256"), `${sum}  canvast.html\n`);
 say(`dist/canvast.html  ${(statSync(file).size / 1048576).toFixed(2)} MB  sha256 ${sum}`);
 
 // 3. The latest release now, and the one before this tag (for the changelog link)
-const releases = JSON.parse(run("gh", ["release", "list", "--repo", repo, "--limit", "100", "--json", "tagName,isLatest"]) || "[]");
+// (a withdrawn release, turned back into a draft, is not one: the notes start from the last release people could download)
+const releases = (JSON.parse(run("gh", ["release", "list", "--repo", repo, "--limit", "100", "--json", "tagName,isLatest,isDraft"]) || "[]")).filter((r) => !r.isDraft || r.tagName === tag);
 const latest = releases.find((r) => r.isLatest)?.tagName;
 if (latest && olderThan(version, latest.slice(1)) && !force) stop(`${latest} is already the latest and is newer than ${tag}: use --force only if this is meant.`);
 const previous = releases.map((r) => r.tagName).filter((t) => t !== tag && olderThan(t.slice(1), version)).sort((a, b) => (olderThan(a.slice(1), b.slice(1)) ? 1 : -1))[0] ?? null;
