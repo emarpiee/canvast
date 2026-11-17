@@ -9,7 +9,7 @@ import { randomBytes } from "node:crypto";
 import { appendFileSync, chmodSync, readFileSync, renameSync, statSync, writeFileSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
-import { makeSelfCert } from "./self-cert";
+import { certReadable, makeSelfCert } from "./self-cert";
 import type { SelfCert } from "./self-cert";
 import { guestPage, newCode, newDavPassword, pathAllowed, startShare } from "./share-server";
 import { answerFinds } from "./share-find";
@@ -195,7 +195,7 @@ export function installShare(win: BrowserWindow, html: string, workspaceName: st
   };
   const start = async (port: number): Promise<ShareServer> =>
     startShare({
-      cert: (saved.cert ??= makeSelfCert()),
+      cert: (saved.cert = certReadable(saved.cert) ? saved.cert! : makeSelfCert()),
       code: (saved.code ??= newCode()),
       davPassword: (saved.davPassword ??= newDavPassword()),
       port,

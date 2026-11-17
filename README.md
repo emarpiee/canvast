@@ -2951,7 +2951,7 @@ Shared machines vary in speed, so a failure there in a test that measures time i
 
 #### The pan and zoom standard
 
-Every change is held to how smoothly the canvas pans and zooms. The `Pan and zoom` workflow draws the *Powers of two* showcase (about 7,000 objects), opens it at its first bookmark, and pans and wheel-zooms it with real mouse input in Chromium. A change that breaks the budget in `scripts/lib/pan-zoom-budget.mjs` has made the canvas view slower, and `npm run release` refuses a commit where it has not passed.
+Every change is held to how smoothly the canvas pans and zooms. The `Pan and zoom` workflow draws the *Powers of two* showcase (about 7,000 objects), opens it at its first bookmark, and pans and wheel-zooms it with real mouse input in Chromium. A change that breaks the budget in `scripts/lib/pan-zoom-budget.mjs` has made the canvas view slower, and `npm run release` refuses a commit where it (or CI, or Tests) has not passed.
 
 | Run | What it does |
 | --- | --- |
@@ -2977,7 +2977,7 @@ The budget is never loosened to let a change pass. A time over it once is run ag
 
 `npm run release` publishes a version. Run it after the version is bumped, `CHANGELOG.md` has its `## X.Y.Z — Title (date)` section, and everything is pushed.
 
-1. It builds and checks `dist/canvast.html`, and checks that the [pan and zoom standard](#the-pan-and-zoom-standard) passed on the commit.
+1. It builds and checks `dist/canvast.html`, and stops unless every check on GitHub passed on the commit: `CI` (typecheck, unit tests, every `check:*`), `Tests` (the whole end-to-end suite) and the [pan and zoom standard](#the-pan-and-zoom-standard). A run still going, failed or cancelled stops it.
 2. It creates (or updates) the GitHub release `vX.Y.Z` with the file and its SHA-256, and the [canvast tools](#canvast-tools-without-the-app) built from the same commit (`canvast-tools.mjs`), and marks it **Latest**.
 3. It reads the release back to confirm it is the latest and serves the same file, then closes the GitHub issues the release fixes (see below).
 4. Publishing starts the `Release packages` workflow (`.github/workflows/release-packages.yml`). On an x86_64 and an ARM machine it builds the app from the tag, checks that its single file is the one released (the build is reproducible), makes the packages with `npm run package:desktop` (which checks each), and adds them with their SHA-256 and the AppImage's `.zsync`. No package is uploaded from the developer's machine; the workflow can also be run by hand for a tag.

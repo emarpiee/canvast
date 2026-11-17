@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.61.1 — Sharing certificates (2026-11-17)
+
+- **Fixed:** about one sharing certificate in 256 could not be read (its random serial number began with a zero byte), so sharing on the local network failed for that computer; a certificate kept from before that cannot be read is made again, by the desktop app and the canvast tools. ([Sharing on the local network](README.md#sharing-on-the-local-network))
+
+### For developers
+
+- `npm run release` stops unless `CI`, `Tests` and `Pan and zoom` all passed on the commit (before, only Pan and zoom).
+
 ## 0.61.0 — Every action a command, and AI agents (2026-11-17)
 
 Every action of canvast is now a command with a fixed name, so the buttons, menus, keys, macros and, new in this release, an AI agent can all run it. Agents connect through the canvast tools on your computer, ask before anything risky, and show you where they work; this link is in alpha. ZIP archives and comic books open in the Library too.
