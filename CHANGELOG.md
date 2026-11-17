@@ -1,18 +1,19 @@
 # Changelog
 
-## 0.61.1 — Every action a command, and AI agents (2026-11-17)
+## 0.61.1 — ZIPs and comic books, a faster Library (2026-11-17)
 
-Every action of canvast is now a command with a fixed name, so the buttons, menus, keys, macros and, new in this release, an AI agent can all run it. Agents connect through the canvast tools on your computer, ask before anything risky, and show you where they work; this link is in alpha. This release replaces 0.61.0, which was withdrawn the hour it came out: it could make a sharing certificate that does not work.
+ZIPs and comic books open in the Library, which also shows several folders at once, moves folders, scrolls more smoothly and names pasted pictures; big hidden videos play, and every button, menu and key now records in macros. It also brings AI agents, in alpha. This release replaces 0.61.0, withdrawn the hour it came out: it could make a sharing certificate that does not work.
 
 - **Fixed:** a picture saved twice in a row from PhotoCraft could be kept twice (the second save replaced the version before the first, already gone: *Not saved: … is not in the library*); its saves now run one after another. ([PhotoCraft](README.md#photocraft))
 - **Fixed:** about one sharing certificate in 256 could not be read (its random serial number began with a zero byte), so sharing on the local network failed for that computer; a certificate kept from before that cannot be read is made again, by the desktop app and the canvast tools. ([Sharing on the local network](README.md#sharing-on-the-local-network))
 
 ### Highlights
 
-- **AI agents (alpha):** turn on Settings > AI agents and an agent such as Claude Code can draw, arrange, tag and export for you; deleting and hidden items ask you first. ([AI agents](README.md#ai-agents))
-- **See what an agent does:** its pointer goes to what it made or changed, a button by Settings shows when one is connected, and it lists what the agent did. ([Seeing what an agent does](README.md#seeing-what-an-agent-does))
-- **Every action is a command:** each button, menu row, key and switch runs a named command, so macros record them all and the command palette finds them. ([Commands](README.md#commands))
-- **ZIPs and comic books** open in the Library: their pictures as pages, or their files to take out. ([ZIPs and comic books](README.md#zips-and-comic-books))
+- **ZIPs and comic books** open in the Library and on a canvas: their files to look through and take out, or their pictures as pages turned with the arrow keys; password-protected ZIPs open too. ([ZIPs and comic books](README.md#zips-and-comic-books))
+- **The Library** shows several folders at once (Ctrl+click, Shift+click), moves a folder into another, and scrolls more smoothly at small thumbnail sizes. ([Folders and tags](README.md#folders-and-tags))
+- **Big videos:** a hidden video or sound of any size plays, and a video too big to import shows a frame of it as its picture. ([Hidden items and passwords](README.md#hidden-items-and-passwords))
+- **Pasted pictures get a name** you choose (Settings > Saving to the library), and in the desktop app the Library lists each file by its name on disk.
+- **Macros record everything:** every button, menu row and key is a command, so a macro records it and the command palette finds it. ([The command palette](README.md#the-command-palette))
 
 ### For developers
 
