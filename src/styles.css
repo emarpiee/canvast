@@ -2222,6 +2222,8 @@ body[data-viewing] #nav, body[data-viewing] .view-settings { display: none; }
 /* ---- Panels stack (ADR 0066): neither squeezes the other away; the Layers list scrolls and the selection settings sit under it ---- */
 #side-panels, #side-panels-left { max-height: calc(100% - var(--bar-bottom, 56px) - 96px); }
 .layers-panel { overflow: hidden; }
+/* A field in a floating panel takes the theme's text, not the browser's (13.33 px): any rule of its own still wins (no weight here). */
+:where(.layers-panel) :where(input, select, textarea) { font: var(--font-value); }
 .bookmarks-panel > ul { overflow-y: auto; min-height: 0; }
 /* The one shape of a panel (ui/panel.ts): a header and a strip that stay put, a body that scrolls, a footer that stays put; a panel has the parts it needs. */
 .panel-head, .panel-sub, .panel-foot { flex: none; }

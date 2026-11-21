@@ -103,10 +103,16 @@ export function mountReferenceWindows(deps: ReferenceDeps): { open(source?: RefS
   const wins = new Map<string, Win>();
   let keepTimer = 0;
   /** Where the windows are, kept for the next start: once they rest, not at every step of a move or a resize. */
+  const keepNow = (): void => {
+    clearTimeout(keepTimer);
+    settings.set("reference.windows", JSON.stringify([...wins.values()].map((w) => ({ source: w.source, x: w.el.offsetLeft, y: w.el.offsetTop, w: w.el.offsetWidth, h: w.el.offsetHeight }))));
+  };
   const keepWindows = (): void => {
     clearTimeout(keepTimer);
-    keepTimer = window.setTimeout(() => settings.set("reference.windows", JSON.stringify([...wins.values()].map((w) => ({ source: w.source, x: w.el.offsetLeft, y: w.el.offsetTop, w: w.el.offsetWidth, h: w.el.offsetHeight })))), 500);
+    keepTimer = window.setTimeout(keepNow, 500);
   };
+  // (what a window shows is kept at once; where it is once it rests, and in any case before the page goes)
+  window.addEventListener("pagehide", keepNow);
 
   interface Win { id: string; source: RefSource; el: HTMLElement; render(): Promise<void>; sync(): void; close(): void }
 
@@ -162,7 +168,7 @@ export function mountReferenceWindows(deps: ReferenceDeps): { open(source?: RefS
     win.close = (): void => {
       el.remove();
       wins.delete(id);
-      keepWindows();
+      keepNow();
     };
     // What it shows: the shared menu, as the Styles panel's kinds (boards first, then the gallery: all pictures and each folder)
     pickBtn.addEventListener("click", async () => {
@@ -606,7 +612,7 @@ export function mountReferenceWindows(deps: ReferenceDeps): { open(source?: RefS
     };
     wins.set(id, win);
     void win.render();
-    keepWindows();
+    keepNow();
     el.focus({ preventScroll: true });
     return win;
   };
@@ -650,7 +656,7 @@ export function mountReferenceWindows(deps: ReferenceDeps): { open(source?: RefS
       if (!w) return { ok: false, error: "No such window." };
       if (!/^(all|folder:.+|board:.+)$/.test(src)) return { ok: false, error: '"source" is all, folder:<id> or board:<id>.' };
       w.source = src;
-      keepWindows();
+      keepNow();
       void w.render();
       return { ok: true };
     }),
@@ -663,7 +669,7 @@ export function mountReferenceWindows(deps: ReferenceDeps): { open(source?: RefS
       const w = winOf(o);
       if (w) {
         w.source = `board:${b.id}`;
-        keepWindows();
+        keepNow();
         void w.render();
       } else open(`board:${b.id}`);
       return { ok: true, made: [b.id] };
@@ -684,7 +690,7 @@ export function mountReferenceWindows(deps: ReferenceDeps): { open(source?: RefS
       settings.set("reference.boards", JSON.stringify(boards().filter((x) => x.id !== b.id)));
       history.delete(b.id);
       for (const w of wins.values()) if (w.source === `board:${b.id}`) w.source = "all";
-      keepWindows();
+      keepNow();
       renderAll();
       return { ok: true, removed: [b.id] };
     }),

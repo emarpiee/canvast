@@ -16,7 +16,9 @@ import { outerAt } from "./path-edit";
 export type ComicHandle =
   | { what: "move"; gutter: number; x: number; y: number; a: number }
   | { what: "end"; gutter: number; end: 0 | 1; x: number; y: number; a: number }
-  | { what: "corner"; panel: string; index: number; x: number; y: number };
+  | { what: "corner"; panel: string; index: number; x: number; y: number }
+  /** The chosen gutter's width: a grip on each side (side -1: side a's, 1: side b's), pointing away from it. */
+  | { what: "width"; gutter: number; side: -1 | 1; x: number; y: number; a: number };
 
 export const COMIC_HANDLE_REACH_PX = 9;
 
@@ -26,6 +28,8 @@ export interface ComicHandles {
   panels: PathObject[];
   polys: Pt[][];
   gutters: Gutter[];
+  /** The chosen gutter's index, or -1. */
+  chosen: number;
   handles: ComicHandle[];
 }
 
@@ -33,6 +37,7 @@ export interface ComicHandles {
 export const pageToScreen = (po: ProjectedObject, x: number, y: number): [number, number] => outerAt(po, exactX(po.proj, x), exactY(po.proj, y));
 
 export function comicHandles(doc: DocumentStore, editor: EditorState, visible: readonly ProjectedObject[]): ComicHandles | null {
+  let chosen = -1;
   if (editor.tool !== "select" && editor.tool !== "panel") return null;
   const page = selectedComicPage(doc, editor);
   const po = page && visible.find((p) => p.obj.id === page.id);
@@ -41,7 +46,20 @@ export function comicHandles(doc: DocumentStore, editor: EditorState, visible: r
   const polys = panels.map((p) => panelPoly(doc, page, p));
   const gutters = guttersOf(polys, Math.max(pagePer(page, page.container.comic.gutter) * 2.5, pagePer(page, 4)));
   const handles: ComicHandle[] = [];
+  // the gutter chosen (a click on its middle handle): its two sides' panels, as `editor.comicGutter` keeps them
+  const ids = (es: readonly { panel: number }[]): string => [...new Set(es.map((e) => panels[e.panel]!.id))].sort().join(",");
+  const c = editor.comicGutter;
+  const want = c && c.page === page.id ? [c.a.slice().sort().join(","), c.b.slice().sort().join(",")].sort().join("|") : null;
   gutters.forEach((g, i) => {
+    if (want && [ids(g.a), ids(g.b)].sort().join("|") === want) {
+      chosen = i;
+      // its grips, beside its middle, as far out as its edges and a little more
+      const mid: Pt = [(g.ends[0][0] + g.ends[1][0]) / 2, (g.ends[0][1] + g.ends[1][1]) / 2];
+      const [mx, my] = pageToScreen(po, mid[0], mid[1]);
+      const [ox, oy] = pageToScreen(po, mid[0] + g.nx, mid[1] + g.ny);
+      const len = Math.hypot(ox - mx, oy - my) || 1, ux = (ox - mx) / len, uy = (oy - my) / len, half = (g.width * po.proj.ppu) / 2 + 12;
+      for (const side of [-1, 1] as const) handles.push({ what: "width", gutter: i, side, x: mx + ux * half * side, y: my + uy * half * side, a: Math.atan2(uy * side, ux * side) });
+    }
     const [a, b] = g.ends.map(([x, y]) => pageToScreen(po, x, y)) as [[number, number], [number, number]];
     const ang = Math.atan2(b[1] - a[1], b[0] - a[0]);
     // (a gutter too short on screen to hold three handles keeps its middle one)
@@ -59,12 +77,12 @@ export function comicHandles(doc: DocumentStore, editor: EditorState, visible: r
       handles.push({ what: "corner", panel: one[0]!.id, index, x: sx, y: sy });
     });
   }
-  return { page, po, panels, polys, gutters, handles: handles.filter((h) => Math.abs(h.x) < 1e6 && Math.abs(h.y) < 1e6) };
+  return { page, po, panels, polys, gutters, chosen, handles: handles.filter((h) => Math.abs(h.x) < 1e6 && Math.abs(h.y) < 1e6) };
 }
 
 /** The handle under a point: corners and ends before middles (they lie on the same lines). */
 export function comicHandleAt(handles: readonly ComicHandle[], x: number, y: number): ComicHandle | undefined {
   const near = handles.filter((h) => Math.hypot(h.x - x, h.y - y) <= COMIC_HANDLE_REACH_PX);
-  const rank = (h: ComicHandle): number => (h.what === "move" ? 1 : 0);
+  const rank = (h: ComicHandle): number => (h.what === "move" ? 1 : 0); // (a width grip, an end and a corner before a middle)
   return near.sort((p, q) => rank(p) - rank(q) || Math.hypot(p.x - x, p.y - y) - Math.hypot(q.x - x, q.y - y))[0];
 }

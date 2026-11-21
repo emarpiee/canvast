@@ -506,17 +506,21 @@ function drawComicHandles(ctx: CanvasRenderingContext2D, handles: readonly Comic
   ctx.save();
   ctx.lineWidth = 1.25;
   ctx.strokeStyle = theme.selection;
-  ctx.setLineDash([3, 3]);
   const ends = new Map<number, Array<{ x: number; y: number }>>();
   for (const h of handles) if (h.what === "end") ends.set(h.gutter, [...(ends.get(h.gutter) ?? []), h]);
-  for (const [a, b] of ends.values()) {
+  const chosen = new Set(handles.filter((h) => h.what === "width").map((h) => h.gutter));
+  for (const [g, [a, b]] of ends) {
     if (!a || !b) continue;
+    // (the chosen gutter's line solid and wider: what the Gutter field and its grips change)
+    ctx.setLineDash(chosen.has(g) ? [] : [3, 3]);
+    ctx.lineWidth = chosen.has(g) ? 2.5 : 1.25;
     ctx.beginPath();
     ctx.moveTo(a.x, a.y);
     ctx.lineTo(b.x, b.y);
     ctx.stroke();
   }
   ctx.setLineDash([]);
+  ctx.lineWidth = 1.25;
   for (const h of handles) {
     ctx.fillStyle = theme.handleFill;
     ctx.strokeStyle = theme.selection;
@@ -535,6 +539,10 @@ function drawComicHandles(ctx: CanvasRenderingContext2D, handles: readonly Comic
       dot(ctx, theme, h.x, h.y, HANDLE_SIZE_PX / 2);
       ctx.fill();
       ctx.stroke();
+    } else if (h.what === "width") {
+      // the chosen gutter's width: a triangle each side pointing away from it (a balloon's width handle's look)
+      ctx.fillStyle = theme.selection;
+      handleGlyph(ctx, h.x, h.y, HANDLE_SIZE_PX / 2 + 1, 3, h.a + Math.PI / 2);
     } else {
       const s = HANDLE_SIZE_PX - 2;
       ctx.fillRect(h.x - s / 2, h.y - s / 2, s, s);

@@ -408,7 +408,9 @@ export async function themeProblems(page: Page): Promise<string[]> {
           const v = cs[c];
           if (!radii.has(v) && !v.endsWith("%")) out.push(`${name}: ${say(el)} has corners of ${v}, not a radius of the theme`);
         }
-        if (!sizes.has(cs.fontSize)) out.push(`${name}: ${say(el)} has text of ${cs.fontSize}, not a size of the theme`);
+        // (text it shows: a field's, or a button's words; an icon alone has no text size to keep)
+        const words = el.tagName !== "BUTTON" || (el.textContent ?? "").trim().length > 0;
+        if (words && !sizes.has(cs.fontSize)) out.push(`${name}: ${say(el)} has text of ${cs.fontSize}, not a size of the theme`);
       }
       for (const b of panel.querySelectorAll(".panel-head button")) if (shown(b) && !b.classList.contains("layer-btn")) out.push(`${name}: header button ${say(b)} is not the panel's .layer-btn`);
       for (const b of panel.querySelectorAll(".panel-sub button[aria-haspopup]")) if (shown(b) && !b.classList.contains("pick-current")) out.push(`${name}: ${say(b)} opens a list but is not the shared chooser (.pick-current)`);

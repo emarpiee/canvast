@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.61.11 — A chosen gutter's width grips, Esc and the reference window fixed (2026-11-22)
+
+- **Added:** a chosen gutter (a click on its middle handle) is drawn solid with a grip on each side: drag one to widen or narrow that gutter alone. ([Comics and storyboards](README.md#comics-and-storyboards))
+- **Fixed before release:** the first `Esc` after a note opened from its card still did not close it in some styles: with only that card selected on the canvas, `Esc` now closes the note. ([Notes on a canvas](README.md#notes-on-a-canvas))
+- **Fixed before release:** a reference window reopened after a reload could show a gallery instead of its board (what it showed was kept half a second late); it is kept at once. Fields in floating panels take the theme's text size. ([The Library](README.md#the-library))
+- **Fixed before release:** turning off *Keep file names* again left notes' path links to a tidied folder unchanged (the rename was reported before the move). ([Notes](README.md#notes))
+
+### For developers
+
+- The comic handles are worked out only with something selected (they cost every frame of a pan before); the theme audit leaves out icon-only buttons' text size.
+
 ## 0.61.10 — Comic page options without doubles, one gutter at a time (2026-11-22)
 
 - **Changed:** the Panel tool no longer has its own Page size and Border: a page's shape is the sheet's Ratio, a panel's border the Appearance's outline (on the selected panels only; the tool's outline for a new page). A click on a gutter's middle handle chooses that gutter, and Gutter then sets its width alone. ([Comics and storyboards](README.md#comics-and-storyboards))

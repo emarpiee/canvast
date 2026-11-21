@@ -1,4 +1,4 @@
-import { cornerMoved, gutterMoved, gutterTurned, mergeGutter, pagePer, cutAcross, gutterOf, isComicPage, mergeAt, movedGutter, newComicPage, panelPoly, panelsOf } from "../app/comic";
+import { cornerMoved, gutterMoved, gutterTurned, gutterWidened, mergeGutter, pagePer, cutAcross, gutterOf, isComicPage, mergeAt, movedGutter, newComicPage, panelPoly, panelsOf } from "../app/comic";
 import { insidePoly } from "../doc/comic";
 import { comicHandleAt, comicHandles, pageToScreen } from "./comic-handles";
 import type { ComicHandle, ComicHandles } from "./comic-handles";
@@ -566,6 +566,12 @@ export function attachTools(
         const d = (to[0] - gc.start[0]) * gu.nx + (to[1] - gc.start[1]) * gu.ny;
         next = gutterMoved(doc, ch.page, ch.panels, ch.polys, gu, d);
         label = "Gutter";
+      } else if (h.what === "width") {
+        // a grip pulled out widens this gutter, half on each side; pushed in narrows it
+        const d = ((to[0] - gc.start[0]) * gu.nx + (to[1] - gc.start[1]) * gu.ny) * h.side;
+        const width = Math.max(0, gu.width + 2 * d);
+        next = gutterWidened(doc, ch.page, ch.panels, ch.polys, gu, width);
+        label = `Gutter ${(width / pagePer(ch.page, 10)).toFixed(1)}%`;
       } else {
         const fixed = gu.ends[h.end === 0 ? 1 : 0];
         // Shift: the gutter at a step of 15 degrees
@@ -584,7 +590,7 @@ export function attachTools(
     }
     editor.preview = { kind: "none" };
     editor.handleLabel = null;
-    if (far && next) doc.commit(doc.transaction(h.what === "corner" ? "Move the panel's corner" : h.what === "move" ? "Move the gutter" : "Turn the gutter", next));
+    if (far && next) doc.commit(doc.transaction(h.what === "corner" ? "Move the panel's corner" : h.what === "move" ? "Move the gutter" : h.what === "width" ? "Gutter width" : "Turn the gutter", next));
     // a click on a gutter's middle handle chooses that gutter (again: lets it go): the Gutter field is then its alone
     if (!far && h.what === "move") {
       const gu = ch.gutters[h.gutter]!, ids = (es: readonly { panel: number }[]): string[] => [...new Set(es.map((x) => ch.panels[x.panel]!.id))];

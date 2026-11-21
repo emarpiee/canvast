@@ -1543,6 +1543,8 @@ export class LibraryMirror {
         // The move is noted first: if the app stops between the rename and the stored original's new place, start-up finishes it.
         await this.setMeta(MOVING_KEY, { hash: m.hash, from: m.from, to: target } satisfies Moving);
         await this.bridge.rename(m.from, target);
+        // (told first, with its name and place before: renaming the item to its file's name reports it too, from its new place)
+        if (was !== undefined) this.movedOutside({ hash: m.hash, name: was, path: m.from });
         await this.setFile(m.hash, (r) => r.ext === 1 && r.file === m.from, target);
         await this.setMeta(MOVING_KEY, null);
         taken.delete(m.from.toLowerCase());
@@ -1550,7 +1552,6 @@ export class LibraryMirror {
         // (every move the app makes is followed by the links to it in notes: a setting turned off (Keep file names renames files and the
         // folders' spelling on disk, My Pictures to my_pictures), a file leaving the root for its kind's folder, a library folder renamed, moved
         // or deleted. A move the library also reports is followed twice, the second finding nothing left to change.)
-        if (was !== undefined) this.movedOutside({ hash: m.hash, name: was, path: m.from });
       }
     } catch (e) {
       taken.delete(target.toLowerCase());

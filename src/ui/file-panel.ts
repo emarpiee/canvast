@@ -91,10 +91,11 @@ export function mountFilePanel(
       note = await k.open(el.querySelector<HTMLElement>(".viewer-note > div")!, { hash, name: name0, blob: rec.blob }, deps, { ...place, ...card });
       if (k.id !== "note") el.querySelector<HTMLElement>(".viewer-note [tabindex]")?.focus({ preventScroll: true });
       // a note: the caret in its words at once, so the keys (Escape too) are the note's from the first one, not the canvas's behind it
-      else requestAnimationFrame(() => {
+      // (after the double-click that opened it has ended: its last release would take the focus back to the canvas)
+      else setTimeout(() => {
         const words = el.querySelector<HTMLElement>(".sun-editor-editable[contenteditable='true']");
         if (words && !el.contains(document.activeElement)) words.focus({ preventScroll: true });
-      });
+      }, 50);
     } catch (err) {
       shut();
       deps.session.editor.message = `This ${k.noun} could not be opened (“${rec.name}”): ${(err as Error).message}.`;
@@ -140,7 +141,10 @@ export function mountFilePanel(
     // (there, a first Escape clears the selection, as it always does)
     const inside = e.target instanceof Node && el.contains(e.target);
     const nowhere = e.target === document.body || e.target === document.documentElement;
-    const onCanvas = e.target instanceof HTMLElement && e.target.id === "canvas" && deps.session.editor.selection.size === 0 && !deps.session.editor.editingText;
+    // (on the canvas: with nothing selected, or only the card the file was opened from; anything else selected is cleared first)
+    const ed = deps.session.editor;
+    const onlyItsCard = [...ed.selection].every((id) => { const o = deps.session.doc.get(id); return o?.kind === "image" && o.assetId.split("#")[0] === note?.hash; });
+    const onCanvas = e.target instanceof HTMLElement && e.target.id === "canvas" && onlyItsCard && !ed.editingText;
     if (!inside && el !== hosts.window && !nowhere && !onCanvas) return;
     if ([...document.querySelectorAll(POPUPS)].some(showing)) return;
     e.preventDefault();
