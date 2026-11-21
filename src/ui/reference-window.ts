@@ -241,7 +241,7 @@ export function mountReferenceWindows(deps: ReferenceDeps): { open(source?: RefS
       el.style.opacity = String(p.opacity ?? 1);
       el.classList.toggle("is-through", !!p.through);
       lookHost.hidden = !p.look;
-      if (p.look) look.build();
+      if (p.look) look.sync();
     };
     const choosing = false; // (what it shows is chosen in the shared menu, not inside the window)
 
@@ -543,7 +543,7 @@ export function mountReferenceWindows(deps: ReferenceDeps): { open(source?: RefS
       for (const extra of nodes.slice(b.items.length)) extra.remove();
       area?.querySelector(".ref-empty")?.toggleAttribute("hidden", b.items.length > 0);
       upgrade();
-      if (win.prefs.look) look.build(); // (the pictures picked now: their slider, or none)
+      if (win.prefs.look) look.sync(); // (the pictures picked now: their slider, or none)
     };
     win.sync = (): void => {
       const b = boardOf();
@@ -686,7 +686,7 @@ export function mountReferenceWindows(deps: ReferenceDeps): { open(source?: RefS
       const up = (u: PointerEvent): void => {
         body.removeEventListener("pointermove", move);
         marquee.hidden = true;
-        if (win.prefs.look) look.build(); // (a picture picked or let go: the pictures' slider follows)
+        if (win.prefs.look) look.sync(); // (a picture picked or let go: the pictures' slider follows)
         const dx = u.clientX - sx, dy = u.clientY - sy, far = Math.hypot(dx, dy) > 2;
         if (pan) return saveView();
         // let go outside the window, over the canvas: the pictures are placed there, and stay on the moodboard

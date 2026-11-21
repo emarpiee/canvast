@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.61.22 — Opacity sliders follow the mouse (2026-11-22)
+
+- **Fixed before release:** a reference window's opacity sliders could not be dragged: the strip was made again at each step, under the pointer (as the Layers panel's once was, issue #2). Settings rows now take new values in place and are made again only when the rows shown change; a 3D view's settings that change what it shows too. ([The Library](README.md#the-library))
+
+### For developers
+
+- `mountSettings` returns `sync()`: the values again in the rows there (call it on every change, never `build()`). `sliderDragProblems(page, root)` in the harness drags every slider shown and fails one made again while dragged or not ending where it was let go; `components.spec.ts` runs it on the Pattern panel and a reference window's Opacity strip.
+
 ## 0.61.21 — The canvas's view keys in a reference window (2026-11-22)
 
 - **Fixed before release:** W A S D and F did nothing in a reference window. On a moodboard, W A S D select the next picture that way (bringing it into view) and F fits the selected pictures, then every picture, as on the canvas; in a picture shown large, A and D go to the one before and after and F fits it again. Keys you rebound work there too. ([The Library](README.md#the-library))

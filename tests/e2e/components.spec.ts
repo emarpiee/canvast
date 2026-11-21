@@ -1,5 +1,5 @@
 import type { Page } from "@playwright/test";
-import { expect, test, themeProblems } from "./harness";
+import { expect, sliderDragProblems, test, themeProblems } from "./harness";
 import { blockyFixture } from "./png";
 
 /** The component audit on the real thing: every menu that opens has rows with an icon, a name and a short line; dialogs come from the one shell. */
@@ -354,4 +354,20 @@ test("every floating panel follows the theme at every density: corners and text 
   await p.evaluate(() => window.__canvastDebug.runCommand("reference.newBoard", { name: "Audit" }, "test"));
   await expect(p.getByTestId("reference-window").locator("[data-ref-board]").first()).toBeVisible();
   expect(await themeProblems(p), "a board").toEqual([]);
+});
+
+test("every slider of the panels follows a mouse drag to where it is let go: no panel is drawn again under it (issue #2)", async ({ app }) => {
+  const p = app.page;
+  // the Pattern panel's settings, and a reference window's Opacity strip (the window's slider changes the window at each step)
+  await p.locator("[data-pattern-panel]").first().click();
+  const pattern = p.getByTestId("pattern-panel");
+  await expect(pattern.locator('input[type="range"]').first()).toBeVisible();
+  expect(await sliderDragProblems(p, pattern), "the Pattern panel").toEqual([]);
+  await p.keyboard.press("Shift+R");
+  const win = p.getByTestId("reference-window");
+  await expect(win).toHaveCount(1);
+  await win.locator("[data-ref-more]").click();
+  await p.locator('.pop-menu [data-command="reference.window"]').filter({ hasText: "Opacity" }).click();
+  await expect(win.locator('[data-ref-look] input[type="range"]')).toBeVisible();
+  expect(await sliderDragProblems(p, win.locator("[data-ref-look]")), "the reference window's opacity").toEqual([]);
 });

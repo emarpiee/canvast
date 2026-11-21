@@ -136,7 +136,7 @@ export async function openModelView(el: HTMLElement, file: FileFacts, deps: View
       // Lines alone or on a fill would not show on the usual dark ground: paper, until a ground is chosen.
       if (k === "linesShow" && (v === "only" || v === "flat") && look["bg"] === defaultLook(first)["bg"]) look = { ...look, bg: "#ffffff" };
       changed();
-      if (SHAPERS.has(k)) build(); // (what it shows or hides, the length of the time)
+      if (SHAPERS.has(k)) rows.sync(); // (what it shows or hides, the length of the time)
     },
     reset: (keys) => {
       look = { ...look, ...Object.fromEntries(keys.map((s) => [s.k, usual(s)])) };

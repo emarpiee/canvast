@@ -92,7 +92,7 @@ export function mountSettings(host: HTMLElement, o: {
   idPrefix?: string;
   /** The command these settings are (ADR 0205): `<id>` sets one ({ key, value }), `<id>Reset` puts them back; the rows run them. */
   command?: { id: string; title: string; group: string };
-}): { build(): void; syncResets(): void } {
+}): { build(): void; sync(): void; syncResets(): void } {
   const all = (): Setting[] => o.sections().flatMap((x) => x.items);
   const fits = (st: Setting, v: unknown): boolean => (st.t === "range" ? typeof v === "number" && v >= st.min && v <= st.max : st.t === "toggle" ? typeof v === "boolean" : st.t === "choice" ? typeof v === "string" : typeof v === "string" && (v === "" || /^#[0-9a-f]{6}$/i.test(v)));
   const setNow = (k: string, v: SettingValue): void => {
@@ -141,6 +141,22 @@ export function mountSettings(host: HTMLElement, o: {
       bindSettingRow(r, s, o.get, setRow, () => resetRows([s]));
     }
   };
+  /**
+   * The values again, in the rows already there: a row is made again only when the rows shown change. Call this on every change the rows
+   * may follow (never build(): a slider made again under the pointer stops following it, issue #2); a field in use keeps what is typed or dragged.
+   */
+  const sync = (): void => {
+    const want = o.sections().flatMap((sec) => items(sec).map((x) => x.k)).join("|");
+    const have = [...host.querySelectorAll<HTMLElement>("[data-k]")].map((r) => r.dataset["k"]).join("|");
+    if (want !== have) return build();
+    for (const r of host.querySelectorAll<HTMLElement>("[data-k]")) {
+      const v = o.get(r.dataset["k"]!);
+      for (const f of r.querySelectorAll<HTMLInputElement>("input[type=range], input[type=number]")) if (f !== document.activeElement && !f.matches(":active")) f.value = String(v);
+      const tick = r.querySelector<HTMLInputElement>("input[type=checkbox]");
+      if (tick) tick.checked = !!v;
+    }
+    syncResets();
+  };
   // commands: (a group's Reset runs the owner's reset command)
   host.addEventListener("click", (e) => {
     const b = (e.target as HTMLElement).closest<HTMLElement>("[data-group-reset]");
@@ -149,5 +165,5 @@ export function mountSettings(host: HTMLElement, o: {
     resetRows(sec.items);
   });
   if (!host.closest("[data-scrub-root]")) scrubNumbers(host); // (drag a number to change it, as everywhere; rows made again later are marked on the first pointer over)
-  return { build, syncResets };
+  return { build, sync, syncResets };
 }

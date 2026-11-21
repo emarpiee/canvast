@@ -554,6 +554,43 @@ export function fieldLooks(page: Page): Promise<Array<{ label: string; look: str
   });
 }
 
+/**
+ * Every slider shown under `root` dragged with the mouse, from near its right end to a third of the way along: it must stay the same element
+ * (a panel drawn again under the pointer stops the drag, issue #2) and end where it was let go. Returns what failed, by the slider's name.
+ */
+export async function sliderDragProblems(page: Page, root: ReturnType<Page["locator"]>, most = 12): Promise<string[]> {
+  const out: string[] = [];
+  const all = root.locator('input[type="range"]');
+  const n = Math.min(most, await all.count());
+  for (let i = 0; i < n; i++) {
+    const r = all.nth(i);
+    if (!(await r.isVisible()) || (await r.isDisabled())) continue;
+    const box = await r.boundingBox();
+    if (!box || box.width < 40) continue;
+    const name = await r.evaluate((el) => {
+      el.dataset["dragAudit"] = "1";
+      return el.getAttribute("aria-label") || el.closest("[data-k]")?.querySelector(".adj-label")?.textContent?.trim() || el.id || "a slider";
+    });
+    const y = box.y + box.height / 2;
+    await page.mouse.move(box.x + box.width * 0.9, y);
+    await page.mouse.down();
+    await page.mouse.move(box.x + box.width * 0.6, y, { steps: 4 });
+    await page.mouse.move(box.x + box.width / 3, y, { steps: 4 });
+    const kept = await r.evaluate((el) => el.isConnected && el.dataset["dragAudit"] === "1").catch(() => false);
+    await page.mouse.up();
+    if (!kept) {
+      out.push(`${name}: made again while dragged`);
+      continue;
+    }
+    const at = await r.evaluate((el) => {
+      const f = el as HTMLInputElement, lo = Number(f.min || 0), hi = Number(f.max || 100);
+      return (Number(f.value) - lo) / (hi - lo || 1);
+    });
+    if (Math.abs(at - 1 / 3) > 0.15) out.push(`${name}: ended at ${Math.round(at * 100)}% of its range, let go at 33%`);
+  }
+  return out;
+}
+
 export function settingsRowProblems(panel: ReturnType<Page["locator"]>): Promise<string[]> {
   return panel.evaluate((root) => {
     const probe = document.createElement("div");
