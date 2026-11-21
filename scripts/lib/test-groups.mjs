@@ -51,7 +51,7 @@ export const RULES = [
   [/^src\/storage\//, ["storage", "library", "desktop"]],
   [/^src\/assets\/(asset-catalog|asset-library|hidden-lock|sha256)\.ts$/, ["library", "storage", "pictures", "desktop"]],
   [/^src\/assets\//, ["library", "pictures"]],
-  [/^src\/(ui\/(assets-view|library-[a-z-]+|batch-rename|hidden-access|note-editor|file-views|file-panel|pdf-view|model-view|archive-view|view-state|setting-rows)\.ts|notes\/.+\.ts)$/, ["library"]],
+  [/^src\/(ui\/(assets-view|library-[a-z-]+|batch-rename|hidden-access|note-editor|file-views|file-panel|pdf-view|model-view|archive-view|reference-window|view-state|setting-rows)\.ts|notes\/.+\.ts)$/, ["library"]],
   [/^src\/ui\/(archive-ui|library-folder-card|reset-dialog)\.ts$/, ["storage", "library"]],
   [/^src\/app\/(library-filing|asset-names)\.ts$/, ["library"]],
   // pictures, files and export

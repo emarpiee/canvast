@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.61.4 — Reference windows (2026-11-21)
+
+- **Added:** reference windows: small windows over every view (the canvas, the Library, PhotoCraft) that keep references in sight. One shows a gallery (all pictures or a library folder, one large with the arrows), or a board saved with the workspace: drop pictures on it from the Library, drag them off the canvas or bring them from another app (they go into the library), move and resize them, pan and zoom. Several at once; they open again where they were. The button beside Settings or `Shift+R`. Hidden pictures show only while the hidden items do. ([The Library](README.md#the-library))
+- **Fixed before release:** unit tests updated for closed-path adjustment shapes, the Panel tool's key and a comic sliver case.
+
+### For developers
+
+- `ui/reference-window.ts` ([ADR 0207](docs/adr/0207-reference-windows.md)), the `reference.*` commands, the `reference.boards` and `reference.windows` settings, `--z-reference`; tools' `droppedOff` hook.
+
 ## 0.61.3 — Comic pages, storyboard and comic guide options (2026-11-21)
 
 - **Added:** comic pages: the **Panel** tool (`J`) makes a page of a chosen size laid out in panels that hold and clip what is drawn or placed in them; a drag across a panel cuts it in two with the gutter kept (Shift: straight), a gutter dragged moves the panels on both sides, a double-click on a gutter merges two panels. Its options (page size, way up, layout, gutter, margin, border) also change a selected page; the Sheets menu cuts and merges selected panels. ([Comics and storyboards](README.md#comics-and-storyboards))

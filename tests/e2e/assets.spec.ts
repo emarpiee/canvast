@@ -2909,3 +2909,42 @@ test("a library of thousands keeps only the cards near the view in the page; End
   await expect(p.getByTestId("assets-total")).toHaveText(/^\S+ KiB in all$/);
   expect(app.consoleErrors).toEqual([]);
 });
+
+test("reference window (ADR 0207): over the Library and the canvas, a gallery of the library's pictures, a new board that a Library card is dragged onto, kept over a reload", async ({ app }) => {
+  const p = app.page;
+  await p.getByTestId("view-assets").click();
+  await p.getByTestId("assets-import-input").setInputFiles([
+    { name: "red.png", mimeType: "image/png", buffer: makePng(40, 30, () => [200, 40, 40, 255]) },
+    { name: "blue.png", mimeType: "image/png", buffer: makePng(30, 40, () => [40, 40, 200, 255]) },
+  ]);
+  await expect(p.getByTestId("asset-card")).toHaveCount(2);
+  // Shift+R opens it, over the Library
+  await p.keyboard.press("Shift+R");
+  const win = p.getByTestId("reference-window");
+  await expect(win).toHaveCount(1);
+  await expect(win.locator(".ref-thumb")).toHaveCount(2);
+  const z = await win.evaluate((el) => Number(getComputedStyle(el).zIndex));
+  expect(z, "above the bars and panels").toBeGreaterThan(10);
+  // one large, then back
+  await win.locator(".ref-thumb").first().click();
+  await expect(win.locator("[data-ref-big]")).toHaveCount(1);
+  await win.locator("[data-ref-back]").click();
+  // a new board, then a Library card dragged onto it
+  await win.locator("[data-ref-more]").click();
+  await p.locator('.pop-menu [data-command="reference.newBoard"], .pop-menu button:has-text("New board")').first().click();
+  await p.getByTestId("prompt-input").fill("Faces");
+  await p.getByTestId("prompt-ok").click();
+  await expect(win.locator("[data-ref-board]")).toHaveCount(1);
+  await p.locator('[data-testid="asset-card"][title="red.png"]').dragTo(win.locator("[data-ref-board]"));
+  const boards = () => p.evaluate(() => JSON.parse(String(window.__canvastDebug.getSetting("reference.boards"))) as Array<{ name: string; items: Array<{ h: string }> }>);
+  await expect.poll(async () => (await boards()).map((b) => `${b.name}:${b.items.length}`)).toEqual(["Faces:1"]);
+  await expect(win.locator("[data-ref-item] img")).toHaveCount(1);
+  // over the canvas too, and opened again after a reload, on its board
+  await p.getByTestId("view-canvas").click().catch(() => undefined);
+  await expect(win).toBeVisible();
+  await p.reload();
+  await p.waitForFunction(() => typeof window.__canvastDebug !== "undefined");
+  await expect(p.getByTestId("reference-window")).toHaveCount(1);
+  await expect(p.getByTestId("reference-window").locator("[data-ref-item]")).toHaveCount(1);
+  expect(app.consoleErrors).toEqual([]);
+});

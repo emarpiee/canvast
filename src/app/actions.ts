@@ -243,6 +243,8 @@ export function layoutSelection(doc: DocumentStore, editor: EditorState, cmd: La
 // ---- copy, cut, paste, duplicate (ADR 0038) ------------------------------------------------
 const CLIP_KEY = "canvast.clipboard";
 let inMemory: { payload: ClipboardPayload; text: string } | null = null;
+/** The library files of the pictures copied on the canvas last (the reference window pastes them, ADR 0207). */
+export const copiedPictureHashes = (): string[] => (inMemory?.payload.objects ?? []).flatMap((o) => (o["kind"] === "image" && typeof o["assetId"] === "string" ? [o["assetId"] as string] : []));
 let pastes = 0;
 /** CSS px each repeated paste (or duplicate) is moved down and right, so copies do not hide each other. */
 const PASTE_STEP_PX = 24;

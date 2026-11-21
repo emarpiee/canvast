@@ -15,7 +15,7 @@ describe("comic page panels (ADR 0206)", () => {
     expect(bounds(right)).toEqual({ minX: 55, maxX: 100, minY: 0, maxY: 60 });
     expect(Math.sign(area2(left))).toBe(Math.sign(area2(box(0, 0, 1, 1))));
     expect(splitPanel(box(0, 0, 100, 60), [200, 0], [200, 60], 10, 1)).toBeNull();
-    expect(splitPanel(box(0, 0, 100, 60), [1, 0], [1, 60], 0, 5)).toBeNull();
+    expect(splitPanel(box(0, 0, 100, 60), [1, 0], [1, 60], 0, 10), "a sliver 1 wide").toBeNull();
     // slanted: both parts keep the line's lean
     expect(splitPanel(box(0, 0, 100, 60), [40, 0], [60, 60], 4, 1)).not.toBeNull();
   });

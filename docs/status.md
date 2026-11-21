@@ -38,6 +38,13 @@ Unverified / Committed / Next bounded task**.
 | 5 | Creative editing, including **arrange selected items in a grid (A–Z, Z–A, by date, size, type), align and distribute** | **done** ([ADR 0036](adr/0036-arrange-align-distribute.md)) |
 | WF | Workspace folder and the desktop app ([ADR 0177](adr/0177-workspace-folder-desktop-app.md)): Electron shell, the workspace as a folder of files, encrypted hidden items, outside changes; Linux packages (AppImage with updates, `.deb`, `.rpm`, `.tar.gz`, x86_64 and aarch64) | **done** (v0.49.0; packages v0.50.33 to 0.50.35) |
 
+## v0.61.4: reference windows (2026-11-21)
+
+- **Implemented:** reference windows ([ADR 0207](adr/0207-reference-windows.md)): gallery and saved boards, drop from the Library, the canvas and other apps, paste, copy, hidden rule, reopened windows.
+- **Tested:** `assets.spec` (gallery, new board, a card dragged on, kept over a reload); on GitHub.
+- **Known failures:** none known. **Unverified:** dragging off the canvas onto a board, the hidden-picture padlock, pasting from another app (no test yet); README waits for the owner's go.
+- **Committed:** v0.61.4 on `main`.
+
 ## v0.61.3: comic pages, storyboard and comic guide options (2026-11-21)
 
 - **Implemented:** the Panel tool and comic pages ([ADR 0206](adr/0206-comic-pages.md)): cut, move a gutter, merge, lay out, gutter, border, page size; guide Page section (`gen/pages.ts`) sizing the sheet; storyboard and comic guide options.

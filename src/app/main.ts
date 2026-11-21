@@ -1,3 +1,4 @@
+import { mountReferenceWindows } from "../ui/reference-window";
 import { mergeSelectedPanels, panelCount, selectedComicPage, setComicOption, splitSelectedPanels } from "./comic";
 import { useMediaAddress } from "../assets/thumb";
 import { setSnapPx } from "../interaction/snap";
@@ -47,7 +48,7 @@ import { EditorState } from "./editor-state";
 import type { LayoutCommand } from "./actions";
 import { flattenSelection } from "./actions";
 import { applyBalloonStyle, balloonStyle, balloonsToPaths, canConnectBalloons, connectBalloons, selectedBalloon, selectedLink, selectedShapeText, setBalloonLink, setShapeText } from "./actions";
-import { backdropState, setBackdrop, canSplitPaths, splitPaths, placeCardViews, placeLinesBeside, imageAt, pasteCssPaint, copiedText, setCopiedText, renderedStill, isPlaceholderText, markCopiedPicture, isCopiedPicture, forgetCopiedPicture, applyRotation, showReplaced, arrangeSelection, copySelection, cutSelection, duplicateSelection, pasteObjects, layoutSelection, clearFlag, deleteSelection, groupSelection, importImages, moveAbove, moveLayers, setStackOrder, tagObjects, resetRotation, resetProportions, resettable, resetSize, sizeResets, recolourOldInk, svgWarningOfTargets, svgWarningOfSelection, extractFrame, placePictureBeside, applyLayoutStyle, canTakeLayoutStyle, laidOutSheetOfSelection, arrangeAsLayout, pruneSelection, redo, setFlag, setMedia, setFlagOn, setOpacityOn, setBlendOn, renameLayer, ungroupSelection, undo, selectedPaint, previewPaint, commitPaint, combineSelection, canCombine, selectedOutline, commitOutline, selectedDashNumbers, commitDashNumbers, selectedArrows, commitArrows, selectedMiterAngle, commitMiterAngle, selectedShape, commitShape, selectedCorners, commitCorners, selectedSmoothing, commitSmoothing, selectionPaints, recolour, initialShapeState, setInitialShape, resetToInitialShape, groupJoinMode, addToBooleanGroup, takeOutOfBooleanGroup, convertTextToPath, simplifySelection, canSimplify, outlineStroke, setWidthProfile, canOutlineStroke, makeMask, makeClippingMask, canMakeMask, changeMask, selectTheMask, canReleaseMask, selectedMask, startBrushMask, paintMask, divide, startShapeBuilder, finishShapeBuilder, canDivide, canFillGaps, fillAllGaps, startGapFill, finishGapFill, makeNetwork, releaseNetwork, canMakeNetwork, canReleaseNetwork, strokeToPath, canStrokeToPath, setTextOnPath, canSetOnPath, canSetInShape, setTextInShape, takeTextOffPath, canTakeOffPath, canOutline, booleanSelection, releaseBoolean, flattenBoolean, canExportSvg, exportTarget, buildTarget, exportTargets, exportEachTargets, canSheetEach, sheetEach, svgOfTarget, pdfVectorOfTarget, svgOfSelection, importSvg, setSheetClip, sheetSelection, releaseSheets, selectedPin, setPin, canFitSheet, fitSheet, autoLayoutOf, autoLayoutState, setAutoLayout, autoLayoutShortcut, patchAutoLayout, setSheetLayout, selectedInLayout, setInLayout, sheetRatio, ratioOfSheet, setSheetRatio, sheetScalesContents, setSheetScale, boxOnSheet, moveOnSheet, resizeOnSheet, canDetach, detachSelection, selectedTextStyle, setTextStyle, croppablePicture, isCropped, uncropPicture, selectedFlip, flipSelection, unflipPictures, selectedAdjust, pictureCount, applyGradientMap, paintTargetCount, selectionColours, previewAdjust, commitAdjust, copyAdjustments, pasteAdjustments, canPasteAdjustments, copyRenderedPicture, bakePicture, sizeResetBlock, matchSize, sizable } from "./actions";
+import { copiedPictureHashes, backdropState, setBackdrop, canSplitPaths, splitPaths, placeCardViews, placeLinesBeside, imageAt, pasteCssPaint, copiedText, setCopiedText, renderedStill, isPlaceholderText, markCopiedPicture, isCopiedPicture, forgetCopiedPicture, applyRotation, showReplaced, arrangeSelection, copySelection, cutSelection, duplicateSelection, pasteObjects, layoutSelection, clearFlag, deleteSelection, groupSelection, importImages, moveAbove, moveLayers, setStackOrder, tagObjects, resetRotation, resetProportions, resettable, resetSize, sizeResets, recolourOldInk, svgWarningOfTargets, svgWarningOfSelection, extractFrame, placePictureBeside, applyLayoutStyle, canTakeLayoutStyle, laidOutSheetOfSelection, arrangeAsLayout, pruneSelection, redo, setFlag, setMedia, setFlagOn, setOpacityOn, setBlendOn, renameLayer, ungroupSelection, undo, selectedPaint, previewPaint, commitPaint, combineSelection, canCombine, selectedOutline, commitOutline, selectedDashNumbers, commitDashNumbers, selectedArrows, commitArrows, selectedMiterAngle, commitMiterAngle, selectedShape, commitShape, selectedCorners, commitCorners, selectedSmoothing, commitSmoothing, selectionPaints, recolour, initialShapeState, setInitialShape, resetToInitialShape, groupJoinMode, addToBooleanGroup, takeOutOfBooleanGroup, convertTextToPath, simplifySelection, canSimplify, outlineStroke, setWidthProfile, canOutlineStroke, makeMask, makeClippingMask, canMakeMask, changeMask, selectTheMask, canReleaseMask, selectedMask, startBrushMask, paintMask, divide, startShapeBuilder, finishShapeBuilder, canDivide, canFillGaps, fillAllGaps, startGapFill, finishGapFill, makeNetwork, releaseNetwork, canMakeNetwork, canReleaseNetwork, strokeToPath, canStrokeToPath, setTextOnPath, canSetOnPath, canSetInShape, setTextInShape, takeTextOffPath, canTakeOffPath, canOutline, booleanSelection, releaseBoolean, flattenBoolean, canExportSvg, exportTarget, buildTarget, exportTargets, exportEachTargets, canSheetEach, sheetEach, svgOfTarget, pdfVectorOfTarget, svgOfSelection, importSvg, setSheetClip, sheetSelection, releaseSheets, selectedPin, setPin, canFitSheet, fitSheet, autoLayoutOf, autoLayoutState, setAutoLayout, autoLayoutShortcut, patchAutoLayout, setSheetLayout, selectedInLayout, setInLayout, sheetRatio, ratioOfSheet, setSheetRatio, sheetScalesContents, setSheetScale, boxOnSheet, moveOnSheet, resizeOnSheet, canDetach, detachSelection, selectedTextStyle, setTextStyle, croppablePicture, isCropped, uncropPicture, selectedFlip, flipSelection, unflipPictures, selectedAdjust, pictureCount, applyGradientMap, paintTargetCount, selectionColours, previewAdjust, commitAdjust, copyAdjustments, pasteAdjustments, canPasteAdjustments, copyRenderedPicture, bakePicture, sizeResetBlock, matchSize, sizable } from "./actions";
 import { attachNavigation } from "../interaction/navigation";
 import { attachTools, selectEverything } from "../interaction/tools";
 import { createFocusCycle, focusObjects, stepToNeighbour } from "../interaction/item-navigation";
@@ -1081,11 +1082,13 @@ async function start(): Promise<void> {
   // here, or while hidden mode is on outside the library (Stay in hidden mode); and, in the desktop app, while their key is open. What makes a file uses `filesAssets`, and a capture of the screen is drawn with
   // padlocks first (`padlocked`), so nothing readable of them leaves the app.
   // The file panel (file-panel.ts): made once the library view is, which it imports through.
+  let references: { open(source?: string): void; refresh(): void } | null = null;
   let notePanel: { open(hash: string, card?: CardActions): Promise<boolean>; close(): Promise<boolean>; closeHidden(): void } = { open: async () => false, close: async () => true, closeHidden: () => undefined };
   const syncReveal = (): void => {
     const on = ((settings.get("library.hiddenRemember") && hiddenRemembered()) || hiddenModeOn()) && (storage?.hidden ? storage.hidden.isOpen() : true);
     if (on === assets.revealing) return;
     if (!on) notePanel.closeHidden(); // (nothing hidden stays open on a canvas once hidden items are no longer shown)
+    references?.refresh(); // (the reference windows show hidden pictures only while they show here)
     assets.reveal(on);
     assetNames.clear();
     tiles.clear();
@@ -1437,6 +1440,16 @@ async function start(): Promise<void> {
     // press shows or unlocks), then, inside the selection's box, what the selection holds (a group's items, or each selected thing). A row
     // outlines its thing while touched and picks it when pressed; "Add to the selection" keeps what is picked; on touch the right-click menu follows.
     revealList: (at, pick, opts) => openChoiceList(at, pick, opts),
+    // canvas pictures dragged onto a reference window's board go onto it (ADR 0207)
+    droppedOff: (ids, cx, cy) => {
+      const board = document.elementFromPoint(cx, cy)?.closest<HTMLElement>("[data-ref-board]");
+      const win = board?.closest<HTMLElement>(".ref-window");
+      if (!board || !win) return false;
+      const hashes = ids.flatMap((id) => { const o = doc.get(id); return o?.kind === "image" ? [o.assetId] : []; });
+      if (!hashes.length) return false;
+      board.dispatchEvent(new CustomEvent("ref-drop", { detail: { hashes, x: cx, y: cy }, bubbles: true }));
+      return true;
+    },
   });
   const side = document.createElement("div");
   side.id = "side-panels";
@@ -2757,6 +2770,25 @@ async function start(): Promise<void> {
     redrawNoteCards();
     wantNoteSync();
   };
+  // Reference windows (ADR 0207): over every view; the pictures selected on the canvas, else copied there last, paste into a board
+  references = mountReferenceWindows({
+    session, assets, settings, hidden: () => assets.revealing,
+    importFiles: (files) => assetsView.importFiles(files),
+    canvasPictures: () => {
+      const sel = [...editor.selection].flatMap((id) => { const o = doc.get(id); return o?.kind === "image" ? [o.assetId] : []; });
+      return sel.length ? sel : copiedPictureHashes();
+    },
+    say: (text) => {
+      editor.message = text;
+      editor.changed();
+    },
+  });
+  document.querySelector('[data-testid="reference-open"]')?.addEventListener("click", () => void pressCommand("reference.open", {}));
+  window.addEventListener("keydown", (e) => {
+    if (e.repeat || typing(e.target) || (e.target as HTMLElement | null)?.closest?.("dialog") || comboOfEvent(e) !== "Shift+R") return;
+    e.preventDefault();
+    pressCommand("reference.open", {}, "key");
+  });
   notePanelReady({ session, assets, settings, fonts: libraryFonts, importFiles: (files) => assetsView.importFiles(files), showInLibrary: (h) => (setView("assets"), void assetsView.reveal([h])), hidden: hiddenModeOn });
   // Alt+Shift+Left and Alt+Shift+Right: previous and next view (ADR 0116), on the canvas. (Alt with an arrow alone pans, as ever.)
   window.addEventListener("keydown", (e) => {

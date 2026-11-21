@@ -57,6 +57,10 @@
   /* Sizes that follow Density too (these are Compact's): small buttons on a row, buttons on a chip, a tree's indent. */
   --row-btn: 26px; --chip-btn: 20px; --tree-indent: 20px;
   --model-side-w: 20rem;
+  --ref-min-w: 13.75rem; /* a reference window at its smallest */
+  --ref-min-h: 10rem;
+  --ref-thumb: 5.5rem; /* a picture of a reference gallery */
+  --ref-pick-w: 11rem; /* the list of what a reference window shows */
   /* Spacing: gaps, paddings and margins, set by Density (Settings > Appearance; these are Compact's). --sp-* are fixed lengths, for what is not spacing. */
   --s-1: 2px; --s-2: 4px; --s-4: 8px; --s-6: 12px; --s-8: 16px; --s-10: 24px; --s-12: 32px; --s-13: 40px; --s-14: 44px; --s-15: 60px;
   --view-tint: color-mix(in oklch, var(--hud-accent) 14%, var(--paper)); /* the buttons that change the view */
@@ -72,6 +76,7 @@
   --z-edge: 10;
   --z-view: 2; /* a view of the app under its top bar (Settings, PhotoCraft): above the canvas, under the bars and the menus */
   --z-pop: 60; /* menus and popovers opened from a button: above the edge bars, the panels and the Settings view */
+  --z-reference: 50; /* the reference windows (ADR 0207): over every view, the bars and the panels; under menus, popovers and dialogs */
   --z-window: 70; /* the frameless window's row and its top edge, over everything of the page (in a modal, they are in its top layer) */
   /* Animation (Settings > Performance): every duration and curve here, so one setting changes them all. --anim-speed and --anim-move are set by the settings (none: the durations below are made 0 by the rule at the end of this block). */
   --anim-speed: 1;
@@ -3488,3 +3493,28 @@ button.archive-crumb:hover { background: var(--hud-hover); color: var(--hud-fg);
 .combo-pop .combo-item[aria-disabled="true"] { opacity: 0.4; cursor: default; }
 .combo-pop .combo-group { padding: var(--s-4) var(--s-6) var(--s-2); color: var(--hud-muted); font: var(--font-meta); }
 
+
+/* ---- Reference windows (ADR 0207): float over every view; moved by the header, resized by the corner */
+.ref-window { position: fixed; z-index: var(--z-reference); resize: both; overflow: hidden; min-width: var(--ref-min-w); min-height: var(--ref-min-h); pointer-events: auto; box-shadow: var(--hud-lift); border-radius: var(--r-lg); }
+.ref-window .panel-head { cursor: move; }
+.ref-window [data-ref-source] { max-width: var(--ref-pick-w); }
+.ref-window .panel-body { flex: 1; min-height: 0; }
+.ref-window[data-mode="board"] .panel-body { padding: 0; overflow: hidden; }
+.ref-body { height: 100%; }
+.ref-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(var(--ref-thumb), 1fr)); gap: var(--s-4); }
+.ref-thumb { aspect-ratio: 1; padding: 0; border: 1px solid var(--hud-border); border-radius: var(--r-sm); overflow: hidden; background: var(--check); cursor: zoom-in; }
+.ref-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.ref-one { display: flex; flex-direction: column; height: 100%; gap: var(--s-2); }
+.ref-one img { flex: 1; min-height: 0; width: 100%; object-fit: contain; }
+.ref-one-bar { display: flex; align-items: center; gap: var(--s-2); }
+.ref-one-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: var(--font-meta); color: var(--hud-muted); }
+.ref-board { position: relative; overflow: hidden; height: 100%; touch-action: none; cursor: grab; background: var(--canvas-bg); }
+.ref-board:active { cursor: grabbing; }
+.ref-stage { position: absolute; left: 0; top: 0; transform-origin: 0 0; }
+.ref-item { position: absolute; cursor: move; }
+.ref-item img { width: 100%; height: 100%; display: block; object-fit: contain; }
+.ref-item.is-picked { outline: 2px solid var(--hud-accent); }
+.ref-grip { position: absolute; right: 0; bottom: 0; width: var(--s-8); height: var(--s-8); background: var(--hud-accent); cursor: nwse-resize; display: none; }
+.ref-item.is-picked .ref-grip { display: block; }
+.ref-gone { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--s-2); width: 100%; height: 100%; border: 1px dashed var(--hud-border); color: var(--hud-muted); font: var(--font-meta); background: var(--hud-bg); }
+.ref-empty { position: absolute; inset: 0; margin: auto; height: max-content; padding: var(--s-8); text-align: center; pointer-events: none; }

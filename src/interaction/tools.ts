@@ -361,6 +361,8 @@ export interface ToolHooks {
   revealList(at: ScreenPoint, pick: (ids: readonly ObjectId[], enter: readonly string[], additive: boolean) => void, opts: { onlyIfChoice: boolean; onOpen(): void; add?: boolean; touch?: boolean }): boolean;
   /** Takes the way to make a shape or a sheet from corner `a` to corner `b` without a drag (a command's: `item.create`), drawn as the tool draws it. */
   setMaker?(make: (tool: "shape" | "sheet", kind: Exclude<ShapeKind, "balloon">, a: ScreenPoint, b: ScreenPoint) => boolean): void;
+  /** Objects dragged off the canvas and let go over something that takes them (a reference window's board, ADR 0207): whether it took them (then they do not move). */
+  droppedOff?(ids: readonly ObjectId[], clientX: number, clientY: number): boolean;
 }
 
 export function attachTools(
@@ -2679,6 +2681,13 @@ export function attachTools(
       }
       case "move":
         edgePan.stop();
+        // (let go over a reference window's board: the pictures go onto it, and stay where they were on the canvas)
+        if (!cancelled && hooks.droppedOff?.(g.ids, e.clientX, e.clientY)) {
+          editor.guides = null;
+          editor.preview = { kind: "none" };
+          editor.changed();
+          break;
+        }
         if (!cancelled) updateMove(s);
         editor.guides = null;
         if (cancelled) editor.preview = { kind: "none" };

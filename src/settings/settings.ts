@@ -50,6 +50,17 @@ const idList = (v: unknown): string | undefined => {
     return undefined;
   }
 };
+/** A JSON list of at most `max` objects, each passing `ok`, of at most 500 kB (the reference window's boards and windows). */
+const objectList = (max: number, ok: (x: Record<string, unknown>) => boolean) => (v: unknown): string | undefined => {
+  if (typeof v !== "string" || v.length > 500_000) return undefined;
+  try {
+    const a: unknown = JSON.parse(v);
+    return Array.isArray(a) && a.length <= max && a.every((x) => typeof x === "object" && x !== null && ok(x as Record<string, unknown>)) ? v : undefined;
+  } catch {
+    return undefined;
+  }
+};
+const finiteN = (x: unknown): boolean => typeof x === "number" && Number.isFinite(x);
 const colour = (v: unknown): string | undefined => (typeof v === "string" && /^#[0-9a-f]{6}$/i.test(v) ? v : undefined);
 
 /** Up to eight "#rrggbb" colours, newest first, written as one comma-separated text. */
@@ -108,6 +119,10 @@ export const SETTINGS = {
   "search.saved.hidden": { scope: "device", default: "[]", validate: validSaved, effect: "immediate" } as Def<string>,
   /** Library folders pinned to the top of the Folders list, by id. */
   "library.pinned": { scope: "workspace", default: "[]", validate: idList, effect: "immediate" } as Def<string>,
+  /** The reference window's boards (ADR 0207): each a name and its pictures (a library file's hash, where it is and how wide). */
+  "reference.boards": { scope: "workspace", default: "[]", validate: objectList(100, (b) => typeof b["id"] === "string" && typeof b["name"] === "string" && Array.isArray(b["items"]) && (b["items"] as unknown[]).length <= 1000 && (b["items"] as Array<Record<string, unknown>>).every((i) => typeof i === "object" && i !== null && typeof i["h"] === "string" && finiteN(i["x"]) && finiteN(i["y"]) && finiteN(i["w"]))), effect: "immediate" } as Def<string>,
+  /** The reference windows open on this device, to open again: what each shows and where it is. */
+  "reference.windows": { scope: "device", default: "[]", validate: objectList(12, (w) => typeof w["source"] === "string" && finiteN(w["x"]) && finiteN(w["y"]) && finiteN(w["w"]) && finiteN(w["h"])), effect: "immediate" } as Def<string>,
   /** Concealed library folders, by id: their items are listed only when one of them is opened (a view filter: the folders and items are not changed). */
   "library.concealed": { scope: "workspace", default: "[]", validate: idList, effect: "immediate" } as Def<string>,
   "search.saved.canvas": { scope: "workspace", default: "[]", validate: validSaved, effect: "immediate" } as Def<string>,

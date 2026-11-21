@@ -12,7 +12,7 @@ export function mountViewSwitch(root: HTMLElement, onSelect: (v: AppView) => voi
     <div class="view-switch" data-cmd-group="Navigate" role="tablist" aria-label="View" data-view-state>
       <button type="button" role="tab" data-view="assets" data-testid="view-assets" title="Library">${ICONS.images}<span>Library</span></button>
     </div>
-    <div class="view-settings" data-cmd-group="Navigate" data-view-state><button type="button" class="agent-chip" data-command="agents.activity" data-testid="agent-chip" data-state="waiting" hidden aria-label="AI agent: waiting for one" title="AI agent: waiting for one">${ICONS.tabAgents}</button><button type="button" data-view="settings" data-testid="view-settings" aria-pressed="false" aria-label="Settings" title="Settings">${ICONS.settings}</button></div>`;
+    <div class="view-settings" data-cmd-group="Navigate" data-view-state><button type="button" class="agent-chip" data-command="agents.activity" data-testid="agent-chip" data-state="waiting" hidden aria-label="AI agent: waiting for one" title="AI agent: waiting for one">${ICONS.tabAgents}</button><button type="button" data-command="reference.open" data-testid="reference-open" aria-label="Reference window" title="Reference window: a gallery or a board of references over every view (Shift+R)">${ICONS.referenceWindow}</button><button type="button" data-view="settings" data-testid="view-settings" aria-pressed="false" aria-label="Settings" title="Settings">${ICONS.settings}</button></div>`;
   // PhotoCraft's set, after the canvas's (#photocraft-switch): its tab, and its × while it runs
   const pc = photoCraft ? document.getElementById("photocraft-switch") : null;
   if (pc) {
