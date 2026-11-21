@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.61.17 — Place on the canvas works from a moodboard (2026-11-22)
+
+- **Fixed before release:** *Place on the canvas* in a moodboard's right-click menu always failed (*has no option "board"*); from another view (the Library) it now goes to the canvas first. ([The Library](README.md#the-library))
+
 ## 0.61.16 — Find any folder for a reference window (2026-11-22)
 
 - **Changed:** a reference window's list of what it shows no longer lists every folder of the library (thousands made it unusable): it lists the folders shown lately, and *Choose a folder…* finds any by its name in the Library's own folder chooser (its search and tree). ([The Library](README.md#the-library))

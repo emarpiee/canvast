@@ -2974,6 +2974,10 @@ test("reference window (ADR 0207): over the Library and the canvas, a gallery of
   await app.drag({ x: (pic.minX + pic.maxX) / 2, y: (pic.minY + pic.maxY) / 2 }, { x: wb.x + wb.width / 2, y: wb.y + wb.height / 2 }, 8);
   await expect.poll(async () => (await items()).length, { message: "dragged off the canvas" }).toBe(3);
   expect(await p.evaluate(() => window.__canvastDebug.objects().length), "still on the canvas").toBe(1);
+  // its right-click menu places a picture on the canvas
+  await w2.locator('[data-ref-item="1"]').click({ button: "right" });
+  await p.locator('.pop-menu [data-command="reference.toCanvas"]').click();
+  await expect.poll(() => p.evaluate(() => window.__canvastDebug.objects().length), { message: "placed from the moodboard's menu" }).toBe(2);
   // a picture hidden out of hidden mode shows a padlock in its place
   await p.evaluate((h) => window.__canvastDebug.libraryOp("hide", h, "1"), (await items())[0]!.h);
   await expect(w2.locator(".ref-gone")).toHaveCount(1);

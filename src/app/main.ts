@@ -3518,6 +3518,11 @@ async function start(): Promise<void> {
    * after another a little apart. How many.
    */
   const placeOnCanvas = async (hashes: readonly string[], at?: { x: number; y: number }): Promise<number> => {
+    // (from another view, Place on the canvas goes to the canvas first: a drop is only ever on it)
+    if (appView !== "canvas" && !at) {
+      setView("canvas");
+      await new Promise((r) => requestAnimationFrame(r));
+    }
     if (appView !== "canvas" || editor.blockEdit()) return 0;
     const r = canvas.getBoundingClientRect();
     let n = 0;

@@ -630,7 +630,8 @@ export function mountReferenceWindows(deps: ReferenceDeps): { open(source?: RefS
       const look = (patch: Record<string, unknown>, label: string, icon: string, hint: string, extra: Partial<MenuItem> = {}): MenuItem => go("reference.look", { indices: sel, patch }, label, icon, hint, extra);
       openMoreMenu(node ?? t, sel.length
         ? [
-            go("reference.toCanvas", { ids: items.map((x) => x.h) }, "Place on the canvas", ICONS.mapPin, "In the middle of the view"),
+            // (the pictures only: this command is not the moodboard's, it takes no "board")
+            { label: "Place on the canvas", icon: ICONS.mapPin, hint: "In the middle of the view", command: "reference.toCanvas", run: () => void pressCommand("reference.toCanvas", { ids: items.map((x) => x.h) }) },
             look({ flip: "x" }, "Flip horizontally", ICONS.flipHorizontal, "Mirrored left to right (Shift+H)", { sep: true }),
             look({ flip: "y" }, "Flip vertically", ICONS.flipVertical, "Mirrored top to bottom (Shift+V)"),
             look({ turn: 90 }, "Turn a quarter", ICONS.turnQuarter, "Clockwise, 90°"),
