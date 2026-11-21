@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.61.21 — The canvas's view keys in a reference window (2026-11-22)
+
+- **Fixed before release:** W A S D and F did nothing in a reference window. On a moodboard, W A S D select the next picture that way (bringing it into view) and F fits the selected pictures, then every picture, as on the canvas; in a picture shown large, A and D go to the one before and after and F fits it again. Keys you rebound work there too. ([The Library](README.md#the-library))
+
 ## 0.61.20 — A reference gallery shows every picture the Library shows (2026-11-22)
 
 - **Fixed before release:** some of a reference window's gallery pictures were blank though the Library showed them: it took only a thumbnail already stored, remembered when there was none, and left out custom thumbnails and art files' pictures. It now shows what the Library shows (a custom thumbnail, the stored one, one made as the Library makes it, an art file's picture, the file), tries again later, and names a picture it cannot draw. ([The Library](README.md#the-library))

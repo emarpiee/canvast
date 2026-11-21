@@ -2978,6 +2978,14 @@ test("reference window (ADR 0207): over the Library and the canvas, a gallery of
   await w2.locator('[data-ref-item="1"]').click({ button: "right" });
   await p.locator('.pop-menu [data-command="reference.toCanvas"]').click();
   await expect.poll(() => p.evaluate(() => window.__canvastDebug.objects().length), { message: "placed from the moodboard's menu" }).toBe(2);
+  // the canvas's step keys work in it: with nothing selected, D selects the picture nearest the middle (and nothing reaches the canvas)
+  await w2.locator("[data-ref-board]").focus();
+  await p.keyboard.press("Escape");
+  await expect(w2.locator(".ref-item.is-picked")).toHaveCount(0);
+  await p.keyboard.press("d");
+  await expect(w2.locator(".ref-item.is-picked"), "D selected a picture").toHaveCount(1);
+  await p.keyboard.press("f");
+  expect(await p.evaluate(() => window.__canvastDebug.objects().length), "nothing reached the canvas").toBe(2);
   // a picture hidden out of hidden mode shows a padlock in its place
   await p.evaluate((h) => window.__canvastDebug.libraryOp("hide", h, "1"), (await items())[0]!.h);
   await expect(w2.locator(".ref-gone")).toHaveCount(1);

@@ -583,6 +583,35 @@ export function mountReferenceWindows(deps: ReferenceDeps): { open(source?: RefS
       view.x = Math.min(w - 40 - minX * view.k, Math.max(40 - maxX * view.k, view.x));
       view.y = Math.min(h - 40 - minY * view.k, Math.max(40 - maxY * view.k, view.y));
     };
+    /** The selection F fitted last (a second F fits every picture). */
+    let fitted = "";
+    /** The nearest picture in a direction (w a s d) from the selected one, or from the middle of the view: selected, and centred when out of sight. */
+    const step = (b: Board, key: string, sel: readonly number[]): void => {
+      if (!area) return;
+      const mid = (it: Item) => ({ x: it.x + it.w / 2, y: it.y + (it.w * (ratio.get(it.h) ?? 0.75)) / 2 });
+      const from = sel.length ? mid(b.items[sel[0]!]!) : { x: (area.clientWidth / 2 - view.x) / view.k, y: (area.clientHeight / 2 - view.y) / view.k };
+      const [ax, ay] = key === "a" ? [-1, 0] : key === "d" ? [1, 0] : key === "w" ? [0, -1] : [0, 1];
+      let best = -1, bestScore = Infinity;
+      b.items.forEach((it, j) => {
+        if (sel.length && j === sel[0]) return;
+        const m = mid(it), dx = m.x - from.x, dy = m.y - from.y, along = dx * ax + dy * ay;
+        if (sel.length && along <= 0) return; // (only what lies that way; with nothing selected, the nearest of all)
+        const score = Math.hypot(dx, dy) + Math.abs(dx * ay - dy * ax); // (straight ahead before off to the side)
+        if (score < bestScore) (bestScore = score), (best = j);
+      });
+      if (best < 0) return;
+      picked.clear();
+      picked.add(best);
+      fitted = "";
+      void syncItems(b);
+      const m = mid(b.items[best]!), sx = m.x * view.k + view.x, sy = m.y * view.k + view.y;
+      if (sx < 0 || sy < 0 || sx > area.clientWidth || sy > area.clientHeight) {
+        view = { ...view, x: area.clientWidth / 2 - m.x * view.k, y: area.clientHeight / 2 - m.y * view.k };
+        clampView();
+        placeStage();
+        saveView();
+      }
+    };
     const zoomAt = (cx: number, cy: number, factor: number): void => {
       if (!area) return;
       const p = onBoard(cx, cy), r = area.getBoundingClientRect();
@@ -742,8 +771,16 @@ export function mountReferenceWindows(deps: ReferenceDeps): { open(source?: RefS
         e.preventDefault();
       }
       if (one !== null && !win.source.startsWith("board:")) {
+        const k1 = e.ctrlKey || e.metaKey || e.altKey ? "" : e.key.toLowerCase();
         if (e.key === "Escape") (one = null), stopSlides();
-        else if (e.key === "ArrowLeft" || e.key === "ArrowRight") one = (one + (e.key === "ArrowLeft" ? -1 : 1) + shown.length) % shown.length;
+        else if (e.key === "ArrowLeft" || e.key === "ArrowRight" || k1 === "a" || k1 === "d") one = (one + (e.key === "ArrowLeft" || k1 === "a" ? -1 : 1) + shown.length) % shown.length;
+        else if (k1 === "f" || k1 === "0") {
+          // (fitted again, as a double-click does)
+          zoom = { k: 1, x: 0, y: 0 };
+          placeZoom();
+          e.preventDefault();
+          return void e.stopPropagation();
+        }
         else return void e.stopPropagation();
         e.preventDefault();
         e.stopPropagation();
@@ -767,6 +804,15 @@ export function mountReferenceWindows(deps: ReferenceDeps): { open(source?: RefS
       else if (!mod && (e.key === "+" || e.key === "=")) zoomAt(mid.x, mid.y, e.shiftKey ? 2 : 1.25);
       else if (!mod && (e.key === "-" || e.key === "_")) zoomAt(mid.x, mid.y, e.shiftKey ? 0.5 : 0.8);
       else if (!mod && (e.key === "0" || e.key === "Home")) void pressCommand("reference.fit", { window: id, board: b.id });
+      // F, as on the canvas: the selected pictures in view; again (or none selected): every picture
+      else if (!mod && !e.shiftKey && key === "f") {
+        const which = sel.join(",");
+        const all = !sel.length || fitted === which;
+        fitted = all ? "" : which;
+        void pressCommand("reference.fit", all ? { window: id, board: b.id } : { window: id, board: b.id, indices: sel });
+      }
+      // W A S D, as on the canvas: the next picture that way selected, and brought into view
+      else if (!mod && !e.shiftKey && "wasd".includes(key) && key.length === 1 && b.items.length) step(b, key, sel);
       else if (!mod && e.key.startsWith("Arrow")) {
         const d = e.shiftKey ? 40 : 4, [ax, ay] = e.key === "ArrowLeft" ? [-1, 0] : e.key === "ArrowRight" ? [1, 0] : e.key === "ArrowUp" ? [0, -1] : [0, 1];
         if (sel.length) void pressCommand("reference.place", { board: b.id, moves: sel.map((j) => ({ i: j, x: b.items[j]!.x + (ax * d) / view.k, y: b.items[j]!.y + (ay * d) / view.k })) });
@@ -1252,12 +1298,13 @@ let d=null;addEventListener("pointerdown",(e)=>{d={x:e.clientX-v.x,y:e.clientY-v
       manage(winOf(o));
       return { ok: true };
     }),
-    rc("reference.fit", "Fit the moodboard", "Every picture in sight", "read", [{ name: "window", type: "text", doc: "the window", required: true }, ID], (o) => {
+    rc("reference.fit", "Fit the moodboard", "Every picture in sight, or the ones named", "read", [{ name: "window", type: "text", doc: "the window", required: true }, ID, { name: "indices", type: "json", doc: "only these pictures (from 0), as a list" }], (o) => {
       const w = winOf(o), b = hasBoard(o);
       if (!w || !b) return { ok: false, error: "No such window or moodboard." };
       const area = w.el.querySelector<HTMLElement>("[data-ref-board]");
-      if (!area || !b.items.length) return { ok: true };
-      const minX = Math.min(...b.items.map((i) => i.x)), maxX = Math.max(...b.items.map((i) => i.x + i.w)), minY = Math.min(...b.items.map((i) => i.y)), maxY = Math.max(...b.items.map((i) => i.y + i.w));
+      const these = o["indices"] === undefined ? b.items : indices(o["indices"], b).map((j) => b.items[j]!);
+      if (!area || !these.length) return { ok: true };
+      const ex = extentOf(these), minX = ex.minX, minY = ex.minY, maxX = ex.minX + ex.w, maxY = ex.minY + ex.h;
       const k = Math.min(8, Math.max(0.05, Math.min((area.clientWidth - 24) / Math.max(1, maxX - minX), (area.clientHeight - 24) / Math.max(1, maxY - minY))));
       updateBoard(b.id, (bd) => ({ ...bd, view: { k, x: 12 - minX * k + (area.clientWidth - 24 - (maxX - minX) * k) / 2, y: 12 - minY * k } }), false);
       void w.render();
