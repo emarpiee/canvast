@@ -1,4 +1,4 @@
-import { cutPanel, gutterOf, isComicPage, mergeAt, movedGutter, newComicPage, panelPoly, panelsOf } from "../app/comic";
+import { cutAcross, gutterOf, isComicPage, mergeAt, movedGutter, newComicPage, panelPoly, panelsOf } from "../app/comic";
 import { insidePoly } from "../doc/comic";
 import { pageRatio } from "../gen/pages";
 import { lookFromChoices } from "../doc/stroke-look";
@@ -531,8 +531,9 @@ export function attachTools(
     const hit = comicAt(s);
     if (!hit || editor.blockEdit()) return false;
     const reach = 10 / hit.po.proj.ppu; // (a gutter is found within 10 px of the pointer)
-    const found = hit.panel ? null : gutterOf(doc, hit.page, hit.at, reach);
-    g = { kind: "comic", pointerId: e.pointerId, page: hit.page.id, mode: hit.panel ? "cut" : found ? "gutter" : "click", target: hit.panel?.id ?? hit.page.id, start: hit.at, startScreen: s, found };
+    // a gutter is moved by a drag on it; anywhere else on the page (a panel, the margin), or with Alt, a drag is a knife's cut, at any angle
+    const found = hit.panel || e.altKey ? null : gutterOf(doc, hit.page, hit.at, reach);
+    g = { kind: "comic", pointerId: e.pointerId, page: hit.page.id, mode: found ? "gutter" : "cut", target: hit.panel?.id ?? hit.page.id, start: hit.at, startScreen: s, found };
     return true;
   };
   const updateComic = (gc: Extract<Gesture, { kind: "comic" }>, s: ScreenPoint, e: PointerEvent, final: boolean): void => {
@@ -559,8 +560,10 @@ export function attachTools(
         const dx = to[0] - gc.start[0], dy = to[1] - gc.start[1], a = Math.round(Math.atan2(dy, dx) / (Math.PI / 4)) * (Math.PI / 4), len = Math.hypot(dx, dy);
         to = [gc.start[0] + len * Math.cos(a), gc.start[1] + len * Math.sin(a)];
       }
-      const panel = doc.get(gc.target) as PathObject | undefined;
-      const next = panel ? cutPanel(doc, page, panel, gc.start, to) : null;
+      // let go in the panel it started in: that panel, along the line; else every panel the stroke crosses
+      const started = doc.get(gc.target) as PathObject | undefined;
+      const inOne = started && started.id !== page.id && insidePoly(panelPoly(doc, page, started), to);
+      const next = cutAcross(doc, page, gc.start, to, inOne ? started : undefined);
       // the knife's line, across the screen as far as the page goes
       const k = po.proj.ppu, sx = (x: number): number => gc.startScreen.x + (x - gc.start[0]) * k, sy = (y: number): number => gc.startScreen.y + (y - gc.start[1]) * k;
       const ex = to[0] - gc.start[0], ey = to[1] - gc.start[1], n = Math.hypot(ex, ey) || 1, far2 = 1e5 / k;
@@ -568,8 +571,8 @@ export function attachTools(
       if (!final) return showReplaced(editor, next ?? []);
       done();
       if (next) {
-        doc.commit(doc.transaction("Cut the panel", next));
-        editor.select([next[0]!.id, next[1]!.id]);
+        doc.commit(doc.transaction("Cut panels", next));
+        editor.select(next.filter((o) => isContainer(o) && o.parent === page.id).map((o) => o.id));
       } else {
         editor.message = "That cut leaves no room for two panels.";
         editor.changed();

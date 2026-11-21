@@ -21,8 +21,9 @@ tools are: cut a panel with a line, keep the gutter, move a gutter, merge two pa
   would fold or a panel grow thinner than a hundredth of the page; a merge is the convex hull of the two outlines; widening the gutters
   moves each edge that faces another by half the change.
 - **The Panel tool** (`J`, beside the Speech balloon): a drag on empty canvas makes a page of the chosen size (*As drawn* or a page size,
-  portrait or landscape: the same list as the guides, `gen/pages.ts`), laid out in panels inside its margin; a drag across a panel cuts it
-  (Shift: straight or at 45°), the knife's line shown and the result shown live; a drag on a gutter moves it; a double-click on a gutter
+  portrait or landscape: the same list as the guides, `gen/pages.ts`), laid out in panels inside its margin; a drag on the page is a knife, as
+  Krita's: at any angle (Shift: straight or at 45°), it cuts every panel the stroke crosses (a stroke that starts and ends in one panel, that
+  panel along its line; Alt starts one on a gutter), the knife's line and the result shown live; a drag on a gutter moves it; a double-click on a gutter
   merges the two panels across it; a click picks a panel. What lay in a panel goes with the part that holds its middle.
 - **Options** (the Properties bar's *Comic page* section, with the tool and whenever a page or its panels are selected): page size and way
   up, layout (one panel, or the guide's twelve), gutter, margin and border, in per cent of the page's shorter side. With a page selected

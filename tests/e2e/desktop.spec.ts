@@ -2793,7 +2793,7 @@ test("Keep file names (the default) with Sort files by kind off: names, places a
   const NOTE = "just words\n\n![a](Root%20Pic.PNG)\n";
   put(FILES[4]!, NOTE);
   // (a picture in a library folder whose spelling on disk changes when names are tidied: My Refs → my_refs)
-  put(FILES[5]!, "![b](My%20Refs/Red-Dress%20Sky%20Blue.png)\n");
+  put(FILES[5]!, "![b](My%20Refs/Red-Dress%20Sky%20Blue.png)\n\n![[Root Pic.PNG]]\n");
   let { app, page } = await launch(ws, "userdata", true);
   await page.getByTestId("view-assets").click();
   const card = (name: string) => page.locator(`[data-testid="asset-card"][title="${name}"]`);
@@ -2833,6 +2833,8 @@ test("Keep file names (the default) with Sort files by kind off: names, places a
   expect(files(lib)).toContain("images/root_pic.png");
   // the note's link follows a file whose folder was tidied too, not only one renamed in its folder
   await expect.poll(() => readFileSync(join(lib, files(lib).find((f) => f.endsWith("refs.md"))!), "utf8"), { timeout: 15_000 }).toContain("my_refs/red-dress_sky_blue.png");
+  // and an embed by name (as another notes app writes it) follows the item's new name
+  await expect.poll(() => readFileSync(join(lib, files(lib).find((f) => f.endsWith("refs.md"))!), "utf8"), { timeout: 15_000 }).toContain("![[root_pic.png]]");
   await page.getByTestId("view-assets").click();
   await page.getByTestId("assets-import-input").setInputFiles({ name: "Next One.png", mimeType: "image/png", buffer: png(40) });
   await expect.poll(() => files(lib), { timeout: 15_000 }).toContain("images/next_one.png");

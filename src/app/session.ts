@@ -7,7 +7,7 @@ import { stampNote } from "../notes/note-dates";
 import { NO_META, fileInlineTags, fileMeta, sameMeta, withFileMeta } from "../notes/frontmatter";
 import type { NoteMeta } from "../notes/frontmatter";
 import { makeThumb } from "../assets/thumb";
-import { isDataText, WIKI, libraryLink, linkTarget, noteKindOf, noteLinks, relativeLink, relinkNote, wikiTarget, wikiKeyOf } from "../notes/note-file";
+import { encodeLinkPart, isDataText, WIKI, libraryLink, linkTarget, noteKindOf, noteLinks, relativeLink, relinkNote, wikiTarget, wikiKeyOf } from "../notes/note-file";
 import type { PathTarget } from "../notes/note-file";
 import { nameBase } from "../storage/workspace-names";
 import type { NoteKind } from "../notes/note-file";
@@ -716,13 +716,52 @@ export class Session {
         const kind = noteKindOf(e.name);
         if (!kind || kind === "txt" || !e.present || (!hidden && e.hidden)) continue;
         const links = await this.linksOf(e, kind);
-        if (!links.paths.length) continue;
+        if (!links.paths.length && !links.wiki.length) continue;
         const dir = (await pathOf(e)).slice(0, -1);
         const rec = await this.assets?.record(e.hash).catch(() => undefined);
         if (!rec) continue;
         const text = await rec.blob.text();
         let next = text;
+        // `[[Hard Edges.png]]` (a markdown note) or a rich note's link to it, naming an item renamed since (`hard_edges.png`): its new name
+        const wikiOf = (p: string): string | null => {
+          if (!p.startsWith(WIKI)) return null;
+          try {
+            return decodeURIComponent(p.slice(WIKI.length));
+          } catch {
+            return p.slice(WIKI.length);
+          }
+        };
+        const named = (w: string): boolean => {
+          const t = wikiTarget(w);
+          return listing.entries.some((x) => x.present && (x.name.toLowerCase() === t.name || Session.wikiKey(x.name) === t.name));
+        };
+        for (const w of new Set([...links.wiki, ...links.paths.flatMap((p) => { const x = wikiOf(p); return x === null ? [] : [x]; })])) {
+          if (/^canvas:/i.test(w) || named(w)) continue;
+          const parts = w.split("#")[0]!.split("/").filter(Boolean);
+          const last = parts[parts.length - 1] ?? "";
+          const cands = [...(byKey.get(key(last)) ?? []), ...(/\.[a-z0-9]+$/i.test(last) ? [] : byKey.get(key(`${last}.md`)) ?? [])];
+          const want = parts.slice(0, -1).map(key);
+          const scored = await Promise.all(cands.map(async (x) => {
+            const have = (await pathOf(x)).slice(0, -1).map(key);
+            let n = 0;
+            while (n < want.length && n < have.length && want[want.length - 1 - n] === have[have.length - 1 - n]) n++;
+            return { x, s: n };
+          }));
+          scored.sort((a, b) => b.s - a.s);
+          const best = scored[0];
+          if (!best || (scored[1] && scored[1].s === best.s)) {
+            out.left++;
+            continue;
+          }
+          const newWiki = noteKindOf(best.x.name) === "md" ? best.x.name.replace(/\.(md|markdown)$/i, "") : best.x.name;
+          let fixed = kind === "md" ? relinkNote(kind, next, { oldWiki: wikiTarget(w).name, newWiki, oldPath: "", newPath: "" }) : next;
+          // (a rich note keeps the link as an address: the old name's, written again with the new one)
+          fixed = fixed.split(`${WIKI}${encodeLinkPart(w)}`).join(`${WIKI}${encodeLinkPart(newWiki)}`);
+          if (fixed !== next) out.links++;
+          next = fixed;
+        }
         for (const p of new Set(links.paths)) {
+          if (p.startsWith(WIKI)) continue;
           const t = linkTarget(p, dir);
           if (!t || "hash" in t) continue;
           if (await this.storage?.originals.hashAt(`library/${t.path.join("/")}`).catch(() => null)) continue;

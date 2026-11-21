@@ -1516,6 +1516,8 @@ export class LibraryMirror {
   /** Move an item's file to the first free place for its name (a sealed one is opened back into it). */
   private async place(m: { hash: string; from: string | null; dir: string; base: string; ext: string }, taken: Set<string>, emptied: Set<string>, failed: string[]): Promise<void> {
     const target = await this.freeTarget(m.dir, m.base, m.ext, taken);
+    // (its name before the move: the move renames the item to its file's new name, and links to it in notes are written with the old one)
+    const was = (await this.lib.entry(m.hash).catch(() => undefined))?.name;
     try {
       if (isHiddenFile(m.from)) {
         // Shown again: opened, proven, written to its place, and only then the sealed file erased.
@@ -1548,8 +1550,7 @@ export class LibraryMirror {
         // (every move the app makes is followed by the links to it in notes: a setting turned off (Keep file names renames files and the
         // folders' spelling on disk, My Pictures to my_pictures), a file leaving the root for its kind's folder, a library folder renamed, moved
         // or deleted. A move the library also reports is followed twice, the second finding nothing left to change.)
-        const name = (await this.lib.entry(m.hash))?.name;
-        if (name !== undefined) this.movedOutside({ hash: m.hash, name, path: m.from });
+        if (was !== undefined) this.movedOutside({ hash: m.hash, name: was, path: m.from });
       }
     } catch (e) {
       taken.delete(target.toLowerCase());
@@ -1789,13 +1790,16 @@ export class LibraryMirror {
     if (!shown.length) return;
     await this.lib.serial(async () => {
       const ops: LibraryOp[] = [];
+      const renamed: Array<{ hash: string; name: string; path: string }> = [];
       for (const { hash, file } of shown) {
         const entry = await this.lib.entry(hash);
         const name = entry && nameOnDisk(entry, file);
-        if (name) ops.push({ t: "entry", hash, v: { ...entry, name } });
+        if (name) ops.push({ t: "entry", hash, v: { ...entry, name } }), renamed.push({ hash, name: entry.name, path: file });
       }
       if (!ops.length) return;
       await this.lib.apply(ops);
+      // (an item that took its file's name: `[[its old name]]` in notes follows it)
+      for (const r of renamed) this.movedOutside(r);
       // (many at once: one redraw)
       if (this.namesTimer) clearTimeout(this.namesTimer);
       this.namesTimer = setTimeout(() => this.onNamesChanged?.(), 150);

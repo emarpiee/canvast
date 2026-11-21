@@ -214,3 +214,13 @@ export const insidePoly = (p: Poly, q: Pt): boolean => {
   const s = Math.sign(area2(p));
   return p.every((a, i) => s * cross(a, p[(i + 1) % p.length]!, q) >= -1e-9);
 };
+
+/** Whether the segment a–b touches the outline: an end inside it, or a crossing of one of its edges. */
+export function segmentHits(p: Poly, a: Pt, b: Pt): boolean {
+  if (insidePoly(p, a) || insidePoly(p, b)) return true;
+  const side = (o: Pt, q: Pt, r: Pt): number => Math.sign(cross(o, q, r));
+  return p.some((c, i) => {
+    const d = p[(i + 1) % p.length]!;
+    return side(a, b, c) !== side(a, b, d) && side(c, d, a) !== side(c, d, b);
+  });
+}

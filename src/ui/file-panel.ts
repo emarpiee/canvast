@@ -123,13 +123,22 @@ export function mountFilePanel(
         e.stopPropagation();
         return;
       }
-      // view-state: Escape closes the panel (as its × does), asking about unsaved changes; the editor's own menus and dialogs take it first
-      if (e.key === "Escape" && !e.defaultPrevented && !e.ctrlKey && !e.altKey && !e.metaKey && !e.shiftKey && !e.isComposing && note) {
-        e.preventDefault();
-        e.stopPropagation();
-        void leave();
-      }
     });
+  // view-state: Escape closes the file open on the canvas (as its × does), asking about unsaved changes. Heard first, before the editor,
+  // which takes every Escape for itself: only a menu, list, dialog or find bar of its own (or of the app) that is open takes it instead.
+  const POPUPS = ".se-controller, .se-dropdown, .se-select-menu, .se-menu-list, .se-modal, .se-modal-show, .se-cmd-row, .pop-menu, .combo-list, dialog[open]";
+  const showing = (q: Element): boolean => (q as HTMLElement).getClientRects().length > 0 && getComputedStyle(q).visibility !== "hidden";
+  window.addEventListener("keydown", (e) => {
+    if (e.key !== "Escape" || e.ctrlKey || e.altKey || e.metaKey || e.shiftKey || e.isComposing || !note || el.hidden) return;
+    // in the file, or on the canvas with nothing selected (there, a first Escape clears the selection, as it always does)
+    const inside = e.target instanceof Node && el.contains(e.target);
+    const onCanvas = e.target === document.body || (e.target instanceof HTMLElement && e.target.id === "canvas");
+    if (!inside && !(onCanvas && deps.session.editor.selection.size === 0 && !deps.session.editor.editingText)) return;
+    if ([...document.querySelectorAll(POPUPS)].some(showing)) return;
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    void leave();
+  }, true);
   return {
     open: (hash, card) => open(hash, card),
     close: leave,

@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.61.7 — Reference window controls and speed, notes' embeds follow renames, a knife for comic panels, Esc (2026-11-22)
+
+- **Fixed before release:** the reference window's list of what it shows opened as a dropdown cut off beside the window; it is now a list inside the window, with the folders as a tree and a search. ([The Library](README.md#the-library))
+- **Fixed before release:** the reference window lagged: it blurred the canvas behind it at every frame, built its board again at every change and read the whole library each time. It is now opaque, moves pictures in place, reads the library once and builds a gallery 200 pictures at a time. ([The Library](README.md#the-library))
+- **Fixed before release:** keys and pastes in a reference window reached the canvas or the Library behind it (Ctrl+V pasted there); they now stay in the window, which has the canvas's controls on a board: wheel zoom, Shift+wheel and middle-button or Space pan, a box to select, arrows, Delete, copy, cut, paste, duplicate, undo and redo. ([The Library](README.md#the-library))
+- **Fixed:** links like `![[Hard Edges.png]]` in notes did not follow a file renamed to its tidy name (`hard_edges.png`) in the desktop app: the item was renamed before the notes were told its old name. *Repair links in notes* now also repairs such links. ([Notes](README.md#notes))
+- **Fixed:** `Esc` did not close a note open on a canvas (the editor took it); it closes it now, after the editor's own menus, and also from the canvas when nothing is selected. ([Notes on a canvas](README.md#notes-on-a-canvas))
+- **Fixed before release:** the Panel tool cuts as a knife: a line drawn at any angle across the page cuts every panel it crosses (Alt starts one on a gutter). ([Comics and storyboards](README.md#comics-and-storyboards))
+
 ## 0.61.6 — Reference window controls marked as view state (2026-11-22)
 
 ### For developers

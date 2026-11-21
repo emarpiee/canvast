@@ -27,8 +27,17 @@ not endless. It floats above everything, in any view (the Library, the canvas, P
   board shows a padlock in its place and a gallery leaves it out, and the windows are drawn again when that changes.
 - **Commands**: `reference.open`, `reference.newBoard`, `reference.renameBoard`, `reference.deleteBoard` (confirm), `reference.add`,
   `reference.place`, `reference.remove`, `reference.fit`. Which source a window shows and its size and place are view state.
+- **Controls, as the canvas's** (on a board): the wheel zooms (Ctrl: a touchpad's pinch), Shift+wheel pans, the middle button or Space
+  with a drag pans, a drag on the empty board selects with a box, Shift or Ctrl adds; `+` `-` zoom, `0` or Home fits, the arrows move
+  the selected pictures (or the view), Delete, Ctrl+A, Ctrl+C, Ctrl+X, Ctrl+V, Ctrl+D, Ctrl+Z and Ctrl+Shift+Z (the board's own history),
+  Escape. A press takes the focus into the window, and its keys, pastes and copies stop there: they never reach the canvas or the Library.
+- **What it shows** is chosen from a list drawn inside the window (boards, all pictures, the folders as a tree, a search), not a dropdown
+  over the page.
+- **Speed**: the window is opaque, without the panels' backdrop blur (over a canvas drawn every frame it was drawn again every frame); a
+  board's pictures are moved in place, not built again at each change; the library is read once and again only when it changes; a gallery
+  builds 200 pictures at a time; the windows' places are kept once they rest.
 
 ## Consequences
 
 - A board holds library files only: a picture from outside is in the library once it is on a board.
-- Its pictures are thumbnails while small, the file itself once wider than 360 pixels on screen.
+- Its pictures are thumbnails while small, the file itself once wider than 600 pixels on screen.

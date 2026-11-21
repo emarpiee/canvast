@@ -2,7 +2,7 @@ import * as D from "../core/dyadic";
 import type { DocumentStore } from "../doc/document-store";
 import { isContainer } from "../doc/containers";
 import { normalizeUnit, worldBounds } from "../doc/edit-ops";
-import { gutterAt, insidePoly, layoutPanels, mergePanels, moveGutter, polySub, splitPanel, subPoly, widenGutters } from "../doc/comic";
+import { gutterAt, insidePoly, layoutPanels, mergePanels, moveGutter, polySub, segmentHits, splitPanel, subPoly, widenGutters } from "../doc/comic";
 import type { Poly, Pt } from "../doc/comic";
 import type { CanvasObject, ObjectId, PathObject } from "../doc/model";
 import { expressObjectIn, homeObject, newObjectId } from "../doc/model";
@@ -117,14 +117,32 @@ export function newComicPage(doc: DocumentStore, sheet: PathObject, opts: ComicO
 const withSpace = (o: PathObject, space: DocumentStore["space"]): PathObject => homeObject(normalizeUnit(o), space) as PathObject;
 
 /** Cut `panel` along the line a → b (page units): the panel keeps one part (and the stack), a new panel takes the other; null when the line misses. */
-export function cutPanel(doc: DocumentStore, page: PathObject, panel: PathObject, a: Pt, b: Pt): CanvasObject[] | null {
+export function cutPanel(doc: DocumentStore, page: PathObject, panel: PathObject, a: Pt, b: Pt, skip = 0): CanvasObject[] | null {
   const gutter = isComicPage(page) ? per(page, page.container.comic.gutter) : 0;
   const parts = splitPanel(panelPoly(doc, page, panel), a, b, gutter, minOf(page));
   if (!parts) return null;
   const [one, two] = parts;
   const kept = withSpace(panelObject(doc, page, one, panel, panel.z, { border: panel.width }, panel.name ?? "Panel"), doc.space);
-  const made = withSpace({ ...panelObject(doc, page, two, panel, panel.z, { border: panel.width }, ""), id: newObjectId(), z: panel.z + 1e-6, name: nextPanelName(panelsOf(doc, page)) }, doc.space);
+  const made = withSpace({ ...panelObject(doc, page, two, panel, panel.z, { border: panel.width }, ""), id: newObjectId(), z: panel.z + 1e-6, name: nextPanelName(panelsOf(doc, page), skip) }, doc.space);
   return [kept, made, ...rehome(doc, page, [panel.id], [{ id: kept.id, poly: one }, { id: made.id, poly: two }])];
+}
+
+/**
+ * A knife's cut (the Panel tool, as Krita's): every panel of the page that the stroke from `a` to `b` crosses is cut along its line, or
+ * `only` when given (a cut started inside a panel and let go in it). The changed and new objects, or null when it cut nothing.
+ */
+export function cutAcross(doc: DocumentStore, page: PathObject, a: Pt, b: Pt, only?: PathObject): CanvasObject[] | null {
+  const crossed = only ? [only] : panelsOf(doc, page).filter((p) => !p.hidden && segmentHits(panelPoly(doc, page, p), a, b));
+  const out: CanvasObject[] = [];
+  let made = 0;
+  for (const p of crossed) {
+    const cut = cutPanel(doc, page, p, a, b, made);
+    if (!cut) continue;
+    made++;
+    // (what was in two panels at once is not: each object belongs to one panel)
+    out.push(...cut.filter((o) => !out.some((x) => x.id === o.id)));
+  }
+  return made ? out : null;
 }
 
 /** The gutter of `page` under the point (page units), with the panels it lies between. */
