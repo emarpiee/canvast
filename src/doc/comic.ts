@@ -150,18 +150,18 @@ export function gutterAt(panels: readonly Poly[], at: Pt, reach: number): { a: E
     }
   }
   if (!best) return null;
-  // every edge on the same line on either side, joined end to end with these (a T: one panel above, two below)
-  const line = (seed: Edge): Edge[] => {
-    const same = edges.filter((x) => Math.abs(x.nx - seed.nx) < 1e-6 && Math.abs(x.ny - seed.ny) < 1e-6 && Math.abs(x.off - seed.off) < 1e-6 * Math.max(1, Math.abs(seed.off)));
-    const got = [seed];
-    for (let grew = true; grew; ) {
-      grew = false;
-      const lo = Math.min(...got.map((x) => x.from)), hi = Math.max(...got.map((x) => x.to)), slack = Math.max(best!.d, reach) + 1e-9; // (across a gutter that crosses this one)
-      for (const x of same) if (!got.includes(x) && x.from <= hi + slack && x.to >= lo - slack) got.push(x), (grew = true);
-    }
-    return got;
-  };
-  return { a: line(best.e), b: line(best.f), nx: best.e.nx, ny: best.e.ny, width: best.d };
+  // every edge on either line that faces an edge of the other side (one panel above, two below: all three), grown until none is left; two
+  // gutters on one line apart (the gutters of two rows, one under the other) stay two, as their edges face no edge of the other row
+  const onLine = (seed: Edge): Edge[] => edges.filter((x) => Math.abs(x.nx - seed.nx) < 1e-6 && Math.abs(x.ny - seed.ny) < 1e-6 && Math.abs(x.off - seed.off) < 1e-6 * Math.max(1, Math.abs(seed.off)));
+  // (the two sides' normals point at each other, so one side's span runs the other way along the line)
+  const faces = (x: Edge, y: Edge): boolean => -y.to < x.to - 1e-9 && -y.from > x.from + 1e-9;
+  const lineA = onLine(best.e), lineB = onLine(best.f), a = [best.e], b = [best.f];
+  for (let grew = true; grew; ) {
+    grew = false;
+    for (const x of lineA) if (!a.includes(x) && b.some((y) => faces(x, y))) a.push(x), (grew = true);
+    for (const y of lineB) if (!b.includes(y) && a.some((x) => faces(y, x))) b.push(y), (grew = true);
+  }
+  return { a, b, nx: best.e.nx, ny: best.e.ny, width: best.d };
 }
 
 /**

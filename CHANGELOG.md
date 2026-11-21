@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.61.5 — A gutter of a comic page is the panels facing across it (2026-11-21)
+
+- **Fixed before release:** on a comic page, the gutters of two rows that line up were taken as one, so a double-click between two panels merged nothing and a drag moved panels of another row; a gutter is now the panels that face each other across it (one panel above two still moves all three). ([Comics and storyboards](README.md#comics-and-storyboards))
+
+### For developers
+
+- Tests follow the new Panel tool key (the shortcut test changes Pen to Y) and the Links in notes card.
+
 ## 0.61.4 — Reference windows (2026-11-21)
 
 - **Added:** reference windows: small windows over every view (the canvas, the Library, PhotoCraft) that keep references in sight. One shows a gallery (all pictures or a library folder, one large with the arrows), or a board saved with the workspace: drop pictures on it from the Library, drag them off the canvas or bring them from another app (they go into the library), move and resize them, pan and zoom. Several at once; they open again where they were. The button beside Settings or `Shift+R`. Hidden pictures show only while the hidden items do. ([The Library](README.md#the-library))

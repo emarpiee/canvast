@@ -16,8 +16,8 @@ tools are: cut a panel with a line, keep the gutter, move a gutter, merge two pa
   outline each, a white fill and a border drawn *outside* their edge (`align: "outside"`), so the art a panel clips never covers its
   border. Nothing else marks a panel; it is a sheet on a page. Old versions see sheets on a sheet.
 - **Geometry** is pure, in `doc/comic.ts`, in the page's units: a cut keeps each side of the line farther than half the gutter (a
-  half-plane clip of a convex outline); a gutter is two facing edges of two panels, joined along their line with every other edge on it
-  (one panel above, two below); moving it moves those edges and their corners slide along the edges beside them, refused when an outline
+  half-plane clip of a convex outline); a gutter is two facing edges of two panels, with every other edge on their lines that faces an edge
+  of the other side (one panel above, two below: all three; the gutters of two rows on one line stay two); moving it moves those edges and their corners slide along the edges beside them, refused when an outline
   would fold or a panel grow thinner than a hundredth of the page; a merge is the convex hull of the two outlines; widening the gutters
   moves each edge that faces another by half the change.
 - **The Panel tool** (`J`, beside the Speech balloon): a drag on empty canvas makes a page of the chosen size (*As drawn* or a page size,

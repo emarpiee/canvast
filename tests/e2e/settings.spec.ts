@@ -16,7 +16,7 @@ test("every setting says what it is on one short line, the rest under its More; 
   expect(cut).toEqual([]);
   await p.getByRole("tab", { name: "Notes", exact: true }).click();
   const titles = await p.locator('[data-panel="notes"] .set-card > h3').allTextContents();
-  expect(titles).toEqual(["Editor", "New notes", "Cards and previews", "Properties", "File names"]);
+  expect(titles).toEqual(["Editor", "New notes", "Cards and previews", "Properties", "File names", "Links in notes"]);
   const row = p.locator('[data-row="notes.renameOnSave"]');
   await expect(row.locator(".set-more p")).toBeHidden();
   await row.locator(".set-more summary").click();
@@ -101,13 +101,13 @@ test("shortcuts: every key can be changed, to a key or a chord, with warnings; t
   await expect(panel.locator("#set-panel-shortcuts")).toBeVisible();
   await expect(panel.locator("#set-panel-shortcuts")).toContainText("Ctrl+Z");
   await expect(panel.locator('[data-key-row="view.focus"] kbd')).toHaveText("F"); // (the focus is F, not an Alt tap)
-  // Pen to J: J works on the canvas, P no longer does, the button says J.
+  // Pen to Y: Y works on the canvas, P no longer does, the button says Y.
   await change("Pen").click();
-  await p.keyboard.press("j");
-  await expect(note).toContainText("Pen: J.");
+  await p.keyboard.press("y");
+  await expect(note).toContainText("Pen: Y.");
   // A key another command has is asked about, not taken silently; Cancel leaves everything as it was.
   await change("Lasso").click();
-  await p.keyboard.press("j");
+  await p.keyboard.press("y");
   await expect(note).toContainText("already the key for Pen");
   await note.getByRole("button", { name: "Cancel" }).click();
   await expect(panel.locator('[data-key-row="tool.lasso"] kbd')).toHaveText("L");
@@ -147,7 +147,7 @@ test("shortcuts: every key can be changed, to a key or a chord, with warnings; t
   await p.mouse.click(5, 5); // the focus leaves the panel
   await expect(waiting).toHaveCount(0);
   await panel.getByRole("button", { name: "Back to canvas" }).click();
-  await expect(p.getByRole("radio", { name: "Pen" })).toHaveAttribute("title", "Pen (J)");
+  await expect(p.getByRole("radio", { name: "Pen" })).toHaveAttribute("title", "Pen (Y)");
   // The tool tooltips belong to the tool buttons only; the canvas (which also carries the current tool) has none.
   await expect(p.locator("#canvas")).not.toHaveAttribute("title", /.+/);
   // On the canvas: the new keys work, the old ones do not.
@@ -155,7 +155,7 @@ test("shortcuts: every key can be changed, to a key or a chord, with warnings; t
   expect(await tool()).toBe("select");
   await p.keyboard.press("p");
   expect(await tool(), "the old key no longer picks the pen").toBe("select");
-  await p.keyboard.press("j");
+  await p.keyboard.press("y");
   expect(await tool()).toBe("pen");
   await p.keyboard.press("v");
   await p.keyboard.press("Alt+q");
@@ -177,7 +177,7 @@ test("shortcuts: every key can be changed, to a key or a chord, with warnings; t
   await p.reload();
   await p.waitForFunction(() => typeof window.__canvastDebug !== "undefined");
   await p.keyboard.press("v");
-  await p.keyboard.press("j");
+  await p.keyboard.press("y");
   expect(await tool()).toBe("pen");
   await p.keyboard.press("?");
   await panel.getByRole("button", { name: "Reset every shortcut" }).click();
