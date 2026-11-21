@@ -1,6 +1,6 @@
 import { cornerMoved, gutterMoved, gutterTurned, gutterWidened, mergeGutter, pagePer, cutAcross, gutterOf, isComicPage, mergeAt, movedGutter, newComicPage, panelPoly, panelsOf } from "../app/comic";
 import { insidePoly } from "../doc/comic";
-import { comicHandleAt, comicHandles, pageToScreen } from "./comic-handles";
+import { comicHandleAt, comicHandles, gutterUnder, pageToScreen } from "./comic-handles";
 import type { ComicHandle, ComicHandles } from "./comic-handles";
 import { lookFromChoices } from "../doc/stroke-look";
 import type { NavDir } from "./item-navigation";
@@ -2459,6 +2459,18 @@ export function attachTools(
       return;
     }
     reveal.move(local(e), e.ctrlKey || e.metaKey, e.buttons !== 0);
+    // a comic page's gutter under the pointer shows its width grips (ADR 0206)
+    if (g.kind === "none" && !e.buttons && (effectiveTool() === "select" || effectiveTool() === "panel") && editor.selection.size) {
+      const ch = comicHandles(doc, editor, visible());
+      const p = local(e), next = ch && gutterUnder(ch, p.x, p.y);
+      if (JSON.stringify(next ?? null) !== JSON.stringify(editor.comicHover)) {
+        editor.comicHover = next ?? null;
+        editor.changed();
+      }
+    } else if (editor.comicHover && g.kind === "none") {
+      editor.comicHover = null;
+      editor.changed();
+    }
     if (g.kind === "none" && effectiveTool() === "select" && !e.buttons) {
       // A rotate cursor where a press would turn the selection (near a corner outside the box, or on the handle).
       const b = editor.selectionBoxOnScreen;

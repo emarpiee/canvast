@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.61.13 — A gutter's width grips show under the pointer (2026-11-22)
+
+- **Changed:** on a selected comic page, the gutter under the pointer shows its width grips (drag one to widen or narrow that gutter alone): no click to choose it first. A click on its middle still keeps it chosen for the Gutter field. ([Comics and storyboards](README.md#comics-and-storyboards))
+
 ## 0.61.12 — Esc closes a note wherever the focus is (2026-11-22)
 
 - **Fixed before release:** the first `Esc` after a note opened still did not close it when the focus was somewhere other than the canvas itself; from anywhere but a field, a dialog or another panel, it now closes the note when nothing, or only the note's card, is selected. ([Notes on a canvas](README.md#notes-on-a-canvas))

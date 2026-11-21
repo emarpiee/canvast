@@ -48,11 +48,13 @@ export function comicHandles(doc: DocumentStore, editor: EditorState, visible: r
   const handles: ComicHandle[] = [];
   // the gutter chosen (a click on its middle handle): its two sides' panels, as `editor.comicGutter` keeps them
   const ids = (es: readonly { panel: number }[]): string => [...new Set(es.map((e) => panels[e.panel]!.id))].sort().join(",");
-  const c = editor.comicGutter;
-  const want = c && c.page === page.id ? [c.a.slice().sort().join(","), c.b.slice().sort().join(",")].sort().join("|") : null;
+  const keyOf = (c: { page: string; a: string[]; b: string[] } | null): string | null => (c && c.page === page.id ? [c.a.slice().sort().join(","), c.b.slice().sort().join(",")].sort().join("|") : null);
+  const want = keyOf(editor.comicGutter), hover = keyOf(editor.comicHover);
   gutters.forEach((g, i) => {
-    if (want && [ids(g.a), ids(g.b)].sort().join("|") === want) {
-      chosen = i;
+    const key = [ids(g.a), ids(g.b)].sort().join("|");
+    if (key === want) chosen = i;
+    // (its width grips: the chosen gutter's, and the one under the pointer)
+    if (key === want || key === hover) {
       // its grips, beside its middle, as far out as its edges and a little more
       const mid: Pt = [(g.ends[0][0] + g.ends[1][0]) / 2, (g.ends[0][1] + g.ends[1][1]) / 2];
       const [mx, my] = pageToScreen(po, mid[0], mid[1]);
@@ -85,4 +87,19 @@ export function comicHandleAt(handles: readonly ComicHandle[], x: number, y: num
   const near = handles.filter((h) => Math.hypot(h.x - x, h.y - y) <= COMIC_HANDLE_REACH_PX);
   const rank = (h: ComicHandle): number => (h.what === "move" ? 1 : 0); // (a width grip, an end and a corner before a middle)
   return near.sort((p, q) => rank(p) - rank(q) || Math.hypot(p.x - x, p.y - y) - Math.hypot(q.x - x, q.y - y))[0];
+}
+
+/** The gutter whose middle line passes within `reach` px of a point (as far as its width grips), as `editor.comicGutter` names one; else null. */
+export function gutterUnder(ch: ComicHandles, x: number, y: number): { page: string; a: string[]; b: string[] } | null {
+  let best: { d: number; i: number } | null = null;
+  ch.gutters.forEach((g, i) => {
+    const [a, b] = g.ends.map(([px, py]) => pageToScreen(ch.po, px, py)) as [[number, number], [number, number]];
+    const dx = b[0] - a[0], dy = b[1] - a[1], len2 = dx * dx + dy * dy || 1;
+    const t = Math.max(0, Math.min(1, ((x - a[0]) * dx + (y - a[1]) * dy) / len2));
+    const d = Math.hypot(x - (a[0] + dx * t), y - (a[1] + dy * t)), reach = (g.width * ch.po.proj.ppu) / 2 + 22;
+    if (d <= reach && (!best || d < best.d)) best = { d, i };
+  });
+  if (!best) return null;
+  const g = ch.gutters[(best as { i: number }).i]!, ids = (es: readonly { panel: number }[]): string[] => [...new Set(es.map((e) => ch.panels[e.panel]!.id))];
+  return { page: ch.page.id, a: ids(g.a), b: ids(g.b) };
 }

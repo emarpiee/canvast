@@ -199,6 +199,8 @@ export class EditorState {
   comicKnife: { a: readonly [number, number]; b: readonly [number, number]; half: number } | null = null;
   /** The gutter chosen on a comic page (a click on its middle handle): its two sides' panels. The Gutter field and its grips are its alone. */
   comicGutter: { page: string; a: string[]; b: string[] } | null = null;
+  /** The gutter under the pointer (with nothing pressed): it shows its width grips too, as the chosen one does. */
+  comicHover: { page: string; a: string[]; b: string[] } | null = null;
   shapeTips = 5;
   /** Waiting for a click on the object to attach the picked ones to (ADR 0109). */
   attachMode = false;

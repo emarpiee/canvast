@@ -44,7 +44,8 @@ tools are: cut a panel with a line, keep the gutter, move a gutter, merge two pa
   shape and has its corner handles, not a sheet's box, resize and turn handles. A panel follows its page when the page is resized
   (`constraint: scale`).
 
-- **One gutter at a time**: a click on a gutter's middle handle chooses it (its line drawn solid, a grip on each side to drag its width);
+- **One gutter at a time**: the gutter under the pointer shows a grip on each side to drag its width (its line drawn solid); a click on its
+  middle handle chooses it, so it keeps them;
   the Gutter field then sets that gutter's width alone, else every gutter of the page. The Panel tool has no page size and no border of
   its own: the sheet's Ratio shapes a page, the Appearance's outline borders the selected panels (and, as the tool's, a new page's).
 
