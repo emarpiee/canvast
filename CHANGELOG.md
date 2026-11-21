@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.61.19 — Opacity on a slider (2026-11-22)
+
+- **Changed:** a reference window's opacity, and its selected pictures' on a moodboard, are set on sliders (with their numbers; a double-click puts them back) in an *Opacity* strip under its title, opened from *Opacity…* in the More menu or a picture's right-click menu, instead of four fixed steps; Alt and the wheel over its title change the window's too. A slider dragged is one undo step. ([The Library](README.md#the-library))
+
 ## 0.61.18 — A reference window's More menu, shorter, with the way to a moodboard (2026-11-22)
 
 - **Changed:** a reference window's More menu starts with *Show a moodboard or folder…* (the list under the title, where moodboards are), and its order, picture size and opacity are one row each naming the choice, opening the others: the menu is a third as long. ([The Library](README.md#the-library))

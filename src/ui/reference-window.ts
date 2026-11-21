@@ -17,6 +17,8 @@ import { panelHtml } from "./panel";
 import { openTreeChooser } from "./tree-chooser";
 import type { ChoiceNode, ChooserView } from "./tree-chooser";
 import { showMoreButton } from "./show-more";
+import { mountSettings } from "./setting-rows";
+import { R } from "../gen/kit";
 
 /**
  * Reference windows (ADR 0207): small windows that float over every view (the canvas, the Library, PhotoCraft, Settings), above the bars and
@@ -34,7 +36,7 @@ export type RefSource = string; // "all" | "folder:<id>" | "board:<id>"
 interface Item { h: string; x: number; y: number; w: number; fx?: true; fy?: true; r?: number; grey?: true; o?: number }
 type Sort = "new" | "old" | "az" | "za";
 /** A window's own choices, kept with where it is. */
-interface Prefs { folded?: boolean; opacity?: number; through?: boolean; sort?: Sort; size?: "s" | "m" | "l" }
+interface Prefs { folded?: boolean; opacity?: number; through?: boolean; sort?: Sort; size?: "s" | "m" | "l"; /** The Opacity strip under the title shown. */ look?: boolean }
 interface Board { id: string; name: string; items: Item[]; view?: { x: number; y: number; k: number } }
 
 export interface ReferenceDeps {
@@ -89,12 +91,16 @@ export function mountReferenceWindows(deps: ReferenceDeps): { open(source?: RefS
       /* (no storage: the history lasts as long as the page) */
     }
   };
-  const updateBoard = (id: string, f: (b: Board) => Board, step = true): void => {
+  /** The last change and when: the same change again soon after (a slider dragged) is the same undo step. */
+  let lastStep = { key: "", at: 0 };
+  const updateBoard = (id: string, f: (b: Board) => Board, step = true, merge = ""): void => {
     const all = boards();
     const was = all.find((b) => b.id === id);
     if (!was) return;
     const now = f(was);
-    if (step && JSON.stringify(now.items) !== JSON.stringify(was.items)) {
+    const same = !!merge && lastStep.key === `${id}|${merge}` && performance.now() - lastStep.at < 800;
+    lastStep = { key: merge ? `${id}|${merge}` : "", at: performance.now() };
+    if (step && !same && JSON.stringify(now.items) !== JSON.stringify(was.items)) {
       const h = history.get(id) ?? { back: [], ahead: [] };
       h.back.push(was.items);
       if (h.back.length > 100) h.back.shift();
@@ -162,7 +168,7 @@ export function mountReferenceWindows(deps: ReferenceDeps): { open(source?: RefS
       title: "Reference",
       count: 0,
       tools: `<button type="button" class="layer-btn" data-ref-more aria-haspopup="menu" aria-label="More" title="More: moodboards, the gallery's order, the window (fold, see-through, float)">${ICONS.ellipsis}</button>`,
-      sub: `<div class="styles-kinds"><button type="button" class="pick-current" data-ref-source aria-haspopup="menu" aria-expanded="false" aria-label="What it shows" title="What it shows: a gallery of the library, or a moodboard"></button></div><div class="layers-filter" data-ref-filter-row><input type="search" data-ref-filter placeholder="Search pictures" aria-label="Search the pictures by name" autocomplete="off"></div>`,
+      sub: `<div class="styles-kinds"><button type="button" class="pick-current" data-ref-source aria-haspopup="menu" aria-expanded="false" aria-label="What it shows" title="What it shows: a gallery of the library, or a moodboard"></button></div><div class="layers-filter" data-ref-filter-row><input type="search" data-ref-filter placeholder="Search pictures" aria-label="Search the pictures by name" autocomplete="off"></div><div class="ref-look" data-ref-look hidden></div>`,
       body: `<div class="ref-body" data-ref-body></div>`,
     });
     const n = wins.size;
@@ -170,10 +176,38 @@ export function mountReferenceWindows(deps: ReferenceDeps): { open(source?: RefS
     Object.assign(el.style, { left: `${box.x}px`, top: `${box.y}px`, width: `${Math.max(MIN_W, box.w)}px`, height: `${Math.max(MIN_H, box.h)}px` });
     document.body.append(el);
     const body = el.querySelector<HTMLElement>("[data-ref-body]")!;
+    // The Opacity strip: the shared rows of settings (a slider and its number; a double-click puts it back): the window's, and the pictures picked on a moodboard
+    const lookHost = el.querySelector<HTMLElement>("[data-ref-look]")!;
+    const pickedNow = (): { b: Board; sel: number[] } | null => {
+      const b = win.source.startsWith("board:") ? boardById(win.source.slice(6)) : undefined;
+      const sel = b ? [...picked].filter((j) => b.items[j]).sort((x, y) => x - y) : [];
+      return b && sel.length ? { b, sel } : null;
+    };
+    const look = mountSettings(lookHost, {
+      sections: () => [{ title: "Opacity", items: [R("window", "Window opacity", 20, 100, 100), ...(pickedNow() ? [R("pictures", "Pictures' opacity", 10, 100, 100)] : [])] }],
+      get: (k) => {
+        if (k === "window") return Math.round((win.prefs.opacity ?? 1) * 100);
+        const at = pickedNow();
+        return at ? Math.round((at.b.items[at.sel[0]!]!.o ?? 1) * 100) : 100;
+      },
+      set: (k, v) => {
+        if (k === "window") return void pressCommand("reference.window", { window: id, opacity: Number(v) / 100 });
+        const at = pickedNow();
+        if (at) void pressCommand("reference.look", { board: at.b.id, indices: at.sel, patch: { opacity: Number(v) / 100 } });
+      },
+      reset: (keys) => {
+        for (const k of keys) {
+          if (k.k === "window") void pressCommand("reference.window", { window: id, opacity: 1 });
+          const at = pickedNow();
+          if (k.k === "pictures" && at) void pressCommand("reference.look", { board: at.b.id, indices: at.sel, patch: { opacity: 1 } });
+        }
+      },
+      idPrefix: `ref-${id}-`,
+    });
     const pickBtn = el.querySelector<HTMLButtonElement>("[data-ref-source]")!;
     const win: Win = {
       id, source, el, unfoldedH: Math.max(MIN_H, box.h),
-      prefs: { ...(at?.folded ? { folded: true } : {}), ...(at?.opacity ? { opacity: at.opacity } : {}), ...(at?.through ? { through: true } : {}), ...(at?.sort ? { sort: at.sort } : {}), ...(at?.size ? { size: at.size } : {}) },
+      prefs: { ...(at?.folded ? { folded: true } : {}), ...(at?.opacity ? { opacity: at.opacity } : {}), ...(at?.through ? { through: true } : {}), ...(at?.sort ? { sort: at.sort } : {}), ...(at?.size ? { size: at.size } : {}), ...(at?.look ? { look: true } : {}) },
       render: async () => undefined, sync: () => undefined, close: () => undefined, applyPrefs: () => undefined, slideshow: () => undefined,
     };
     // Folded to its title, see-through, letting clicks through to what is under it (its title still takes them)
@@ -184,6 +218,8 @@ export function mountReferenceWindows(deps: ReferenceDeps): { open(source?: RefS
       el.style.height = p.folded ? "" : `${Math.max(MIN_H, win.unfoldedH)}px`;
       el.style.opacity = String(p.opacity ?? 1);
       el.classList.toggle("is-through", !!p.through);
+      lookHost.hidden = !p.look;
+      if (p.look) look.build();
     };
     const choosing = false; // (what it shows is chosen in the shared menu, not inside the window)
 
@@ -205,6 +241,13 @@ export function mountReferenceWindows(deps: ReferenceDeps): { open(source?: RefS
       head.addEventListener("pointerup", up, { once: true });
       head.addEventListener("pointercancel", up, { once: true });
     });
+    // Alt and the wheel over the title: the window's opacity, a step at a time
+    head.addEventListener("wheel", (e) => {
+      if (!e.altKey) return;
+      e.preventDefault();
+      const now = win.prefs.opacity ?? 1;
+      void pressCommand("reference.window", { window: id, opacity: Math.round(Math.min(1, Math.max(0.2, now - Math.sign(e.deltaY) * 0.05)) * 100) / 100 });
+    }, { passive: false });
     // a double-click on the title folds the window to it, or opens it again
     head.addEventListener("dblclick", (e) => {
       if (!(e.target as HTMLElement).closest("button")) void pressCommand("reference.window", { window: id, fold: !win.prefs.folded });
@@ -250,7 +293,6 @@ export function mountReferenceWindows(deps: ReferenceDeps): { open(source?: RefS
       });
       const SORTS = [["new", "Newest first"], ["old", "Oldest first"], ["az", "By name, A to Z"], ["za", "By name, Z to A"]] as const;
       const SIZES = [["s", "Small"], ["m", "Medium"], ["l", "Large"]] as const;
-      const OPACITY = [[1, "100%"], [0.8, "80%"], [0.6, "60%"], [0.4, "40%"]] as const;
       openMoreMenu(anchor, [
         // (what it shows is the list under the title: named here too, so a moodboard is found from either)
         { label: "Show a moodboard or folder…", icon: ICONS.referenceWindow, hint: "The list under the title", command: "reference.show", run: () => pickBtn.click() },
@@ -261,7 +303,7 @@ export function mountReferenceWindows(deps: ReferenceDeps): { open(source?: RefS
           go("reference.slideshow", { window: id }, "Slideshow", ICONS.presentation, "One after another, every 4 seconds"),
         ]),
         go("reference.window", { window: id, fold: !p.folded }, "Fold to its title", ICONS.foldWindow, "A double-click on the title too", { checked: !!p.folded, sep: true }),
-        choice("Opacity", ICONS.windowOpacity, "See what is behind it", OPACITY, p.opacity ?? 1, (v) => ({ opacity: v })),
+        go("reference.window", { window: id, look: !p.look }, `Opacity… (${Math.round((p.opacity ?? 1) * 100)}%)`, ICONS.windowOpacity, "A slider under the title; Alt+wheel too", { checked: !!p.look }),
         go("reference.window", { window: id, through: !p.through }, "Let clicks through", ICONS.clickThrough, "To what is under it; its title stays", { checked: !!p.through }),
         ...(deps.float ? [go("reference.float", { window: id }, "Float over other apps", ICONS.floatOnTop, "A window above every app, view only")] : []),
       ], "More");
@@ -470,6 +512,7 @@ export function mountReferenceWindows(deps: ReferenceDeps): { open(source?: RefS
       for (const extra of nodes.slice(b.items.length)) extra.remove();
       area?.querySelector(".ref-empty")?.toggleAttribute("hidden", b.items.length > 0);
       upgrade();
+      if (win.prefs.look) look.build(); // (the pictures picked now: their slider, or none)
     };
     win.sync = (): void => {
       const b = boardOf();
@@ -583,6 +626,7 @@ export function mountReferenceWindows(deps: ReferenceDeps): { open(source?: RefS
       const up = (u: PointerEvent): void => {
         body.removeEventListener("pointermove", move);
         marquee.hidden = true;
+        if (win.prefs.look) look.build(); // (a picture picked or let go: the pictures' slider follows)
         const dx = u.clientX - sx, dy = u.clientY - sy, far = Math.hypot(dx, dy) > 2;
         if (pan) return saveView();
         // let go outside the window, over the canvas: the pictures are placed there, and stay on the moodboard
@@ -647,7 +691,7 @@ export function mountReferenceWindows(deps: ReferenceDeps): { open(source?: RefS
             look({ flip: "y" }, "Flip vertically", ICONS.flipVertical, "Mirrored top to bottom (Shift+V)"),
             look({ turn: 90 }, "Turn a quarter", ICONS.turnQuarter, "Clockwise, 90°"),
             look({ grey: !items.every((x) => x.grey) }, "Greyscale", ICONS.greyscale, "To study its values", { checked: items.every((x) => x.grey) }),
-            ...([1, 0.75, 0.5, 0.25] as const).map((v, k) => look({ opacity: v }, `${v * 100}% opaque`, ICONS.windowOpacity, "How much of it shows", { checked: items.every((x) => (x.o ?? 1) === v), sep: k === 0 })),
+            { label: "Opacity…", icon: ICONS.windowOpacity, hint: "A slider under the title", command: "reference.window", sep: true, run: () => void pressCommand("reference.window", { window: id, look: true }) },
             go("reference.order", { indices: sel, to: "front" }, "Bring to front", ICONS.bringToFront, "Over the others", { sep: true }),
             go("reference.order", { indices: sel, to: "back" }, "Send to back", ICONS.sendToBack, "Under the others"),
             go("reference.arrange", { indices: sel }, "Arrange in a grid", ICONS.arrangeMenu, "These pictures in rows, tidy"),
@@ -1089,7 +1133,9 @@ let d=null;addEventListener("pointerdown",(e)=>{d={x:e.clientX-v.x,y:e.clientY-v
         const no = typeof p["opacity"] === "number" && Number.isFinite(p["opacity"]) ? Math.min(1, Math.max(0.1, p["opacity"])) : op ?? 1;
         return { ...rest, ...(nfx ? { fx: true as const } : {}), ...(nfy ? { fy: true as const } : {}), ...(nr ? { r: nr } : {}), ...(ng ? { grey: true as const } : {}), ...(no < 1 ? { o: no } : {}) };
       };
-      updateBoard(b.id, (bd) => ({ ...bd, items: bd.items.map((it, j) => (at.has(j) ? look(it) : it)) }));
+      // (an opacity dragged on its slider: one undo step for the whole drag)
+      const onlyOpacity = Object.keys(p).length === 1 && "opacity" in p;
+      updateBoard(b.id, (bd) => ({ ...bd, items: bd.items.map((it, j) => (at.has(j) ? look(it) : it)) }), true, onlyOpacity ? `opacity:${[...at].join(",")}` : "");
       return { ok: true, changed: [b.id] };
     }),
     rc("reference.order", "Bring pictures forward or back", "Over the others, or under them", "edit", [ID, { name: "indices", type: "json", doc: "which pictures (from 0), as a list", required: true }, { name: "to", type: "choice", doc: "front or back", required: true, choices: ["front", "back"] }], (o) => {
@@ -1141,7 +1187,7 @@ let d=null;addEventListener("pointerdown",(e)=>{d={x:e.clientX-v.x,y:e.clientY-v
       const n = await deps.place((o["ids"] as string[]) ?? []);
       return n ? { ok: true } : { ok: false, error: "Open a canvas to place pictures on it." };
     }),
-    rc("reference.window", "Set the reference window", "Folded, see-through, clicks through, the gallery's order", "read", [{ name: "window", type: "text", doc: "the window", required: true }, { name: "fold", type: "boolean", doc: "folded to its title" }, { name: "opacity", type: "number", doc: "0.2 to 1" }, { name: "through", type: "boolean", doc: "clicks go through to what is under it (its title still takes them)" }, { name: "sort", type: "choice", doc: "the gallery's order", choices: ["new", "old", "az", "za"] }, { name: "size", type: "choice", doc: "the gallery's pictures", choices: ["s", "m", "l"] }], (o) => {
+    rc("reference.window", "Set the reference window", "Folded, see-through, clicks through, the gallery's order", "read", [{ name: "window", type: "text", doc: "the window", required: true }, { name: "fold", type: "boolean", doc: "folded to its title" }, { name: "opacity", type: "number", doc: "0.2 to 1" }, { name: "through", type: "boolean", doc: "clicks go through to what is under it (its title still takes them)" }, { name: "sort", type: "choice", doc: "the gallery's order", choices: ["new", "old", "az", "za"] }, { name: "size", type: "choice", doc: "the gallery's pictures", choices: ["s", "m", "l"] }, { name: "look", type: "boolean", doc: "the Opacity strip under its title shown" }], (o) => {
       const w = winOf(o);
       if (!w) return { ok: false, error: "No such window." };
       const p = { ...w.prefs };
@@ -1150,6 +1196,7 @@ let d=null;addEventListener("pointerdown",(e)=>{d={x:e.clientX-v.x,y:e.clientY-v
       if (typeof o["through"] === "boolean") p.through = o["through"];
       if (o["sort"] === "new" || o["sort"] === "old" || o["sort"] === "az" || o["sort"] === "za") p.sort = o["sort"];
       if (o["size"] === "s" || o["size"] === "m" || o["size"] === "l") p.size = o["size"];
+      if (typeof o["look"] === "boolean") p.look = o["look"];
       w.prefs = p;
       w.applyPrefs();
       keepNow();

@@ -3503,6 +3503,7 @@ button.archive-crumb:hover { background: var(--hud-hover); color: var(--hud-fg);
 .ref-window { position: fixed; z-index: var(--z-reference); resize: both; overflow: hidden; min-width: var(--ref-min-w); min-height: var(--ref-min-h); pointer-events: auto; background: var(--theme-bg); backdrop-filter: none; contain: layout paint; }
 .ref-window:focus { outline: none; }
 .ref-window .panel-head { cursor: move; }
+.ref-look { padding: var(--s-2) var(--s-4) var(--s-1); }
 .ref-window .panel-body { flex: 1; min-height: 0; position: relative; }
 .ref-window[data-one] .panel-body { overflow: hidden; } /* (a picture shown large is fitted in: never a scrollbar, never a window that grows) */
 .ref-window.is-folded { resize: none; }
