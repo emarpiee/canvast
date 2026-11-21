@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.61.9 — Esc closes a note the first time (2026-11-22)
+
+- **Fixed:** the first `Esc` after a note opened on a canvas did not close it: the focus was still on the canvas with the note's card selected, so it cleared the selection. A note now opens with the caret in its words; in the window, and with no focus anywhere, `Esc` closes it at once. ([Notes on a canvas](README.md#notes-on-a-canvas))
+
 ## 0.61.8 — Comic panels with their own handles, a reference window of the theme, Esc in every note style (2026-11-22)
 
 - **Changed:** comic panels have their own handles, as a balloon has: on each gutter a bar to move it (double-click: merge the two panels) and a handle at each end to turn it to any angle; the selected panel's corners move one by one. A cut shows only its line and the gutter it will leave until it is let go. Panels are their own kind (Layers, outline, no sheet handles) and follow their page when it is resized. ([Comics and storyboards](README.md#comics-and-storyboards))

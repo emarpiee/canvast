@@ -90,6 +90,11 @@ export function mountFilePanel(
     try {
       note = await k.open(el.querySelector<HTMLElement>(".viewer-note > div")!, { hash, name: name0, blob: rec.blob }, deps, { ...place, ...card });
       if (k.id !== "note") el.querySelector<HTMLElement>(".viewer-note [tabindex]")?.focus({ preventScroll: true });
+      // a note: the caret in its words at once, so the keys (Escape too) are the note's from the first one, not the canvas's behind it
+      else requestAnimationFrame(() => {
+        const words = el.querySelector<HTMLElement>(".sun-editor-editable[contenteditable='true']");
+        if (words && !el.contains(document.activeElement)) words.focus({ preventScroll: true });
+      });
     } catch (err) {
       shut();
       deps.session.editor.message = `This ${k.noun} could not be opened (“${rec.name}”): ${(err as Error).message}.`;
@@ -131,10 +136,12 @@ export function mountFilePanel(
   const showing = (q: Element): boolean => (q as HTMLElement).getClientRects().length > 0 && getComputedStyle(q).visibility !== "hidden";
   window.addEventListener("keydown", (e) => {
     if (e.key !== "Escape" || e.ctrlKey || e.altKey || e.metaKey || e.shiftKey || e.isComposing || !note || el.hidden) return;
-    // in the file, or on the canvas with nothing selected (there, a first Escape clears the selection, as it always does)
+    // in the file; in the window wherever the focus is (it covers the canvas); with no focus anywhere; on the canvas with nothing selected
+    // (there, a first Escape clears the selection, as it always does)
     const inside = e.target instanceof Node && el.contains(e.target);
-    const onCanvas = e.target === document.body || (e.target instanceof HTMLElement && e.target.id === "canvas");
-    if (!inside && !(onCanvas && deps.session.editor.selection.size === 0 && !deps.session.editor.editingText)) return;
+    const nowhere = e.target === document.body || e.target === document.documentElement;
+    const onCanvas = e.target instanceof HTMLElement && e.target.id === "canvas" && deps.session.editor.selection.size === 0 && !deps.session.editor.editingText;
+    if (!inside && el !== hosts.window && !nowhere && !onCanvas) return;
     if ([...document.querySelectorAll(POPUPS)].some(showing)) return;
     e.preventDefault();
     e.stopImmediatePropagation();

@@ -1389,7 +1389,7 @@ test("a note on full screen covers the panel beside it: nothing of the panel sho
   expect(app.consoleErrors).toEqual([]);
 });
 
-test("Escape closes a note open on a canvas in every editor style, in the panel and in the window: from its words, and from the canvas with nothing selected; an open editor menu closes first", async ({ app }) => {
+test("Escape closes a note open on a canvas in every editor style, in the panel and in the window: the first one right after it opens, from its words, and from the canvas with nothing selected; an open editor menu closes first", async ({ app }) => {
   const p = app.page;
   await p.evaluate(() => window.__canvastDebug.setSetting("notes.saveOnClose", true)); // (a change is saved on close, not asked about)
   await p.getByTestId("view-assets").click();
@@ -1411,6 +1411,10 @@ test("Escape closes a note open on a canvas in every editor style, in the panel 
     const host = mode === "panel" ? "note-panel" : "note-window";
     for (const style of ["document", "classic", "bottom", "balloon", "notion"]) {
       await p.evaluate(([m, s]) => { window.__canvastDebug.setSetting("notes.panelMode", m); window.__canvastDebug.setSetting("notes.panelStyle", s); }, [mode, style] as const);
+      // the first Escape right after it opens (double-clicked on its card, nothing else pressed)
+      await open(host);
+      await p.keyboard.press("Escape");
+      await expect(p.getByTestId(host), `${mode}, ${style}: the first Escape after opening`).toBeHidden();
       // from the words
       const words = await open(host);
       await words.locator("p").first().click();
