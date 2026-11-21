@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.61.2 — Adjusted big pictures, note links that follow, pages filed with their PDF (2026-11-21)
+
+- **Fixed:** a picture of more than 8 million pixels lost its adjustments when zoomed in on it (it was drawn as it is), and zoomed in so far that its pixels show one by one it lost its blur, sharpening, grain and pixelation; it is now adjusted at every zoom. ([Adjust](README.md#adjust))
+- **Changed:** a closed path (drawn with the Path tool, a lasso, an edited shape) can be an adjustment shape too, and a shape made a path stays one. ([Adjust](README.md#adjust))
+- **Fixed:** turning off *Keep file names* in the desktop app broke links to pictures in notes when the folders' spelling changed on disk too (`My Pictures` to `my_pictures`); every file the app moves or renames now has the links to it follow, and so do the items in a library folder that is renamed, moved or deleted. Two link updates no longer overlap and undo each other. ([Notes](README.md#notes))
+- **Added:** *Repair links in notes* (Settings > Notes): links to pictures and files that find nothing are written again to the item they meant, by its name as written or as a disk spells it. ([Notes](README.md#notes))
+- **Changed:** `Esc` closes a note, PDF or other file open in the panel or window on a canvas, as its ✕ does (asking about unsaved changes); the editor's own menus close first. ([Notes on a canvas](README.md#notes-on-a-canvas))
+- **Changed:** a PDF's page taken out with *Extract this page*, and pages or files imported from a ZIP or comic book, are filed in the folder the PDF or ZIP is in (in none when it is in none), not in no folder or the extracted frames' folder; *Extracted pages go to* (Settings > Saving to the library) chooses. ([ZIPs and comic books](README.md#zips-and-comic-books))
+
 ## 0.61.1 — ZIPs and comic books, a faster Library (2026-11-17)
 
 ZIPs and comic books open in the Library, which also shows several folders at once, moves folders, scrolls more smoothly and names pasted pictures; big hidden videos play, and every button, menu and key now records in macros. It also brings AI agents, in alpha. This release replaces 0.61.0, withdrawn the hour it came out: it could make a sharing certificate that does not work.

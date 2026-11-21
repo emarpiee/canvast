@@ -391,7 +391,8 @@ export interface PathObject extends ObjectBase {
   readonly shape?: ShapeKind;
   /**
    * An adjustment shape (ADR 0188): its adjustments are made on what is drawn under it, inside its outline, not on itself (its own fill and
-   * outline are drawn over that, as they are). Only a shape made with a shape tool and not a line (`canBeBackdrop`); a path never.
+   * outline are drawn over that, as they are). A shape that is not a line, or a path (offered when every part of it is closed: `backdropOffered`); never
+   * a sheet or a vector network (`canBeBackdrop`). An open part of a path is closed for it, as its fill is.
    */
   readonly backdrop?: true;
   /**
@@ -414,7 +415,9 @@ export type CanvasObject = StrokeObject | ImageObject | TextObject | PathObject;
 
 /** The outline style of a path as `paintBounds` takes it (null: no outline). */
 /** Whether a path can be an adjustment shape (ADR 0188): made with a shape tool (not a line: it has no inside), not a sheet, not a network. */
-export const canBeBackdrop = (o: PathObject): boolean => o.shape !== undefined && o.shape !== "line" && o.container === undefined && o.net !== true;
+export const canBeBackdrop = (o: PathObject): boolean => o.shape !== "line" && o.container === undefined && o.net !== true && o.result === undefined;
+/** Whether Adjust what is under it is offered for it: a shape that can be one, or a path whose every part is closed (an open line has no inside). */
+export const backdropOffered = (o: PathObject): boolean => canBeBackdrop(o) && (o.shape !== undefined || (o.sub.length > 0 && o.sub.every((s) => s.closed)));
 /** An adjustment shape: it adjusts what is under it (ADR 0188). */
 export const isBackdrop = (o: CanvasObject): o is PathObject & { backdrop: true } => o.kind === "path" && o.backdrop === true;
 
@@ -720,7 +723,7 @@ export function validateObject(o: CanvasObject): CanvasObject {
     for (const [what, v] of [["start", o.arrowStart], ["end", o.arrowEnd]] as const) if (v !== undefined && !ARROWS.includes(v)) throw new InvalidObjectError(`bad arrow ${what}`);
     if (o.dashOffset !== undefined && !(typeof o.dashOffset === "number" && Number.isFinite(o.dashOffset))) throw new InvalidObjectError("bad dash offset");
     if (o.align !== undefined && o.align !== "inside" && o.align !== "outside") throw new InvalidObjectError("bad align");
-    if (o.backdrop !== undefined && !(o.backdrop === true && canBeBackdrop(o))) throw new InvalidObjectError("an adjustment shape is a shape that is not a line, a sheet or a path");
+    if (o.backdrop !== undefined && !(o.backdrop === true && canBeBackdrop(o))) throw new InvalidObjectError("an adjustment shape is a shape or a path, not a line, a sheet or a vector network");
     if (o.radius !== undefined) {
       const rs = typeof o.radius === "number" ? [o.radius] : o.radius;
       if (!Array.isArray(rs) && typeof o.radius !== "number") throw new InvalidObjectError("bad radius");

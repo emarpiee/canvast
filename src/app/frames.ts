@@ -2,7 +2,7 @@ import type { AssetLibrary, AssetRecord } from "../assets/asset-library";
 import type { SettingsStore } from "../settings/settings";
 import type { Session } from "./session";
 import { SHOT_FORMATS, encodeShot, parseTags, shotFileName } from "./screenshot";
-import { fileInLibrary } from "./library-filing";
+import { fileInLibrary, filePages } from "./library-filing";
 
 /**
  * Extracted frames (ADR 0081): the picture a video or GIF shows becomes a new library original with a name, format, folder and tags chosen in
@@ -109,6 +109,8 @@ export async function storeFrame(assets: AssetLibrary, session: Session, setting
   if (c.source) tags.push(stem);
   if (c.inherit) tags.push(...((await session.catalog?.entry(shot.sourceHash).catch(() => undefined))?.tags ?? []));
   tags.push(...parseTags(c.custom));
-  await fileInLibrary(session, record.hash, c.folder, tags);
+  // (a PDF's page goes with the PDF unless Settings says the frames' folder; a video's or GIF's frame, to the frames' folder)
+  if (!edit && /^Page \d/.test(shot.label)) await filePages(session, [record.hash], shot.sourceHash, settings.get("frame.pageTo"), c.folder, tags);
+  else await fileInLibrary(session, record.hash, c.folder, tags);
   return record;
 }

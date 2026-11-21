@@ -433,6 +433,16 @@ export class Session {
       }
     };
     const moves = (ch: MetaChange): boolean => !!(ch.addFolders?.length || ch.removeFolders?.length || ch.clearFolder);
+    // (a folder renamed, moved or deleted: every item in it, and in the folders under it, has a new place)
+    const inFolder = async (id: string): Promise<void> => {
+      const { folders, entries } = await c.list();
+      const under = new Set([id]);
+      for (let grew = true; grew; ) {
+        grew = false;
+        for (const f of folders) if (f.parentId !== null && under.has(f.parentId) && !under.has(f.id)) under.add(f.id), (grew = true);
+      }
+      await before(entries.filter((e) => e.folderIds?.some((f) => under.has(f))).map((e) => e.hash));
+    };
     return new Proxy(c, {
       get(target, key, recv) {
         const v = Reflect.get(target, key, recv) as unknown;
@@ -445,6 +455,7 @@ export class Session {
             return c.updateMetaEach(chs);
           };
         if (key === "renameAssets") return async (chs: ReadonlyArray<{ hash: string; name: string }>) => (await before(chs.map((x) => x.hash)), c.renameAssets(chs));
+        if (key === "renameFolder" || key === "moveFolder" || key === "deleteFolder") return async (id: string, ...rest: unknown[]) => (await inFolder(id), (v as (...a: unknown[]) => unknown).call(target, id, ...rest));
         if (key === "renameTag" || key === "deleteTag" || key === "restoreMeta") seen.add("*");
         return (v as (...a: unknown[]) => unknown).bind(target);
       },
@@ -627,7 +638,14 @@ export class Session {
    * Items were renamed or put in other folders: the notes' links to them follow (`[[old name]]` when that name was theirs alone, a path
    * to their old place), and a note that moved has its own paths written from its new place. Each changed note is saved as a new version.
    */
-  private async relink(moved: ReadonlyMap<string, { name: string; path: string[] }>): Promise<void> {
+  private relinking: Promise<void> = Promise.resolve();
+  private relink(moved: ReadonlyMap<string, { name: string; path: string[] }>): Promise<void> {
+    // (one after another: two at once each read a note before the other saved it, and the second saved over the first one's links)
+    const run = this.relinking.then(() => this.relinkNow(moved));
+    this.relinking = run.catch(() => undefined);
+    return run;
+  }
+  private async relinkNow(moved: ReadonlyMap<string, { name: string; path: string[] }>): Promise<void> {
     await this.storage?.flush().catch(() => undefined); // (the desktop app's files in their new places first)
     const listing = await this.catalog?.list().catch(() => null);
     if (!listing) return;
@@ -648,12 +666,13 @@ export class Session {
       for (const [h, then] of moved) {
         const cur = now.get(h);
         const to = pathNow.get(h);
-        if (!cur || !to) continue;
+        if (!cur || !to || (then.name === cur.name && then.path.join("/") === to.join("/"))) continue; // (not moved after all: its links are left as written)
         const oldKey = Session.wikiKey(then.name);
         const alone = !listing.entries.some((x) => x.hash !== h && Session.wikiKey(x.name) === oldKey);
         const named = then.name !== cur.name && alone;
         out = relinkNote(kind, out, { oldWiki: named ? oldKey : null, newWiki: noteKindOf(cur.name) === "md" ? cur.name.replace(/\.(md|markdown)$/i, "") : cur.name, oldPath: relativeLink(dirThen, then.path), newPath: libraryLink(to) });
         out = relinkNote(kind, out, { oldWiki: null, newWiki: "", oldPath: libraryLink(then.path), newPath: libraryLink(to) }); // (as a note writes a link now)
+        out = relinkNote(kind, out, { oldWiki: null, newWiki: "", oldPath: `library/${libraryLink(then.path)}`, newPath: `library/${libraryLink(to)}` }); // (written from a vault one folder up)
       }
       // (a note that moved: its paths to items that stayed are written from its new folder)
       if (dirThen.join("/") !== dirNow.join("/")) {
@@ -669,6 +688,83 @@ export class Session {
         await this.saveVersion(e.hash, new File([out], e.name, { type: rec.type })).finally(() => void this.ownWrites--);
       }
     }
+  }
+
+  /**
+   * Repair links in notes: a path in a note that finds no item (its file was renamed or moved while its links did not follow, by an older
+   * version or by another app) is written again to the item it most likely meant: the one of that name, spelled as a disk writes it or not
+   * (`My Cat.png`, `my_cat.png`), the one whose folders are most like the link's when there are several. A link with no such item, or two
+   * equally likely, is left as it is. Each changed note is saved as a new version. Hidden notes only in hidden mode.
+   */
+  async repairNoteLinks(hidden = false): Promise<{ notes: number; links: number; left: number } | null> {
+    if (!this.guardWrite()) return null;
+    const run = this.relinking.then(async () => {
+      await this.storage?.flush().catch(() => undefined);
+      const listing = await this.catalog?.list().catch(() => null);
+      if (!listing) return null;
+      const key = (n: string): string => n.toLowerCase().replace(/[^\p{L}\p{N}.]+/gu, "");
+      const where = new Map<string, string[]>();
+      const byKey = new Map<string, CatalogEntry[]>();
+      for (const e of listing.entries) {
+        if (!e.present || (!hidden && e.hidden)) continue;
+        const k = key(e.name);
+        byKey.set(k, [...(byKey.get(k) ?? []), e]);
+      }
+      const pathOf = async (e: CatalogEntry): Promise<string[]> => where.get(e.hash) ?? (where.set(e.hash, await this.itemPath(e, listing.folders)), where.get(e.hash)!);
+      const out = { notes: 0, links: 0, left: 0 };
+      for (const e of listing.entries) {
+        const kind = noteKindOf(e.name);
+        if (!kind || kind === "txt" || !e.present || (!hidden && e.hidden)) continue;
+        const links = await this.linksOf(e, kind);
+        if (!links.paths.length) continue;
+        const dir = (await pathOf(e)).slice(0, -1);
+        const rec = await this.assets?.record(e.hash).catch(() => undefined);
+        if (!rec) continue;
+        const text = await rec.blob.text();
+        let next = text;
+        for (const p of new Set(links.paths)) {
+          const t = linkTarget(p, dir);
+          if (!t || "hash" in t) continue;
+          if (await this.storage?.originals.hashAt(`library/${t.path.join("/")}`).catch(() => null)) continue;
+          if (t.root && (await this.storage?.originals.hashAt(`library/${t.root.join("/")}`).catch(() => null))) continue;
+          const named = byKey.get(key(t.path[t.path.length - 1]!)) ?? [];
+          // (without files: an item is found by its name and folders, as the note shows it)
+          let exact = false;
+          for (const x of named) {
+            const at = (await pathOf(x)).join("/");
+            if (at === t.path.join("/") || at === t.root?.join("/")) exact = true;
+          }
+          if (exact) continue;
+          // the most folders in common with the link (as a disk spells them), from the end; two as likely: left alone
+          const dirsOf = (parts: readonly string[]): string[] => parts.slice(0, -1).map(key);
+          const want = dirsOf(t.root ?? t.path);
+          const score = async (x: CatalogEntry): Promise<number> => {
+            const have = dirsOf(await pathOf(x));
+            let n = 0;
+            while (n < want.length && n < have.length && want[want.length - 1 - n] === have[have.length - 1 - n]) n++;
+            return n * 2 + (want.length === have.length ? 1 : 0);
+          };
+          const scored = await Promise.all(named.map(async (x) => ({ x, s: await score(x) })));
+          scored.sort((a, b) => b.s - a.s);
+          const best = scored[0];
+          if (!best || (scored[1] && scored[1].s === best.s)) {
+            out.left++;
+            continue;
+          }
+          const fixed = relinkNote(kind, next, { oldWiki: null, newWiki: "", oldPath: p, newPath: libraryLink(await pathOf(best.x)) });
+          if (fixed !== next) out.links++;
+          next = fixed;
+        }
+        if (next !== text) {
+          out.notes++;
+          this.ownWrites++;
+          await this.saveVersion(e.hash, new File([next], e.name, { type: rec.type })).finally(() => void this.ownWrites--);
+        }
+      }
+      return out;
+    });
+    this.relinking = run.then(() => undefined, () => undefined);
+    return run;
   }
 
   private outsideMoves = new Map<string, { name: string; path: string[] }>();

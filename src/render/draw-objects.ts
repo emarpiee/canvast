@@ -12,7 +12,7 @@ import { canvasPaint, pictureBox } from "./gradient";
 import { exactStrokeCoverage } from "./stroke-coverage";
 import { adjustHex, adjustPixel, cropOf, isNeutral } from "../doc/adjust";
 import { playingFilter } from "./adjust-filter";
-import { adjustedSource } from "./adjust-image";
+import { adjustedPixels, adjustedSource, colourOnly } from "./adjust-image";
 
 /**
  * Canvas 2D drawing of projected objects.
@@ -585,8 +585,12 @@ export function drawImageObject(
     const h = y1 - y0;
     if (w <= 0 || h <= 0) return;
     // (flipped: shown pixel i is the source's crop.w - 1 - i, so the window read is mirrored and so is the index into it)
-    const data = src.readPixels(crop.x + (o.flipX ? crop.w - x1 : x0), crop.y + (o.flipY ? crop.h - y1 : y0), w, h);
-    const adj = isNeutral(o.adjust) || o.media ? null : o.adjust!;
+    const rx = crop.x + (o.flipX ? crop.w - x1 : x0), ry = crop.y + (o.flipY ? crop.h - y1 : y0);
+    const wanted = isNeutral(o.adjust) || o.media ? null : o.adjust!;
+    // (a blur, sharpening, grain or pixelation needs the pixels round each one: read from the adjusted picture; colours alone are made pixel by pixel)
+    const near = wanted && !colourOnly(wanted);
+    const data = near ? adjustedPixels(src, wanted, rx, ry, w, h) : src.readPixels(rx, ry, w, h);
+    const adj = near ? null : wanted;
     const snap = (v: number): number => Math.round(v * dpr) / dpr;
     // Pixel edge i lies at the rational local x = i·w/pixelW. Project it as
     // (i·w − L·pixelW)·2^e·f / pixelW: the numerator is exact, so interior

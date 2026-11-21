@@ -3660,6 +3660,19 @@ test("an adjustment shape (ADR 0188): a shape with no fill adjusts what is under
   expect(await bd()).toBe(true);
   await reload(app);
   expect(await bd()).toBe(true);
+  // a closed path drawn with the Path tool can be one too (an open one cannot: it has no inside)
+  await key(app, "b");
+  await click(app, 520, 520);
+  await click(app, 640, 520);
+  await click(app, 580, 600);
+  await click(app, 520, 520);
+  const tri = await last(app);
+  expect(tri.sub[0]!.closed).toBe(true);
+  await key(app, "v");
+  await p.evaluate((i) => window.__canvastDebug.select([i]), tri.id);
+  await p.getByRole("button", { name: /^Adjust the picture/ }).click();
+  await p.getByTestId("adjust-backdrop").check();
+  await expect.poll(async () => ((await objs(app)).find((o) => o.id === tri.id) as Obj & { backdrop?: boolean }).backdrop).toBe(true);
   expect(app.consoleErrors).toEqual([]);
 });
 

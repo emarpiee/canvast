@@ -1545,12 +1545,11 @@ export class LibraryMirror {
         await this.setMeta(MOVING_KEY, null);
         taken.delete(m.from.toLowerCase());
         emptied.add(parentOf(m.from));
-        // (its name changed in its folder, a setting turned off, say, or it left the library's root for its kind's folder: the links to it in notes follow.
-        // A move between library folders comes with its own, from the library; one that also started in the root is followed twice, the second finding nothing.)
-        if (parentOf(m.from) === parentOf(target) || parentOf(m.from) === "library") {
-          const name = (await this.lib.entry(m.hash))?.name;
-          if (name !== undefined) this.movedOutside({ hash: m.hash, name, path: m.from });
-        }
+        // (every move the app makes is followed by the links to it in notes: a setting turned off (Keep file names renames files and the
+        // folders' spelling on disk, My Pictures to my_pictures), a file leaving the root for its kind's folder, a library folder renamed, moved
+        // or deleted. A move the library also reports is followed twice, the second finding nothing left to change.)
+        const name = (await this.lib.entry(m.hash))?.name;
+        if (name !== undefined) this.movedOutside({ hash: m.hash, name, path: m.from });
       }
     } catch (e) {
       taken.delete(target.toLowerCase());

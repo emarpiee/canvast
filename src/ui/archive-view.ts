@@ -1,3 +1,4 @@
+import { filePages } from "../app/library-filing";
 import { NeedsPassword, WrongPassword, isComicFile, openArchive } from "../assets/archive";
 import type { Archive, ArchiveEntry } from "../assets/archive";
 import { describeFile } from "../assets/file-kind";
@@ -274,10 +275,12 @@ export async function openArchiveView(el: HTMLElement, file: FileFacts, deps: Vi
     // (an import asked for finishes, the view closed meanwhile or not: only what follows it in the view is left out)
     if (!out.length) return;
     const hashes = await place.importFiles(out);
+    // (filed with the ZIP, or in the extracted frames' folder: Settings > Saving to the library, Extracted pages go to)
+    const where = hashes.length ? await filePages(deps.session, hashes, hash, deps.settings.get("frame.pageTo"), deps.settings.get("frame.folder")).catch(() => "the library") : "the library";
     await place.refresh();
     if (closed) return;
     if (thenOpen && hashes[0]) return place.show(hashes[0]);
-    say(`${plural(hashes.length, "file")} imported to the library.`);
+    say(`${plural(hashes.length, "file")} imported to the library${where === "the library" ? "" : `, in ${where}`}.`);
   };
 
   // ---- pages

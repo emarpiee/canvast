@@ -577,6 +577,13 @@ test("on a canvas: pages placed as cards, one step of undo; a page extracted as 
   await p.getByTestId("pdf-page").press("Enter");
   await p.getByTestId("view-extract").click();
   await expect(p.getByTestId("toast")).toContainText("Page “book-p2.png” added to the library.");
+  // filed with its PDF (in no folder, as the PDF), not in the extracted frames' folder (Settings: Extracted pages go to)
+  const folderOf = (name: string) => p.evaluate(async (n) => {
+    const l = await window.__canvastDebug.assetListing();
+    const e = l.entries.find((x) => x.name === n);
+    return e ? (l.folders.find((f) => f.id === e.folderIds?.[0])?.name ?? "") : null;
+  }, name);
+  await expect.poll(() => folderOf("book-p2.png")).toBe("");
   await p.getByTestId("pdf-page").fill("1");
   await p.getByTestId("pdf-page").press("Enter");
   await detailsShown(p);

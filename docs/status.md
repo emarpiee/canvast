@@ -38,6 +38,13 @@ Unverified / Committed / Next bounded task**.
 | 5 | Creative editing, including **arrange selected items in a grid (A–Z, Z–A, by date, size, type), align and distribute** | **done** ([ADR 0036](adr/0036-arrange-align-distribute.md)) |
 | WF | Workspace folder and the desktop app ([ADR 0177](adr/0177-workspace-folder-desktop-app.md)): Electron shell, the workspace as a folder of files, encrypted hidden items, outside changes; Linux packages (AppImage with updates, `.deb`, `.rpm`, `.tar.gz`, x86_64 and aarch64) | **done** (v0.49.0; packages v0.50.33 to 0.50.35) |
 
+## v0.61.2: adjusted big pictures, note links that follow, Esc, pages filed with their PDF (2026-11-21)
+
+- **Implemented:** big pictures adjusted at a reduced size past 8 MP and from the adjusted copy when magnified (`render/adjust-image.ts`); closed paths as adjustment shapes (`backdropOffered`); every app move followed by note links, folder rename/move/delete tracked, relinks serialized, `Session.repairNoteLinks` (Settings > Notes); Esc closes the file panel; `frame.pageTo` files extracted PDF pages and ZIP imports beside their source.
+- **Tested:** extended `pictures.spec` (zoomed-in big picture), `vectors.spec` (closed path backdrop), `notes.spec` (Esc), `desktop.spec` (Keep file names off: a tidied folder's link follows), `file-views.spec` (page filed with its PDF); on GitHub.
+- **Known failures:** none known. **Unverified:** the repair on a real tidied library.
+- **Committed:** v0.61.2 on `main`.
+
 ## v0.60.1: the animation's PhotoCraft part, its limits completed (2026-11-15)
 
 - **Implemented:** the PhotoCraft clip as a gesture study (found on screen, recorded at a pixel ratio of 1); README Pasting row and two PhotoCraft limits.

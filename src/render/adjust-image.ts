@@ -10,7 +10,7 @@ import type { ImageObject } from "../doc/model";
 import { adjustKey, cropOf, isLayerColourNeutral, layersOf, prepare } from "../doc/adjust";
 import type { RasterSource } from "./draw-objects";
 
-/** Beyond this many pixels a source is drawn as it is: adjusting it would stall a frame (it is only so large when zoomed far in, where pixels are drawn one by one and adjusted one by one). */
+/** Beyond this many pixels a source is adjusted at a smaller size (this many pixels): adjusting all of a big picture's pixels would stall a frame and hold too much memory. */
 const MAX_PIXELS = 8_000_000;
 const KEEP = 6;
 const cache = new WeakMap<object, Map<string, HTMLCanvasElement>>();
@@ -140,16 +140,17 @@ export function setAdjustPreviewing(on: boolean): void {
 
 /** The adjusted picture and how much smaller than the source it is (1: the same size; less while a slider is being dragged). */
 export function adjustedSource(src: RasterSource, a: Adjust): { img: CanvasImageSource; f: number } {
-  const quick = previewing && src.pixelW * src.pixelH > PREVIEW_PIXELS;
+  const px = src.pixelW * src.pixelH;
+  const quick = previewing && px > PREVIEW_PIXELS;
   const key = adjustKey(a) + (quick ? "|p" : "");
   let per = cache.get(src.source as object);
   if (!per) cache.set(src.source as object, (per = new Map()));
   const hit = per.get(key);
   if (hit) return { img: hit, f: hit.width / src.pixelW };
   // (`pixelW` and `pixelH` are the pixels this source really has: a reduced copy is already smaller than the picture)
-  const f = quick ? Math.sqrt(PREVIEW_PIXELS / (src.pixelW * src.pixelH)) : 1;
+  // (a big picture, zoomed in where its whole source is drawn, is adjusted at a smaller size: shown adjusted, a little softer, never as it is)
+  const f = quick ? Math.sqrt(PREVIEW_PIXELS / px) : px > MAX_PIXELS ? Math.sqrt(MAX_PIXELS / px) : 1;
   const w = Math.max(1, Math.round(src.pixelW * f)), h = Math.max(1, Math.round(src.pixelH * f));
-  if (w * h > MAX_PIXELS) return { img: src.source, f: 1 };
   const c = document.createElement("canvas");
   c.width = w;
   c.height = h;
@@ -157,6 +158,32 @@ export function adjustedSource(src: RasterSource, a: Adjust): { img: CanvasImage
   per.set(key, c);
   if (per.size > KEEP) per.delete(per.keys().next().value as string); // (the oldest numbers go: a slider being dragged makes many)
   return { img: c, f: w / src.pixelW };
+}
+
+/** Whether a stack changes only colours (each pixel on its own): no blur, sharpening, grain or pixelation, which need the pixels round it. */
+export const colourOnly = (a: Adjust): boolean => layersOf(a).every((l) => !l.blur && !l.sharpen && !l.grain && !l.pixelate);
+
+/**
+ * The colours of a window of source pixels (`x`, `y`, `w` x `h`, in the source's full-size pixels) as the adjusted picture has them: for a picture
+ * magnified so far that its pixels are drawn one by one, with adjustments that need the pixels round each one (blur, sharpening, grain,
+ * pixelation). An adjusted copy smaller than the source gives each source pixel the colour of the copy's pixel it falls in.
+ */
+export function adjustedPixels(src: RasterSource, a: Adjust, x: number, y: number, w: number, h: number): Uint8ClampedArray {
+  const { img, f } = adjustedSource(src, a);
+  if (!(img instanceof HTMLCanvasElement)) return src.readPixels(x, y, w, h);
+  const ax = Math.floor(x * f), ay = Math.floor(y * f);
+  const aw = Math.max(1, Math.min(img.width - ax, Math.ceil((x + w) * f) - ax + 1)), ah = Math.max(1, Math.min(img.height - ay, Math.ceil((y + h) * f) - ay + 1));
+  const d = img.getContext("2d", { willReadFrequently: true })!.getImageData(ax, ay, aw, ah).data;
+  if (f === 1 && aw === w && ah === h) return d;
+  const out = new Uint8ClampedArray(w * h * 4);
+  for (let j = 0; j < h; j++) {
+    const sy = Math.min(ah - 1, Math.floor((y + j) * f) - ay);
+    for (let i = 0; i < w; i++) {
+      const sx = Math.min(aw - 1, Math.floor((x + i) * f) - ax);
+      out.set(d.subarray((sy * aw + sx) * 4, (sy * aw + sx) * 4 + 4), (j * w + i) * 4);
+    }
+  }
+  return out;
 }
 
 /** A picture as a PNG with its crop, flip and adjustments baked in, at the size of its source pixels (null: it could not be made). */

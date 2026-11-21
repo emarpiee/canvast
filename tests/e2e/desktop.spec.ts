@@ -2785,13 +2785,15 @@ test("Keep file names (the default) with Sort files by kind off: names, places a
     mkdirSync(join(lib, path, ".."), { recursive: true });
     writeFileSync(join(lib, path), data);
   };
-  const FILES = ["My Refs/Red-Dress Sky Blue.png", "My Refs/sub dir/deep.png", "Root Pic.PNG", "noext", "plain.md"];
+  const FILES = ["My Refs/Red-Dress Sky Blue.png", "My Refs/sub dir/deep.png", "Root Pic.PNG", "noext", "plain.md", "refs.md"];
   put(FILES[0]!, png(1));
   put(FILES[1]!, png(2));
   put(FILES[2]!, png(3));
   put(FILES[3]!, png(4));
   const NOTE = "just words\n\n![a](Root%20Pic.PNG)\n";
   put(FILES[4]!, NOTE);
+  // (a picture in a library folder whose spelling on disk changes when names are tidied: My Refs → my_refs)
+  put(FILES[5]!, "![b](My%20Refs/Red-Dress%20Sky%20Blue.png)\n");
   let { app, page } = await launch(ws, "userdata", true);
   await page.getByTestId("view-assets").click();
   const card = (name: string) => page.locator(`[data-testid="asset-card"][title="${name}"]`);
@@ -2829,6 +2831,8 @@ test("Keep file names (the default) with Sort files by kind off: names, places a
   await page.locator('[data-set="library.keepFileNames"]').click({ force: true });
   await expect.poll(() => files(lib), { timeout: 15_000 }).toContain("my_refs/red-dress_sky_blue.png");
   expect(files(lib)).toContain("images/root_pic.png");
+  // the note's link follows a file whose folder was tidied too, not only one renamed in its folder
+  await expect.poll(() => readFileSync(join(lib, files(lib).find((f) => f.endsWith("refs.md"))!), "utf8"), { timeout: 15_000 }).toContain("my_refs/red-dress_sky_blue.png");
   await page.getByTestId("view-assets").click();
   await page.getByTestId("assets-import-input").setInputFiles({ name: "Next One.png", mimeType: "image/png", buffer: png(40) });
   await expect.poll(() => files(lib), { timeout: 15_000 }).toContain("images/next_one.png");

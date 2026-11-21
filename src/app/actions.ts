@@ -57,7 +57,7 @@ import { isMaskObject, maskMembers } from "../doc/masks";
 import { parseCssPaint } from "./css-paint";
 import { parseSvg } from "./svg-import";
 import { piecesOf } from "../doc/path-pieces";
-import { NOTE_PAGE_PIXEL_W, canBeBackdrop, pivotOf } from "../doc/model";
+import { NOTE_PAGE_PIXEL_W, backdropOffered, pivotOf } from "../doc/model";
 import { MAX_NAME_LENGTH, editSubs, inkStyle, expressObjectIn, homeObject, localBounds, newObjectId, pathSubs, strokePoints } from "../doc/model";
 import { worldBounds, scaleAbout, layoutTimes } from "../doc/edit-ops";
 import { planSheetScale } from "../doc/constraints";
@@ -1437,7 +1437,7 @@ export function applyBalloonStyle(doc: DocumentStore, editor: EditorState, style
 
 /** The selected balloons become ordinary paths, for editing their nodes: their numbers are given up. */
 export function balloonsToPaths(doc: DocumentStore, editor: EditorState): void {
-  const next = balloonTargets(doc, editor).map((o) => { const { params: _p, shape: _s, backdrop: _bd, ...rest } = o; return rest as PathObject; });
+  const next = balloonTargets(doc, editor).map((o) => { const { params: _p, shape: _s, ...rest } = o; return rest as PathObject; }); // (an adjustment balloon stays one: a path can be)
   if (!next.length || editor.blockEdit()) return;
   doc.commit(doc.transaction(next.length === 1 ? "Convert balloon to path" : `Convert ${next.length} balloons to paths`, next));
   editor.changed();
@@ -1978,7 +1978,7 @@ export function simplifySelection(doc: DocumentStore, editor: EditorState): void
     if (count(sub) >= count(o.sub)) return [];
     before += count(o.sub);
     after += count(sub);
-    const { shape: _s, backdrop: _bd, params: _p, radius: _r, base: _b, initial: _i, ...rest } = o; // (a path now: no adjustment shape)
+    const { shape: _s, params: _p, radius: _r, base: _b, initial: _i, ...rest } = o; // (a path now; an adjustment shape stays one)
     return [{ ...rest, sub }];
   });
   if (!next.length) {
@@ -3252,10 +3252,10 @@ export function commitAdjust(doc: DocumentStore, editor: EditorState, adjust: Ad
   editor.changed();
 }
 
-/** The selected shapes that can be adjustment shapes (ADR 0188), when every selected object is one; null otherwise. */
+/** The selected shapes and closed paths that can be adjustment shapes (ADR 0188), when every selected object is one; null otherwise. */
 function backdropTargets(doc: DocumentStore, editor: EditorState): PathObject[] | null {
   const sel = [...editor.selection].map((id) => doc.get(id));
-  if (!sel.length || !sel.every((o) => o?.kind === "path" && canBeBackdrop(o))) return null;
+  if (!sel.length || !sel.every((o) => o?.kind === "path" && backdropOffered(o))) return null;
   return sel as PathObject[];
 }
 

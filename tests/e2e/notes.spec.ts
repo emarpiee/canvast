@@ -1029,7 +1029,10 @@ test("Settings > Notes: Save notes on close saves without asking; a note's forma
   await expect(tool.first()).toBeHidden();
   await p.getByTestId("note-panel").getByRole("button", { name: "More" }).first().click();
   await expect(tool.filter({ visible: true })).toHaveCount(1);
-  await p.getByTestId("note-panel").locator("[data-close]").click();
+  // Escape in the words closes the panel, as its × does
+  await typed.locator("h2").click();
+  await p.keyboard.press("Escape");
+  await expect(p.getByTestId("note-panel")).toBeHidden();
   await p.getByTestId("view-assets").click();
   await edit("rich.md");
   await expect.poll(names).toEqual(["keep.md", "rich.note.html"]);

@@ -121,6 +121,13 @@ export function mountFilePanel(
       if (note?.key?.(e)) {
         e.preventDefault();
         e.stopPropagation();
+        return;
+      }
+      // view-state: Escape closes the panel (as its × does), asking about unsaved changes; the editor's own menus and dialogs take it first
+      if (e.key === "Escape" && !e.defaultPrevented && !e.ctrlKey && !e.altKey && !e.metaKey && !e.shiftKey && !e.isComposing && note) {
+        e.preventDefault();
+        e.stopPropagation();
+        void leave();
       }
     });
   return {

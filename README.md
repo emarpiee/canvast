@@ -341,7 +341,7 @@ Give prints a soft drop shadow so they read as paper laid on a table.
 | On shapes, strokes and text | Applied to the object as drawn (fill, outline, gradient and texture together). A blur is a share of the object's size, so it does not change with zoom (far inside an object it stays at most about 330 px wide) |
 | Exporting | A selection leaves room for a blur or a drop shadow. An exported SVG carries them as a filter on the shape, and making the SVG into shapes again brings them back. A vector PDF draws such a shape as a picture instead (see [Limitations](#limitations)) |
 | On a sheet that clips | The sheet cuts what a blur or a shadow spreads past its edge too |
-| **Adjust what is under it** | For shapes (rectangle, ellipse, polygon, star, speech balloon; not a line or a path): the adjustments are made on what lies under the shape, inside its outline, not on the shape. A circle with no fill and a blur of 100 over a picture blurs that part of it; move it and the effect follows. Objects only (not the grid); its own fill and outline stay plain over it; its opacity is the strength. Selected anywhere inside; *Adjustment ellipse* in Layers. Making it a path turns it off |
+| **Adjust what is under it** | For shapes (rectangle, ellipse, polygon, star, speech balloon) and closed paths (a lasso drawn with the Pen, an edited shape); not a line, an open path, a sheet or a vector network: the adjustments are made on what lies under it, inside its outline, not on itself. A circle with no fill and a blur of 100 over a picture blurs that part of it; move it and the effect follows. Objects only (not the grid); its own fill and outline stay plain over it; its opacity is the strength. Selected anywhere inside; *Adjustment ellipse* in Layers. Editing its nodes or making it a path keeps it |
 
 ### Video, audio and GIFs
 
@@ -1030,7 +1030,7 @@ Turn a simple 3D object under a light, as the start of a still-life lighting stu
 | Placed from the view (**Place**) | The page in sight | The view in sight |
 | Several cards at once | **Place pages**: a card for each page typed, such as `1-4, 9` | **Place a turnaround**: eight cards, from all around |
 | Finding | Ctrl+F in it; the library's search finds its words too | |
-| As a picture file | **Extract this page**: the page in sight as a picture in the library, at 150, 300 or 600 dots an inch, named, filed and tagged as an [extracted frame](#video-audio-and-gifs) is (`book-p03.png`); from a card on a canvas it is placed beside the card | The view's lines: **Save the lines as SVG** |
+| As a picture file | **Extract this page**: the page in sight as a picture in the library, at 150, 300 or 600 dots an inch, named and tagged as an [extracted frame](#video-audio-and-gifs) is (`book-p03.png`) and filed in the PDF's own folder (Settings > Saving to the library: *Extracted pages go to*); from a card on a canvas it is placed beside the card | The view's lines: **Save the lines as SVG** |
 
 Copy a diagram out of a handout to draw over it, as a picture of its own.
 
@@ -1100,7 +1100,7 @@ Look through a reference pack you downloaded, and take only the studies you want
 | **Files** | Its folders and files as a list (open a folder, go back by the path above it); a picture, a video, a sound or a text opens inside the view |
 | **Pages** | Its pictures one at a time, in natural order (page 2 before page 10), as a comic is read; a `.cbz` opens here, at its cover |
 | Moving around | Page buttons, a click on the page, the page number; zoom with its buttons |
-| **Import** | Into the library: the page in sight, the files selected (Ctrl and Shift pick several) or the folder; **Import and open** for one file |
+| **Import** | Into the library: the page in sight, the files selected (Ctrl and Shift pick several) or the folder; **Import and open** for one file. They are filed in the ZIP's own folder, or in the extracted frames' folder (Settings > Saving to the library: *Extracted pages go to*) |
 | Bookmarks | Pages, as in a PDF: **Bookmark current page** in the details, renamed or deleted from their ⋯ |
 | On a card on a canvas | Its cover; **Show this page on the card** |
 | A password | Asked once when a file inside needs it, kept in this view only, never stored |
@@ -1363,7 +1363,7 @@ Keep the notes beside the picture they are about, and edit them there.
 | Feature | How |
 | --- | --- |
 | **Where it opens** | *Files on a canvas* (Settings > Notes): **Panel** (the default) or **Window**, centred over the canvas until it is closed (a click beside it closes it, asking about unsaved changes) |
-| **The panel** | A panel like Layers (it never folds): it floats, docks to a side (keeping its own width), its width and height can be dragged. ✕ closes it (asking about unsaved changes); the card shows the saved version at once |
+| **The panel** | A panel like Layers (it never folds): it floats, docks to a side (keeping its own width), its width and height can be dragged. ✕ or `Esc` closes it (the editor's own menus and dialogs close first) (asking about unsaved changes); the card shows the saved version at once |
 | **Undo** | Saving is no step of the canvas's undo: undo and redo on the canvas keep the saved version (they never bring an older one back) |
 | **Renaming** | The rename button in its header (or F2) renames the note with the library's rename dialog; the extension stays as it is, and `.note.html` counts as one extension there and in batch rename |
 | **Card size** | A side handle lays the page out at the new width or height, the text keeping its size; dragging a corner evenly (`Shift`) zooms the whole card. A new version keeps the card's width. **Reset size** in a card's Actions bar puts it back to its Note tool card size |

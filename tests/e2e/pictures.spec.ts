@@ -219,9 +219,10 @@ test("a blur has a type (motion, zoom, spin) and a picture can be pixelated (ADR
   expect(app.consoleErrors).toEqual([]);
 });
 
-test("an adjusted picture too big to be decoded whole is still drawn whole when zoomed out (a reduced copy is adjusted at its own size)", async ({ app }) => {
+test("an adjusted picture too big to be decoded whole is still drawn whole when zoomed out (a reduced copy is adjusted at its own size), and adjusted when zoomed in on its whole source", async ({ app }) => {
   const p = app.page;
-  const big = makePng(2400, 1600, (x, y) => [x % 256, y % 256, 120, 255]);
+  // (past 8 million pixels: zoomed in, its whole source is adjusted at a smaller size, never drawn as it is)
+  const big = makePng(3600, 2400, (x, y) => [x % 256, y % 256, 120, 255]);
   const pic = await place(app, "big.png", big);
   await p.keyboard.press("v");
   const b = await boxOf(app, pic.id);
@@ -238,6 +239,14 @@ test("an adjusted picture too big to be decoded whole is still drawn whole when 
   // the far corner of the picture is the picture, not the empty page
   const corner = await px(app, Math.round(s.maxX - 3), Math.round(s.maxY - 3));
   expect(corner).not.toEqual(bg);
+  await p.evaluate(() => window.__canvastDebug.jump(6)); // in, where the whole source is drawn
+  await app.frame();
+  const at = (await boxOf(app, pic.id));
+  const mid = [Math.round((Math.max(at.minX, 0) + Math.min(at.maxX, 1200)) / 2), Math.round((Math.max(at.minY, 0) + Math.min(at.maxY, 700)) / 2)] as const;
+  await expect.poll(async () => { await app.frame(); return JSON.stringify(await px(app, mid[0], mid[1])); }).not.toBe("null");
+  const adjusted = await px(app, mid[0], mid[1]);
+  await p.keyboard.press("Control+z");
+  await expect.poll(async () => { await app.frame(); return JSON.stringify(await px(app, mid[0], mid[1])); }, { message: "zoomed in, the contrast showed" }).not.toBe(JSON.stringify(adjusted));
   expect(app.consoleErrors).toEqual([]);
 });
 

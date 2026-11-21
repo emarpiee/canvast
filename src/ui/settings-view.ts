@@ -218,6 +218,7 @@ export const SETTINGS_TABS: readonly Tab[] = [
       { key: "frame.quality", label: "Extracted frame quality", help: "For WebP and JPEG.", control: { kind: "range", min: 10, max: 100, step: 1, unit: "%" } },
       { key: "frame.pageDpi", label: "Extracted PDF pages: resolution", help: "Dots an inch a PDF's page is drawn at.", more: "Dots an inch a PDF's page is drawn at by Extract this page: 300 is print quality, 150 is smaller, 600 is for fine line work (the longer side stays at most 10 000 pixels).", control: { kind: "select", options: [["150", "150 dpi"], ["300", "300 dpi"], ["600", "600 dpi"]] } },
       { key: "frame.place", label: "Place extracted frames on the canvas", help: "Also put a frame or page extracted in the library viewer on the open canvas.", more: "When a frame or a PDF's page is extracted in the library viewer: also put it on the open canvas (off by default). (From a player or a PDF's card on the canvas it is always placed beside it.)", control: { kind: "toggle" } },
+      { key: "frame.pageTo", label: "Extracted pages go to", help: "Pages taken out of a PDF or a comic (a ZIP): its folder, or the extracted frames' folder.", more: "Extract this page (a PDF) and Import from a ZIP or comic book: The original's folder (the default) files them in the folder the PDF or ZIP is in, or in no folder when it is in none; Extracted frames folder files them in the folder below.", control: { kind: "select", options: [["source", "The original's folder"], ["frames", "Extracted frames folder"]] } },
       { key: "frame.folder", label: "Extracted frames: library folder", help: "Frames are filed in this folder of the library (made the first time). Leave it empty to file them in no folder.", control: { kind: "text", max: 60, placeholder: "Extracted frames" } },
       { key: "frame.name", label: "Extracted frames: file name", help: "Words in braces are replaced. The extension is added.", more: "Words in braces are replaced: {name} the video's or PDF's name, {position} where in it (0m03s, frame12 for a GIF, p03 for a PDF's page), {board} {canvas} {workspace} {ddmmyyyy} {yyyymmdd} {hhmmss} {hhmm}. The extension is added.", control: { kind: "text", max: 120, placeholder: "{name}-{position}" } },
       { key: "frame.nameStyle", label: "Extracted frames: name words", help: "How the video's name and the board and canvas names are written in the file name.", control: { kind: "select", options: NAME_STYLES.map(([v, l]) => [v, l] as [string, string]) } },
@@ -417,6 +418,8 @@ export interface BackupHooks {
   librarySplit?: { get(): Promise<{ split: 1 | 2 | 3; items: number }>; set(split: 1 | 2 | 3): Promise<boolean> };
   /** The concealed library folders, each by its path (Privacy's Concealed folders). */
   concealedFolders?(): Promise<string[]>;
+  /** Repair links in notes: what was written again (null: refused, said by the app). */
+  repairNoteLinks?(): Promise<{ notes: number; links: number; left: number } | null>;
 }
 
 /** The desktop app: what it keeps on this computer, outside the workspace folder, and what to do for full privacy. */
@@ -459,6 +462,8 @@ export function mountSettingsView(root: HTMLElement, settings: SettingsStore, ke
                 DEVICE_DATA_CARD
               : pwCard("workspace", "Password for the workspace", "Asked when the app opens: nothing of the workspace is read or shown until it is given. It keeps people at your screen out; it does not encrypt your data, so someone with access to this browser's storage or to an exported file is not stopped. It cannot be recovered: to change or remove it you enter the old one.") +
                 pwCard("hidden", "Password for the Hidden items", "A password asked before the Hidden items open and before an export that includes them. The same limits apply: it does not encrypt the files. It cannot be recovered either."))
+          : t.id === "notes" && backup?.repairNoteLinks
+          ? `<div class="set-card"><h3>Links in notes</h3>${plainRowHtml({ label: "Repair links in notes", help: "Links to pictures and files that find nothing, written again to the item they meant.", control: `<button type="button" class="set-reset" data-repair-links data-testid="repair-note-links">Repair</button>` })}<p class="set-help" data-repair-note role="status" hidden></p></div>`
           : t.id === "photocraft"
           ? `<div class="set-info set-card" data-photocraft><h3>About PhotoCraft</h3>
              <p>PhotoCraft is the photo editor of ArtCraft, open source (MIT or Apache-2.0). canvast carries its released web build unchanged${photoCraftVersion() ? ` (version <span data-testid="photocraft-version">${esc(photoCraftVersion())}</span>)` : ""} and opens it from its tab beside Library, from selected pictures or a sheet (Edit in PhotoCraft on the Actions bar: a sheet becomes a layered project), from a library item of any kind it reads (PSD, Krita, OpenRaster, camera raw…), or from the command list. Its File > Open takes files from the library; what it saves comes back to the library. It makes no network requests: its help links and update check are hidden.</p>
@@ -818,6 +823,18 @@ export function mountSettingsView(root: HTMLElement, settings: SettingsStore, ke
     ...(["set", "remove", "lock", "newkey"] as const).map((action) => setCmd(`password.${action}`, { set: "Set a password", remove: "Remove a password", lock: "Lock now", newkey: "A new key" }[action], { set: "Of the hidden items or the workspace", remove: "Of the hidden items or the workspace", lock: "Nothing opens until the password is typed", newkey: "Encrypt again with a new key" }[action], action === "lock" ? "edit" : "refused", [KIND], (o) => void passwordCard(o["kind"] as "hidden" | "workspace", action), () => (backup ? null : "Not in this build."))),
     setCmd("settings.librarySplit", "Split the library's index", "Into more, smaller files", "edit", [{ name: "split", type: "choice", doc: "1, 2 or 3", required: true, choices: ["1", "2", "3"] }], (o) => void backup?.librarySplit?.set(Number(o["split"]) as 1 | 2 | 3).then(() => fillSplit()), () => (backup?.librarySplit ? null : "Not in this build.")),
     setCmd("settings.importBackup", "Import a backup", "A .canvast file into this workspace", "confirm", [], () => root.querySelector<HTMLInputElement>('[data-testid="set-import-input"]')?.click(), () => (backup ? null : "Not in this build.")),
+    setCmd("notes.repairLinks", "Repair links in notes", "Broken links written again to the items they meant", "edit", [], async () => {
+      const r = await backup?.repairNoteLinks?.();
+      const note = root.querySelector<HTMLElement>("[data-repair-note]");
+      if (!r) return { ok: false, error: "The links were not repaired." };
+      const text = r.links ? `${plural(r.links, "link")} repaired in ${plural(r.notes, "note")}.` : "No broken link had an item to point to.";
+      const left = r.left ? ` ${plural(r.left, "link")} ${r.left === 1 ? "has" : "have"} two or more items it may mean, or none: left as ${r.left === 1 ? "it is" : "they are"}.` : "";
+      if (note) {
+        note.hidden = false;
+        note.textContent = text + left;
+      }
+      return { ok: true, result: r };
+    }, () => (backup?.repairNoteLinks ? null : "Not in this build.")),
     setCmd("photocraft.resetPrefs", "Reset PhotoCraft's preferences", "Its own, the next time it opens", "confirm", [], (_o, ctx) => {
       const done = (): void => {
         settings.set("photocraft.prefs", "");
@@ -840,7 +857,7 @@ export function mountSettingsView(root: HTMLElement, settings: SettingsStore, ke
   const all = [...SETTINGS_TABS.flatMap((t) => t.rows ?? []), ...(DESKTOP ? [DELETE_TO_ROW, TRASH_DAYS_ROW] : [])];
   /** Show the stored values in the controls (never while one is being typed into: only called on a change). */
   /** Each control of Settings and the command it runs (ADR 0205). */
-  const SETTINGS_CONTROLS: ReadonlyArray<readonly [string, string]> = [["[data-set]", "settings.set"], ["[data-colour]", "settings.set"], ["[data-adaptive]", "settings.set"], ["[data-preset]", "settings.set"], ["[data-reset]", "settings.reset"], ["[data-change-key]", "keys.set"], ["[data-key-remove]", "keys.set"], ["[data-key-yes]", "keys.set"], ["[data-key-reset]", "keys.reset"], ["[data-keys-reset-all]", "keys.resetAll"], ["[data-pw]", "password.set"], ["[data-library-split]", "settings.librarySplit"], ["[data-photocraft-reset]", "photocraft.resetPrefs"], ["[data-switch-workspace]", "workspace.switch"]];
+  const SETTINGS_CONTROLS: ReadonlyArray<readonly [string, string]> = [["[data-set]", "settings.set"], ["[data-colour]", "settings.set"], ["[data-adaptive]", "settings.set"], ["[data-preset]", "settings.set"], ["[data-reset]", "settings.reset"], ["[data-change-key]", "keys.set"], ["[data-key-remove]", "keys.set"], ["[data-key-yes]", "keys.set"], ["[data-key-reset]", "keys.reset"], ["[data-keys-reset-all]", "keys.resetAll"], ["[data-pw]", "password.set"], ["[data-library-split]", "settings.librarySplit"], ["[data-photocraft-reset]", "photocraft.resetPrefs"], ["[data-repair-links]", "notes.repairLinks"], ["[data-switch-workspace]", "workspace.switch"]];
   const refresh = (): void => {
     markCommands(root, SETTINGS_CONTROLS);
     for (const b of root.querySelectorAll<HTMLElement>("[data-done], [data-key-no], [data-concealed-show], [data-about], [data-reload]")) b.dataset["viewState"] = "";
@@ -946,6 +963,7 @@ export function mountSettingsView(root: HTMLElement, settings: SettingsStore, ke
     if (reset) return void pressCommand("settings.reset", { key: reset.dataset["reset"]! });
     if (t.closest("[data-reload]")) location.reload();
     if (t.closest<HTMLButtonElement>("[data-photocraft-reset]")) pressCommand("photocraft.resetPrefs");
+    if (t.closest<HTMLButtonElement>("[data-repair-links]")) pressCommand("notes.repairLinks");
     if (t.closest<HTMLElement>("[data-switch-workspace]")) pressCommand("workspace.switch");
     if (t.closest("[data-done]")) onClose();
   });

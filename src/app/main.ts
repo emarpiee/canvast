@@ -2841,6 +2841,7 @@ async function start(): Promise<void> {
       return (host: HTMLElement) => (draw ??= mountLibraryFolderCard(host, session))();
     })(),
     persist: async () => void (await navigator.storage?.persist?.().catch(() => false)),
+    repairNoteLinks: () => session.repairNoteLinks(hiddenModeOn()),
     concealedFolders: async () => {
       const ids = JSON.parse(settings.get("library.concealed")) as string[];
       const cat = session.catalog;
