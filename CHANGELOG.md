@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.61.15 — Moodboards: pictures flipped, greyed, placed on the canvas; managed; windows folded and floated (2026-11-22)
+
+- **Changed:** a reference window's board is now a **moodboard** (a board is the workspace's level). Each moodboard has its own ⋯ in the chooser (open in a new window, rename, duplicate, arrange, fit, save as a picture, delete), and *Manage moodboards…* lists them all. ([The Library](README.md#the-library))
+- **Added:** on a moodboard, a right-click shows its pictures flipped (Shift+H, Shift+V), turned, grey or see-through (the files are never changed), brings them forward or back, arranges them in a grid, or places them on the canvas; pictures resize from any corner and can be dragged out onto the canvas; its undo outlives a reload; a moodboard can be saved as a picture in the library. ([The Library](README.md#the-library))
+- **Added:** a reference window folds to its title (a double-click on it), turns see-through, lets clicks through, and in the desktop app floats over other apps (a snapshot, view only). The gallery sorts by date or name, shows small, medium or large pictures, and plays a slideshow; pictures dragged from it land on the canvas. ([The Library](README.md#the-library))
+- **Fixed before release:** a picture shown large in a reference window is fitted in it (no scrollbar, the window no longer grows), zooms and pans, and its bar stays at the bottom. ([The Library](README.md#the-library))
+
+### For developers
+
+- `reference.look`, `.order`, `.arrange`, `.duplicateBoard`, `.export`, `.toCanvas`, `.window`, `.slideshow`, `.float`, `.manage`; the desktop bridge's `floatWindow`; `plainRowHtml` shared from `settings-view.ts`.
+
 ## 0.61.14 — Comic page styles; the Comic Panels guide leaves the Pattern panel (2026-11-22)
 
 - **Added:** a comic page can be saved as a style (the Save button of its options): its shape, its panels' outlines (slanted cuts and turned gutters too), its gutter and border, in the Styles panel's *Comic pages* and the Panel tool's Layout list. Applied, it lays out a selected page that way (what is in its panels goes with them); chosen in Layout, the next page drawn takes its shape and panels. ([Comics and storyboards](README.md#comics-and-storyboards))

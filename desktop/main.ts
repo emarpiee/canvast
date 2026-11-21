@@ -746,6 +746,22 @@ function installFileCalls(win: BrowserWindow, root: string, partition: string): 
     await writeFile(file, bytes, { mode: 0o600 });
     return process.env["CANVAST_NO_OPEN"] === "1" ? "" : shell.openPath(file); // (tests: the copy is made, no app is started)
   });
+  // A reference window floated over every app (ADR 0207): the page the app made of its pictures (view only: pan and zoom), in a small
+  // window kept on top of the others, sandboxed, with nothing to reach but its own pictures; its file goes when it closes.
+  ipcMain.handle("canvast:floatWindow", async (e, title: unknown, html: unknown) => {
+    own(e);
+    if (typeof title !== "string" || typeof html !== "string" || html.length > 200 * 1024 * 1024) throw new Error("not a reference window");
+    const dir = join(OPENED_DIR, randomUUID());
+    await mkdir(dir, { recursive: true, mode: 0o700 });
+    const file = join(dir, "reference.html");
+    await writeFile(file, html, { mode: 0o600 });
+    const float = new BrowserWindow({ width: 480, height: 400, alwaysOnTop: true, title: title.slice(0, 80) || "Reference", autoHideMenuBar: true, webPreferences: { sandbox: true, contextIsolation: true, nodeIntegration: false, javascript: true } });
+    float.setAlwaysOnTop(true, "floating");
+    float.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
+    float.webContents.on("will-navigate", (ev) => ev.preventDefault());
+    float.on("closed", () => void rm(dir, { recursive: true, force: true }).catch(() => undefined));
+    await float.loadFile(file);
+  });
   // Real files on the system clipboard, of any kind: the workspace's own, and readable copies of hidden items (made as for opening them, deleted the same way).
   ipcMain.handle("canvast:copyFiles", async (e, rels: unknown, copies: unknown, also: unknown) => {
     own(e);

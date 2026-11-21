@@ -158,6 +158,8 @@ export interface DesktopBridge {
    * when the app closes (the next start deletes any a crash left).
    */
   openCopy(name: string, bytes: Uint8Array | string): Promise<string>;
+  /** A reference window floated over every app (ADR 0207): a page of its pictures (view only), in a small window kept above the others. */
+  floatWindow?(title: string, html: string): Promise<void>;
   /** Real files on the system clipboard: `files` in the workspace, and `copies` written like `openCopy`'s (hidden items). `also`: the same thing as pictures or words, for a program that takes those. How many. */
   copyFiles(files: readonly string[], copies: ReadonlyArray<{ name: string; bytes: Uint8Array | string }>, also?: { svg?: string; png?: Uint8Array; text?: string; hidden?: boolean }): Promise<number>;
   /** The copy of hidden items last made leaves the clipboard, unless something else was copied since, and its readable copies are deleted. Whether it left. */

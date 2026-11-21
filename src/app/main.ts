@@ -159,6 +159,7 @@ import { randomEmptyView, viewIsEmpty } from "../interaction/random-view";
 import { renderExport } from "./export-render";
 import type { ExportTarget } from "./export-render";
 import * as D from "../core/dyadic";
+import { translate } from "../doc/edit-ops";
 import { openExportDialog, exportAgain, setExportChoices, exportedBefore, exportPresetSummary, type ExportPreset } from "../ui/export-dialog";
 import { mountViewSwitch } from "../ui/view-switch";
 import { followFrameSetting, mountWindowRow } from "../ui/window-frame";
@@ -2807,7 +2808,11 @@ async function start(): Promise<void> {
       editor.message = text;
       editor.changed();
     },
+    place: (hashes, at) => placeOnCanvas(hashes, at),
+    ...(desktopBridge()?.floatWindow ? { float: (title: string, html: string) => desktopBridge()!.floatWindow!(title, html) } : {}),
   });
+  // (the library changed: a picture renamed, hidden, filed or deleted shows so in the reference windows; usage counts alone change nothing there)
+  session.subscribeAssets((_meta, usageOnly) => void (!usageOnly && references?.refresh()));
   document.querySelector('[data-testid="reference-open"]')?.addEventListener("click", () => void pressCommand("reference.open", {}));
   window.addEventListener("keydown", (e) => {
     if (e.repeat || typing(e.target) || (e.target as HTMLElement | null)?.closest?.("dialog") || comboOfEvent(e) !== "Shift+R") return;
@@ -3508,6 +3513,47 @@ async function start(): Promise<void> {
     // (files that came from a folder are then put in library folders of the same names)
     void (appView === "assets" ? assetsView.importFiles(files, true) : importFiles(files).then(() => fileByFolders(session, files))); // (the library files them itself)
   };
+  /**
+   * Library pictures placed on the open canvas (a reference window's, ADR 0207): each where it is let go (else in the middle of the view), one
+   * after another a little apart. How many.
+   */
+  const placeOnCanvas = async (hashes: readonly string[], at?: { x: number; y: number }): Promise<number> => {
+    if (appView !== "canvas" || editor.blockEdit()) return 0;
+    const r = canvas.getBoundingClientRect();
+    let n = 0;
+    for (const h of hashes) {
+      const id = await session.placeAsset(h);
+      const o = id ? doc.get(id) : undefined;
+      if (!o) continue;
+      if (at) {
+        // (placed in the middle of the view: moved to where it was let go, in the same frame)
+        const cam = view.camera, vp = view.viewport;
+        const from = screenToWorld(cam, vp, { x: vp.width / 2, y: vp.height / 2 }), to = screenToWorld(cam, vp, { x: at.x - r.left + n * 24, y: at.y - r.top + n * 24 });
+        doc.commit(doc.transaction("Place item", [translate(o, D.sub(to.x, from.x), D.sub(to.y, from.y))]));
+      }
+      n++;
+    }
+    editor.changed();
+    return n;
+  };
+  // A picture of a reference window (a gallery's, or one shown large) dropped on the canvas: placed where it is let go
+  canvas.addEventListener("dragover", (e) => {
+    if (!e.dataTransfer?.types.includes("application/x-canvast-assets")) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "copy";
+  });
+  canvas.addEventListener("drop", (e) => {
+    const lib = e.dataTransfer?.getData("application/x-canvast-assets");
+    if (!lib) return;
+    e.preventDefault();
+    e.stopPropagation();
+    internalDrag = false;
+    try {
+      void placeOnCanvas((JSON.parse(lib) as unknown[]).filter((h): h is string => typeof h === "string"), { x: e.clientX, y: e.clientY });
+    } catch {
+      /* (not a list of library files) */
+    }
+  });
   // A drag that starts inside the app (a picture dragged out of the library, a layer row) is never a file import: the browser would hand
   // the dragged thumbnail over as a new file and store it as an asset of its own.
   let internalDrag = false;

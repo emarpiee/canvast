@@ -7,25 +7,32 @@ import type { Command, OptionSpec } from "../commands/types";
 import { folderPath } from "../assets/asset-catalog";
 import { newObjectId } from "../doc/model";
 import { plural } from "../doc/plural";
-import { confirmDialog, promptDialog } from "./confirm";
+import { confirmDialog, listDialog, promptDialog } from "./confirm";
+import { plainRowHtml } from "./settings-view";
 import { esc } from "./format";
 import { ICONS } from "./icons";
 import { commandRows, openMoreMenu } from "./more-menu";
+import type { MenuItem } from "./more-menu";
 import { panelHtml } from "./panel";
 import { showMoreButton } from "./show-more";
 
 /**
  * Reference windows (ADR 0207): small windows that float over every view (the canvas, the Library, PhotoCraft, Settings), above the bars and
  * panels and under menus and dialogs, to keep references in sight while working. One shows a **gallery** (the pictures of a library folder,
- * or all of them), the other a **board**: a simple surface, panned and zoomed as the canvas is but not endless, where pictures dragged from
- * the Library, the canvas or another app are laid out. Boards are saved with the workspace (Settings `reference.boards`); the windows open
+ * or all of them), the other a **moodboard**: a simple surface, panned and zoomed as the canvas is but not endless, where pictures dragged
+ * from the Library, the canvas or another app are laid out ("board" is the workspace's own level, so the word on screen is "moodboard"; the
+ * code keeps "board"). Moodboards are saved with the workspace (Settings `reference.boards`); the windows open
  * on a device are opened again (`reference.windows`). A window only shows: it changes no picture. Hidden items show only while the hidden
  * items do, as on a canvas (a padlock in their place otherwise). Keys, pastes and the wheel inside a window are the window's: they never
  * reach the canvas or the Library behind it.
  */
 
 export type RefSource = string; // "all" | "folder:<id>" | "board:<id>"
-interface Item { h: string; x: number; y: number; w: number }
+/** A picture on a moodboard: its library file, place and width, and how it is shown (flipped, turned a quarter at a time, grey, see-through): the file is never changed. */
+interface Item { h: string; x: number; y: number; w: number; fx?: true; fy?: true; r?: number; grey?: true; o?: number }
+type Sort = "new" | "old" | "az" | "za";
+/** A window's own choices, kept with where it is. */
+interface Prefs { folded?: boolean; opacity?: number; through?: boolean; sort?: Sort; size?: "s" | "m" | "l" }
 interface Board { id: string; name: string; items: Item[]; view?: { x: number; y: number; k: number } }
 
 export interface ReferenceDeps {
@@ -39,6 +46,10 @@ export interface ReferenceDeps {
   /** The pictures selected on the canvas, then those copied there last: their library files. */
   canvasPictures(): string[];
   say(text: string): void;
+  /** Library files placed on the open canvas, at a point of the screen (else its middle): how many. */
+  place(hashes: readonly string[], at?: { x: number; y: number }): Promise<number>;
+  /** The desktop app: a page floated over every app, in a window of its own kept on top (absent: not in this build). */
+  float?(title: string, html: string): Promise<void>;
 }
 
 const LIBRARY_DRAG = "application/x-canvast-assets";
@@ -60,8 +71,22 @@ export function mountReferenceWindows(deps: ReferenceDeps): { open(source?: RefS
   };
   const boards = (): Board[] => read<Board>("reference.boards");
   const boardById = (id: string): Board | undefined => boards().find((b) => b.id === id);
-  /** A board's change (one undo step of the board's own history), then each window showing it follows. */
-  const history = new Map<string, { back: Item[][]; ahead: Item[][] }>();
+  /** A board's change (one undo step of the board's own history, kept on this device over a reload), then each window showing it follows. */
+  const HISTORY_KEY = "canvast.reference.history";
+  const history = new Map<string, { back: Item[][]; ahead: Item[][] }>((() => {
+    try {
+      return Object.entries(JSON.parse(localStorage.getItem(HISTORY_KEY) ?? "{}") as Record<string, { back: Item[][]; ahead: Item[][] }>);
+    } catch {
+      return [];
+    }
+  })());
+  const keepHistory = (): void => {
+    try {
+      localStorage.setItem(HISTORY_KEY, JSON.stringify(Object.fromEntries([...history].map(([k, h]) => [k, { back: h.back.slice(-30), ahead: h.ahead.slice(-30) }]))));
+    } catch {
+      /* (no storage: the history lasts as long as the page) */
+    }
+  };
   const updateBoard = (id: string, f: (b: Board) => Board, step = true): void => {
     const all = boards();
     const was = all.find((b) => b.id === id);
@@ -75,6 +100,8 @@ export function mountReferenceWindows(deps: ReferenceDeps): { open(source?: RefS
       history.set(id, h);
     }
     settings.set("reference.boards", JSON.stringify(all.map((b) => (b.id === id ? now : b))));
+    if (step) keepHistory();
+    manageList?.refresh();
     for (const w of wins.values()) if (w.source === `board:${id}`) w.sync();
   };
 
@@ -101,11 +128,12 @@ export function mountReferenceWindows(deps: ReferenceDeps): { open(source?: RefS
   const shows = (e: CatalogEntry | undefined): boolean => !!e && (deps.hidden() || !e.hidden);
 
   const wins = new Map<string, Win>();
+  const ratio = new Map<string, number>(); // (each picture's height over width, once its thumbnail is read: every window's)
   let keepTimer = 0;
   /** Where the windows are, kept for the next start: once they rest, not at every step of a move or a resize. */
   const keepNow = (): void => {
     clearTimeout(keepTimer);
-    settings.set("reference.windows", JSON.stringify([...wins.values()].map((w) => ({ source: w.source, x: w.el.offsetLeft, y: w.el.offsetTop, w: w.el.offsetWidth, h: w.el.offsetHeight }))));
+    settings.set("reference.windows", JSON.stringify([...wins.values()].map((w) => ({ source: w.source, x: w.el.offsetLeft, y: w.el.offsetTop, w: w.el.offsetWidth, h: w.prefs.folded ? w.unfoldedH : w.el.offsetHeight, ...w.prefs }))));
   };
   const keepWindows = (): void => {
     clearTimeout(keepTimer);
@@ -114,12 +142,12 @@ export function mountReferenceWindows(deps: ReferenceDeps): { open(source?: RefS
   // (what a window shows is kept at once; where it is once it rests, and in any case before the page goes)
   window.addEventListener("pagehide", keepNow);
 
-  interface Win { id: string; source: RefSource; el: HTMLElement; render(): Promise<void>; sync(): void; close(): void }
+  interface Win { id: string; source: RefSource; el: HTMLElement; prefs: Prefs; unfoldedH: number; render(): Promise<void>; sync(): void; close(): void; applyPrefs(): void; slideshow(): void }
 
   /** The pictures copied in a reference window last (Ctrl+C there), to paste on another board. */
   let copied: string[] = [];
 
-  const open = (source: RefSource = "all", at?: { x: number; y: number; w: number; h: number }): Win => {
+  const open = (source: RefSource = "all", at?: { x: number; y: number; w: number; h: number } & Prefs): Win => {
     const id = newObjectId();
     const el = document.createElement("aside");
     el.className = "layers-panel ref-window";
@@ -131,8 +159,8 @@ export function mountReferenceWindows(deps: ReferenceDeps): { open(source?: RefS
     el.innerHTML = panelHtml({
       title: "Reference",
       count: 0,
-      tools: `<button type="button" class="layer-btn" data-ref-more aria-haspopup="menu" aria-label="Boards" title="Boards: a new one, rename or delete this one, fit it in the window">${ICONS.ellipsis}</button>`,
-      sub: `<div class="styles-kinds"><button type="button" class="pick-current" data-ref-source aria-haspopup="menu" aria-expanded="false" aria-label="What it shows" title="What it shows: a gallery of the library, or a board"></button></div><div class="layers-filter" data-ref-filter-row><input type="search" data-ref-filter placeholder="Search pictures" aria-label="Search the pictures by name" autocomplete="off"></div>`,
+      tools: `<button type="button" class="layer-btn" data-ref-more aria-haspopup="menu" aria-label="More" title="More: moodboards, the gallery's order, the window (fold, see-through, float)">${ICONS.ellipsis}</button>`,
+      sub: `<div class="styles-kinds"><button type="button" class="pick-current" data-ref-source aria-haspopup="menu" aria-expanded="false" aria-label="What it shows" title="What it shows: a gallery of the library, or a moodboard"></button></div><div class="layers-filter" data-ref-filter-row><input type="search" data-ref-filter placeholder="Search pictures" aria-label="Search the pictures by name" autocomplete="off"></div>`,
       body: `<div class="ref-body" data-ref-body></div>`,
     });
     const n = wins.size;
@@ -141,7 +169,20 @@ export function mountReferenceWindows(deps: ReferenceDeps): { open(source?: RefS
     document.body.append(el);
     const body = el.querySelector<HTMLElement>("[data-ref-body]")!;
     const pickBtn = el.querySelector<HTMLButtonElement>("[data-ref-source]")!;
-    const win: Win = { id, source, el, render: async () => undefined, sync: () => undefined, close: () => undefined };
+    const win: Win = {
+      id, source, el, unfoldedH: Math.max(MIN_H, box.h),
+      prefs: { ...(at?.folded ? { folded: true } : {}), ...(at?.opacity ? { opacity: at.opacity } : {}), ...(at?.through ? { through: true } : {}), ...(at?.sort ? { sort: at.sort } : {}), ...(at?.size ? { size: at.size } : {}) },
+      render: async () => undefined, sync: () => undefined, close: () => undefined, applyPrefs: () => undefined, slideshow: () => undefined,
+    };
+    // Folded to its title, see-through, letting clicks through to what is under it (its title still takes them)
+    win.applyPrefs = (): void => {
+      const p = win.prefs;
+      if (p.folded && !el.classList.contains("is-folded")) win.unfoldedH = el.offsetHeight;
+      el.classList.toggle("is-folded", !!p.folded);
+      el.style.height = p.folded ? "" : `${Math.max(MIN_H, win.unfoldedH)}px`;
+      el.style.opacity = String(p.opacity ?? 1);
+      el.classList.toggle("is-through", !!p.through);
+    };
     const choosing = false; // (what it shows is chosen in the shared menu, not inside the window)
 
     // moved by its header, kept inside the window of the app
@@ -162,7 +203,14 @@ export function mountReferenceWindows(deps: ReferenceDeps): { open(source?: RefS
       head.addEventListener("pointerup", up, { once: true });
       head.addEventListener("pointercancel", up, { once: true });
     });
-    new ResizeObserver(() => keepWindows()).observe(el);
+    // a double-click on the title folds the window to it, or opens it again
+    head.addEventListener("dblclick", (e) => {
+      if (!(e.target as HTMLElement).closest("button")) void pressCommand("reference.window", { window: id, fold: !win.prefs.folded });
+    });
+    new ResizeObserver(() => {
+      if (!win.prefs.folded) win.unfoldedH = el.offsetHeight;
+      keepWindows();
+    }).observe(el);
     // view-state: (closes this window; its board is kept)
     el.querySelector("[data-close]")!.addEventListener("click", () => win.close());
     win.close = (): void => {
@@ -170,25 +218,37 @@ export function mountReferenceWindows(deps: ReferenceDeps): { open(source?: RefS
       wins.delete(id);
       keepNow();
     };
-    // What it shows: the shared menu, as the Styles panel's kinds (boards first, then the gallery: all pictures and each folder)
+    // What it shows: the shared menu, as the Styles panel's kinds (moodboards first, each with its own ⋯; then the gallery: all pictures and each folder)
     pickBtn.addEventListener("click", async () => {
       const l = await listing();
       const folders = (l?.folders ?? []).filter((f) => deps.hidden() || !f.hidden).map((f) => ({ f, path: folderPath(l!.folders, f.id) })).sort((a, b) => a.path.join("\u0000").localeCompare(b.path.join("\u0000")));
       const row = (value: string, label: string, icon: string, hint: string, sep = false) => ({ label, icon, hint, command: "reference.show", checked: value === win.source, sep, run: () => void pressCommand("reference.show", { window: id, source: value }) });
-      const bs = boards();
       openMoreMenu(pickBtn, [
-        ...bs.map((b, i) => row(`board:${b.id}`, b.name, ICONS.referenceWindow, `Board · ${plural(b.items.length, "picture")}`, i === 0)),
-        { label: "New board…", icon: ICONS.plus, hint: "An empty board in this window", command: "reference.newBoard", run: () => void newBoard(win) },
+        ...boards().map((b, i) => ({ ...row(`board:${b.id}`, b.name, ICONS.referenceWindow, `Moodboard · ${plural(b.items.length, "picture")}`, i === 0), more: boardRows(b.id, win) })),
+        { label: "New moodboard…", icon: ICONS.plus, hint: "An empty one in this window", command: "reference.newBoard", run: () => void newBoard(win) },
+        { label: "Manage moodboards…", icon: ICONS.settings, hint: "Rename, copy, open or delete them", command: "reference.manage", run: () => void pressCommand("reference.manage", { window: id }) },
         row("all", "All pictures", ICONS.images, "Gallery of the library", true),
         ...folders.map((x) => row(`folder:${x.f.id}`, x.path.join(" › "), ICONS.folder, "Gallery of a folder")),
       ], "What it shows");
     });
+    // More: what can be done to this moodboard, how the gallery is ordered and sized, and the window itself
     el.querySelector<HTMLElement>("[data-ref-more]")!.addEventListener("click", (e) => {
       const b = win.source.startsWith("board:") ? win.source.slice(6) : null;
-      openMoreMenu(e.currentTarget as HTMLElement, commandRows([
-        ["reference.newBoard", { hint: "An empty board in this window" }] as const,
-        ...(b ? [["reference.renameBoard", { hint: "A new name for this board" }] as const, ["reference.fit", { hint: "Every picture in sight (0)" }] as const, ["reference.deleteBoard", { hint: "This board; its pictures stay in the library", danger: true }] as const] : []),
-      ]).map((r) => ({ ...r, run: () => (r.command === "reference.newBoard" ? void newBoard(win) : void pressCommand(r.command, { window: id, board: b ?? "" })) })), "Boards");
+      const go = (command: string, o: Record<string, unknown>, label: string, icon: string, hint: string, extra: Partial<MenuItem> = {}): MenuItem => ({ label, icon, hint, command, run: () => void pressCommand(command, o), ...extra });
+      const p = win.prefs;
+      const gallery: MenuItem[] = b ? [] : [
+        ...(([["new", "Newest first", ICONS.calendarDays], ["old", "Oldest first", ICONS.calendarArrowUp], ["az", "By name, A to Z", ICONS.arrowDownAZ], ["za", "By name, Z to A", ICONS.arrowDownAZ]] as const).map(([v, label, icon], i) => go("reference.window", { window: id, sort: v }, label, icon, "The gallery's order", { checked: (p.sort ?? "new") === v, sep: i === 0 }))),
+        ...(([["s", "Small pictures"], ["m", "Medium pictures"], ["l", "Large pictures"]] as const).map(([v, label], i) => go("reference.window", { window: id, size: v }, label, ICONS.layoutGrid, "The gallery's pictures", { checked: (p.size ?? "m") === v, sep: i === 0 }))),
+        go("reference.slideshow", { window: id }, "Slideshow", ICONS.presentation, "One after another, every 4 seconds", { sep: true }),
+      ];
+      openMoreMenu(e.currentTarget as HTMLElement, [
+        ...(b ? boardRows(b, win) : [{ label: "New moodboard…", icon: ICONS.plus, hint: "An empty one in this window", command: "reference.newBoard", run: () => void newBoard(win) }]),
+        ...gallery,
+        go("reference.window", { window: id, fold: !p.folded }, "Fold to its title", ICONS.foldWindow, "A double-click on the title too", { checked: !!p.folded, sep: true }),
+        ...([1, 0.8, 0.6, 0.4] as const).map((v, i) => go("reference.window", { window: id, opacity: v }, `${Math.round(v * 100)}% opaque`, ICONS.windowOpacity, "See what is behind it", { checked: (p.opacity ?? 1) === v, sep: i === 0 })),
+        go("reference.window", { window: id, through: !p.through }, "Let clicks through", ICONS.clickThrough, "To what is under it; its title stays", { checked: !!p.through, sep: true }),
+        ...(deps.float ? [go("reference.float", { window: id }, "Float over other apps", ICONS.floatOnTop, "A window above every app, view only")] : []),
+      ], "More");
     });
     // The window takes the focus when pressed, so its keys are its own (not the canvas's behind it)
     el.addEventListener("pointerdown", (e) => {
@@ -220,19 +280,24 @@ export function mountReferenceWindows(deps: ReferenceDeps): { open(source?: RefS
         for (const f of l.folders) if (f.parentId !== null && under.has(f.parentId) && !under.has(f.id)) under.add(f.id), (grew = true);
       }
       const q = filter.trim().toLowerCase();
-      shown = l.entries.filter((e) => isPicture(e) && shows(e) && (!fid || e.folderIds?.some((f) => under.has(f))) && (!q || e.name.toLowerCase().includes(q))).sort((a, b) => b.importedAt - a.importedAt);
+      const order = win.prefs.sort ?? "new";
+      shown = l.entries.filter((e) => isPicture(e) && shows(e) && (!fid || e.folderIds?.some((f) => under.has(f))) && (!q || e.name.toLowerCase().includes(q))).sort((a, b) => (order === "new" ? b.importedAt - a.importedAt : order === "old" ? a.importedAt - b.importedAt : order === "az" ? a.name.localeCompare(b.name) : b.name.localeCompare(a.name)));
       const count = el.querySelector(".layers-count");
       if (count) count.textContent = String(shown.length);
+      el.toggleAttribute("data-one", one !== null && !!shown[one]);
       if (one !== null && shown[one]) {
         const e = shown[one]!;
-        body.innerHTML = `<div class="ref-one"><img data-ref-big alt="${esc(e.name)}" draggable="false"><div class="ref-one-bar"><button type="button" class="layer-btn" data-ref-back aria-label="Back to the gallery" title="Back to the gallery (Esc)">${ICONS.layoutGrid}</button><span class="ref-one-name" title="${esc(e.name)}">${esc(e.name)}</span><button type="button" class="layer-btn" data-ref-prev aria-label="Previous picture" title="Previous picture (←)">${ICONS.chevronLeft}</button><button type="button" class="layer-btn" data-ref-next aria-label="Next picture" title="Next picture (→)">${ICONS.chevronRight}</button></div></div>`;
+        // the picture fitted in the view (never a scrollbar, never a window that grows), zoomed and panned in it; its bar always at the bottom
+        zoom = { k: 1, x: 0, y: 0 };
+        body.innerHTML = `<div class="ref-one"><div class="ref-one-view" data-ref-view><img data-ref-big alt="${esc(e.name)}" draggable="false"></div><div class="ref-one-bar"><button type="button" class="layer-btn" data-ref-back aria-label="Back to the gallery" title="Back to the gallery (Esc)">${ICONS.layoutGrid}</button><span class="ref-one-name" draggable="true" data-ref-drag title="${esc(e.name)}: drag it onto the canvas or a moodboard">${esc(e.name)}</span><button type="button" class="layer-btn" data-ref-play aria-label="${slides ? "Stop the slideshow" : "Slideshow"}" title="${slides ? "Stop the slideshow" : "Slideshow: one after another, every 4 seconds"}">${slides ? ICONS.pause : ICONS.presentation}</button><button type="button" class="layer-btn" data-ref-prev aria-label="Previous picture" title="Previous picture (←)">${ICONS.chevronLeft}</button><button type="button" class="layer-btn" data-ref-next aria-label="Next picture" title="Next picture (→)">${ICONS.chevronRight}</button></div></div>`;
         void urlOf(e.hash, true).then((u) => { const img = body.querySelector<HTMLImageElement>("[data-ref-big]"); if (img && u) img.src = u; });
         return;
       }
       one = null;
+      stopSlides();
       const upto = Math.min(shown.length, pages * PAGE);
       body.innerHTML = shown.length
-        ? `<div class="ref-grid">${shown.slice(0, upto).map((e, i) => `<button type="button" class="ref-thumb" data-ref-i="${i}" draggable="true" title="${esc(e.name)}" aria-label="${esc(e.name)}"><img alt="" draggable="false" loading="lazy" decoding="async"></button>`).join("")}</div>${upto < shown.length ? showMoreButton({ attrs: "data-ref-page", hidden: shown.length - upto, label: `Show ${Math.min(PAGE, shown.length - upto)} more` }) : ""}`
+        ? `<div class="ref-grid" data-size="${win.prefs.size ?? "m"}">${shown.slice(0, upto).map((e, i) => `<button type="button" class="ref-thumb" data-ref-i="${i}" draggable="true" title="${esc(e.name)}" aria-label="${esc(e.name)}"><img alt="" draggable="false" loading="lazy" decoding="async"></button>`).join("")}</div>${upto < shown.length ? showMoreButton({ attrs: "data-ref-page", hidden: shown.length - upto, label: `Show ${Math.min(PAGE, shown.length - upto)} more` }) : ""}`
         : `<p class="styles-hint">${ICONS.images}<span>${q ? "No picture has that name here." : `No pictures here${deps.hidden() ? "" : " (hidden ones show in hidden mode)"}.`}</span></p>`;
       const io = new IntersectionObserver((seen) => {
         for (const s of seen) {
@@ -244,23 +309,68 @@ export function mountReferenceWindows(deps: ReferenceDeps): { open(source?: RefS
       }, { root: body.closest(".panel-body"), rootMargin: "200px" });
       for (const t of body.querySelectorAll(".ref-thumb")) io.observe(t);
     };
-    // view-state: (one picture large, the next or the one before, back to the gallery, the next pictures)
+    // ---- the picture shown large: zoomed with the wheel at the pointer, panned with a drag, fitted again with a double-click
+    let zoom = { k: 1, x: 0, y: 0 };
+    const placeZoom = (): void => {
+      const img = body.querySelector<HTMLElement>("[data-ref-big]");
+      if (img) img.style.transform = zoom.k === 1 && !zoom.x && !zoom.y ? "" : `translate(${zoom.x}px, ${zoom.y}px) scale(${zoom.k})`;
+    };
+    body.addEventListener("wheel", (e) => {
+      const v = (e.target as HTMLElement).closest<HTMLElement>("[data-ref-view]");
+      if (!v) return;
+      e.preventDefault();
+      const r = v.getBoundingClientRect(), px = e.clientX - r.left, py = e.clientY - r.top;
+      const k = Math.min(16, Math.max(1, zoom.k * Math.exp(-e.deltaY * 0.0025)));
+      zoom = k === 1 ? { k: 1, x: 0, y: 0 } : { k, x: px - ((px - zoom.x) * k) / zoom.k, y: py - ((py - zoom.y) * k) / zoom.k };
+      placeZoom();
+    }, { passive: false });
+    body.addEventListener("pointerdown", (e) => {
+      const v = (e.target as HTMLElement).closest<HTMLElement>("[data-ref-view]");
+      if (!v || e.button !== 0 || zoom.k === 1) return;
+      e.preventDefault();
+      const sx = e.clientX - zoom.x, sy = e.clientY - zoom.y;
+      v.setPointerCapture(e.pointerId);
+      const move = (m: PointerEvent): void => void ((zoom = { ...zoom, x: m.clientX - sx, y: m.clientY - sy }), placeZoom());
+      v.addEventListener("pointermove", move);
+      v.addEventListener("pointerup", () => v.removeEventListener("pointermove", move), { once: true });
+    });
+    // ---- a slideshow: the next picture every 4 seconds, until it is stopped (its button, Escape, or the gallery again)
+    let slides = 0;
+    const stopSlides = (): void => void (slides && (clearInterval(slides), (slides = 0)));
+    win.slideshow = (): void => {
+      if (slides) return void (stopSlides(), win.render());
+      if (!shown.length) return;
+      one ??= 0;
+      slides = window.setInterval(() => {
+        if (one === null || !shown.length) return stopSlides();
+        one = (one + 1) % shown.length;
+        void win.render();
+      }, 4000);
+      void win.render();
+    };
+    // view-state: (one picture large, the next or the one before, back to the gallery, the next pictures, fitted again)
+    body.addEventListener("dblclick", (e) => {
+      if (!(e.target as HTMLElement).closest("[data-ref-view]")) return;
+      zoom = { k: 1, x: 0, y: 0 };
+      placeZoom();
+    });
     body.addEventListener("click", (e) => {
       if (win.source.startsWith("board:") || choosing) return;
       const t = e.target as HTMLElement;
       const th = t.closest<HTMLElement>(".ref-thumb");
+      if (t.closest("[data-ref-play]")) return void pressCommand("reference.slideshow", { window: id });
       if (th) one = Number(th.dataset["refI"]);
-      else if (t.closest("[data-ref-back]")) one = null;
+      else if (t.closest("[data-ref-back]")) (one = null), stopSlides();
       else if (t.closest("[data-ref-prev]") && one !== null) one = (one - 1 + shown.length) % shown.length;
       else if (t.closest("[data-ref-next]") && one !== null) one = (one + 1) % shown.length;
       else if (t.closest("[data-ref-page]")) pages++;
       else return;
       void win.render();
     });
-    // a picture of the gallery dragged onto a board (or onto the Library's folders, the canvas: what a Library card carries)
+    // a picture of the gallery (or the one shown large, by its name) dragged onto a moodboard or the canvas: what a Library card carries
     body.addEventListener("dragstart", (e) => {
       const th = (e.target as HTMLElement).closest<HTMLElement>(".ref-thumb");
-      const entry = th && shown[Number(th.dataset["refI"])];
+      const entry = th ? shown[Number(th.dataset["refI"])] : (e.target as HTMLElement).closest("[data-ref-drag]") && one !== null ? shown[one] : undefined;
       if (!entry || !e.dataTransfer) return;
       e.dataTransfer.setData(LIBRARY_DRAG, JSON.stringify([entry.hash]));
       e.dataTransfer.setData("text/plain", entry.name);
@@ -282,7 +392,6 @@ export function mountReferenceWindows(deps: ReferenceDeps): { open(source?: RefS
         if (stage) upgrade();
       });
     };
-    const ratio = new Map<string, number>(); // (each picture's height over width, once its thumbnail is read)
     const boardOf = (): Board | undefined => (win.source.startsWith("board:") ? boardById(win.source.slice(6)) : undefined);
     /** Each picture shown large enough gets its file instead of its thumbnail. */
     const upgrade = (): void => {
@@ -299,7 +408,7 @@ export function mountReferenceWindows(deps: ReferenceDeps): { open(source?: RefS
       node.dataset["refItem"] = String(i);
       node.dataset["h"] = it.h;
       const hiddenNow = !!e?.hidden && !deps.hidden();
-      node.innerHTML = (!e ? `<span class="ref-gone">${ICONS.fileMissing}<span>Missing</span></span>` : hiddenNow ? `<span class="ref-gone">${ICONS.lockKeyhole}<span>Hidden</span></span>` : `<img alt="${esc(e.name)}" draggable="false" decoding="async">`) + `<span class="ref-grip" data-ref-grip aria-hidden="true"></span>`;
+      node.innerHTML = (!e ? `<span class="ref-gone">${ICONS.fileMissing}<span>Missing</span></span>` : hiddenNow ? `<span class="ref-gone">${ICONS.lockKeyhole}<span>Hidden</span></span>` : `<img alt="${esc(e.name)}" draggable="false" decoding="async">`) + (["nw", "ne", "se", "sw"] as const).map((c) => `<span class="ref-grip" data-ref-grip="${c}" aria-hidden="true"></span>`).join("");
       const img = node.querySelector("img");
       if (img)
         void urlOf(it.h, false).then((u) => {
@@ -332,6 +441,14 @@ export function mountReferenceWindows(deps: ReferenceDeps): { open(source?: RefS
         node.style.top = `${it.y}px`;
         node.style.width = `${it.w}px`;
         node.style.height = `${it.w * (ratio.get(it.h) ?? 0.75)}px`;
+        // how it is shown: turned, flipped, grey, see-through (the file is never changed)
+        node.style.transform = it.r ? `rotate(${it.r}deg)` : "";
+        node.style.opacity = it.o !== undefined && it.o < 1 ? String(Math.max(0.1, it.o)) : "";
+        const img = node.querySelector<HTMLElement>("img");
+        if (img) {
+          img.style.transform = it.fx || it.fy ? `scale(${it.fx ? -1 : 1}, ${it.fy ? -1 : 1})` : "";
+          img.style.filter = it.grey ? "grayscale(1)" : "";
+        }
         node.classList.toggle("is-picked", picked.has(i));
       });
       for (const extra of nodes.slice(b.items.length)) extra.remove();
@@ -406,7 +523,7 @@ export function mountReferenceWindows(deps: ReferenceDeps): { open(source?: RefS
       const t = e.target as HTMLElement;
       const node = t.closest<HTMLElement>("[data-ref-item]");
       const i = node ? Number(node.dataset["refItem"]) : null;
-      const grip = !!t.closest("[data-ref-grip]");
+      const grip = t.closest<HTMLElement>("[data-ref-grip]")?.dataset["refGrip"] ?? null;
       const pan = e.button === 1 || space;
       area.focus({ preventScroll: true });
       e.preventDefault();
@@ -416,7 +533,8 @@ export function mountReferenceWindows(deps: ReferenceDeps): { open(source?: RefS
         if (!(e.shiftKey || e.ctrlKey || e.metaKey)) picked.clear();
         picked.add(i);
       } else if (!pan && i !== null && (e.shiftKey || e.ctrlKey || e.metaKey)) picked.delete(i);
-      const moving = !pan && i !== null ? [...picked].map((j) => ({ j, it: { ...b.items[j]! }, node: stage!.querySelector<HTMLElement>(`[data-ref-item="${j}"]`) })) : [];
+      // (a corner's grip resizes the picture it is on, the opposite corner staying where it is; a drag moves every picture picked)
+      const moving = !pan && i !== null ? (grip ? [i] : [...picked]).map((j) => ({ j, it: { ...b.items[j]! }, node: stage!.querySelector<HTMLElement>(`[data-ref-item="${j}"]`) })) : [];
       for (const n2 of stage!.querySelectorAll<HTMLElement>("[data-ref-item]")) n2.classList.toggle("is-picked", picked.has(Number(n2.dataset["refItem"])));
       const marquee = body.querySelector<HTMLElement>("[data-ref-marquee]")!;
       const start = onBoard(sx, sy);
@@ -432,9 +550,8 @@ export function mountReferenceWindows(deps: ReferenceDeps): { open(source?: RefS
           for (const { it, node: nd } of moving) {
             if (!nd) continue;
             if (grip) {
-              const w = Math.max(16, it.w + dx / view.k);
-              nd.style.width = `${w}px`;
-              nd.style.height = `${w * (ratio.get(it.h) ?? 0.75)}px`;
+              const r = resized(it, grip, dx);
+              Object.assign(nd.style, { left: `${r.x}px`, top: `${r.y}px`, width: `${r.w}px`, height: `${r.w * (ratio.get(it.h) ?? 0.75)}px` });
             } else {
               nd.style.left = `${it.x + dx / view.k}px`;
               nd.style.top = `${it.y + dy / view.k}px`;
@@ -452,8 +569,16 @@ export function mountReferenceWindows(deps: ReferenceDeps): { open(source?: RefS
         marquee.hidden = true;
         const dx = u.clientX - sx, dy = u.clientY - sy, far = Math.hypot(dx, dy) > 2;
         if (pan) return saveView();
+        // let go outside the window, over the canvas: the pictures are placed there, and stay on the moodboard
+        const wr = el.getBoundingClientRect();
+        const out = u.clientX < wr.left || u.clientX > wr.right || u.clientY < wr.top || u.clientY > wr.bottom;
+        if (moving.length && far && out && !grip) {
+          void syncItems(b);
+          if (document.elementFromPoint(u.clientX, u.clientY)?.closest("#canvas")) void deps.place(moving.map(({ it }) => it.h), { x: u.clientX, y: u.clientY });
+          return;
+        }
         if (moving.length && far) {
-          const moves = moving.map(({ j, it }) => (grip ? { i: j, w: Math.max(16, it.w + dx / view.k) } : { i: j, x: it.x + dx / view.k, y: it.y + dy / view.k }));
+          const moves = moving.map(({ j, it }) => (grip ? { i: j, ...resized(it, grip, dx) } : { i: j, x: it.x + dx / view.k, y: it.y + dy / view.k }));
           return void pressCommand("reference.place", { board: b.id, moves });
         }
         if (i === null) {
@@ -473,8 +598,45 @@ export function mountReferenceWindows(deps: ReferenceDeps): { open(source?: RefS
       body.addEventListener("pointerup", up, { once: true });
       body.addEventListener("pointercancel", up, { once: true });
     });
+    /** A picture resized by a corner's grip dragged `dx` px across: its new place and width, the opposite corner kept. */
+    const resized = (it: Item, corner: string, dx: number): { x: number; y: number; w: number } => {
+      const left = corner === "nw" || corner === "sw", top = corner === "nw" || corner === "ne";
+      const w = Math.max(16, it.w + (left ? -dx : dx) / view.k), r = ratio.get(it.h) ?? 0.75;
+      return { w, x: left ? it.x + it.w - w : it.x, y: top ? it.y + (it.w - w) * r : it.y };
+    };
     body.addEventListener("dblclick", (e) => {
       if (boardOf() && !(e.target as HTMLElement).closest("[data-ref-item]")) void pressCommand("reference.fit", { window: id, board: boardOf()!.id });
+    });
+    // A right-click: what can be done to the pictures picked (the one under the pointer joins them), or to the whole moodboard
+    body.addEventListener("contextmenu", (e) => {
+      const t = e.target as HTMLElement, b = boardOf();
+      const th = t.closest<HTMLElement>(".ref-thumb");
+      if (!b) {
+        const entry = th ? shown[Number(th.dataset["refI"])] : t.closest("[data-ref-view]") && one !== null ? shown[one] : undefined;
+        if (!entry) return;
+        e.preventDefault();
+        return openMoreMenu(th ?? t, [{ label: "Place on the canvas", icon: ICONS.mapPin, hint: "In the middle of the view", command: "reference.toCanvas", run: () => void pressCommand("reference.toCanvas", { ids: [entry.hash] }) }], "Picture");
+      }
+      e.preventDefault();
+      const node = t.closest<HTMLElement>("[data-ref-item]");
+      if (node && !picked.has(Number(node.dataset["refItem"]))) (picked.clear(), picked.add(Number(node.dataset["refItem"])), void syncItems(b));
+      const sel = [...picked].sort((a, c) => a - c), items = sel.map((j) => b.items[j]!);
+      const go = (command: string, o: Record<string, unknown>, label: string, icon: string, hint: string, extra: Partial<MenuItem> = {}): MenuItem => ({ label, icon, hint, command, run: () => void pressCommand(command, { board: b.id, ...o }), ...extra });
+      const look = (patch: Record<string, unknown>, label: string, icon: string, hint: string, extra: Partial<MenuItem> = {}): MenuItem => go("reference.look", { indices: sel, patch }, label, icon, hint, extra);
+      openMoreMenu(node ?? t, sel.length
+        ? [
+            go("reference.toCanvas", { ids: items.map((x) => x.h) }, "Place on the canvas", ICONS.mapPin, "In the middle of the view"),
+            look({ flip: "x" }, "Flip horizontally", ICONS.flipHorizontal, "Mirrored left to right (Shift+H)", { sep: true }),
+            look({ flip: "y" }, "Flip vertically", ICONS.flipVertical, "Mirrored top to bottom (Shift+V)"),
+            look({ turn: 90 }, "Turn a quarter", ICONS.turnQuarter, "Clockwise, 90°"),
+            look({ grey: !items.every((x) => x.grey) }, "Greyscale", ICONS.greyscale, "To study its values", { checked: items.every((x) => x.grey) }),
+            ...([1, 0.75, 0.5, 0.25] as const).map((v, k) => look({ opacity: v }, `${v * 100}% opaque`, ICONS.windowOpacity, "How much of it shows", { checked: items.every((x) => (x.o ?? 1) === v), sep: k === 0 })),
+            go("reference.order", { indices: sel, to: "front" }, "Bring to front", ICONS.bringToFront, "Over the others", { sep: true }),
+            go("reference.order", { indices: sel, to: "back" }, "Send to back", ICONS.sendToBack, "Under the others"),
+            go("reference.arrange", { indices: sel }, "Arrange in a grid", ICONS.arrangeMenu, "These pictures in rows, tidy"),
+            go("reference.remove", { indices: sel }, "Take off the moodboard", ICONS.trash, "It stays in the library", { danger: true, sep: true }),
+          ]
+        : boardRows(b.id, win), sel.length ? "Pictures" : "Moodboard");
     });
     body.addEventListener("auxclick", (e) => e.button === 1 && e.preventDefault()); // (a middle click pans: it pastes nothing on Linux)
 
@@ -488,7 +650,7 @@ export function mountReferenceWindows(deps: ReferenceDeps): { open(source?: RefS
         e.preventDefault();
       }
       if (one !== null && !win.source.startsWith("board:")) {
-        if (e.key === "Escape") one = null;
+        if (e.key === "Escape") (one = null), stopSlides();
         else if (e.key === "ArrowLeft" || e.key === "ArrowRight") one = (one + (e.key === "ArrowLeft" ? -1 : 1) + shown.length) % shown.length;
         else return void e.stopPropagation();
         e.preventDefault();
@@ -509,6 +671,7 @@ export function mountReferenceWindows(deps: ReferenceDeps): { open(source?: RefS
       else if (mod && key === "d" && sel.length) void pressCommand("reference.add", { board: b.id, ids: sel.map((j) => b.items[j]!.h), x: b.items[sel[0]!]!.x + 24, y: b.items[sel[0]!]!.y + 24 });
       else if ((e.key === "Delete" || e.key === "Backspace") && sel.length) (picked.clear(), void pressCommand("reference.remove", { board: b.id, indices: sel }));
       else if (e.key === "Escape") picked.clear(), void syncItems(b);
+      else if (!mod && e.shiftKey && (key === "h" || key === "v") && sel.length) void pressCommand("reference.look", { board: b.id, indices: sel, patch: { flip: key === "h" ? "x" : "y" } });
       else if (!mod && (e.key === "+" || e.key === "=")) zoomAt(mid.x, mid.y, e.shiftKey ? 2 : 1.25);
       else if (!mod && (e.key === "-" || e.key === "_")) zoomAt(mid.x, mid.y, e.shiftKey ? 0.5 : 0.8);
       else if (!mod && (e.key === "0" || e.key === "Home")) void pressCommand("reference.fit", { window: id, board: b.id });
@@ -611,6 +774,7 @@ export function mountReferenceWindows(deps: ReferenceDeps): { open(source?: RefS
       else await gallery();
     };
     wins.set(id, win);
+    win.applyPrefs();
     void win.render();
     keepNow();
     el.focus({ preventScroll: true });
@@ -631,27 +795,146 @@ export function mountReferenceWindows(deps: ReferenceDeps): { open(source?: RefS
   const addTo = (board: string, hashes: readonly string[], at: { x: number; y: number }): void => {
     if (hashes.length) void pressCommand("reference.add", { board, ids: [...hashes], x: at.x, y: at.y });
   };
+  /** What can be done to one moodboard: one list of rows for its ⋯ in the chooser and for the window's More menu (DRY). */
+  const boardRows = (bid: string, w: Win): MenuItem[] => {
+    const go = (command: string, label: string, icon: string, hint: string, extra: Partial<MenuItem> = {}): MenuItem => ({ label, icon, hint, command, run: () => void pressCommand(command, { window: w.id, board: bid }), ...extra });
+    return [
+      go("reference.open", "Open in a new window", ICONS.referenceWindow, "This moodboard beside this window", { run: () => void pressCommand("reference.open", { source: `board:${bid}` }) }),
+      go("reference.renameBoard", "Rename…", ICONS.textCursorInput, "A new name for it"),
+      go("reference.duplicateBoard", "Duplicate", ICONS.copy, "A copy, with the same pictures"),
+      go("reference.arrange", "Arrange in a grid", ICONS.arrangeMenu, "Its pictures in rows, tidy"),
+      go("reference.fit", "Fit in the window", ICONS.shrink, "Every picture in sight (0)"),
+      go("reference.export", "Save as a picture", ICONS.imageDown, "A PNG of it, into the library"),
+      go("reference.deleteBoard", "Delete", ICONS.trash, "Its pictures stay in the library", { danger: true, sep: true }),
+    ];
+  };
+  /** A picture's file, or its thumbnail when the file cannot be read (null: neither, or a hidden one out of hidden mode). */
+  const blobOf = async (hash: string, maxBytes = Infinity): Promise<Blob | null> => {
+    const entry = (await listing())?.byHash.get(hash);
+    if (!entry || (entry.hidden && !deps.hidden())) return null;
+    const full = (await deps.assets.record(hash).catch(() => undefined))?.blob;
+    return full && full.size <= maxBytes ? full : ((await session.catalog?.thumb(hash).catch(() => undefined))?.blob ?? full ?? null);
+  };
+  const dataUrl = (b: Blob): Promise<string> => new Promise((done, fail) => {
+    const r = new FileReader();
+    r.onload = () => done(String(r.result));
+    r.onerror = () => fail(r.error);
+    r.readAsDataURL(b);
+  });
+  const extentOf = (items: readonly Item[]) => {
+    const minX = Math.min(...items.map((i) => i.x)), minY = Math.min(...items.map((i) => i.y));
+    return { minX, minY, w: Math.max(...items.map((i) => i.x + i.w)) - minX, h: Math.max(...items.map((i) => i.y + i.w * (ratio.get(i.h) ?? 0.75))) - minY };
+  };
+
+  /** A moodboard drawn into one PNG, as it is shown (turned, flipped, grey, see-through), at most 4,096 px a side. */
+  const boardPicture = async (b: Board): Promise<Blob | null> => {
+    const ex = extentOf(b.items), k = Math.min(4, 4096 / Math.max(ex.w, ex.h, 1));
+    const c = document.createElement("canvas");
+    c.width = Math.max(1, Math.round(ex.w * k));
+    c.height = Math.max(1, Math.round(ex.h * k));
+    const g = c.getContext("2d");
+    if (!g) return null;
+    for (const it of b.items) {
+      const blob = await blobOf(it.h);
+      const bmp = blob && (await createImageBitmap(blob).catch(() => null));
+      if (!bmp) continue;
+      const w = it.w * k, h = w * (bmp.height / Math.max(1, bmp.width));
+      g.save();
+      g.translate((it.x - ex.minX) * k + w / 2, (it.y - ex.minY) * k + h / 2);
+      g.rotate(((it.r ?? 0) * Math.PI) / 180);
+      g.scale(it.fx ? -1 : 1, it.fy ? -1 : 1);
+      g.globalAlpha = it.o ?? 1;
+      g.filter = it.grey ? "grayscale(1)" : "none";
+      g.drawImage(bmp, -w / 2, -h / 2, w, h);
+      g.restore();
+      bmp.close();
+    }
+    return new Promise<Blob | null>((done) => c.toBlob(done, "image/png"));
+  };
+
+  /**
+   * The page a floated window shows (the desktop app's window over every app): what the reference window shows now, its pictures in it
+   * (files up to 4 MB, thumbnails past that), panned with a drag and zoomed with the wheel. View only; a snapshot of now.
+   */
+  const floatPage = async (w: Win): Promise<{ title: string; html: string } | null> => {
+    const b = w.source.startsWith("board:") ? boardById(w.source.slice(6)) : undefined;
+    const l = await listing();
+    let inner = "", title = "Reference";
+    if (b) {
+      title = b.name;
+      const ex = extentOf(b.items);
+      for (const it of b.items) {
+        const blob = await blobOf(it.h, 4 * 1024 * 1024);
+        if (!blob) continue;
+        const img = `transform:${it.fx || it.fy ? `scale(${it.fx ? -1 : 1},${it.fy ? -1 : 1})` : "none"};${it.grey ? "filter:grayscale(1);" : ""}`;
+        inner += `<div style="position:absolute;left:${it.x - ex.minX}px;top:${it.y - ex.minY}px;width:${it.w}px;${it.r ? `transform:rotate(${it.r}deg);` : ""}${it.o !== undefined ? `opacity:${it.o};` : ""}"><img src="${await dataUrl(blob)}" style="width:100%;display:block;${img}"></div>`;
+      }
+    } else {
+      const fid = w.source.startsWith("folder:") ? w.source.slice(7) : null;
+      title = fid ? (l?.folders.find((f) => f.id === fid)?.name ?? "Reference") : "All pictures";
+      const pics = l?.entries.filter((e) => isPicture(e) && shows(e) && (!fid || e.folderIds?.includes(fid))).sort((a, c) => c.importedAt - a.importedAt).slice(0, 60) ?? [];
+      let x = 0;
+      const TILE = 200; // (the floated page is a page of its own, not the app's: its sizes are its own)
+      for (const e of pics) {
+        const blob = await blobOf(e.hash, 512 * 1024);
+        if (blob) inner += `<img src="${await dataUrl(blob)}" style="position:absolute;left:${(x % 6) * (TILE + 10)}px;top:${Math.floor(x++ / 6) * (TILE + 10)}px;width:${TILE}px">`;
+      }
+    }
+    if (!inner) return null;
+    const html = `<!doctype html><html><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src data:; style-src 'unsafe-inline'; script-src 'unsafe-inline'"><title>${esc(title)}</title>
+<style>html,body{margin:0;height:100%;overflow:hidden;background:#1e1e1e}#s{position:absolute;left:0;top:0;transform-origin:0 0}</style></head><body><div id="s">${inner}</div>
+<script>const s=document.getElementById("s");let v={x:0,y:0,k:1};const put=()=>s.style.transform="translate("+v.x+"px,"+v.y+"px) scale("+v.k+")";
+const fit=()=>{const r=s.getBoundingClientRect(),w=r.width/v.k,h=r.height/v.k,k=Math.min(innerWidth/w,innerHeight/h)*0.95;v={k,x:(innerWidth-w*k)/2,y:(innerHeight-h*k)/2};put();};
+addEventListener("load",fit);addEventListener("dblclick",fit);
+addEventListener("wheel",(e)=>{e.preventDefault();const f=Math.exp(-e.deltaY*0.0025),k=Math.min(16,Math.max(0.05,v.k*f));v={k,x:e.clientX-(e.clientX-v.x)*k/v.k,y:e.clientY-(e.clientY-v.y)*k/v.k};put();},{passive:false});
+let d=null;addEventListener("pointerdown",(e)=>{d={x:e.clientX-v.x,y:e.clientY-v.y};});addEventListener("pointermove",(e)=>{if(d){v.x=e.clientX-d.x;v.y=e.clientY-d.y;put();}});addEventListener("pointerup",()=>{d=null;});</script></body></html>`;
+    return { title, html };
+  };
+
+  /** Every moodboard in one list (the shared list dialog): open, rename, copy or delete each. */
+  const manage = (w?: Win): void => {
+    const btn = (attrs: string, label: string): string => `<button type="button" class="set-done" ${attrs}>${label}</button>`;
+    manageList = listDialog({
+      title: "Moodboards",
+      lines: ["Saved with this workspace. Their pictures stay in the library whatever is done here."],
+      testid: "reference-manage",
+      body: () =>
+        boards().map((b) => plainRowHtml({ label: esc(b.name), help: plural(b.items.length, "picture"), control: btn(`data-mb-act="open" data-mb="${esc(b.id)}"`, "Open") + btn(`data-mb-act="rename" data-mb="${esc(b.id)}"`, "Rename…") + btn(`data-mb-act="copy" data-mb="${esc(b.id)}"`, "Duplicate") + `<button type="button" class="set-reset" data-mb-act="delete" data-mb="${esc(b.id)}" aria-label="Delete ${esc(b.name)}" title="Delete: its pictures stay in the library">${ICONS.trash}</button>` })).join("") ||
+        `<p class="set-help">None yet: make one from a reference window's list (New moodboard…).</p>`,
+      // (the list is drawn again when the moodboards change: renderAll)
+      onClick: (t) => {
+        const a = t.closest<HTMLElement>("[data-mb-act]");
+        if (!a) return;
+        const bid = a.dataset["mb"]!, act = a.dataset["mbAct"];
+        if (act === "open") pressCommand(w ? "reference.show" : "reference.open", w ? { window: w.id, source: `board:${bid}` } : { source: `board:${bid}` });
+        else pressCommand(act === "rename" ? "reference.renameBoard" : act === "copy" ? "reference.duplicateBoard" : "reference.deleteBoard", { board: bid });
+      },
+    });
+  };
+
   const newBoard = async (w?: Win): Promise<void> => {
-    const name = await promptDialog({ title: "New board", lines: ["A board of references, saved with this workspace."], value: `Board ${boards().length + 1}`, confirmLabel: "Make it" });
+    const name = await promptDialog({ title: "New moodboard", lines: ["Pictures to keep in sight, laid out as you like, saved with this workspace."], value: `Moodboard ${boards().length + 1}`, confirmLabel: "Make it" });
     if (name === null) return void w?.render();
     void pressCommand("reference.newBoard", { name, ...(w ? { window: w.id } : {}) });
   };
+  let manageList: { refresh(): void } | null = null;
   const renderAll = (): void => {
+    manageList?.refresh();
     for (const w of wins.values()) void w.render();
   };
   const winOf = (o: Readonly<Record<string, unknown>>): Win | undefined => (typeof o["window"] === "string" ? wins.get(o["window"]) : undefined);
   const indices = (v: unknown, b: Board): number[] => (Array.isArray(v) ? [...new Set(v.map(Number).filter((i) => Number.isInteger(i) && i >= 0 && i < b.items.length))] : []);
 
   // ---- commands (ADR 0205): every action of the windows, for the buttons, menus, keys, macros and outside callers alike
-  const ID: OptionSpec = { name: "board", type: "id", doc: "the board's id", required: true };
+  const ID: OptionSpec = { name: "board", type: "id", doc: "the moodboard's id", required: true };
   const rc = (id: string, title: string, hint: string, risk: NonNullable<Command["risk"]>, options: readonly OptionSpec[], exec: NonNullable<Command["exec"]>, why: () => string | null = () => null): Command => ({ id, group: "Reference", kind: "reference", title, hint, icon: ICONS.referenceWindow, risk, options, why, exec });
   const hasBoard = (o: Readonly<Record<string, unknown>>): Board | null => boardById(String(o["board"] ?? "")) ?? null;
   commands.setProvider("reference", () => [
-    rc("reference.open", "Reference window", "A gallery or a board, over every view (Shift+R)", "read", [{ name: "source", type: "text", doc: "all, folder:<id> or board:<id> (all when left out)" }], (o) => {
+    rc("reference.open", "Reference window", "A gallery or a moodboard, over every view", "read", [{ name: "source", type: "text", doc: "all, folder:<id> or board:<id> (a moodboard; all when left out)" }], (o) => {
       const w = open(typeof o["source"] === "string" ? o["source"] : "all");
       return { ok: true, value: w.id };
     }),
-    rc("reference.show", "Show in a reference window", "A board, all pictures or a folder", "read", [{ name: "window", type: "text", doc: "the window", required: true }, { name: "source", type: "text", doc: "all, folder:<id> or board:<id>", required: true }], (o) => {
+    rc("reference.show", "Show in a reference window", "A moodboard, all pictures or a folder", "read", [{ name: "window", type: "text", doc: "the window", required: true }, { name: "source", type: "text", doc: "all, folder:<id> or board:<id>", required: true }], (o) => {
       const w = winOf(o), src = String(o["source"]);
       if (!w) return { ok: false, error: "No such window." };
       if (!/^(all|folder:.+|board:.+)$/.test(src)) return { ok: false, error: '"source" is all, folder:<id> or board:<id>.' };
@@ -660,10 +943,10 @@ export function mountReferenceWindows(deps: ReferenceDeps): { open(source?: RefS
       void w.render();
       return { ok: true };
     }),
-    rc("reference.newBoard", "New board", "An empty board of references", "edit", [{ name: "name", type: "text", doc: "its name", required: true }, { name: "window", type: "text", doc: "the window to show it in (a new one when left out)" }], (o) => {
+    rc("reference.newBoard", "New moodboard", "An empty moodboard of references", "edit", [{ name: "name", type: "text", doc: "its name", required: true }, { name: "window", type: "text", doc: "the window to show it in (a new one when left out)" }], (o) => {
       const name = String(o["name"]).trim().slice(0, 80) || "Board";
       const all = boards();
-      if (all.length >= 100) return { ok: false, error: "There are 100 boards already: delete one first." };
+      if (all.length >= 100) return { ok: false, error: "There are 100 moodboards already: delete one first." };
       const b: Board = { id: newObjectId(), name, items: [] };
       settings.set("reference.boards", JSON.stringify([...all, b]));
       const w = winOf(o);
@@ -674,19 +957,19 @@ export function mountReferenceWindows(deps: ReferenceDeps): { open(source?: RefS
       } else open(`board:${b.id}`);
       return { ok: true, made: [b.id] };
     }),
-    rc("reference.renameBoard", "Rename the board", "A new name for it", "edit", [ID, { name: "name", type: "text", doc: "its new name (asked when left out)" }], async (o) => {
+    rc("reference.renameBoard", "Rename the moodboard", "A new name for it", "edit", [ID, { name: "name", type: "text", doc: "its new name (asked when left out)" }], async (o) => {
       const b = hasBoard(o);
-      if (!b) return { ok: false, error: "No such board." };
-      const name = typeof o["name"] === "string" ? o["name"] : await promptDialog({ title: "Rename the board", lines: [], value: b.name, confirmLabel: "Rename" });
+      if (!b) return { ok: false, error: "No such moodboard." };
+      const name = typeof o["name"] === "string" ? o["name"] : await promptDialog({ title: "Rename the moodboard", lines: [], value: b.name, confirmLabel: "Rename" });
       if (name === null) return { ok: true };
       updateBoard(b.id, (x) => ({ ...x, name: name.trim().slice(0, 80) || x.name }), false);
       renderAll();
       return { ok: true, changed: [b.id] };
     }),
-    rc("reference.deleteBoard", "Delete the board", "Its pictures stay in the library", "confirm", [ID], async (o, ctx) => {
+    rc("reference.deleteBoard", "Delete the moodboard", "Its pictures stay in the library", "confirm", [ID], async (o, ctx) => {
       const b = hasBoard(o);
-      if (!b) return { ok: false, error: "No such board." };
-      if (ctx.caller !== "agent" && !(await confirmDialog({ title: `Delete the board “${b.name}”?`, lines: [`Its ${plural(b.items.length, "picture")} stay in the library; only the board goes.`], confirmLabel: "Delete it" }))) return { ok: true };
+      if (!b) return { ok: false, error: "No such moodboard." };
+      if (ctx.caller !== "agent" && !(await confirmDialog({ title: `Delete the moodboard “${b.name}”?`, lines: [`Its ${plural(b.items.length, "picture")} stay in the library; only the moodboard goes.`], confirmLabel: "Delete it" }))) return { ok: true };
       settings.set("reference.boards", JSON.stringify(boards().filter((x) => x.id !== b.id)));
       history.delete(b.id);
       for (const w of wins.values()) if (w.source === `board:${b.id}`) w.source = "all";
@@ -694,50 +977,146 @@ export function mountReferenceWindows(deps: ReferenceDeps): { open(source?: RefS
       renderAll();
       return { ok: true, removed: [b.id] };
     }),
-    rc("reference.add", "Put pictures on a board", "Library files, side by side", "edit", [ID, { name: "ids", type: "ids", doc: "the library files (their hashes)", required: true }, { name: "x", type: "number", doc: "where, across" }, { name: "y", type: "number", doc: "where, down" }], async (o) => {
+    rc("reference.add", "Put pictures on a moodboard", "Library files, side by side", "edit", [ID, { name: "ids", type: "ids", doc: "the library files (their hashes)", required: true }, { name: "x", type: "number", doc: "where, across" }, { name: "y", type: "number", doc: "where, down" }], async (o) => {
       const b = hasBoard(o);
-      if (!b) return { ok: false, error: "No such board." };
+      if (!b) return { ok: false, error: "No such moodboard." };
       listed = null; // (a picture just imported is in the library now)
       const l = await listing();
       const hs = ((o["ids"] as string[]) ?? []).filter((h) => isPicture(l?.byHash.get(h)));
       if (!hs.length) return { ok: false, error: "Those are not pictures of the library." };
       const room = MAX_ITEMS - b.items.length;
-      if (room <= 0) return { ok: false, error: `A board holds at most ${MAX_ITEMS} pictures.` };
+      if (room <= 0) return { ok: false, error: `A moodboard holds at most ${MAX_ITEMS} pictures.` };
       const x = Number(o["x"] ?? 0), y = Number(o["y"] ?? 0);
       const items = hs.slice(0, room).map((h, i): Item => ({ h, x: x + (i % 6) * 220, y: y + Math.floor(i / 6) * 220, w: 200 }));
       updateBoard(b.id, (bd) => ({ ...bd, items: [...bd.items, ...items] }));
       return { ok: true, changed: [b.id] };
     }),
-    rc("reference.place", "Move pictures on a board", "Where each is, or how wide", "edit", [ID, { name: "moves", type: "json", doc: "a list of { i: which picture (from 0), x, y, w }", required: true }], (o) => {
+    rc("reference.place", "Move pictures on a moodboard", "Where each is, or how wide", "edit", [ID, { name: "moves", type: "json", doc: "a list of { i: which picture (from 0), x, y, w }", required: true }], (o) => {
       const b = hasBoard(o);
       const moves = Array.isArray(o["moves"]) ? (o["moves"] as Array<Record<string, unknown>>) : [];
-      if (!b || !moves.length || !moves.every((m) => typeof m === "object" && m !== null && b.items[Number(m["i"])])) return { ok: false, error: "No such picture on that board." };
+      if (!b || !moves.length || !moves.every((m) => typeof m === "object" && m !== null && b.items[Number(m["i"])])) return { ok: false, error: "No such picture on that moodboard." };
       const n = (m: Record<string, unknown>, k: string, now: number, min = -1e7): number => (typeof m[k] === "number" && Number.isFinite(m[k]) ? Math.max(min, Math.min(1e7, m[k] as number)) : now);
       const by = new Map(moves.map((m) => [Number(m["i"]), m]));
       updateBoard(b.id, (bd) => ({ ...bd, items: bd.items.map((it, j) => { const m = by.get(j); return m ? { ...it, x: n(m, "x", it.x), y: n(m, "y", it.y), w: n(m, "w", it.w, 16) } : it; }) }));
       return { ok: true, changed: [b.id] };
     }),
-    rc("reference.remove", "Take pictures off a board", "They stay in the library", "edit", [ID, { name: "indices", type: "json", doc: "which pictures (from 0), as a list", required: true }], (o) => {
+    rc("reference.remove", "Take pictures off a moodboard", "They stay in the library", "edit", [ID, { name: "indices", type: "json", doc: "which pictures (from 0), as a list", required: true }], (o) => {
       const b = hasBoard(o);
       const gone = b ? new Set(indices(o["indices"], b)) : new Set<number>();
-      if (!b || !gone.size) return { ok: false, error: "No such picture on that board." };
+      if (!b || !gone.size) return { ok: false, error: "No such picture on that moodboard." };
       updateBoard(b.id, (bd) => ({ ...bd, items: bd.items.filter((_, j) => !gone.has(j)) }));
       return { ok: true, changed: [b.id] };
     }),
     ...(["undo", "redo"] as const).map((dir) =>
-      rc(`reference.${dir}`, dir === "undo" ? "Undo on the board" : "Redo on the board", dir === "undo" ? "The board's last change (Ctrl+Z)" : "The change undone (Ctrl+Shift+Z)", "edit", [ID], (o) => {
+      rc(`reference.${dir}`, dir === "undo" ? "Undo on the moodboard" : "Redo on the moodboard", dir === "undo" ? "The board's last change (Ctrl+Z)" : "The change undone (Ctrl+Shift+Z)", "edit", [ID], (o) => {
         const b = hasBoard(o), h = b && history.get(b.id);
         const from = h ? (dir === "undo" ? h.back : h.ahead) : [];
         const items = from.pop();
-        if (!b || !h || !items) return { ok: false, error: dir === "undo" ? "Nothing to undo on this board." : "Nothing to redo on this board." };
+        if (!b || !h || !items) return { ok: false, error: dir === "undo" ? "Nothing to undo on this moodboard." : "Nothing to redo on this moodboard." };
         (dir === "undo" ? h.ahead : h.back).push(b.items);
         updateBoard(b.id, (bd) => ({ ...bd, items }), false);
         return { ok: true, changed: [b.id] };
       }),
     ),
-    rc("reference.fit", "Fit the board", "Every picture in sight", "read", [{ name: "window", type: "text", doc: "the window", required: true }, ID], (o) => {
+    rc("reference.look", "Show pictures another way", "Flipped, turned, grey or see-through", "edit", [ID, { name: "indices", type: "json", doc: "which pictures (from 0), as a list", required: true }, { name: "patch", type: "json", doc: "flip: x or y (each a toggle), turn: degrees added, grey: true or false, opacity: 0.1 to 1", required: true }], (o) => {
+      const b = hasBoard(o), at = b ? new Set(indices(o["indices"], b)) : new Set<number>(), p = (o["patch"] ?? {}) as Record<string, unknown>;
+      if (!b || !at.size) return { ok: false, error: "No such picture on that moodboard." };
+      const look = (it: Item): Item => {
+        const { fx, fy, r, grey, o: op, ...rest } = it;
+        const nfx = p["flip"] === "x" ? !fx : !!fx, nfy = p["flip"] === "y" ? !fy : !!fy;
+        const nr = (((r ?? 0) + (typeof p["turn"] === "number" ? p["turn"] : 0)) % 360 + 360) % 360;
+        const ng = typeof p["grey"] === "boolean" ? p["grey"] : !!grey;
+        const no = typeof p["opacity"] === "number" && Number.isFinite(p["opacity"]) ? Math.min(1, Math.max(0.1, p["opacity"])) : op ?? 1;
+        return { ...rest, ...(nfx ? { fx: true as const } : {}), ...(nfy ? { fy: true as const } : {}), ...(nr ? { r: nr } : {}), ...(ng ? { grey: true as const } : {}), ...(no < 1 ? { o: no } : {}) };
+      };
+      updateBoard(b.id, (bd) => ({ ...bd, items: bd.items.map((it, j) => (at.has(j) ? look(it) : it)) }));
+      return { ok: true, changed: [b.id] };
+    }),
+    rc("reference.order", "Bring pictures forward or back", "Over the others, or under them", "edit", [ID, { name: "indices", type: "json", doc: "which pictures (from 0), as a list", required: true }, { name: "to", type: "choice", doc: "front or back", required: true, choices: ["front", "back"] }], (o) => {
+      const b = hasBoard(o), at = b ? new Set(indices(o["indices"], b)) : new Set<number>();
+      if (!b || !at.size) return { ok: false, error: "No such picture on that moodboard." };
+      const these = b.items.filter((_, j) => at.has(j)), rest = b.items.filter((_, j) => !at.has(j));
+      updateBoard(b.id, (bd) => ({ ...bd, items: o["to"] === "front" ? [...rest, ...these] : [...these, ...rest] }));
+      return { ok: true, changed: [b.id] };
+    }),
+    rc("reference.arrange", "Arrange in a grid", "Pictures in rows, tidy", "edit", [ID, { name: "indices", type: "json", doc: "which pictures (from 0), as a list; all when left out" }], (o) => {
+      const b = hasBoard(o);
+      if (!b || !b.items.length) return { ok: false, error: "No pictures on that moodboard." };
+      const at = o["indices"] === undefined ? new Set(b.items.map((_, j) => j)) : new Set(indices(o["indices"], b));
+      const these = [...at].sort((x, y) => x - y), first = b.items[these[0]!]!;
+      // rows about as wide as tall, each picture as wide as the widest, a gap of a tenth of it; from where the first one is
+      const cols = Math.max(1, Math.ceil(Math.sqrt(these.length))), w = Math.max(...these.map((j) => b.items[j]!.w)), gap = w / 10;
+      const hOf = (j: number): number => b.items[j]!.w * (ratio.get(b.items[j]!.h) ?? 0.75);
+      let y = first.y;
+      const placed = new Map<number, Item>();
+      for (let r = 0; r * cols < these.length; r++) {
+        const row = these.slice(r * cols, r * cols + cols);
+        row.forEach((j, c) => placed.set(j, { ...b.items[j]!, x: first.x + c * (w + gap), y }));
+        y += Math.max(...row.map(hOf)) + gap;
+      }
+      updateBoard(b.id, (bd) => ({ ...bd, items: bd.items.map((it, j) => placed.get(j) ?? it) }));
+      return { ok: true, changed: [b.id] };
+    }),
+    rc("reference.duplicateBoard", "Duplicate the moodboard", "A copy with the same pictures", "edit", [ID, { name: "window", type: "text", doc: "the window to show the copy in" }], (o) => {
+      const b = hasBoard(o), all = boards();
+      if (!b) return { ok: false, error: "No such moodboard." };
+      if (all.length >= 100) return { ok: false, error: "There are 100 moodboards already: delete one first." };
+      const copy: Board = { ...b, id: newObjectId(), name: `${b.name} copy`.slice(0, 80) };
+      settings.set("reference.boards", JSON.stringify([...all, copy]));
+      const w = winOf(o);
+      if (w) (w.source = `board:${copy.id}`), keepNow();
+      renderAll();
+      return { ok: true, made: [copy.id] };
+    }),
+    rc("reference.export", "Save the moodboard as a picture", "A PNG of it, into the library", "edit", [ID], async (o) => {
+      const b = hasBoard(o);
+      if (!b || !b.items.length) return { ok: false, error: "No pictures on that moodboard." };
+      const png = await boardPicture(b);
+      if (!png) return { ok: false, error: "The moodboard could not be drawn." };
+      const [h] = await deps.importFiles([new File([png], `${b.name}.png`, { type: "image/png" })]);
+      deps.say(h ? `“${b.name}.png” is in the library.` : "The picture could not be saved.");
+      return h ? { ok: true, made: [h] } : { ok: false, error: "The picture could not be saved." };
+    }),
+    rc("reference.toCanvas", "Place on the canvas", "Library pictures, in the middle of the view", "edit", [{ name: "ids", type: "ids", doc: "the library files (their hashes)", required: true }], async (o) => {
+      const n = await deps.place((o["ids"] as string[]) ?? []);
+      return n ? { ok: true } : { ok: false, error: "Open a canvas to place pictures on it." };
+    }),
+    rc("reference.window", "Set the reference window", "Folded, see-through, clicks through, the gallery's order", "read", [{ name: "window", type: "text", doc: "the window", required: true }, { name: "fold", type: "boolean", doc: "folded to its title" }, { name: "opacity", type: "number", doc: "0.2 to 1" }, { name: "through", type: "boolean", doc: "clicks go through to what is under it (its title still takes them)" }, { name: "sort", type: "choice", doc: "the gallery's order", choices: ["new", "old", "az", "za"] }, { name: "size", type: "choice", doc: "the gallery's pictures", choices: ["s", "m", "l"] }], (o) => {
+      const w = winOf(o);
+      if (!w) return { ok: false, error: "No such window." };
+      const p = { ...w.prefs };
+      if (typeof o["fold"] === "boolean") p.folded = o["fold"];
+      if (typeof o["opacity"] === "number" && Number.isFinite(o["opacity"])) p.opacity = Math.min(1, Math.max(0.2, o["opacity"]));
+      if (typeof o["through"] === "boolean") p.through = o["through"];
+      if (o["sort"] === "new" || o["sort"] === "old" || o["sort"] === "az" || o["sort"] === "za") p.sort = o["sort"];
+      if (o["size"] === "s" || o["size"] === "m" || o["size"] === "l") p.size = o["size"];
+      w.prefs = p;
+      w.applyPrefs();
+      keepNow();
+      void w.render();
+      return { ok: true };
+    }),
+    rc("reference.slideshow", "Slideshow", "The gallery's pictures one after another", "read", [{ name: "window", type: "text", doc: "the window", required: true }], (o) => {
+      const w = winOf(o);
+      if (!w || w.source.startsWith("board:")) return { ok: false, error: "A gallery's window has a slideshow." };
+      w.slideshow();
+      return { ok: true };
+    }),
+    rc("reference.float", "Float over other apps", "A window above every app, view only", "read", [{ name: "window", type: "text", doc: "the window", required: true }], async (o) => {
+      const w = winOf(o);
+      if (!w || !deps.float) return { ok: false, error: "Only the desktop app floats a window over other apps." };
+      const page = await floatPage(w);
+      if (!page) return { ok: false, error: "Nothing to show in it." };
+      await deps.float(page.title, page.html);
+      return { ok: true };
+    }, () => (deps.float ? null : "Only in the desktop app.")),
+    rc("reference.manage", "Manage moodboards", "Rename, copy, open or delete them", "read", [{ name: "window", type: "text", doc: "the window to open one in" }], (o) => {
+      manage(winOf(o));
+      return { ok: true };
+    }),
+    rc("reference.fit", "Fit the moodboard", "Every picture in sight", "read", [{ name: "window", type: "text", doc: "the window", required: true }, ID], (o) => {
       const w = winOf(o), b = hasBoard(o);
-      if (!w || !b) return { ok: false, error: "No such window or board." };
+      if (!w || !b) return { ok: false, error: "No such window or moodboard." };
       const area = w.el.querySelector<HTMLElement>("[data-ref-board]");
       if (!area || !b.items.length) return { ok: true };
       const minX = Math.min(...b.items.map((i) => i.x)), maxX = Math.max(...b.items.map((i) => i.x + i.w)), minY = Math.min(...b.items.map((i) => i.y)), maxY = Math.max(...b.items.map((i) => i.y + i.w));

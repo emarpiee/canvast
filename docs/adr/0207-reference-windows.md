@@ -37,7 +37,21 @@ not endless. It floats above everything, in any view (the Library, the canvas, P
   board's pictures are moved in place, not built again at each change; the library is read once and again only when it changes; a gallery
   builds 200 pictures at a time; the windows' places are kept once they rest.
 
+- **"Moodboard", not "board"** on screen (a board is the workspace's own level); the code and the stored setting keep `board`.
+- **A moodboard's pictures**: shown flipped, turned a quarter at a time, grey or see-through (`reference.look`; Shift+H, Shift+V; the
+  file is never changed), resized from any corner, brought forward or back (`reference.order`), arranged in a grid (`reference.arrange`),
+  placed on the canvas (dragged out of the window onto it, or *Place on the canvas*), all from a right-click menu as on the canvas. Its
+  undo history is kept on the device over a reload.
+- **Managing moodboards**: each in the chooser has its own ⋯ (open in a new window, rename, duplicate, arrange, fit, save as a picture,
+  delete), the same rows as the window's More menu; *Manage moodboards…* lists them all in the shared list dialog.
+- **The window**: folded to its title (a double-click on it), see-through, letting clicks through (its title keeps them); the gallery
+  sorted (newest, oldest, A to Z, Z to A), its pictures small, medium or large, a slideshow; a picture shown large is fitted in the
+  window (no scrollbar, never a window that grows), zoomed and panned, its bar always at the bottom, dragged out by its name.
+- **Floating over other apps** (the desktop app, `reference.float`): a snapshot of the window's pictures in a sandboxed window kept on top
+  of every app, panned and zoomed; view only.
+
 ## Consequences
 
 - A board holds library files only: a picture from outside is in the library once it is on a board.
 - Its pictures are thumbnails while small, the file itself once wider than 600 pixels on screen.
+- A floated window is a snapshot: it does not follow later changes to the moodboard.

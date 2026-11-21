@@ -2910,7 +2910,7 @@ test("a library of thousands keeps only the cards near the view in the page; End
   expect(app.consoleErrors).toEqual([]);
 });
 
-test("reference window (ADR 0207): over the Library and the canvas, a gallery of the library's pictures, a new board that a Library card is dragged onto, kept over a reload", async ({ app }) => {
+test("reference window (ADR 0207): over the Library and the canvas, a gallery of the library's pictures, a new moodboard that a Library card is dragged onto, kept over a reload; a paste from another app, a flip, a picture dragged off the canvas, a hidden one's padlock", async ({ app }) => {
   const p = app.page;
   await p.getByTestId("view-assets").click();
   await p.getByTestId("assets-import-input").setInputFiles([
@@ -2931,7 +2931,7 @@ test("reference window (ADR 0207): over the Library and the canvas, a gallery of
   await win.locator("[data-ref-back]").click();
   // a new board, then a Library card dragged onto it
   await win.locator("[data-ref-more]").click();
-  await p.locator('.pop-menu [data-command="reference.newBoard"], .pop-menu button:has-text("New board")').first().click();
+  await p.locator('.pop-menu [data-command="reference.newBoard"]').first().click();
   await p.getByTestId("prompt-input").fill("Faces");
   await p.getByTestId("prompt-ok").click();
   await expect(win.locator("[data-ref-board]")).toHaveCount(1);
@@ -2946,5 +2946,36 @@ test("reference window (ADR 0207): over the Library and the canvas, a gallery of
   await p.waitForFunction(() => typeof window.__canvastDebug !== "undefined");
   await expect(p.getByTestId("reference-window")).toHaveCount(1);
   await expect(p.getByTestId("reference-window").locator("[data-ref-item]")).toHaveCount(1);
+  const w2 = p.getByTestId("reference-window");
+  const items = async () => (await boards())[0]!.items as Array<{ h: string; fx?: boolean }>;
+  // a picture pasted from another app goes into the library and onto the moodboard
+  const pasted = makePng(20, 20, () => [40, 200, 40, 255]).toString("base64");
+  await w2.evaluate((el, b64) => {
+    const bytes = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
+    const dt = new DataTransfer();
+    dt.items.add(new File([bytes], "green.png", { type: "image/png" }));
+    el.dispatchEvent(new ClipboardEvent("paste", { clipboardData: dt, bubbles: true, cancelable: true }));
+  }, pasted);
+  await expect.poll(async () => (await items()).length, { message: "pasted from another app" }).toBe(2);
+  // shown flipped (the file unchanged): its look is the moodboard's
+  const sid = (await boards()).map((b) => (b as unknown as { id: string }).id)[0]!;
+  await p.evaluate((id) => window.__canvastDebug.runCommand("reference.look", { board: id, indices: [0], patch: { flip: "x" } }, "test"), sid);
+  await expect.poll(async () => (await items())[0]!.fx).toBe(true);
+  await expect(w2.locator('[data-ref-item="0"] img')).toHaveCSS("transform", /matrix\(-1/);
+  // a picture dragged off the canvas onto the moodboard is put on it, and stays on the canvas
+  await p.getByTestId("view-assets").click();
+  await p.locator('[data-testid="asset-card"][title="blue.png"]').click();
+  await p.getByTestId("asset-place").click();
+  await p.getByTestId("view-canvas").click();
+  await expect.poll(() => p.evaluate(() => window.__canvastDebug.objects().length)).toBe(1);
+  await p.keyboard.press("v");
+  const pic = await p.evaluate(() => { const d = window.__canvastDebug; return d.objectScreen(d.objects()[0]!.id)!.box; });
+  const wb = (await w2.locator("[data-ref-board]").boundingBox())!;
+  await app.drag({ x: (pic.minX + pic.maxX) / 2, y: (pic.minY + pic.maxY) / 2 }, { x: wb.x + wb.width / 2, y: wb.y + wb.height / 2 }, 8);
+  await expect.poll(async () => (await items()).length, { message: "dragged off the canvas" }).toBe(3);
+  expect(await p.evaluate(() => window.__canvastDebug.objects().length), "still on the canvas").toBe(1);
+  // a picture hidden out of hidden mode shows a padlock in its place
+  await p.evaluate((h) => window.__canvastDebug.libraryOp("hide", h, "1"), (await items())[0]!.h);
+  await expect(w2.locator(".ref-gone")).toHaveCount(1);
   expect(app.consoleErrors).toEqual([]);
 });

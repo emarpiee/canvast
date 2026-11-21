@@ -29,7 +29,7 @@ import { markCommands } from "../commands/from-bars";
 
 /** The desktop build (ADR 0177): the workspace is a folder, so what Settings says about storage, privacy and the page differs. */
 /** A row for something that is not a stored setting (Sharing's), with the settings rows' look. */
-const plainRowHtml: SettingRow = (o) =>
+export const plainRowHtml: SettingRow = (o) =>
   `<div class="set-row is-plain"><div class="set-words"><label${o.id ? ` for="${o.id}"` : ""}><span class="set-label">${o.label}</span><span class="set-help">${o.help}</span></label></div><div class="set-control">${o.control}</div></div>`;
 const DESKTOP = !!desktopBridge();
 /** A setting's words as the desktop build needs them (it has an app window, not a tab or an address). */
