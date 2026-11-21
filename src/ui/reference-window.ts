@@ -17,6 +17,8 @@ import { panelHtml } from "./panel";
 import { openTreeChooser } from "./tree-chooser";
 import type { ChoiceNode, ChooserView } from "./tree-chooser";
 import { showMoreButton } from "./show-more";
+import { artTile, makeThumb } from "../assets/thumb";
+import { isArtFile } from "../assets/art-preview";
 import { mountSettings } from "./setting-rows";
 import { R } from "../gen/kit";
 
@@ -120,9 +122,29 @@ export function mountReferenceWindows(deps: ReferenceDeps): { open(source?: RefS
     urls.set(hash, at);
     const key = full ? "full" : "thumb";
     at[key] ??= (async () => {
-      const blob = full ? (await deps.assets.record(hash).catch(() => undefined))?.blob : (await session.catalog?.thumb(hash).catch(() => undefined))?.blob;
-      return blob ? URL.createObjectURL(blob) : full ? urlOf(hash, false) : null;
+      if (full) {
+        const blob = (await deps.assets.record(hash).catch(() => undefined))?.blob;
+        return blob ? URL.createObjectURL(blob) : urlOf(hash, false);
+      }
+      // the picture the Library shows for it, in its order: a custom thumbnail, the thumbnail stored, one made now as the Library makes it (and
+      // kept for it), an art file's own picture, else the file itself
+      const custom = (await listing())?.byHash.get(hash)?.thumb;
+      if (custom) {
+        const target = (await listing())?.byHash.get(custom);
+        const b = (target && (deps.hidden() || !target.hidden) ? (await session.catalog?.thumb(custom).catch(() => undefined))?.blob : undefined) ?? (await session.storage?.customThumbs?.get(custom).catch(() => null)) ?? undefined;
+        if (b) return URL.createObjectURL(b);
+      }
+      const kept = (await session.catalog?.thumb(hash).catch(() => undefined))?.blob;
+      if (kept) return URL.createObjectURL(kept);
+      const rec = await deps.assets.record(hash).catch(() => undefined);
+      if (!rec) return null;
+      const made = await makeThumb(rec).catch(() => null);
+      if (made && !made.notKept && !session.readOnly) void session.catalog?.putThumb(made).catch(() => undefined);
+      const tile = made ? null : isArtFile(rec.name) ? await artTile(rec).catch(() => null) : null;
+      return URL.createObjectURL(made?.blob ?? tile ?? rec.blob);
     })();
+    // (nothing found now is looked for again next time: the Library may make it meanwhile)
+    void at[key]!.then((u) => void (u === null && delete at[key]));
     return at[key]!;
   };
   // The library as the windows read it: once, then again only when it changed (`refresh`), not at every redraw
@@ -362,7 +384,16 @@ export function mountReferenceWindows(deps: ReferenceDeps): { open(source?: RefS
           if (!s.isIntersecting) continue;
           io.unobserve(s.target);
           const e = shown[Number((s.target as HTMLElement).dataset["refI"])];
-          if (e) void urlOf(e.hash, false).then((u) => { const img = s.target.querySelector("img"); if (img && u) img.src = u; });
+          if (!e) continue;
+          // (a file no browser draws, with no thumbnail: its name, not an empty square)
+          const none = (): void => void (s.target.innerHTML = `<span class="ref-gone">${ICONS.image}<span>${esc(e.name)}</span></span>`);
+          void urlOf(e.hash, false).then((u) => {
+            const img = s.target.querySelector("img");
+            if (!img) return;
+            if (!u) return none();
+            img.onerror = none;
+            img.src = u;
+          });
         }
       }, { root: body.closest(".panel-body"), rootMargin: "200px" });
       for (const t of body.querySelectorAll(".ref-thumb")) io.observe(t);

@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.61.20 — A reference gallery shows every picture the Library shows (2026-11-22)
+
+- **Fixed before release:** some of a reference window's gallery pictures were blank though the Library showed them: it took only a thumbnail already stored, remembered when there was none, and left out custom thumbnails and art files' pictures. It now shows what the Library shows (a custom thumbnail, the stored one, one made as the Library makes it, an art file's picture, the file), tries again later, and names a picture it cannot draw. ([The Library](README.md#the-library))
+
 ## 0.61.19 — Opacity on a slider (2026-11-22)
 
 - **Changed:** a reference window's opacity, and its selected pictures' on a moodboard, are set on sliders (with their numbers; a double-click puts them back) in an *Opacity* strip under its title, opened from *Opacity…* in the More menu or a picture's right-click menu, instead of four fixed steps; Alt and the wheel over its title change the window's too. A slider dragged is one undo step. ([The Library](README.md#the-library))
