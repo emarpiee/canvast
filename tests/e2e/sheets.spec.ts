@@ -1060,11 +1060,11 @@ test("comic page (ADR 0206): the Panel tool makes a page laid out in panels; a d
   await expect.poll(async () => Math.round((await boxOf(right.id)).maxY - ra.maxY)).toBeGreaterThan(14);
   expect(Math.round((await boxOf(below.id)).minY - rb.minY)).toBeGreaterThan(14);
   // A click on a gutter's middle handle chooses it: Gutter then widens that gutter alone (row two's), not the others (row three's).
-  const [p3, p4, p5] = await Promise.all(["Panel 3", "Panel 4", "Panel 5"].map(async (n) => boxOf((await panels()).find((o) => o.name === n)!.id)));
-  await p.mouse.click(Math.round((p3!.maxX + p4!.minX) / 2), Math.round((p3!.minY + p3!.maxY) / 2));
+  const [g3, g4, g5] = await Promise.all(["Panel 3", "Panel 4", "Panel 5"].map(async (n) => boxOf((await panels()).find((o) => o.name === n)!.id)));
+  await p.mouse.click(Math.round((g3!.maxX + g4!.minX) / 2), Math.round((g3!.minY + g3!.maxY) / 2));
   await p.evaluate(() => window.__canvastDebug.runCommand("comic.setOption", { name: "gutter", value: "80" }, "test"));
-  await expect.poll(async () => Math.round((await boxOf((await panels()).find((o) => o.name === "Panel 3")!.id)).maxX)).toBeLessThan(Math.round(p3!.maxX) - 4);
-  expect(Math.round((await boxOf((await panels()).find((o) => o.name === "Panel 5")!.id)).maxX), "another row's gutter stays").toBe(Math.round(p5!.maxX));
+  await expect.poll(async () => Math.round((await boxOf((await panels()).find((o) => o.name === "Panel 3")!.id)).maxX)).toBeLessThan(Math.round(g3!.maxX) - 4);
+  expect(Math.round((await boxOf((await panels()).find((o) => o.name === "Panel 5")!.id)).maxX), "another row's gutter stays").toBe(Math.round(g5!.maxX));
   await key(app, "Control+z");
   // A double-click on the gutter between the two panels of the last row merges them.
   const [p5, p6] = await Promise.all(["Panel 5", "Panel 6"].map(async (n) => boxOf((await panels()).find((o) => o.name === n)!.id)));
