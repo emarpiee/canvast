@@ -5,6 +5,7 @@
  * sidebar card of the Assets view (rows, rename, delete) and the unknown-kind safety need nothing more.
  */
 import { BODIES, validLook, type BalloonLook } from "../doc/balloon-geometry";
+import { validComicStyle, type ComicStyle } from "../doc/comic";
 import { plural } from "../doc/plural";
 import type { Adjust } from "../doc/adjust";
 import { ADJUSTMENTS, cleanAdjust, layersOf } from "../doc/adjust";
@@ -240,7 +241,18 @@ export const LINE_STYLE_KIND: StyleKind = {
   look: (d) => ({ swatches: [(d as ModelLook)["linesColour"], (d as ModelLook)["bg"], (d as ModelLook)["toneColour"]].filter((c): c is string => typeof c === "string" && isColour(c)) }),
 };
 
-export const STYLE_KINDS: readonly StyleKind[] = [ADJUSTMENT_KIND, GRADIENT_KIND, COLOUR_KIND, PALETTE_KIND, TEXT_KIND, PATTERN_KIND, BALLOON_KIND, LINE_STYLE_KIND, LAYOUT_STYLE_KIND, RATIO_KIND, EXPORT_KIND, EXPORT_NAME_KIND];
+/** A comic page (ADR 0206): its shape, its panels' outlines, its gutter and border, saved from its options to lay out another page. */
+export const COMIC_KIND: StyleKind = {
+  id: "comic",
+  label: "Comic page",
+  plural: "Comic pages",
+  empty: "None yet. Save one from a comic page's options (Save as style).",
+  howTo: "Select a comic page on the canvas, then click one to lay it out that way, or choose it in the Panel tool's Layout.",
+  validate: (d) => validComicStyle(d),
+  summary: (d) => `${plural((d as ComicStyle).panels.length, "panel")} · ${formatRatio((d as ComicStyle).ratio)}`,
+};
+
+export const STYLE_KINDS: readonly StyleKind[] = [ADJUSTMENT_KIND, GRADIENT_KIND, COLOUR_KIND, PALETTE_KIND, TEXT_KIND, PATTERN_KIND, BALLOON_KIND, COMIC_KIND, LINE_STYLE_KIND, LAYOUT_STYLE_KIND, RATIO_KIND, EXPORT_KIND, EXPORT_NAME_KIND];
 
 export const kindById = (id: string): StyleKind | undefined => STYLE_KINDS.find((k) => k.id === id);
 

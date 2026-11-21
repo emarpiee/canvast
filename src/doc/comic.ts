@@ -1,5 +1,7 @@
 import type { SubPath } from "./path";
 import { NODE } from "./path";
+import type { Paint } from "./paint";
+import { isPaint } from "./paint";
 
 /**
  * Comic pages (ADR 0206): the geometry of panels, pure. A page is a sheet; its panels are convex outlines on it, apart by a gutter. A cut
@@ -311,3 +313,23 @@ export function setGutterWidth(panels: readonly Poly[], g: Pick<Gutter, "a" | "b
     }
   return out;
 }
+
+/** A saved comic page: its width ÷ height, each panel's corners as shares of the page's width and height, its gutter and its panels' border (thousandths of the shorter side). */
+export interface ComicStyle {
+  ratio: number;
+  panels: Array<Array<[number, number]>>;
+  gutter: number;
+  border: number;
+  stroke: Paint | null;
+}
+
+/** A style's data, checked (a style file can come from anywhere); null when it is not one. */
+export function validComicStyle(d: unknown): ComicStyle | null {
+  const o = d as Partial<ComicStyle> | null;
+  const num = (v: unknown, lo: number, hi: number): boolean => typeof v === "number" && Number.isFinite(v) && v >= lo && v <= hi;
+  if (!o || typeof o !== "object" || !num(o.ratio, 0.01, 100) || !num(o.gutter, 0, 500) || !num(o.border, 0, 100) || !(o.stroke === null || isPaint(o.stroke))) return null;
+  if (!Array.isArray(o.panels) || !o.panels.length || o.panels.length > 200) return null;
+  for (const p of o.panels) if (!Array.isArray(p) || p.length < 3 || p.length > 64 || !p.every((q) => Array.isArray(q) && q.length === 2 && num(q[0], -1, 2) && num(q[1], -1, 2))) return null;
+  return { ratio: o.ratio!, panels: o.panels.map((p) => p.map(([x, y]) => [x, y] as [number, number])), gutter: o.gutter!, border: o.border!, stroke: o.stroke ?? null };
+}
+

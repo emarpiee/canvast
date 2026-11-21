@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { area2, guttersOf, gutterAt, insidePoly, layoutPanels, mergePanels, moveCorner, moveGutter, splitPanel, turnGutter, widenGutters } from "../../src/doc/comic";
+import { area2, validComicStyle, guttersOf, gutterAt, insidePoly, layoutPanels, mergePanels, moveCorner, moveGutter, splitPanel, turnGutter, widenGutters } from "../../src/doc/comic";
 import type { Pt } from "../../src/doc/comic";
 
 const box = (x: number, y: number, w: number, h: number): Pt[] => [[x, y], [x + w, y], [x + w, y + h], [x, y + h]];
@@ -66,5 +66,15 @@ describe("comic page panels (ADR 0206)", () => {
     expect(turnGutter(p, h, h.ends[0], [h.ends[1][0], h.ends[1][1] + 400], 2), "turned past a panel: refused").toBeNull();
     expect(moveCorner(p[0]!, 2, [80, 160], 2)).not.toBeNull();
     expect(moveCorner(p[0]!, 2, [10, 10], 2), "folded").toBeNull();
+  });
+
+  it("a comic page style is checked before it is used: a page's ratio, panels of 3 to 64 corners, a gutter and a border; anything else is refused", () => {
+    const ok = { ratio: 0.7, panels: [[[0, 0], [1, 0], [1, 0.5]]], gutter: 14, border: 4, stroke: "#000000" };
+    expect(validComicStyle(ok)).toEqual(ok);
+    expect(validComicStyle({ ...ok, ratio: 0 })).toBeNull();
+    expect(validComicStyle({ ...ok, panels: [] })).toBeNull();
+    expect(validComicStyle({ ...ok, panels: [[[0, 0], [1, 0]]] }), "two corners: no panel").toBeNull();
+    expect(validComicStyle({ ...ok, stroke: 5 })).toBeNull();
+    expect(validComicStyle(null)).toBeNull();
   });
 });

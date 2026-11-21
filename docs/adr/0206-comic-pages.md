@@ -49,6 +49,11 @@ tools are: cut a panel with a line, keep the gutter, move a gutter, merge two pa
   the Gutter field then sets that gutter's width alone, else every gutter of the page. The Panel tool has no page size and no border of
   its own: the sheet's Ratio shapes a page, the Appearance's outline borders the selected panels (and, as the tool's, a new page's).
 
+- **Comic page styles** (`ComicStyle`, the Styles panel's *Comic pages*): a page's ratio, each panel's corners as shares of the page,
+  its gutter and border, saved from its options; applied to a selected page (resized to the ratio from its top-left corner, its panels
+  reused by order and what is in them rehomed) or, chosen in the Layout list, to the next page the tool draws (its ratio kept while drawn).
+- The *Comic Panels* guide is hidden from the Pattern panel (`Generator.hidden`): kept so that guides and styles made with it still work.
+
 ## Consequences
 
 - Panels are convex: a cut makes convex parts, and a merge takes the hull (an L-shaped panel is two panels).

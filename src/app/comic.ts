@@ -3,12 +3,12 @@ import type { DocumentStore } from "../doc/document-store";
 import { isContainer } from "../doc/containers";
 import { normalizeUnit, worldBounds } from "../doc/edit-ops";
 import { gutterAt, guttersOf, insidePoly, layoutPanels, mergePanels, moveCorner, moveGutter, polySub, segmentHits, setGutterWidth, splitPanel, subPoly, turnGutter, widenGutters } from "../doc/comic";
-import type { Gutter } from "../doc/comic";
+import type { ComicStyle, Gutter } from "../doc/comic";
 import type { Poly, Pt } from "../doc/comic";
 import type { CanvasObject, ObjectId, PathObject } from "../doc/model";
 import type { Paint } from "../doc/paint";
 import { expressObjectIn, homeObject, newObjectId } from "../doc/model";
-import { geometryBounds } from "../doc/path";
+import { drawnParams, drawnSubs, geometryBounds } from "../doc/path";
 import { COMIC_LAYOUTS, comicRows } from "../gen/guides";
 import { plural } from "../doc/plural";
 import type { EditorState } from "./editor-state";
@@ -332,3 +332,55 @@ export function mergeGutter(doc: DocumentStore, page: PathObject, panels: readon
 
 /** A panel: a sheet on a comic page (what Layers, the labels and the selection show as a panel, not a sheet). */
 export const isComicPanel = (doc: DocumentStore, o: CanvasObject | undefined): boolean => isContainer(o) && o.parent !== undefined && isComicPage(doc.get(o.parent));
+
+// ---- Comic page styles (the Styles panel's "Comic page"): a page's shape, its panels' outlines, gutter and border, to lay out another
+
+/** The selected page as a style (null when no comic page is selected). */
+export function comicStyleOf(doc: DocumentStore, editor: EditorState): ComicStyle | null {
+  const page = selectedComicPage(doc, editor);
+  if (!isComicPage(page)) return null;
+  const s = pageSize(page), panels = panelsOf(doc, page).filter((p) => !p.hidden);
+  if (!(s.w > 0 && s.h > 0) || !panels.length) return null;
+  const first = panels[0]!, k = 2 ** (expressObjectIn(first, page.frame ?? doc.space.world).unit - page.unit);
+  return {
+    ratio: s.w / s.h,
+    panels: panels.map((p) => panelPoly(doc, page, p).map(([x, y]): [number, number] => [(x - s.x) / s.w, (y - s.y) / s.h])),
+    gutter: page.container.comic.gutter,
+    border: first.stroke === null ? 0 : (first.width * k) / per(page, 1),
+    stroke: first.stroke,
+  };
+}
+
+/** A style's panels on a page box (page units). */
+const stylePolys = (st: ComicStyle, s: { x: number; y: number; w: number; h: number }): Pt[][] => st.panels.map((p) => p.map(([x, y]): Pt => [s.x + x * s.w, s.y + y * s.h]));
+
+/** A new page drawn with the Panel tool from a style: its panels and gutter, with the style's border. */
+export function newComicPageFrom(doc: DocumentStore, sheet: PathObject, st: ComicStyle): PathObject[] {
+  const page: PathObject = { ...sheet, container: { clip: true, comic: { gutter: st.gutter } }, name: sheet.name?.replace(/^Sheet/, "Page") ?? "Page" };
+  const polys = stylePolys(st, pageSize(page));
+  const look = { stroke: st.stroke, width: per(page, st.border) };
+  return [page, ...polys.map((p, i) => withSpace(panelObject(doc, page, p, null, page.z + (i + 1) / (polys.length + 1), look, `Panel ${i + 1}`), doc.space))];
+}
+
+/**
+ * The selected page laid out as a style: its shape (as wide as it is, from its top-left corner), its panels (those it has keep their ids
+ * and what is in them goes to the new panel that holds it), its gutter and the style's border. One undo step.
+ */
+export function applyComicStyle(doc: DocumentStore, editor: EditorState, st: ComicStyle): boolean {
+  const page0 = selectedComicPage(doc, editor);
+  if (!isComicPage(page0) || editor.blockEdit()) return false;
+  const s0 = pageSize(page0), h = s0.w / st.ratio;
+  const shaped = !page0.rot && (page0.shape === "rect" || page0.shape === undefined);
+  const params = shaped ? drawnParams("rect", s0.x, s0.y, s0.w, h, 6, 5) : null;
+  const page: PathObject = { ...page0, ...(shaped ? { sub: drawnSubs("rect", s0.x, s0.y, s0.w, h, 6, 5), shape: "rect" as const, ...(params ? { params } : {}) } : {}), container: { ...page0.container, comic: { gutter: st.gutter } } };
+  const old = panelsOf(doc, page0), polys = stylePolys(st, pageSize(page));
+  const look = { stroke: st.stroke, width: per(page, st.border) };
+  // (a panel kept is in the page's units once panelObject has put it there: its border is set in them)
+  const made = polys.map((p, i) =>
+    withSpace(old[i] ? { ...panelObject(doc, page, p, old[i]!, old[i]!.z, {}, ""), stroke: st.stroke, width: Math.max(look.width, Number.MIN_VALUE) } : { ...panelObject(doc, page, p, null, page.z + 0.5 + i * 1e-3, look, ""), name: `Panel ${i + 1}` }, doc.space),
+  );
+  const moved = rehome(doc, page, old.map((p) => p.id), made.map((m, i) => ({ id: m.id, poly: polys[i]! })));
+  doc.commit(doc.transaction("Comic page style", [page, ...made, ...moved], old.slice(polys.length).map((p) => p.id)));
+  editor.changed();
+  return true;
+}

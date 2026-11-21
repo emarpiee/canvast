@@ -1083,5 +1083,15 @@ test("comic page (ADR 0206): the Panel tool makes a page laid out in panels; a d
   await expect.poll(async () => Math.round((await boxOf(right.id)).maxY)).toBe(Math.round(ra.maxY));
   await key(app, "Control+z");
   await expect.poll(async () => (await panels()).length).toBe(6);
+  // Saved as a style, the page lays another layout out its way again: its panels and shape
+  await p.evaluate((id) => window.__canvastDebug.select([id]), page!.id);
+  await p.evaluate(() => window.__canvastDebug.runCommand("comic.saveStyle", {}, "test"));
+  const comicStyles = () => p.evaluate(() => (window.__canvastDebug.styles() as Array<{ kind: string; id?: string }>).filter((x) => x.kind === "comic"));
+  await expect.poll(async () => (await comicStyles()).length).toBe(1);
+  await p.evaluate(() => window.__canvastDebug.runCommand("comic.setOption", { name: "layout", value: "four" }, "test"));
+  await expect.poll(async () => (await panels()).length).toBe(4);
+  const sid = (await comicStyles())[0]!.id;
+  await p.evaluate((v) => window.__canvastDebug.runCommand("comic.setOption", { name: "layout", value: v }, "test"), `style:${sid}`);
+  await expect.poll(async () => (await panels()).length, { message: "the saved page's panels" }).toBe(6);
   expect(app.consoleErrors).toEqual([]);
 });

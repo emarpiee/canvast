@@ -50,6 +50,8 @@ export interface Generator {
   readonly family: "Waves" | "Blobs" | "Soft" | "Lines" | "Tiles" | "Fields" | "Proportion" | "Composition" | "Layout" | "Perspective" | "Geometry" | "Art study" | "Balloons";
   /** For laying out and composing work: it starts with no background, to sit over what is under it. */
   readonly guide?: true;
+  /** Left out of the picker (a tool of its own does it now), still made again for what was made with it and for its saved styles. */
+  readonly hidden?: true;
   /** The settings, in sections; the "Colour" section gets the Background colour in front. */
   readonly sections: readonly Section[];
   readonly run: (v: Values, rng: Rng, w: number, h: number) => GenShape[];

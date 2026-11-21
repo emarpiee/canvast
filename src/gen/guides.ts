@@ -479,7 +479,7 @@ export const comicPanels = guide("comic-panels", "Comic Panels", "Art study", "P
     const k = (n("safeIn") / 100) * Math.min(p.w, p.h);
     p.rect(p.x0 + k, p.y0 + k, p.w - 2 * k, p.h - 2 * k);
   }
-}, { frame: false, page: "portrait" });
+}, { frame: false, page: "portrait", hidden: true }); // (the Panel tool makes comic pages now, ADR 0206: kept for what was made with it)
 
 export const GUIDES: readonly Generator[] = [
   goldenRatio, goldenSpiral, fibonacciGrid, rootRectangles, modularScale, ...MORE_GUIDES.proportion,

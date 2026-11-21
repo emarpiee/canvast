@@ -1,4 +1,5 @@
 import type { BalloonLook } from "../doc/balloon-geometry";
+import type { ComicStyle } from "../doc/comic";
 import { copyPlainText } from "../app/system-clipboard";
 import { cleanName, freeNameIn } from "../doc/file-names";
 import type { Adjust } from "../doc/adjust";
@@ -54,6 +55,8 @@ export interface StylesDeps {
   text: { count(): number; current(): TextLook | null; apply(look: TextLook, label: string): void };
   /** Pattern styles: putting one into the Pattern panel (and making it on what is picked). */
   balloon: { can(): boolean; apply(look: BalloonLook): void };
+  /** Comic page styles (ADR 0206): a comic page selected to lay out. */
+  comic: { can(): boolean; apply(style: ComicStyle): void };
   /** Layout styles: given to the one picked sheet. */
   layout: { can(): boolean; apply(data: SheetLayout, name: string): void };
   /** 3D line styles: given to the 3D view in front. */
@@ -102,7 +105,7 @@ export function mountStylesPanel(host: HTMLElement, editor: EditorState, styles:
   fileInput.dataset["testid"] = "styles-import";
   panel.appendChild(fileInput);
 
-  const canApply = (kind: string): boolean => (kind === "export" ? true : kind === "ratio" ? deps.ratio.current() !== null : kind === "pattern" ? true : kind === "balloon" ? deps.balloon.can() : kind === "lines3d" ? deps.lines3d.can() : kind === "layout" ? deps.layout.can() : kind === "adjustment" ? deps.adjustment.can() : kind === "text" ? deps.text.count() > 0 : deps.paint.count() > 0 || (kind === "gradient" && deps.map.count() > 0));
+  const canApply = (kind: string): boolean => (kind === "export" ? true : kind === "ratio" ? deps.ratio.current() !== null : kind === "pattern" ? true : kind === "balloon" ? deps.balloon.can() : kind === "comic" ? deps.comic.can() : kind === "lines3d" ? deps.lines3d.can() : kind === "layout" ? deps.layout.can() : kind === "adjustment" ? deps.adjustment.can() : kind === "text" ? deps.text.count() > 0 : deps.paint.count() > 0 || (kind === "gradient" && deps.map.count() > 0));
   const kindsShown = STYLE_KINDS;
 
   /** The small pictures of pattern styles, made once for each (the data of a style does not change; an update gets a new key). */
@@ -150,9 +153,9 @@ export function mountStylesPanel(host: HTMLElement, editor: EditorState, styles:
       .map((c, i) => `<div class="pal-row"><button type="button" class="pal-swatch" data-edit-colour="${i}" style="background:${esc(c.c)}" title="Change this colour" aria-label="Change the colour ${esc(c.name || c.c.toUpperCase())}"></button><input class="pal-name" data-colour-name="${i}" value="${esc(c.name ?? "")}" placeholder="${esc(c.c.toUpperCase())}" maxlength="${MAX_NAME}" aria-label="Name of colour ${i + 1}"><button type="button" class="layer-btn" data-remove-colour="${i}" aria-label="Remove ${esc(c.name || c.c.toUpperCase())}" title="Remove"${pal.colours.length < 2 ? " disabled" : ""}>${ICONS.x}</button></div>`)
       .join("")}<div class="pal-actions"><button type="button" class="pal-add" data-add-colour="${esc(item.id)}"${pal.colours.length >= MAX_PALETTE ? " disabled" : ""}>Add colour</button><button type="button" class="pal-done" data-done>Done</button></div></div>`;
 
-  const TAB_ICON: Record<string, string> = { adjustment: ICONS.slidersHorizontal, gradient: ICONS.blend, colour: ICONS.droplet, palette: ICONS.palette, text: ICONS.textStyle, pattern: ICONS.mountainSnow, balloon: ICONS.speechBalloon, lines3d: ICONS.draftingCompass, layout: ICONS.layoutStyles, ratio: ICONS.proportions, export: ICONS.fileCog, exportname: ICONS.fileSignature };
+  const TAB_ICON: Record<string, string> = { adjustment: ICONS.slidersHorizontal, gradient: ICONS.blend, colour: ICONS.droplet, palette: ICONS.palette, text: ICONS.textStyle, pattern: ICONS.mountainSnow, balloon: ICONS.speechBalloon, comic: ICONS.comicPanel, lines3d: ICONS.draftingCompass, layout: ICONS.layoutStyles, ratio: ICONS.proportions, export: ICONS.fileCog, exportname: ICONS.fileSignature };
   /** The short line under each kind in the list of kinds. */
-  const KIND_HINT: Record<string, string> = { adjustment: "From the Adjust panel", gradient: "Blends of colours", colour: "Single colours", palette: "Sets of colours", text: "Size, spacing, colour", pattern: "A generator and its seed", balloon: "Speech balloon looks", lines3d: "Line art of 3D views", layout: "Auto layouts of sheets", ratio: "Shapes of sheets and shapes", export: "Choices of Export…", exportname: "File names for Export…" };
+  const KIND_HINT: Record<string, string> = { adjustment: "From the Adjust panel", gradient: "Blends of colours", colour: "Single colours", palette: "Sets of colours", text: "Size, spacing, colour", pattern: "A generator and its seed", balloon: "Speech balloon looks", comic: "Pages of comic panels", lines3d: "Line art of 3D views", layout: "Auto layouts of sheets", ratio: "Shapes of sheets and shapes", export: "Choices of Export…", exportname: "File names for Export…" };
   const GUIDE: Record<string, string> = {
     adjustment: "Save an adjustment from the Adjust panel of a picture, then click it here to give other pictures the same look.",
     gradient: "A gradient is a blend of colours. Save one from the fill or outline picker, make a new one here, or import a GIMP .ggr file.",
@@ -342,6 +345,7 @@ export function mountStylesPanel(host: HTMLElement, editor: EditorState, styles:
     else if (item.kind === "text") deps.text.apply(item.data as TextLook, item.name);
     else if (item.kind === "pattern") deps.pattern.apply(item.data as PatternData, item.name);
     else if (item.kind === "balloon") deps.balloon.apply(item.data as BalloonLook);
+    else if (item.kind === "comic") deps.comic.apply(item.data as ComicStyle);
     else if (item.kind === "lines3d") deps.lines3d.apply(item.data, item.name);
     else if (item.kind === "layout") deps.layout.apply(item.data as SheetLayout, item.name);
     else if (item.kind === "ratio") deps.ratio.apply(item.data as number, item.name);

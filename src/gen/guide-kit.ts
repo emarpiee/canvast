@@ -139,7 +139,7 @@ export function pen(v: Values, w: number, h: number): Pen {
 }
 
 /** A guide: its own settings (Randomize leaves them, so that it stays what it is, and changes its look), then the colours and the look of every guide. */
-export function guide(id: string, label: string, family: Generator["family"], about: string, items: readonly Setting[], draw: (p: Pen, v: ReturnType<typeof reader>, rng: Rng) => void, more: { frame?: boolean; readout?: Generator["readout"]; /** Laid out on a page: a Page section sets the sheet's size (gen/pages.ts), standing this way up at first. */ page?: "portrait" | "landscape" } = {}): Generator {
+export function guide(id: string, label: string, family: Generator["family"], about: string, items: readonly Setting[], draw: (p: Pen, v: ReturnType<typeof reader>, rng: Rng) => void, more: { frame?: boolean; readout?: Generator["readout"]; /** Laid out on a page: a Page section sets the sheet's size (gen/pages.ts), standing this way up at first. */ page?: "portrait" | "landscape"; hidden?: true } = {}): Generator {
   return {
     id, label, family, about, guide: true,
     sections: [COLOURS, { title: label, items: items.map((i) => wide(steady(i))) }, ...(more.page ? [pageSection(more.page)] : []), { title: "Look", items: [WEIGHT, STRONG_WIDTH, DASH, ...MARGINS, frameSetting(more.frame ?? true)] }],
@@ -149,6 +149,7 @@ export function guide(id: string, label: string, family: Generator["family"], ab
       return p.done();
     },
     ...(more.readout ? { readout: more.readout } : {}),
+    ...(more.hidden ? { hidden: true as const } : {}),
   };
 }
 

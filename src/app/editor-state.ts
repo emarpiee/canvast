@@ -1,5 +1,6 @@
 import { COMIC_DEFAULTS } from "./comic";
 import type { ComicOptions } from "./comic";
+import type { ComicStyle } from "../doc/comic";
 import type { Camera } from "../core/camera";
 import { readOnlyLine } from "../storage/guest-page";
 import type { Dyadic } from "../core/dyadic";
@@ -201,6 +202,8 @@ export class EditorState {
   comicGutter: { page: string; a: string[]; b: string[] } | null = null;
   /** The gutter under the pointer (with nothing pressed): it shows its width grips too, as the chosen one does. */
   comicHover: { page: string; a: string[]; b: string[] } | null = null;
+  /** A comic page style chosen in the Panel tool's Layout: what the next page is made of (its shape too). */
+  comicStyle: ComicStyle | null = null;
   shapeTips = 5;
   /** Waiting for a click on the object to attach the picked ones to (ADR 0109). */
   attachMode = false;

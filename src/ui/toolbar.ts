@@ -123,7 +123,17 @@ export interface ToolbarActions {
   /** A speech balloon's options and a text in a shape's, as groups of this bar (ADR 0198; once a panel). */
   balloon: BalloonActions;
   /** The Panel tool's options (ADR 0206): what the next comic page takes, and the selected page too. */
-  comic: { options(): ComicOptions; selected(): boolean; setOption(name: keyof ComicOptions, value: string | number): boolean; /** The chosen gutter's width (per cent of the page's shorter side), or null. */ chosenGutter(): number | null };
+  comic: {
+    options(): ComicOptions;
+    selected(): boolean;
+    setOption(name: keyof ComicOptions, value: string | number): boolean;
+    /** The chosen gutter's width (per cent of the page's shorter side), or null. */
+    chosenGutter(): number | null;
+    /** The comic page styles saved, by id and name (the Layout list offers them after the built-in layouts). */
+    styles(): Array<[id: string, name: string]>;
+    /** The selected page into the Styles panel. */
+    saveStyle(): void;
+  };
   selectedShape(): { shape: "polygon" | "star"; sides: number; tips: number; inner: number } | null;
   /** Change the sides, points or ratio of the picked polygons and stars: one undo step. */
   shapeSelected(change: { sides?: number; tips?: number; inner?: number }, final?: boolean): void;
@@ -259,7 +269,7 @@ export interface PropertiesBar {
 const BAR_COMMANDS: ReadonlyArray<readonly [string, string]> = [
   ...TOOL_ORDER.map((t) => [`[data-tool="${t}"]`, TOOL_COMMAND[t]] as const),
   ["[data-bookmarks]", "panel.bookmarks"], ["[data-styles]", "panel.styles"], ["[data-tags]", "panel.tags"], ["[data-layers]", "panel.layers"], ["[data-pattern-panel]", "panel.pattern"], ["[data-adjust-panel]", "panel.adjust"],
-  ["[data-size]", "tools.set"], ["[data-shape-width]", "tools.set"], ["[data-sides]", "tools.set"], ["[data-comic-opt]", "comic.setOption"], ["[data-tips]", "tools.set"], ["[data-width]", "tools.set"], ["[data-eraser-size]", "tools.set"], ["[data-strength]", "tools.set"],
+  ["[data-size]", "tools.set"], ["[data-shape-width]", "tools.set"], ["[data-sides]", "tools.set"], ["[data-comic-opt]", "comic.setOption"], ["[data-comic-save]", "comic.saveStyle"], ["[data-tips]", "tools.set"], ["[data-width]", "tools.set"], ["[data-eraser-size]", "tools.set"], ["[data-strength]", "tools.set"],
   ["[data-stab]", "tools.toggle"], ["[data-erase-parts]", "tools.toggle"], ["[data-erase-groups]", "tools.toggle"], ["[data-box-axis]", "tools.toggle"], ["[data-ignore-fill]", "tools.toggle"], ["[data-snap]", "tools.toggle"], ["[data-follow]", "tools.toggle"], ["[data-lock-radius]", "tools.toggle"], ["[data-lock]", "tools.toggle"],
   ["[data-pen-kind]", "tools.choose"], ["[data-shape-kind]", "tools.choose"], ["[data-color]", "tools.choose"], ["[data-colour-open]", "tools.choose"], ["[data-filter]", "tools.choose"],
   ["[data-mask-ink=show]", "mask.paintWhite"], ["[data-mask-ink=hide]", "mask.paintBlack"], ["[data-mask-ink=done]", "mask.paintDone"],
@@ -325,9 +335,10 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
         <button type="button" class="swatch swatch-current" data-colour-open aria-haspopup="dialog" aria-expanded="false" aria-label="Pen colour" title="Pen colour: open the colour picker (new text takes it too, until its own colour is set)"><span data-colour-chip></span></button>
       </div>
       <div class="tb-group tb-options" data-for="panel" data-comic role="group" aria-label="Comic page">
-        <label class="tb-count">Layout <select data-comic-opt="layout" data-name="Layout" aria-label="Layout">${PAGE_LAYOUTS.map(([v, l]) => `<option value="${v}">${esc(l)}</option>`).join("")}</select></label>
+        <label class="tb-count">Layout <select data-comic-opt="layout" data-name="Layout" aria-label="Layout"></select></label>
         <label class="tb-count" title="Between panels, in per cent of the page's shorter side: the gutter chosen (a click on its middle handle), else every gutter of the page">Gutter <input type="number" data-comic-opt="gutter" data-name="Gutter" min="0" max="20" step="0.1" inputmode="decimal" aria-label="Gutter (per cent of the page's shorter side)"></label>
         <label class="tb-count" title="Round the panels, in per cent of the page's shorter side">Margin <input type="number" data-comic-opt="margin" data-name="Margin" min="0" max="30" step="0.1" inputmode="decimal" aria-label="Margin (per cent of the page's shorter side)"></label>
+        <button type="button" data-comic-save aria-label="Save the page as a style" title="Save the selected page as a style: its shape, panels, gutter and border, in the Styles panel and the Layout list">${ICONS.save}</button>
       </div>
       <div class="tb-group tb-options" data-for="shape">
         <label class="tb-count" data-sides-wrap hidden>Sides <input type="number" data-sides min="3" max="24" step="1" inputmode="numeric" aria-label="Polygon sides"></label>
@@ -574,6 +585,7 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
       else editor[n] = !editor[n];
       editor.changed();
     }, () => null),
+    prop("comic.saveStyle", "Save the comic page as a style", "Its shape, panels, gutter and border, in Styles", [], () => actions.comic.saveStyle(), () => (actions.comic.selected() ? null : "Select a comic page.")),
     prop("comic.setOption", "Set a comic page option", "The layout, gutter or margin of the next page, and of the selected one (its chosen gutter alone)", [{ name: "name", type: "choice", doc: "which option", required: true, choices: ["layout", "gutter", "margin"] }, { name: "value", type: "text", doc: "a layout id, or a number in thousandths of the page's shorter side", required: true }], (o) => {
       const name = o["name"] as keyof ComicOptions, raw = o["value"];
       const value = name === "gutter" || name === "margin" ? Number(raw) : String(raw);
@@ -661,6 +673,7 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
     const v = Number((e.target as HTMLInputElement).value);
     pressCommand("tools.set", { name: "shapeWidth", value: v === 0 ? 0 : penFromSlider(v) });
   });
+  q<HTMLButtonElement>("[data-comic-save]")!.addEventListener("click", () => void pressCommand("comic.saveStyle"));
   for (const el of qa<HTMLInputElement | HTMLSelectElement>("[data-comic-opt]")) {
     const name = el.dataset["comicOpt"]!;
     // (a number is per cent here, thousandths of the page's shorter side in the options)
@@ -1455,6 +1468,14 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
     const comicGroup = q<HTMLElement>("[data-comic]")!;
     comicGroup.dataset["for"] = actions.comic.selected() ? "panel select node" : "panel";
     const co = actions.comic.options(), oneGutter = actions.comic.chosenGutter();
+    // (the Layout list: the built-in layouts, then the comic page styles saved, drawn again only when they change)
+    const layoutSel = q<HTMLSelectElement>('[data-comic-opt="layout"]')!, saved = actions.comic.styles();
+    const layoutHtml = PAGE_LAYOUTS.map(([v, l]) => `<option value="${v}">${esc(l)}</option>`).join("") + (saved.length ? `<optgroup label="Saved">${saved.map(([id, n]) => `<option value="style:${esc(id)}">${esc(n)}</option>`).join("")}</optgroup>` : "");
+    if (layoutSel.dataset["html"] !== layoutHtml) {
+      layoutSel.dataset["html"] = layoutHtml;
+      layoutSel.innerHTML = layoutHtml;
+    }
+    q<HTMLButtonElement>("[data-comic-save]")!.hidden = !actions.comic.selected();
     for (const el of qa<HTMLInputElement | HTMLSelectElement>("[data-comic-opt]")) {
       if (document.activeElement === el) continue;
       const k = el.dataset["comicOpt"] as keyof ComicOptions;

@@ -1,7 +1,8 @@
 import { mountReferenceWindows } from "../ui/reference-window";
 import { comicHandles } from "../interaction/comic-handles";
+import { validComicStyle } from "../doc/comic";
 import { isComicPage } from "./comic";
-import { chosenGutter, mergeSelectedPanels, pagePer, panelCount, selectedComicPage, setComicOption, splitSelectedPanels } from "./comic";
+import { applyComicStyle, comicStyleOf, chosenGutter, mergeSelectedPanels, pagePer, panelCount, selectedComicPage, setComicOption, splitSelectedPanels } from "./comic";
 import { useMediaAddress } from "../assets/thumb";
 import { setSnapPx } from "../interaction/snap";
 import { followHost, sendView } from "./follow";
@@ -1518,6 +1519,7 @@ async function start(): Promise<void> {
       ask: async (title, value) => (await askRatio(title, value))?.ratio ?? null,
     },
     balloon: { can: () => selectedBalloon(doc, editor) !== null, apply: (look) => applyBalloonStyle(doc, editor, look) },
+    comic: { can: () => selectedComicPage(doc, editor) !== null, apply: (st) => void applyComicStyle(doc, editor, st) },
     lines3d: { can: () => modelViewInFront() !== null, apply: (d, name) => modelViewInFront()?.useLineStyle(d as ModelLook, name) },
     layout: { can: () => canTakeLayoutStyle(doc, editor), apply: (d, name) => applyLayoutStyle(doc, editor, d, textPpu, name) },
     pattern: {
@@ -1721,7 +1723,30 @@ async function start(): Promise<void> {
     comic: {
       options: () => editor.comic,
       selected: () => selectedComicPage(doc, editor) !== null,
-      setOption: (name, value) => setComicOption(doc, editor, name, value),
+      setOption: (name, value) => {
+        // a saved comic page style chosen as the layout: the next page is made of it, and a selected page laid out by it
+        if (name === "layout" && typeof value === "string" && value.startsWith("style:")) {
+          const st = session.styles.of("comic").find((x) => `style:${x.id}` === value);
+          const data = st ? validComicStyle(st.data) : null;
+          if (!data) return false;
+          editor.comic = { ...editor.comic, layout: value };
+          editor.comicStyle = data;
+          if (selectedComicPage(doc, editor)) applyComicStyle(doc, editor, data);
+          editor.changed();
+          return true;
+        }
+        if (name === "layout") editor.comicStyle = null;
+        return setComicOption(doc, editor, name, value);
+      },
+      styles: () => session.styles.of("comic").map((x) => [x.id, x.name] as [string, string]),
+      saveStyle: () => {
+        const st = comicStyleOf(doc, editor);
+        if (!st) return;
+        void session.styles.add("comic", "", st).then((made) => {
+          editor.message = made ? `Saved the comic page style “${made.name}”. It is in the Styles panel and the Panel tool's Layout.` : "The page could not be saved as a style.";
+          editor.changed();
+        });
+      },
       // (the gutter chosen on the selected page: its width is what the Gutter field shows)
       chosenGutter: () => {
         const page = selectedComicPage(doc, editor);

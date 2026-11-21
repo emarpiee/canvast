@@ -687,7 +687,7 @@ The **55 guides** start with no background so they sit over your work, on a shee
 | Layout | Grid, Column Grid, Modular Grid, Baseline Grid, Van de Graaf Canon, Bleed and Crop Marks, Manuscript Grid, Hierarchical Grid, Bento Grid, Device Frames |
 | Perspective | Isometric Grid, Dimetric Grid, Triangle Grid, Perspective, Fisheye Grid, Cabinet and Cavalier, Curvilinear Perspective, Ground Plane, Cube Lattice |
 | Geometry | Hex Grid, Polar Grid, Radial Symmetry, Logo Construction Circles, Sacred Circles, Rhombus Grid, Islamic Star Grid, Penrose Tiling, Voronoi Guide, Concentric Polygons, Spirograph Construction |
-| Art study | Pixel Grid, Comic Panels, Isometric Pixel Grid, Tile and Sprite Sheet, Storyboard Frames, Value Scale, Color Wheel |
+| Art study | Pixel Grid, Isometric Pixel Grid, Tile and Sprite Sheet, Storyboard Frames, Value Scale, Color Wheel |
 
 | Using the panel | |
 | --- | --- |
@@ -783,7 +783,7 @@ Lay out a comic page from four pictures and letter it.
 | --- | --- |
 | A page | Draw a sheet (`C`) and give it a ratio: `A4 portrait`, `16:9`, a size in px or a saved custom ratio |
 | Panels | Each panel a sheet: draw them, or select pictures and choose *Put each on its own sheet* (a picture's sheet is exactly its size) |
-| Laying them out | Select the panels and press `Shift+A`: a page that holds them in a grid, with a gap and padding (the **Comic Panels** and **Storyboard Frames** guides of the Pattern panel are there too, as guides to draw over) |
+| Laying them out | Select the panels and press `Shift+A`: a page that holds them in a grid, with a gap and padding (the **Storyboard Frames** guide of the Pattern panel is there too, as a guide to draw over) |
 | Words | Speech balloons and captions over the panels; each panel cuts what goes past its edge |
 | Out | Export the page, or every panel on its own, to PNG, JPEG, WebP, SVG or a multi-page PDF |
 

@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.61.14 — Comic page styles; the Comic Panels guide leaves the Pattern panel (2026-11-22)
+
+- **Added:** a comic page can be saved as a style (the Save button of its options): its shape, its panels' outlines (slanted cuts and turned gutters too), its gutter and border, in the Styles panel's *Comic pages* and the Panel tool's Layout list. Applied, it lays out a selected page that way (what is in its panels goes with them); chosen in Layout, the next page drawn takes its shape and panels. ([Comics and storyboards](README.md#comics-and-storyboards))
+- **Removed:** the *Comic Panels* guide from the Pattern panel's list: the Panel tool makes comic pages now. Comic guides made before still open and change in the Pattern panel, and their saved styles still work. ([Comics and storyboards](README.md#comics-and-storyboards))
+
 ## 0.61.13 — A gutter's width grips show under the pointer (2026-11-22)
 
 - **Changed:** on a selected comic page, the gutter under the pointer shows its width grips (drag one to widen or narrow that gutter alone): no click to choose it first. A click on its middle still keeps it chosen for the Gutter field. ([Comics and storyboards](README.md#comics-and-storyboards))

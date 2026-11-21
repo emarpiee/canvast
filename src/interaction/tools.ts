@@ -1,4 +1,4 @@
-import { cornerMoved, gutterMoved, gutterTurned, gutterWidened, mergeGutter, pagePer, cutAcross, gutterOf, isComicPage, mergeAt, movedGutter, newComicPage, panelPoly, panelsOf } from "../app/comic";
+import { newComicPageFrom, cornerMoved, gutterMoved, gutterTurned, gutterWidened, mergeGutter, pagePer, cutAcross, gutterOf, isComicPage, mergeAt, movedGutter, newComicPage, panelPoly, panelsOf } from "../app/comic";
 import { insidePoly } from "../doc/comic";
 import { comicHandleAt, comicHandles, gutterUnder, pageToScreen } from "./comic-handles";
 import type { ComicHandle, ComicHandles } from "./comic-handles";
@@ -957,6 +957,13 @@ export function attachTools(
     const s = snapPoint(s0, sn);
     const l = localIn(d.frame, d.anchor, d.unit, s);
     const box = shapeBox(d.kind, l.x, l.y, keys(e).shift, keys(e).alt);
+    // (a page made from a saved comic page style keeps its shape: as wide as dragged)
+    const ratio = editor.tool === "panel" ? editor.comicStyle?.ratio : undefined;
+    if (ratio && box.bw !== 0) {
+      const h = Math.abs(box.bw) / ratio;
+      box.by = keys(e).alt ? -h / 2 : l.y < 0 ? -h : 0;
+      box.bh = h;
+    }
     editor.shapeDraft = { ...d, ...box };
     // (a line has no shape to give: only boxes show their ratio)
     if (d.kind !== "line") showRatio(s, Math.abs(box.bw), Math.abs(box.bh));
@@ -995,7 +1002,7 @@ export function attachTools(
       const { shape: _s, params: _p, ...plain } = drawn;
       const sheet = homeObject(normalizeUnit(sheetStart && doc.get(sheetStart) ? { ...plain, shape: "rect", stroke: null, container: { clip: true }, name: nextPageName(), parent: sheetStart } : { ...plain, shape: "rect", stroke: null, container: { clip: true }, name: nextPageName() }), doc.space) as PathObject;
       // (its panels' border: the tool's outline, as the Appearance section sets it; ink when it has none)
-      const made = newComicPage(doc, sheet, editor.comic, { stroke: paintOf(editor.shapeStroke) ?? newInk("#1f2329"), width: d.width });
+      const made = editor.comicStyle ? newComicPageFrom(doc, sheet, editor.comicStyle) : newComicPage(doc, sheet, editor.comic, { stroke: paintOf(editor.shapeStroke) ?? newInk("#1f2329"), width: d.width });
       doc.commit(doc.transaction("Make a comic page", made));
       editor.selectMade([made[0]!.id]);
       return;
