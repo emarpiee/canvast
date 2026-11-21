@@ -225,6 +225,7 @@ export function mountReferenceWindows(deps: ReferenceDeps): { open(source?: RefS
         }
       },
       idPrefix: `ref-${id}-`,
+      noHeads: true, // (the strip is opened from "Opacity…": its rows say whose)
     });
     const pickBtn = el.querySelector<HTMLButtonElement>("[data-ref-source]")!;
     const win: Win = {

@@ -90,6 +90,8 @@ export function mountSettings(host: HTMLElement, o: {
   /** After a row is made. */
   bound?(r: HTMLElement, s: Setting): void;
   idPrefix?: string;
+  /** No group headings (a strip of one or two rows that its own place names): a row's double-click still resets it. */
+  noHeads?: boolean;
   /** The command these settings are (ADR 0205): `<id>` sets one ({ key, value }), `<id>Reset` puts them back; the rows run them. */
   command?: { id: string; title: string; group: string };
 }): { build(): void; sync(): void; syncResets(): void } {
@@ -133,7 +135,7 @@ export function mountSettings(host: HTMLElement, o: {
     }
   };
   const build = (): void => {
-    host.innerHTML = o.sections().map((sec) => `<div class="adj-group">${groupHeadHtml(sec.title, changed(sec))}${items(sec).map((s) => settingRowHtml(s, o.get(s.k), o.extra?.(s) ?? "", o.idPrefix)).join("")}</div>`).join("");
+    host.innerHTML = o.sections().map((sec) => `<div class="adj-group">${o.noHeads ? "" : groupHeadHtml(sec.title, changed(sec))}${items(sec).map((s) => settingRowHtml(s, o.get(s.k), o.extra?.(s) ?? "", o.idPrefix)).join("")}</div>`).join("");
     const all = o.sections().flatMap((x) => x.items);
     for (const r of host.querySelectorAll<HTMLElement>("[data-k]")) {
       const s = all.find((x) => x.k === r.dataset["k"])!;

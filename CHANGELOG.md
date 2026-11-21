@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.61.23 — One line for the window's opacity (2026-11-22)
+
+- **Fixed before release:** a reference window's Opacity strip had a heading over its one slider, saying the same thing on a line of its own: the strip is now its sliders alone (a double-click on a name still puts it back). ([The Library](README.md#the-library))
+
 ## 0.61.22 — Opacity sliders follow the mouse (2026-11-22)
 
 - **Fixed before release:** a reference window's opacity sliders could not be dragged: the strip was made again at each step, under the pointer (as the Layers panel's once was, issue #2). Settings rows now take new values in place and are made again only when the rows shown change; a 3D view's settings that change what it shows too. ([The Library](README.md#the-library))
