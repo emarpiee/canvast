@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.61.18 — A reference window's More menu, shorter, with the way to a moodboard (2026-11-22)
+
+- **Changed:** a reference window's More menu starts with *Show a moodboard or folder…* (the list under the title, where moodboards are), and its order, picture size and opacity are one row each naming the choice, opening the others: the menu is a third as long. ([The Library](README.md#the-library))
+
 ## 0.61.17 — Place on the canvas works from a moodboard (2026-11-22)
 
 - **Fixed before release:** *Place on the canvas* in a moodboard's right-click menu always failed (*has no option "board"*); from another view (the Library) it now goes to the canvas first. ([The Library](README.md#the-library))

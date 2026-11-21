@@ -241,17 +241,28 @@ export function mountReferenceWindows(deps: ReferenceDeps): { open(source?: RefS
       const b = win.source.startsWith("board:") ? win.source.slice(6) : null;
       const go = (command: string, o: Record<string, unknown>, label: string, icon: string, hint: string, extra: Partial<MenuItem> = {}): MenuItem => ({ label, icon, hint, command, run: () => void pressCommand(command, o), ...extra });
       const p = win.prefs;
-      const gallery: MenuItem[] = b ? [] : [
-        ...(([["new", "Newest first", ICONS.calendarDays], ["old", "Oldest first", ICONS.calendarArrowUp], ["az", "By name, A to Z", ICONS.arrowDownAZ], ["za", "By name, Z to A", ICONS.arrowDownAZ]] as const).map(([v, label, icon], i) => go("reference.window", { window: id, sort: v }, label, icon, "The gallery's order", { checked: (p.sort ?? "new") === v, sep: i === 0 }))),
-        ...(([["s", "Small pictures"], ["m", "Medium pictures"], ["l", "Large pictures"]] as const).map(([v, label], i) => go("reference.window", { window: id, size: v }, label, ICONS.layoutGrid, "The gallery's pictures", { checked: (p.size ?? "m") === v, sep: i === 0 }))),
-        go("reference.slideshow", { window: id }, "Slideshow", ICONS.presentation, "One after another, every 4 seconds", { sep: true }),
-      ];
-      openMoreMenu(e.currentTarget as HTMLElement, [
+      const anchor = e.currentTarget as HTMLElement;
+      // a choice among several: one row naming the one chosen; a click opens the others (a short menu, not every choice of every kind)
+      const choice = <V extends string | number>(label: string, icon: string, hint: string, opts: ReadonlyArray<readonly [V, string]>, now: V, set: (v: V) => Record<string, unknown>): MenuItem => ({
+        label: `${label}: ${opts.find(([v]) => v === now)?.[1] ?? ""}`, icon, hint, command: "reference.window",
+        // (after the menu it is on has closed: opened again on the same button at once, the shared menu would close)
+        run: () => void setTimeout(() => openMoreMenu(anchor, opts.map(([v, name]) => go("reference.window", { window: id, ...set(v) }, name, icon, hint, { checked: v === now })), label), 0),
+      });
+      const SORTS = [["new", "Newest first"], ["old", "Oldest first"], ["az", "By name, A to Z"], ["za", "By name, Z to A"]] as const;
+      const SIZES = [["s", "Small"], ["m", "Medium"], ["l", "Large"]] as const;
+      const OPACITY = [[1, "100%"], [0.8, "80%"], [0.6, "60%"], [0.4, "40%"]] as const;
+      openMoreMenu(anchor, [
+        // (what it shows is the list under the title: named here too, so a moodboard is found from either)
+        { label: "Show a moodboard or folder…", icon: ICONS.referenceWindow, hint: "The list under the title", command: "reference.show", run: () => pickBtn.click() },
         ...(b ? boardRows(b, win) : [{ label: "New moodboard…", icon: ICONS.plus, hint: "An empty one in this window", command: "reference.newBoard", run: () => void newBoard(win) }]),
-        ...gallery,
+        ...(b ? [] : [
+          { ...choice("Order", ICONS.calendarDays, "The gallery's order", SORTS, p.sort ?? "new", (v) => ({ sort: v })), sep: true },
+          choice("Pictures", ICONS.layoutGrid, "The gallery's picture size", SIZES, p.size ?? "m", (v) => ({ size: v })),
+          go("reference.slideshow", { window: id }, "Slideshow", ICONS.presentation, "One after another, every 4 seconds"),
+        ]),
         go("reference.window", { window: id, fold: !p.folded }, "Fold to its title", ICONS.foldWindow, "A double-click on the title too", { checked: !!p.folded, sep: true }),
-        ...([1, 0.8, 0.6, 0.4] as const).map((v, i) => go("reference.window", { window: id, opacity: v }, `${Math.round(v * 100)}% opaque`, ICONS.windowOpacity, "See what is behind it", { checked: (p.opacity ?? 1) === v, sep: i === 0 })),
-        go("reference.window", { window: id, through: !p.through }, "Let clicks through", ICONS.clickThrough, "To what is under it; its title stays", { checked: !!p.through, sep: true }),
+        choice("Opacity", ICONS.windowOpacity, "See what is behind it", OPACITY, p.opacity ?? 1, (v) => ({ opacity: v })),
+        go("reference.window", { window: id, through: !p.through }, "Let clicks through", ICONS.clickThrough, "To what is under it; its title stays", { checked: !!p.through }),
         ...(deps.float ? [go("reference.float", { window: id }, "Float over other apps", ICONS.floatOnTop, "A window above every app, view only")] : []),
       ], "More");
     });
