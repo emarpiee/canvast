@@ -242,7 +242,9 @@ export function mountLayersPanel(host: HTMLElement, editor: EditorState, doc: Do
       rows++;
       const first = n.members[0]!;
       const bop = n.group ? first.boolOps?.[n.id] : undefined;
-      const lab = n.sheet ? { icon: ICONS.sheetTool, text: n.sheet.name ?? "Sheet", swatch: undefined } : n.group ? { ...groupLabel(first, n.id, n.members.length), swatch: undefined } : labelOf(first, names);
+      // (a comic page and its panels are their own kind, ADR 0206: the Panel tool's icon, not a sheet's)
+      const comic = n.sheet && (n.sheet.container?.comic ? "Page" : n.sheet.parent !== undefined && (doc.get(n.sheet.parent) as PathObject | undefined)?.container?.comic ? "Panel" : null);
+      const lab = n.sheet && comic ? { icon: ICONS.comicPanel, text: n.sheet.name ?? comic, swatch: undefined } : n.sheet ? { icon: ICONS.sheetTool, text: n.sheet.name ?? "Sheet", swatch: undefined } : n.group ? { ...groupLabel(first, n.id, n.members.length), swatch: undefined } : labelOf(first, names);
       const selected = n.members.every((m) => editor.selection.has(m.id));
       const hidden = n.members.every((m) => m.hidden);
       const locked = n.members.every((m) => m.locked);

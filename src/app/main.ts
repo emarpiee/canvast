@@ -1,4 +1,5 @@
 import { mountReferenceWindows } from "../ui/reference-window";
+import { comicHandles } from "../interaction/comic-handles";
 import { mergeSelectedPanels, panelCount, selectedComicPage, setComicOption, splitSelectedPanels } from "./comic";
 import { useMediaAddress } from "../assets/thumb";
 import { setSnapPx } from "../interaction/snap";
@@ -856,7 +857,9 @@ async function start(): Promise<void> {
       const owner = words !== undefined && (doc.get(words) as PathObject | undefined)?.params?.balloon ? visibleObjects(doc, index, null, fc, vp).find((p) => p.obj.id === words) : undefined;
       // (a picked sheet with auto layout: its gap and padding handles, not while it or something on it is being changed)
       const lh = editor.preview.kind === "none" || editor.preview.kind === "replace" ? layoutHandles(doc, selected) : null;
-      drawOverlays(ctx, selected, editor, fc, vp, theme, members, labels, owner, lh && { handles: lh.handles, flow: lh.sheet.container.layout.flow });
+      // (a comic page or its panels selected: its gutter and corner handles, ADR 0206)
+      const ch = editor.preview.kind === "none" && !editor.comicKnife ? comicHandles(doc, editor, (visible ??= visibleObjects(doc, index, editor, fc, vp))) : null;
+      drawOverlays(ctx, selected, editor, fc, vp, theme, members, labels, owner, lh && { handles: lh.handles, flow: lh.sheet.container.layout.flow }, ch?.handles);
     }
     if ((editor.revealAt || editor.revealIds) && (!shot || shot.overlays)) {
       const all = (visible ??= visibleObjects(doc, index, editor, fc, vp));

@@ -37,6 +37,35 @@ for (const r of RULES) {
   for (const f of Object.keys(r.known ?? {})) if (!inUse.has(f)) failed.push(`${r.name}: ${f} no longer makes its own: take it off the known list.`);
   console.log(`${r.name}: ${r.owners.join(", ")}${r.known ? `; still their own: ${Object.keys(r.known).join(", ")}` : ""}`);
 }
+// Floating panels are made of the shared parts (ADR 0156): in the header, buttons are the panel's own `.layer-btn`; in the strip under it, a
+// button that opens a list is the Styles panel's chooser (`.pick-current`) and a search field sits in `.layers-filter`. A look of its own
+// for one of these (another dropdown button, a search box with its own padding) fails here, so a new panel cannot drift from the theme.
+const templ = (src, key) => {
+  const out = [];
+  for (const m of src.matchAll(new RegExp(`\\b${key}: \``, "g"))) {
+    let i = m.index + m[0].length, depth = 0, s = "";
+    for (; i < src.length; i++) {
+      const c = src[i];
+      if (c === "\\") { s += c + src[++i]; continue; }
+      if (c === "$" && src[i + 1] === "{") depth++;
+      else if (c === "}" && depth) depth--;
+      else if (c === "`" && !depth) break;
+      s += c;
+    }
+    out.push(s);
+  }
+  return out;
+};
+for (const f of all) {
+  const src = readFileSync(f, "utf8");
+  if (!src.includes("panelHtml({")) continue;
+  for (const t of templ(src, "tools")) for (const b of t.match(/<button\b[^>]*>/g) ?? []) if (!/class="[^"]*\blayer-btn\b/.test(b)) failed.push(`Panels: ${f}: a header button that is not the panel's .layer-btn: ${b.slice(0, 90)}`);
+  for (const t of templ(src, "sub")) {
+    for (const b of t.match(/<button\b[^>]*>/g) ?? []) if (/aria-haspopup=/.test(b) && !/class="[^"]*\bpick-current\b/.test(b)) failed.push(`Panels: ${f}: a button that opens a list is the shared chooser (.pick-current): ${b.slice(0, 90)}`);
+    if (/type="search"/.test(t) && !/class="[^"]*\blayers-filter\b/.test(t)) failed.push(`Panels: ${f}: a search field in a panel's strip sits in .layers-filter.`);
+  }
+}
+console.log("Panels' parts: header buttons .layer-btn, choosers .pick-current, search in .layers-filter");
 // A menu row's description is very short, wherever it is written.
 const HINT_MAX = 44;
 for (const f of all) for (const m of readFileSync(f, "utf8").matchAll(/\bhint: "([^"]*)"/g)) if (m[1].length > HINT_MAX) failed.push(`Menu rows: ${f}: "${m[1]}" is over ${HINT_MAX} characters.`);

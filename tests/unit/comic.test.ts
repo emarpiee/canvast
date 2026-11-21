@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { area2, gutterAt, insidePoly, layoutPanels, mergePanels, moveGutter, splitPanel, widenGutters } from "../../src/doc/comic";
+import { area2, guttersOf, gutterAt, insidePoly, layoutPanels, mergePanels, moveCorner, moveGutter, splitPanel, turnGutter, widenGutters } from "../../src/doc/comic";
 import type { Pt } from "../../src/doc/comic";
 
 const box = (x: number, y: number, w: number, h: number): Pt[] => [[x, y], [x + w, y], [x + w, y + h], [x, y + h]];
@@ -49,5 +49,22 @@ describe("comic page panels (ADR 0206)", () => {
     expect(l).toHaveLength(3);
     expect(bounds(l[0]!)).toEqual({ minX: 10, maxX: 190, minY: 10, maxY: 147 });
     expect(bounds(l[2]!).maxX).toBe(190);
+  });
+
+  it("a page's gutters are listed once each with their ends; a gutter turns about one end to any angle, the panels on both sides following; a corner moves while the panel stays convex", () => {
+    const p = layoutPanels(200, 300, 10, 6, [[1, 1], [1, 1, 1]]);
+    const gs = guttersOf(p, 12);
+    expect(gs).toHaveLength(4);
+    const h = gs.find((g) => g.a.length + g.b.length === 5)!;
+    expect(h.ends.map((e) => e.map(r))).toContainEqual([10, 150]);
+    const turned = turnGutter(p, h, h.ends[0], [h.ends[1][0], h.ends[1][1] + 30], 2)!;
+    expect(turned).not.toBeNull();
+    // the gutter keeps its width all along: the panel above's lower edge and the panel below's upper edge stay 6 apart, slanted
+    const above = turned[0]!, below = turned[2]!;
+    expect(r(Math.abs(above[3]![1] - above[2]![1]))).toBeGreaterThan(5);
+    expect(Math.min(...below.map((q) => q[1])) - Math.max(...above.map((q) => q[1]))).toBeLessThan(6.5);
+    expect(turnGutter(p, h, h.ends[0], [h.ends[1][0], h.ends[1][1] + 400], 2), "turned past a panel: refused").toBeNull();
+    expect(moveCorner(p[0]!, 2, [80, 160], 2)).not.toBeNull();
+    expect(moveCorner(p[0]!, 2, [10, 10], 2), "folded").toBeNull();
   });
 });

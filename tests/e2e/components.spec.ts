@@ -1,5 +1,5 @@
 import type { Page } from "@playwright/test";
-import { expect, test } from "./harness";
+import { expect, test, themeProblems } from "./harness";
 import { blockyFixture } from "./png";
 
 /** The component audit on the real thing: every menu that opens has rows with an icon, a name and a short line; dialogs come from the one shell. */
@@ -337,4 +337,21 @@ test("a list column made wider: the rows hold every column, with no empty room a
   await p.mouse.move(at.x + 500, at.y + at.height / 2, { steps: 4 });
   await p.mouse.up();
   await expect.poll(() => p.locator(".assets-scroll").evaluate((s) => s.scrollWidth - s.querySelector<HTMLElement>(".assets-grid")!.offsetWidth - s.querySelector<HTMLElement>(".assets-grid")!.offsetLeft)).toBeLessThanOrEqual(3); // (the grid's own small inset)
+});
+
+test("every floating panel follows the theme at every density: corners and text sizes of the theme, the panel's header buttons, the shared chooser and search field (the reference window too)", async ({ app }) => {
+  const p = app.page;
+  // every panel of the dock open, and a reference window as a gallery and as a board
+  for (const b of ["data-layers", "data-tags", "data-styles", "data-pattern-panel", "data-bookmarks", "data-adjust-panel"]) await p.locator(`[${b}]`).first().click();
+  await p.keyboard.press("Shift+R");
+  const win = p.getByTestId("reference-window");
+  await expect(win).toHaveCount(1);
+  for (const density of ["dense", "compact", "comfortable"]) {
+    await p.evaluate((d) => window.__canvastDebug.setSetting("ui.density", d), density);
+    await p.waitForTimeout(150);
+    expect(await themeProblems(p), `density ${density}`).toEqual([]);
+  }
+  await p.evaluate(() => window.__canvastDebug.runCommand("reference.newBoard", { name: "Audit" }, "test"));
+  await expect(p.getByTestId("reference-window").locator("[data-ref-board]").first()).toBeVisible();
+  expect(await themeProblems(p), "a board").toEqual([]);
 });

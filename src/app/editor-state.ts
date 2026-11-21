@@ -195,6 +195,8 @@ export class EditorState {
   shapeSides = 6;
   /** The Panel tool (ADR 0206): the page, layout, gutter, margin and border of the next comic page. */
   comic: ComicOptions = { ...COMIC_DEFAULTS };
+  /** A cut being drawn with the Panel tool (screen px): the knife's line, as far as the page goes, and half the gutter beside it; nothing changes until it is let go. */
+  comicKnife: { a: readonly [number, number]; b: readonly [number, number]; half: number } | null = null;
   shapeTips = 5;
   /** Waiting for a click on the object to attach the picked ones to (ADR 0109). */
   attachMode = false;

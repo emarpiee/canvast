@@ -2,7 +2,8 @@ import * as D from "../core/dyadic";
 import type { DocumentStore } from "../doc/document-store";
 import { isContainer } from "../doc/containers";
 import { normalizeUnit, worldBounds } from "../doc/edit-ops";
-import { gutterAt, insidePoly, layoutPanels, mergePanels, moveGutter, polySub, segmentHits, splitPanel, subPoly, widenGutters } from "../doc/comic";
+import { gutterAt, insidePoly, layoutPanels, mergePanels, moveCorner, moveGutter, polySub, segmentHits, splitPanel, subPoly, turnGutter, widenGutters } from "../doc/comic";
+import type { Gutter } from "../doc/comic";
 import type { Poly, Pt } from "../doc/comic";
 import type { CanvasObject, ObjectId, PathObject } from "../doc/model";
 import { expressObjectIn, homeObject, newObjectId } from "../doc/model";
@@ -68,6 +69,7 @@ const pageSize = (page: PathObject): { w: number; h: number; x: number; y: numbe
   return { x: b.minX, y: b.minY, w: b.maxX - b.minX, h: b.maxY - b.minY };
 };
 /** A length in thousandths of the page's shorter side, in its units. */
+export const pagePer = (page: PathObject, k: number): number => per(page, k);
 const per = (page: PathObject, k: number): number => (Math.min(pageSize(page).w, pageSize(page).h) / 1000) * k;
 /** The smallest panel: a hundredth of the page's shorter side across. */
 const minOf = (page: PathObject): number => per(page, 10);
@@ -83,7 +85,7 @@ function panelObject(doc: DocumentStore, page: PathObject, poly: Poly, from: Pat
   return {
     id: newObjectId(), kind: "path", ...place, z, opacity: 1, attachmentTargetId: null,
     fill: "#ffffff", stroke: "#000000", width: Math.max(look.border, Number.MIN_VALUE), align: "outside", join: "miter",
-    container: { clip: true }, parent: page.id, name,
+    container: { clip: true }, parent: page.id, name, constraint: { h: "scale", v: "scale" }, // (a page resized: its panels with it)
   };
 }
 
@@ -297,3 +299,34 @@ export function setComicOption(doc: DocumentStore, editor: EditorState, name: ke
   editor.changed();
   return true;
 }
+
+/** The panels of `idx` given these outlines, as objects to commit (each keeps its id, look and place in the stack). */
+function panelsAt(doc: DocumentStore, page: PathObject, panels: readonly PathObject[], polys: readonly Poly[], idx: Iterable<number>): PathObject[] {
+  return [...new Set(idx)].map((k) => withSpace(panelObject(doc, page, polys[k]!, panels[k]!, panels[k]!.z, { border: 0 }, ""), doc.space));
+}
+
+/** A gutter's handle moved by `d` across it (page units): the panels on both sides, or null when one would fold. */
+export function gutterMoved(doc: DocumentStore, page: PathObject, panels: readonly PathObject[], polys: readonly Poly[], g: Gutter, d: number): PathObject[] | null {
+  const next = moveGutter(polys, g, d, minOf(page));
+  return next && panelsAt(doc, page, panels, next, [...g.a, ...g.b].map((e) => e.panel));
+}
+
+/** A gutter turned about its end `fixed` toward `to` (page units): the panels on both sides, or null when one would fold. */
+export function gutterTurned(doc: DocumentStore, page: PathObject, panels: readonly PathObject[], polys: readonly Poly[], g: Gutter, fixed: Pt, to: Pt): PathObject[] | null {
+  const next = turnGutter(polys, g, fixed, to, minOf(page));
+  return next && panelsAt(doc, page, panels, next, [...g.a, ...g.b].map((e) => e.panel));
+}
+
+/** A panel's corner moved to `to` (page units): the panel, or null when it would fold. */
+export function cornerMoved(doc: DocumentStore, page: PathObject, panels: readonly PathObject[], polys: readonly Poly[], k: number, index: number, to: Pt): PathObject[] | null {
+  const next = moveCorner(polys[k]!, index, to, minOf(page));
+  return next && panelsAt(doc, page, panels, polys.map((p, j) => (j === k ? next : p)), [k]);
+}
+
+/** The two panels across gutter `g` become one (null when it runs along more than two). */
+export function mergeGutter(doc: DocumentStore, page: PathObject, panels: readonly PathObject[], g: Gutter): { next: CanvasObject[]; removed: ObjectId[] } | null {
+  return g.a.length === 1 && g.b.length === 1 ? mergeThese(doc, page, [panels[g.a[0]!.panel]!, panels[g.b[0]!.panel]!]) : null;
+}
+
+/** A panel: a sheet on a comic page (what Layers, the labels and the selection show as a panel, not a sheet). */
+export const isComicPanel = (doc: DocumentStore, o: CanvasObject | undefined): boolean => isContainer(o) && o.parent !== undefined && isComicPage(doc.get(o.parent));

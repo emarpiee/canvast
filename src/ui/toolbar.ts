@@ -667,7 +667,7 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
   for (const el of qa<HTMLInputElement | HTMLSelectElement>("[data-comic-opt]")) {
     const name = el.dataset["comicOpt"]!;
     // (a number is per cent here, thousandths of the page's shorter side in the options)
-    el.addEventListener("change", () => void pressCommand("comic.setOption", { name, value: el instanceof HTMLInputElement ? Math.round(Number(el.value) * 10) : el.value }));
+    el.addEventListener("change", () => void pressCommand("comic.setOption", { name, value: el instanceof HTMLInputElement ? String(Math.round(Number(el.value) * 10)) : el.value }));
   }
   q<HTMLInputElement>("[data-sides]")!.addEventListener("input", (e) => void pressCommand("tools.set", { name: "sides", value: Math.round(Number((e.target as HTMLInputElement).value)) }));
   q<HTMLInputElement>("[data-tips]")!.addEventListener("input", (e) => void pressCommand("tools.set", { name: "tips", value: Math.round(Number((e.target as HTMLInputElement).value)) }));

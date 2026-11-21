@@ -126,7 +126,8 @@ export function mountFilePanel(
     });
   // view-state: Escape closes the file open on the canvas (as its × does), asking about unsaved changes. Heard first, before the editor,
   // which takes every Escape for itself: only a menu, list, dialog or find bar of its own (or of the app) that is open takes it instead.
-  const POPUPS = ".se-controller, .se-dropdown, .se-select-menu, .se-menu-list, .se-modal, .se-modal-show, .se-cmd-row, .pop-menu, .combo-list, dialog[open]";
+  // (only what opens over the words: never the toolbar, `.se-menu-list`, which is always there in the styles that show one)
+  const POPUPS = ".se-controller, .se-dropdown, .se-select-menu, .se-modal-show, .se-cmd-row, .pop-menu, dialog[open]";
   const showing = (q: Element): boolean => (q as HTMLElement).getClientRects().length > 0 && getComputedStyle(q).visibility !== "hidden";
   window.addEventListener("keydown", (e) => {
     if (e.key !== "Escape" || e.ctrlKey || e.altKey || e.metaKey || e.shiftKey || e.isComposing || !note || el.hidden) return;

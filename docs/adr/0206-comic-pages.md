@@ -33,6 +33,17 @@ tools are: cut a panel with a line, keep the gutter, move a gutter, merge two pa
 - **Commands**: `comic.setOption`, `comic.cutAcross`, `comic.cutDown`, `comic.merge`; the tool's gestures are input on the canvas, as
   drawing a shape is.
 
+- **Handles, as a balloon's** (`interaction/comic-handles.ts`), shown while a page or its panels are selected, with the Select and the
+  Panel tool: on each gutter a bar in its middle (drag: move it; double-click: merge the two panels across it) and a round handle at each
+  end (drag: turn the gutter about its other end, to any angle, Shift by 15°; the panels on both sides follow, the width kept); on the one
+  selected panel a square at each corner (drag: move that corner, the panel kept convex). Each drag is one undo step and says what it does
+  beside the pointer.
+- **A cut is drawn, then made**: while the knife is drawn only its line and the two edges of the gutter it will leave show, with its
+  angle and the gutter beside the pointer; the panels change when it is let go.
+- **Panels are their own kind**: Layers lists a page and its panels with the Panel tool's icon; a selected panel is outlined by its own
+  shape and has its corner handles, not a sheet's box, resize and turn handles. A panel follows its page when the page is resized
+  (`constraint: scale`).
+
 ## Consequences
 
 - Panels are convex: a cut makes convex parts, and a merge takes the hull (an L-shaped panel is two panels).

@@ -121,9 +121,12 @@ export function mountReferenceWindows(deps: ReferenceDeps): { open(source?: RefS
     el.setAttribute("role", "dialog");
     el.setAttribute("aria-label", "Reference window");
     el.tabIndex = -1;
+    // (the shared parts of a panel: the header's buttons, the chooser of the Styles panel and its search field)
     el.innerHTML = panelHtml({
       title: "Reference",
-      tools: `<button type="button" class="ref-source" data-ref-source aria-haspopup="listbox" aria-expanded="false" aria-label="What it shows" title="What it shows: a gallery of the library, or a board"><span data-ref-source-name></span>${ICONS.chevronDown}</button><button type="button" class="layer-btn" data-ref-more aria-haspopup="menu" aria-label="Boards" title="Boards: a new one, rename or delete this one, fit it in the window">${ICONS.ellipsis}</button>`,
+      count: 0,
+      tools: `<button type="button" class="layer-btn" data-ref-more aria-haspopup="menu" aria-label="Boards" title="Boards: a new one, rename or delete this one, fit it in the window">${ICONS.ellipsis}</button>`,
+      sub: `<div class="styles-kinds"><button type="button" class="pick-current" data-ref-source aria-haspopup="menu" aria-expanded="false" aria-label="What it shows" title="What it shows: a gallery of the library, or a board"></button></div><div class="layers-filter" data-ref-filter-row><input type="search" data-ref-filter placeholder="Search pictures" aria-label="Search the pictures by name" autocomplete="off"></div>`,
       body: `<div class="ref-body" data-ref-body></div>`,
     });
     const n = wins.size;
@@ -133,7 +136,7 @@ export function mountReferenceWindows(deps: ReferenceDeps): { open(source?: RefS
     const body = el.querySelector<HTMLElement>("[data-ref-body]")!;
     const pickBtn = el.querySelector<HTMLButtonElement>("[data-ref-source]")!;
     const win: Win = { id, source, el, render: async () => undefined, sync: () => undefined, close: () => undefined };
-    let choosing = false;
+    const choosing = false; // (what it shows is chosen in the shared menu, not inside the window)
 
     // moved by its header, kept inside the window of the app
     const head = el.querySelector<HTMLElement>(".panel-head")!;
@@ -161,10 +164,18 @@ export function mountReferenceWindows(deps: ReferenceDeps): { open(source?: RefS
       wins.delete(id);
       keepWindows();
     };
-    // view-state: (the list of what this window can show, inside it: a click on one shows it; a new board is the command's)
-    pickBtn.addEventListener("click", () => {
-      choosing = !choosing;
-      void win.render();
+    // What it shows: the shared menu, as the Styles panel's kinds (boards first, then the gallery: all pictures and each folder)
+    pickBtn.addEventListener("click", async () => {
+      const l = await listing();
+      const folders = (l?.folders ?? []).filter((f) => deps.hidden() || !f.hidden).map((f) => ({ f, path: folderPath(l!.folders, f.id) })).sort((a, b) => a.path.join("\u0000").localeCompare(b.path.join("\u0000")));
+      const row = (value: string, label: string, icon: string, hint: string, sep = false) => ({ label, icon, hint, command: "reference.show", checked: value === win.source, sep, run: () => void pressCommand("reference.show", { window: id, source: value }) });
+      const bs = boards();
+      openMoreMenu(pickBtn, [
+        ...bs.map((b, i) => row(`board:${b.id}`, b.name, ICONS.referenceWindow, `Board · ${plural(b.items.length, "picture")}`, i === 0)),
+        { label: "New board…", icon: ICONS.plus, hint: "An empty board in this window", command: "reference.newBoard", run: () => void newBoard(win) },
+        row("all", "All pictures", ICONS.images, "Gallery of the library", true),
+        ...folders.map((x) => row(`folder:${x.f.id}`, x.path.join(" › "), ICONS.folder, "Gallery of a folder")),
+      ], "What it shows");
     });
     el.querySelector<HTMLElement>("[data-ref-more]")!.addEventListener("click", (e) => {
       const b = win.source.startsWith("board:") ? win.source.slice(6) : null;
@@ -178,39 +189,14 @@ export function mountReferenceWindows(deps: ReferenceDeps): { open(source?: RefS
       if (!(e.target as HTMLElement).closest("input, button, select, [tabindex]:not(.ref-window)")) el.focus({ preventScroll: true });
     }, true);
 
-    // ---- the list of what it shows: all pictures, a folder (as a tree), a board, a new board; searched by name
+    // the gallery's search: its pictures by name
     let filter = "";
-    const chooser = async (): Promise<void> => {
-      const l = await listing();
-      const folders = (l?.folders ?? []).filter((f) => deps.hidden() || !f.hidden);
-      const depth = (f: AssetFolder): number => folderPath(l!.folders, f.id).length - 1;
-      const tree = folders.map((f) => ({ f, path: folderPath(l!.folders, f.id) })).sort((a, b) => a.path.join("\u0000").localeCompare(b.path.join("\u0000")));
-      const q = filter.trim().toLowerCase();
-      const row = (value: string, icon: string, label: string, title: string, d = 0): string => `<button type="button" class="ref-choice${value === win.source ? " is-on" : ""}" role="option" aria-selected="${value === win.source}" data-ref-choose="${esc(value)}" style="--depth:${d}" title="${esc(title)}">${icon}<span>${esc(label)}</span></button>`;
-      const fold = tree.filter((t) => !q || t.path.join(" ").toLowerCase().includes(q));
-      const bs = boards().filter((b) => !q || b.name.toLowerCase().includes(q));
-      body.innerHTML = `<div class="ref-chooser" role="listbox" aria-label="What it shows"><input type="search" class="ref-filter" data-ref-filter placeholder="Find a folder or a board" aria-label="Find a folder or a board" value="${esc(filter)}">
-        <p class="ref-group">Boards</p>${bs.map((b) => row(`board:${b.id}`, ICONS.referenceWindow, b.name, `${b.name}: ${plural(b.items.length, "picture")}`)).join("")}${row("new", ICONS.plus, "New board…", "A new, empty board")}
-        <p class="ref-group">Gallery</p>${!q ? row("all", ICONS.images, "All pictures", "Every picture of the library") : ""}${fold.map((t) => row(`folder:${t.f.id}`, ICONS.folder, q ? t.path.join(" › ") : t.f.name, t.path.join(" › "), q ? 0 : depth(t.f))).join("")}</div>`;
-      const input = body.querySelector<HTMLInputElement>("[data-ref-filter]")!;
-      input.focus({ preventScroll: true });
-      input.setSelectionRange(filter.length, filter.length);
-      // view-state: (the list narrowed to what the words find)
-      input.addEventListener("input", () => {
-        filter = input.value;
-        void chooser();
-      });
-    };
-    // view-state: (a choice of the list: what this window shows; a new board is the command's, through its dialog)
-    body.addEventListener("click", (e) => {
-      const c = (e.target as HTMLElement).closest<HTMLElement>("[data-ref-choose]");
-      if (!c) return;
-      choosing = false;
-      filter = "";
-      if (c.dataset["refChoose"] === "new") return void newBoard(win);
-      win.source = c.dataset["refChoose"]!;
-      picked.clear();
-      keepWindows();
+    const filterEl = el.querySelector<HTMLInputElement>("[data-ref-filter]")!;
+    // view-state: (the gallery narrowed to the pictures whose names hold the words)
+    filterEl.addEventListener("input", () => {
+      filter = filterEl.value;
+      pages = 1;
+      one = null;
       void win.render();
     });
 
@@ -227,7 +213,10 @@ export function mountReferenceWindows(deps: ReferenceDeps): { open(source?: RefS
         grew = false;
         for (const f of l.folders) if (f.parentId !== null && under.has(f.parentId) && !under.has(f.id)) under.add(f.id), (grew = true);
       }
-      shown = l.entries.filter((e) => isPicture(e) && shows(e) && (!fid || e.folderIds?.some((f) => under.has(f)))).sort((a, b) => b.importedAt - a.importedAt);
+      const q = filter.trim().toLowerCase();
+      shown = l.entries.filter((e) => isPicture(e) && shows(e) && (!fid || e.folderIds?.some((f) => under.has(f))) && (!q || e.name.toLowerCase().includes(q))).sort((a, b) => b.importedAt - a.importedAt);
+      const count = el.querySelector(".layers-count");
+      if (count) count.textContent = String(shown.length);
       if (one !== null && shown[one]) {
         const e = shown[one]!;
         body.innerHTML = `<div class="ref-one"><img data-ref-big alt="${esc(e.name)}" draggable="false"><div class="ref-one-bar"><button type="button" class="layer-btn" data-ref-back aria-label="Back to the gallery" title="Back to the gallery (Esc)">${ICONS.layoutGrid}</button><span class="ref-one-name" title="${esc(e.name)}">${esc(e.name)}</span><button type="button" class="layer-btn" data-ref-prev aria-label="Previous picture" title="Previous picture (←)">${ICONS.chevronLeft}</button><button type="button" class="layer-btn" data-ref-next aria-label="Next picture" title="Next picture (→)">${ICONS.chevronRight}</button></div></div>`;
@@ -235,10 +224,10 @@ export function mountReferenceWindows(deps: ReferenceDeps): { open(source?: RefS
         return;
       }
       one = null;
-      const count = Math.min(shown.length, pages * PAGE);
+      const upto = Math.min(shown.length, pages * PAGE);
       body.innerHTML = shown.length
-        ? `<p class="adj-note">${plural(shown.length, "picture")}</p><div class="ref-grid">${shown.slice(0, count).map((e, i) => `<button type="button" class="ref-thumb" data-ref-i="${i}" draggable="true" title="${esc(e.name)}" aria-label="${esc(e.name)}"><img alt="" draggable="false" loading="lazy" decoding="async"></button>`).join("")}</div>${count < shown.length ? showMoreButton({ attrs: "data-ref-page", hidden: shown.length - count, label: `Show ${Math.min(PAGE, shown.length - count)} more` }) : ""}`
-        : `<p class="adj-note">No pictures here${deps.hidden() ? "" : " (hidden ones show in hidden mode)"}.</p>`;
+        ? `<div class="ref-grid">${shown.slice(0, upto).map((e, i) => `<button type="button" class="ref-thumb" data-ref-i="${i}" draggable="true" title="${esc(e.name)}" aria-label="${esc(e.name)}"><img alt="" draggable="false" loading="lazy" decoding="async"></button>`).join("")}</div>${upto < shown.length ? showMoreButton({ attrs: "data-ref-page", hidden: shown.length - upto, label: `Show ${Math.min(PAGE, shown.length - upto)} more` }) : ""}`
+        : `<p class="styles-hint">${ICONS.images}<span>${q ? "No picture has that name here." : `No pictures here${deps.hidden() ? "" : " (hidden ones show in hidden mode)"}.`}</span></p>`;
       const io = new IntersectionObserver((seen) => {
         for (const s of seen) {
           if (!s.isIntersecting) continue;
@@ -601,12 +590,17 @@ export function mountReferenceWindows(deps: ReferenceDeps): { open(source?: RefS
     win.render = async (): Promise<void> => {
       const b = boardOf();
       const l = await listing();
-      el.querySelector<HTMLElement>("[data-ref-source-name]")!.textContent = choosing ? "Choose…" : b ? b.name : win.source === "all" ? "All pictures" : l?.folders.find((f) => `folder:${f.id}` === win.source)?.name ?? "All pictures";
-      pickBtn.setAttribute("aria-expanded", String(choosing));
-      el.dataset["mode"] = choosing ? "choose" : b ? "board" : "gallery";
+      const name = b ? b.name : win.source === "all" ? "All pictures" : l?.folders.find((f) => `folder:${f.id}` === win.source)?.name ?? "All pictures";
+      // (the Styles panel's chooser, part for part: the kind's icon, its name, the chevron)
+      pickBtn.innerHTML = `${b ? ICONS.referenceWindow : win.source === "all" ? ICONS.images : ICONS.folder}<span class="pg-name">${esc(name)}</span>${ICONS.chevronDown}`;
+      el.querySelector<HTMLElement>("[data-ref-filter-row]")!.hidden = !!b; // (a board shows all its pictures: the search is the gallery's)
+      if (b) {
+        const count = el.querySelector(".layers-count");
+        if (count) count.textContent = String(b.items.length);
+      }
+      el.dataset["mode"] = b ? "board" : "gallery";
       stage = null;
       area = null;
-      if (choosing) return chooser();
       if (b) await board();
       else await gallery();
     };
@@ -650,6 +644,15 @@ export function mountReferenceWindows(deps: ReferenceDeps): { open(source?: RefS
     rc("reference.open", "Reference window", "A gallery or a board, over every view (Shift+R)", "read", [{ name: "source", type: "text", doc: "all, folder:<id> or board:<id> (all when left out)" }], (o) => {
       const w = open(typeof o["source"] === "string" ? o["source"] : "all");
       return { ok: true, value: w.id };
+    }),
+    rc("reference.show", "Show in a reference window", "A board, all pictures or a folder", "read", [{ name: "window", type: "text", doc: "the window", required: true }, { name: "source", type: "text", doc: "all, folder:<id> or board:<id>", required: true }], (o) => {
+      const w = winOf(o), src = String(o["source"]);
+      if (!w) return { ok: false, error: "No such window." };
+      if (!/^(all|folder:.+|board:.+)$/.test(src)) return { ok: false, error: '"source" is all, folder:<id> or board:<id>.' };
+      w.source = src;
+      keepWindows();
+      void w.render();
+      return { ok: true };
     }),
     rc("reference.newBoard", "New board", "An empty board of references", "edit", [{ name: "name", type: "text", doc: "its name", required: true }, { name: "window", type: "text", doc: "the window to show it in (a new one when left out)" }], (o) => {
       const name = String(o["name"]).trim().slice(0, 80) || "Board";

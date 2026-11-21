@@ -357,6 +357,67 @@ export async function lowContrast(p: Page, scope: string): Promise<string[]> {
  * - the colour picker is whole (it scrolls only when the window is shorter than it);
  * - every text and icon in them has the contrast of the theme's rules (`lowContrast`).
  */
+/**
+ * The theme audit of the floating panels open now (ADR 0156, 0198): every control's corners and text size are values of the theme's tokens
+ * (so a control with a look of its own, or one that misses the density, shows up), header buttons are `.layer-btn`, a button that opens a
+ * list in the strip under the header is the shared chooser (`.pick-current`), and a search field there sits in `.layers-filter`. What a
+ * panel shows of a file (the notes editor, a board's pictures) is the file's, not the theme's, and is left out.
+ */
+export async function themeProblems(page: Page): Promise<string[]> {
+  return page.evaluate(() => {
+    const tokens: string[] = [];
+    for (const sheet of [...document.styleSheets]) {
+      let rules: CSSRuleList;
+      try {
+        rules = sheet.cssRules;
+      } catch {
+        continue;
+      }
+      const walk = (list: CSSRuleList): void => {
+        for (const r of [...list]) {
+          if (r instanceof CSSStyleRule && /:root/.test(r.selectorText)) for (const prop of [...r.style]) if (prop.startsWith("--")) tokens.push(prop);
+          if ("cssRules" in r) walk((r as CSSGroupingRule).cssRules);
+        }
+      };
+      walk(rules);
+    }
+    const probe = document.createElement("div");
+    document.body.append(probe);
+    const radii = new Set(["0px"]), sizes = new Set<string>();
+    for (const t of new Set(tokens)) {
+      probe.style.cssText = `border-top-left-radius: var(${t})`;
+      const r = getComputedStyle(probe).borderTopLeftRadius;
+      if (/^[\d.]+px$/.test(r)) radii.add(r);
+      probe.style.cssText = `font: var(${t})`;
+      if (probe.style.font) sizes.add(getComputedStyle(probe).fontSize);
+      probe.style.cssText = `font-size: var(${t})`;
+      const fs = getComputedStyle(probe).fontSize;
+      if (/^[\d.]+px$/.test(fs)) sizes.add(fs);
+    }
+    probe.remove();
+    const out: string[] = [];
+    const shown = (el: Element): boolean => (el as HTMLElement).getClientRects().length > 0 && getComputedStyle(el).visibility !== "hidden";
+    const say = (el: Element): string => `${el.tagName.toLowerCase()}${el.className && typeof el.className === "string" ? `.${el.className.trim().split(/\s+/).join(".")}` : ""}${(el as HTMLElement).getAttribute("aria-label") ? ` "${(el as HTMLElement).getAttribute("aria-label")}"` : ""}`;
+    for (const panel of document.querySelectorAll(".layers-panel")) {
+      if (!shown(panel)) continue;
+      const name = panel.getAttribute("aria-label") ?? (panel as HTMLElement).dataset["testid"] ?? panel.className;
+      for (const el of panel.querySelectorAll("button, input, select, textarea")) {
+        if (!shown(el) || el.closest(".sun-editor, .viewer-note, .ref-stage, [data-theme-free]")) continue;
+        const cs = getComputedStyle(el);
+        for (const c of ["borderTopLeftRadius", "borderTopRightRadius", "borderBottomRightRadius", "borderBottomLeftRadius"] as const) {
+          const v = cs[c];
+          if (!radii.has(v) && !v.endsWith("%")) out.push(`${name}: ${say(el)} has corners of ${v}, not a radius of the theme`);
+        }
+        if (!sizes.has(cs.fontSize)) out.push(`${name}: ${say(el)} has text of ${cs.fontSize}, not a size of the theme`);
+      }
+      for (const b of panel.querySelectorAll(".panel-head button")) if (shown(b) && !b.classList.contains("layer-btn")) out.push(`${name}: header button ${say(b)} is not the panel's .layer-btn`);
+      for (const b of panel.querySelectorAll(".panel-sub button[aria-haspopup]")) if (shown(b) && !b.classList.contains("pick-current")) out.push(`${name}: ${say(b)} opens a list but is not the shared chooser (.pick-current)`);
+      for (const i of panel.querySelectorAll('.panel-sub input[type="search"]')) if (shown(i) && !i.closest(".layers-filter")) out.push(`${name}: a search field outside .layers-filter`);
+    }
+    return [...new Set(out)];
+  });
+}
+
 export async function floatingProblems(page: Page): Promise<string[]> {
   const contrast = (await lowContrast(page, ".vchip-pop, .props-near, .props-chips")).map((m) => `contrast: ${m}`);
   return [...contrast, ...(await floatingRules(page))];

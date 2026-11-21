@@ -1,4 +1,4 @@
-import { isMaskSheet } from "../doc/containers";
+import { isContainer, isMaskSheet } from "../doc/containers";
 import { newInk } from "./ink";
 import { lookFromChoices } from "../doc/stroke-look";
 import type { Viewport } from "../core/camera";
@@ -8,6 +8,7 @@ import type { EditorState } from "../app/editor-state";
 import type { AssetLibrary } from "../assets/asset-library";
 import type { LayoutHandle } from "../interaction/layout-handles";
 import { handleLies } from "../interaction/layout-handles";
+import type { ComicHandle } from "../interaction/comic-handles";
 import type { ProjectedObject, ScreenBox } from "./projection";
 import { projectObject, projectionFor } from "./projection";
 import type { RasterSource } from "./draw-objects";
@@ -246,6 +247,8 @@ export function drawOverlays(
   owner?: ProjectedObject,
   /** The picked sheet's auto layout handles (ADR 0193). */
   layout?: { handles: readonly LayoutHandle[]; flow: SheetLayout["flow"] } | null,
+  /** A comic page's gutter and corner handles (ADR 0206). */
+  comic?: readonly ComicHandle[] | null,
 ): void {
   if (editor.builder) drawBuilder(ctx, editor.builder, fc, vp, theme);
   if (editor.gapFill) drawGaps(ctx, editor.gapFill, fc, vp, theme);
@@ -428,6 +431,8 @@ export function drawOverlays(
   if (editor.tool === "node") drawNodes(ctx, selected, editor, theme);
   if (editor.tool === "select") drawCornerHandles(ctx, selected, editor, theme, owner);
   if (editor.tool === "select" && layout) drawLayoutHandles(ctx, layout.handles, layout.flow, theme);
+  if (comic?.length) drawComicHandles(ctx, comic, theme);
+  if (editor.comicKnife) drawKnife(ctx, editor.comicKnife, theme);
   drawHandleLabel(ctx, editor, theme); // (whatever the tool: a resize, a handle, or a box being drawn says its value)
   // (not while the nodes are edited or a shape's corners are opened out one by one: those handles are what is being worked on)
   if (editor.tool === "select" && !(selected.length === 1 && editor.cornersOpen === selected[0]!.obj.id)) drawGradientHandles(ctx, selected, theme, editor.gradientFocus);
@@ -490,6 +495,75 @@ function drawPathNodes(ctx: CanvasRenderingContext2D, po: ProjectedObject, edito
     ctx.fillRect(n.p[0] - half + 1, n.p[1] - half + 1, HANDLE_SIZE_PX - 2, HANDLE_SIZE_PX - 2);
     ctx.strokeRect(n.p[0] - half + 1, n.p[1] - half + 1, HANDLE_SIZE_PX - 2, HANDLE_SIZE_PX - 2);
   }
+  ctx.restore();
+}
+
+/**
+ * A comic page's handles (ADR 0206): a bar along the middle of each gutter (it moves the gutter; the auto layout's gap handle's look), a
+ * round one at each end (it turns the gutter), and a square at each corner of the selected panel, with the gutter's line faint between.
+ */
+function drawComicHandles(ctx: CanvasRenderingContext2D, handles: readonly ComicHandle[], theme: SceneTheme): void {
+  ctx.save();
+  ctx.lineWidth = 1.25;
+  ctx.strokeStyle = theme.selection;
+  ctx.setLineDash([3, 3]);
+  const ends = new Map<number, Array<{ x: number; y: number }>>();
+  for (const h of handles) if (h.what === "end") ends.set(h.gutter, [...(ends.get(h.gutter) ?? []), h]);
+  for (const [a, b] of ends.values()) {
+    if (!a || !b) continue;
+    ctx.beginPath();
+    ctx.moveTo(a.x, a.y);
+    ctx.lineTo(b.x, b.y);
+    ctx.stroke();
+  }
+  ctx.setLineDash([]);
+  for (const h of handles) {
+    ctx.fillStyle = theme.handleFill;
+    ctx.strokeStyle = theme.selection;
+    ctx.beginPath();
+    if (h.what === "move") {
+      ctx.save();
+      ctx.translate(h.x, h.y);
+      ctx.rotate(h.a);
+      ctx.fillStyle = theme.selection;
+      ctx.strokeStyle = theme.handleFill;
+      ctx.roundRect(-8, -3, 16, 6, 3);
+      ctx.fill();
+      ctx.stroke();
+      ctx.restore();
+    } else if (h.what === "end") {
+      dot(ctx, theme, h.x, h.y, HANDLE_SIZE_PX / 2);
+      ctx.fill();
+      ctx.stroke();
+    } else {
+      const s = HANDLE_SIZE_PX - 2;
+      ctx.fillRect(h.x - s / 2, h.y - s / 2, s, s);
+      ctx.strokeRect(h.x - s / 2, h.y - s / 2, s, s);
+    }
+  }
+  ctx.restore();
+}
+
+/** A cut being drawn with the Panel tool: its line, dashed, and the two edges of the gutter it will leave, until it is let go. */
+function drawKnife(ctx: CanvasRenderingContext2D, k: NonNullable<EditorState["comicKnife"]>, theme: SceneTheme): void {
+  const [ax, ay] = k.a, [bx, by] = k.b;
+  const len = Math.hypot(bx - ax, by - ay);
+  if (!(len > 0)) return;
+  const nx = -(by - ay) / len, ny = (bx - ax) / len;
+  ctx.save();
+  ctx.strokeStyle = theme.selection;
+  ctx.lineWidth = 1.25;
+  for (const s of [-1, 1]) {
+    ctx.beginPath();
+    ctx.moveTo(ax + nx * k.half * s, ay + ny * k.half * s);
+    ctx.lineTo(bx + nx * k.half * s, by + ny * k.half * s);
+    ctx.stroke();
+  }
+  ctx.setLineDash([6, 4]);
+  ctx.beginPath();
+  ctx.moveTo(ax, ay);
+  ctx.lineTo(bx, by);
+  ctx.stroke();
   ctx.restore();
 }
 
@@ -754,9 +828,14 @@ function clampBox(b: ScreenBox, vp: Viewport): ScreenBox {
 /** What a picked clipping mask cuts is part of the mask: the box of the mask is the box of the output, so the cut things get none of their own. */
 const underPickedMask = (po: ProjectedObject, editor: EditorState): boolean => !!po.clip?.some((c) => isMaskSheet(c.obj) && editor.selection.has(c.obj.id));
 
+/** A comic page's panel (ADR 0206): a sheet on a page; it has its own handles (corners and gutters), not a sheet's box. */
+export const isPanelPo = (po: ProjectedObject): boolean => isContainer(po.obj) && !!po.clip?.some((c) => c.obj.id === po.obj.parent && !!(c.obj as PathObject).container?.comic);
+
 /** The box of the visible selected objects (turned with them when they share a rotation, see selection-frame.ts). */
 export function selectedFrame(visible: readonly ProjectedObject[], editor: EditorState, vp: Viewport): { frame: SelectionFrame; handle: Pt } | null {
-  const frame = selectionFrame(visible.filter((po) => editor.selection.has(po.obj.id) && !underPickedMask(po, editor)), editor.alignBox);
+  const picked = visible.filter((po) => editor.selection.has(po.obj.id) && !underPickedMask(po, editor));
+  if (picked.length && picked.every(isPanelPo)) return null; // (panels are shaped by their corners and gutters)
+  const frame = selectionFrame(picked, editor.alignBox);
   return frame ? { frame, handle: rotateHandleAt(frame, vp) } : null;
 }
 
@@ -790,7 +869,8 @@ function drawSelection(
   // Each selected object is outlined by the rectangle it occupies, turned with it.
   for (const po of visible) {
     if (!editor.selection.has(po.obj.id) || underPickedMask(po, editor)) continue;
-    const c = itemCorners(po);
+    // (a panel is outlined by its own shape, a slanted one too)
+    const c = isPanelPo(po) ? nodesOnScreen(po).map((n) => [n.p[0], n.p[1]] as Pt) : itemCorners(po);
     if (!c.every(finite)) continue;
     ctx.beginPath();
     ctx.moveTo(c[0]![0], c[0]![1]);

@@ -1388,3 +1388,53 @@ test("a note on full screen covers the panel beside it: nothing of the panel sho
   await expect.poll(() => note(p).evaluate((e) => e.querySelector(".has-full-note") !== null || e.classList.contains("has-full-note"))).toBe(false);
   expect(app.consoleErrors).toEqual([]);
 });
+
+test("Escape closes a note open on a canvas in every editor style, in the panel and in the window: from its words, and from the canvas with nothing selected; an open editor menu closes first", async ({ app }) => {
+  const p = app.page;
+  await p.evaluate(() => window.__canvastDebug.setSetting("notes.saveOnClose", true)); // (a change is saved on close, not asked about)
+  await p.getByTestId("view-assets").click();
+  await p.getByTestId("assets-import-input").setInputFiles({ name: "esc.md", mimeType: "text/markdown", buffer: Buffer.from("# Esc\n\nWords.\n") });
+  await p.locator('[data-testid="asset-card"][title="esc.md"]').click();
+  await p.getByTestId("asset-place").click();
+  await p.getByTestId("view-canvas").click();
+  await expect.poll(() => p.evaluate(() => window.__canvastDebug.objects().length)).toBe(1);
+  await p.waitForTimeout(300);
+  const at = await p.evaluate(() => { const d = window.__canvastDebug; return d.objectScreen(d.objects()[0]!.id)!.box; });
+  const open = async (host: "note-panel" | "note-window") => {
+    await p.evaluate(() => window.__canvastDebug.select([]));
+    await p.mouse.dblclick((at.minX + at.maxX) / 2, (at.minY + at.maxY) / 2);
+    const words = p.getByTestId(host).locator(".sun-editor-editable").first();
+    await expect(words).toBeVisible();
+    return words;
+  };
+  for (const mode of ["panel", "window"] as const) {
+    const host = mode === "panel" ? "note-panel" : "note-window";
+    for (const style of ["document", "classic", "bottom", "balloon", "notion"]) {
+      await p.evaluate(([m, s]) => { window.__canvastDebug.setSetting("notes.panelMode", m); window.__canvastDebug.setSetting("notes.panelStyle", s); }, [mode, style] as const);
+      // from the words
+      const words = await open(host);
+      await words.locator("p").first().click();
+      await p.keyboard.press("Escape");
+      await expect(p.getByTestId(host), `${mode}, ${style}: Escape in the words`).toBeHidden();
+      if (mode === "window") continue; // (the window covers the canvas: its own Escape is the one above)
+      // from the canvas, with nothing selected
+      await open(host);
+      await p.mouse.click(400, 680); // (empty canvas, clear of the tools and the dev panel)
+      await p.evaluate(() => window.__canvastDebug.select([]));
+      await p.keyboard.press("Escape");
+      await expect(p.getByTestId(host), `${mode}, ${style}: Escape on the canvas`).toBeHidden();
+    }
+  }
+  // An editor's own menu open: the first Escape closes it, the note stays; the next closes the note.
+  await p.evaluate(() => { window.__canvastDebug.setSetting("notes.panelMode", "panel"); window.__canvastDebug.setSetting("notes.panelStyle", "classic"); });
+  const words = await open("note-panel");
+  await words.locator("p").first().click();
+  await p.keyboard.press("End");
+  await p.keyboard.press("Enter");
+  await p.keyboard.type("/");
+  await expect(p.locator(".se-cmd-row").filter({ visible: true }).first()).toBeVisible();
+  await p.keyboard.press("Escape");
+  await expect(p.getByTestId("note-panel")).toBeVisible();
+  await p.keyboard.press("Escape");
+  await expect(p.getByTestId("note-panel")).toBeHidden();
+});

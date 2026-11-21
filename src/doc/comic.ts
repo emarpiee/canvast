@@ -68,21 +68,37 @@ function meet(p: Pt, d: Pt, q: Pt, e: Pt): Pt | null {
   return [p[0] + d[0] * t, p[1] + d[1] * t];
 }
 
-/** The polygon with its edge `i` (from corner i to i + 1) moved by `(dx, dy)`: its two corners slide along the edges beside it. Null when it would fold. */
-export function moveEdge(p: Poly, i: number, dx: number, dy: number): Pt[] | null {
+/** Whether an outline keeps its turn and stays convex (no corner bent the other way, no fold). */
+function convexLike(p: Poly, turn: number): boolean {
+  for (let k = 0; k < p.length; k++) {
+    const c = cross(p[k]!, p[(k + 1) % p.length]!, p[(k + 2) % p.length]!);
+    if (Math.sign(c) === -turn && Math.abs(c) > 1e-9) return false;
+  }
+  return Math.sign(area2(p)) === turn;
+}
+
+/** The polygon with its edge `i` (from corner i to i + 1) on the line through `q` along `d`: its two corners slide along the edges beside it. Null when it would fold. */
+export function setEdgeLine(p: Poly, i: number, q: Pt, d: Pt): Pt[] | null {
   const n = p.length, a = p[i]!, b = p[(i + 1) % n]!, before = p[(i - 1 + n) % n]!, after = p[(i + 2) % n]!;
-  const d: Pt = [b[0] - a[0], b[1] - a[1]];
-  const a2: Pt = [a[0] + dx, a[1] + dy];
-  const na = meet(a2, d, before, [a[0] - before[0], a[1] - before[1]]);
-  const nb = meet(a2, d, after, [b[0] - after[0], b[1] - after[1]]);
+  const na = meet(q, d, before, [a[0] - before[0], a[1] - before[1]]);
+  const nb = meet(q, d, after, [b[0] - after[0], b[1] - after[1]]);
   if (!na || !nb) return null;
-  const out = p.map((q) => q as Pt);
+  const out = p.map((x) => x as Pt);
   out[i] = na;
   out[(i + 1) % n] = nb;
-  // (the outline keeps its turn and stays convex: an edge pushed past its neighbours would fold it)
-  const s = Math.sign(area2(p));
-  for (let k = 0; k < n; k++) if (Math.sign(cross(out[k]!, out[(k + 1) % n]!, out[(k + 2) % n]!)) === -s && Math.abs(cross(out[k]!, out[(k + 1) % n]!, out[(k + 2) % n]!)) > 1e-9) return null;
-  return Math.sign(area2(out)) === s ? out : null;
+  return convexLike(out, Math.sign(area2(p))) ? out : null;
+}
+
+/** The polygon with its edge `i` moved by `(dx, dy)`. Null when it would fold. */
+export function moveEdge(p: Poly, i: number, dx: number, dy: number): Pt[] | null {
+  const a = p[i]!, b = p[(i + 1) % p.length]!;
+  return setEdgeLine(p, i, [a[0] + dx, a[1] + dy], [b[0] - a[0], b[1] - a[1]]);
+}
+
+/** The polygon with its corner `i` at `to` (the two edges at it turn about their other ends). Null when it would fold or grow too thin. */
+export function moveCorner(p: Poly, i: number, to: Pt, min: number): Pt[] | null {
+  const out = p.map((x, k) => (k === i ? to : (x as Pt)));
+  return convexLike(out, Math.sign(area2(p))) && big(out, min) ? out : null;
 }
 
 /** The outline round both panels (their convex hull): two panels across a gutter become one. */
@@ -223,4 +239,62 @@ export function segmentHits(p: Poly, a: Pt, b: Pt): boolean {
     const d = p[(i + 1) % p.length]!;
     return side(a, b, c) !== side(a, b, d) && side(c, d, a) !== side(c, d, b);
   });
+}
+
+/** A gutter of a page as its handles show it: its sides, its direction across (from side a to side b), its width, and its two ends on its middle line. */
+export interface Gutter { a: Edge[]; b: Edge[]; nx: number; ny: number; width: number; ends: [Pt, Pt] }
+
+/** The point of the line `n · x = off` at `t` along it (the coordinate across the normal). */
+const onLineAt = (nx: number, ny: number, off: number, t: number): Pt => [nx * off - ny * t, ny * off + nx * t];
+
+/** Every gutter of a page: two panels' facing edges at most `maxGap` apart (and every edge along it that faces the other side), each once. */
+export function guttersOf(panels: readonly Poly[], maxGap: number): Gutter[] {
+  const edges = edgesOf(panels);
+  const out: Gutter[] = [];
+  const seen = new Set<string>();
+  for (const e of edges)
+    for (const f of edges) {
+      if (f.panel === e.panel || e.nx * f.nx + e.ny * f.ny > -0.9999) continue;
+      const gap = -(e.off + f.off);
+      if (gap < -1e-9 || gap > maxGap) continue;
+      const lo = Math.max(e.from, -f.to), hi = Math.min(e.to, -f.from);
+      if (hi - lo <= 1e-9) continue;
+      const mid = onLineAt(e.nx, e.ny, e.off + gap / 2, (lo + hi) / 2);
+      const g = gutterAt(panels, mid, gap + 1e-6);
+      if (!g) continue;
+      const key = [...g.a, ...g.b].map((x) => `${x.panel}:${x.edge}`).sort().join(",");
+      if (seen.has(key)) continue;
+      seen.add(key);
+      // its ends: as far as its two sides face each other, measured along side a's line
+      const a0 = g.a[0]!;
+      let from = Infinity, to = -Infinity;
+      for (const x of g.a) for (const y of g.b) {
+        const l = Math.max(x.from, -y.to), h = Math.min(x.to, -y.from);
+        if (h > l) (from = Math.min(from, l)), (to = Math.max(to, h));
+      }
+      const off = a0.off + g.width / 2;
+      out.push({ ...g, ends: [onLineAt(a0.nx, a0.ny, off, from), onLineAt(a0.nx, a0.ny, off, to)] });
+    }
+  return out;
+}
+
+/**
+ * The panels with a gutter turned: its middle line now runs from `fixed` (the end held) toward `to`, its width kept; each side's edges lie
+ * along it, their corners sliding along the edges beside them. Null when a panel would fold or grow thinner than `min`.
+ */
+export function turnGutter(panels: readonly Poly[], g: Pick<Gutter, "a" | "b" | "nx" | "ny" | "width">, fixed: Pt, to: Pt, min: number): Pt[][] | null {
+  const len = Math.hypot(to[0] - fixed[0], to[1] - fixed[1]);
+  if (len < 1e-9) return null;
+  const d: Pt = [(to[0] - fixed[0]) / len, (to[1] - fixed[1]) / len];
+  let m: Pt = [-d[1], d[0]];
+  if (m[0] * g.nx + m[1] * g.ny < 0) m = [-m[0], -m[1]];
+  const out = panels.map((p) => p.map((q) => q as Pt));
+  for (const [side, k] of [[g.a, -1], [g.b, 1]] as const)
+    for (const e of side) {
+      const q: Pt = [fixed[0] + (m[0] * k * g.width) / 2, fixed[1] + (m[1] * k * g.width) / 2];
+      const next = setEdgeLine(out[e.panel]!, e.edge, q, d);
+      if (!next || !big(next, min)) return null;
+      out[e.panel] = next;
+    }
+  return out;
 }

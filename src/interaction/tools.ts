@@ -1,5 +1,7 @@
-import { cutAcross, gutterOf, isComicPage, mergeAt, movedGutter, newComicPage, panelPoly, panelsOf } from "../app/comic";
+import { cornerMoved, gutterMoved, gutterTurned, mergeGutter, pagePer, cutAcross, gutterOf, isComicPage, mergeAt, movedGutter, newComicPage, panelPoly, panelsOf } from "../app/comic";
 import { insidePoly } from "../doc/comic";
+import { comicHandleAt, comicHandles, pageToScreen } from "./comic-handles";
+import type { ComicHandle, ComicHandles } from "./comic-handles";
 import { pageRatio } from "../gen/pages";
 import { lookFromChoices } from "../doc/stroke-look";
 import type { NavDir } from "./item-navigation";
@@ -271,6 +273,8 @@ type Gesture =
   | { kind: "round"; pointerId: number; id: ObjectId; what: "main" | "corner" | "ratio" | "count" | "balloon" | "pathtext"; balloon?: { part: BalloonPart; tail: number }; /** A text along a path's handle, and its lift and the point pressed (local units) when it was taken. */ pathText?: { part: "along" | "lift"; lift0: number; l0: { x: number; y: number } }; snap?: SnapContext | null; index: number; ax: number; ay: number; r0: number; proj0: number; x0: number; start: ScreenPoint; moved: boolean; opened: boolean; timer: number; /** Every picked corner taken along (its radius and the most it can have), by node. */ multi?: ReadonlyMap<number, { r0: number; max: number }> }
   /** The Panel tool on a comic page (ADR 0206): a cut across a panel, a gutter moved, or a click that selects (`target`). */
   | { kind: "comic"; pointerId: number; page: ObjectId; mode: "cut" | "gutter" | "click"; target: ObjectId; start: readonly [number, number]; startScreen: ScreenPoint; found: ReturnType<typeof gutterOf> }
+  /** A comic page's gutter or corner handle being dragged (ADR 0206): what the page was at the press, and where on it. */
+  | { kind: "comichandle"; pointerId: number; h: ComicHandle; ch: ComicHandles; start: readonly [number, number]; startScreen: ScreenPoint }
   /** Dragging a shape out (Shape tool). */
   | { kind: "shape"; pointerId: number; start: ScreenPoint; /** What a corner being drawn snaps to (null: snapping off). */ snap: SnapContext | null }
   /** A side handle of words in a shape: the shape sets their box, so what it changes is the padding. */
@@ -536,6 +540,54 @@ export function attachTools(
     g = { kind: "comic", pointerId: e.pointerId, page: hit.page.id, mode: found ? "gutter" : "cut", target: hit.panel?.id ?? hit.page.id, start: hit.at, startScreen: s, found };
     return true;
   };
+  /** A press on a comic page's handle (ADR 0206), with the Select or the Panel tool. */
+  const startComicHandle = (e: PointerEvent, s: ScreenPoint): boolean => {
+    if (editor.blockEdit()) return false;
+    const ch = comicHandles(doc, editor, visible());
+    const h = ch && comicHandleAt(ch.handles, s.x, s.y);
+    if (!ch || !h) return false;
+    const l = localOf(ch.po, s.x, s.y);
+    g = { kind: "comichandle", pointerId: e.pointerId, h, ch, start: [l.x, l.y], startScreen: s };
+    return true;
+  };
+  const updateComicHandle = (gc: Extract<Gesture, { kind: "comichandle" }>, s: ScreenPoint, e: PointerEvent, final: boolean): void => {
+    const { ch, h } = gc;
+    const po = visible().find((p) => p.obj.id === ch.page.id) ?? ch.po;
+    const l = localOf(po, s.x, s.y);
+    let to: [number, number] = [l.x, l.y];
+    const far = Math.hypot(s.x - gc.startScreen.x, s.y - gc.startScreen.y) >= DRAG_THRESHOLD_PX;
+    let next: PathObject[] | null = null, label = "";
+    if (h.what === "corner") {
+      const k = ch.panels.findIndex((p) => p.id === h.panel);
+      next = k < 0 ? null : cornerMoved(doc, ch.page, ch.panels, ch.polys, k, h.index, to);
+      label = "Corner";
+    } else {
+      const gu = ch.gutters[h.gutter]!;
+      if (h.what === "move") {
+        const d = (to[0] - gc.start[0]) * gu.nx + (to[1] - gc.start[1]) * gu.ny;
+        next = gutterMoved(doc, ch.page, ch.panels, ch.polys, gu, d);
+        label = "Gutter";
+      } else {
+        const fixed = gu.ends[h.end === 0 ? 1 : 0];
+        // Shift: the gutter at a step of 15 degrees
+        if (keys(e).shift) {
+          const dx = to[0] - fixed[0], dy = to[1] - fixed[1], a = Math.round(Math.atan2(dy, dx) / (Math.PI / 12)) * (Math.PI / 12), len = Math.hypot(dx, dy);
+          to = [fixed[0] + len * Math.cos(a), fixed[1] + len * Math.sin(a)];
+        }
+        next = gutterTurned(doc, ch.page, ch.panels, ch.polys, gu, fixed, to);
+        label = `Gutter ${Math.round((((Math.atan2(to[1] - fixed[1], to[0] - fixed[0]) * 180) / Math.PI) + 360) % 180)}°`;
+      }
+    }
+    if (!final) {
+      if (!far) return;
+      editor.handleLabel = { x: s.x, y: s.y, text: next ? label : `${label}: a panel would fold` };
+      return showReplaced(editor, next ?? []);
+    }
+    editor.preview = { kind: "none" };
+    editor.handleLabel = null;
+    if (far && next) doc.commit(doc.transaction(h.what === "corner" ? "Move the panel's corner" : h.what === "move" ? "Move the gutter" : "Turn the gutter", next));
+    editor.changed();
+  };
   const updateComic = (gc: Extract<Gesture, { kind: "comic" }>, s: ScreenPoint, e: PointerEvent, final: boolean): void => {
     const page = doc.get(gc.page) as PathObject | undefined;
     const po = page && visible().find((p) => p.obj.id === page.id);
@@ -563,12 +615,27 @@ export function attachTools(
       // let go in the panel it started in: that panel, along the line; else every panel the stroke crosses
       const started = doc.get(gc.target) as PathObject | undefined;
       const inOne = started && started.id !== page.id && insidePoly(panelPoly(doc, page, started), to);
+      if (!final) {
+        // only the knife while it is drawn: its line across the page and the gutter it leaves; the panels change when it is let go
+        const a = pageToScreen(po, gc.start[0], gc.start[1]), b = pageToScreen(po, to[0], to[1]);
+        const dx = b[0] - a[0], dy = b[1] - a[1], len = Math.hypot(dx, dy) || 1, box = po.box;
+        let t0 = -Infinity, t1 = Infinity;
+        for (const [d, lo, hi, o] of [[dx / len, box.minX, box.maxX, a[0]], [dy / len, box.minY, box.maxY, a[1]]] as const) {
+          if (Math.abs(d) < 1e-12) continue;
+          const [p0, p1] = [(lo - o) / d, (hi - o) / d];
+          t0 = Math.max(t0, Math.min(p0, p1));
+          t1 = Math.min(t1, Math.max(p0, p1));
+        }
+        if (!(t0 < t1)) [t0, t1] = [0, len];
+        const gutterPx = (pagePer(page, isComicPage(page) ? page.container.comic.gutter : 0) * po.proj.ppu) / 2;
+        editor.comicKnife = { a: [a[0] + (dx / len) * t0, a[1] + (dy / len) * t0], b: [a[0] + (dx / len) * t1, a[1] + (dy / len) * t1], half: gutterPx };
+        const deg = Math.round((((Math.atan2(to[1] - gc.start[1], to[0] - gc.start[0]) * 180) / Math.PI) + 360) % 180);
+        editor.handleLabel = { x: s.x, y: s.y, text: `Cut ${deg}° · gutter ${((isComicPage(page) ? page.container.comic.gutter : 0) / 10).toFixed(1)}%` };
+        return editor.changed();
+      }
+      editor.comicKnife = null;
+      editor.handleLabel = null;
       const next = cutAcross(doc, page, gc.start, to, inOne ? started : undefined);
-      // the knife's line, across the screen as far as the page goes
-      const k = po.proj.ppu, sx = (x: number): number => gc.startScreen.x + (x - gc.start[0]) * k, sy = (y: number): number => gc.startScreen.y + (y - gc.start[1]) * k;
-      const ex = to[0] - gc.start[0], ey = to[1] - gc.start[1], n = Math.hypot(ex, ey) || 1, far2 = 1e5 / k;
-      editor.guides = final ? null : { seg: [sx(gc.start[0] - (ex / n) * far2), sy(gc.start[1] - (ey / n) * far2), sx(gc.start[0] + (ex / n) * far2), sy(gc.start[1] + (ey / n) * far2)] };
-      if (!final) return showReplaced(editor, next ?? []);
       done();
       if (next) {
         doc.commit(doc.transaction("Cut panels", next));
@@ -1582,6 +1649,8 @@ export function attachTools(
       editor.changed();
       return;
     }
+    // A comic page's gutter and corner handles (ADR 0206)
+    if (editor.selection.size && startComicHandle(e, s)) return;
     // A picked sheet's auto layout handles (ADR 0193): its padding and gaps, dragged as the bar's numbers are.
     if (editor.selection.size && !editor.blockEdit()) {
       const lh = layoutHandles(doc, visible().filter((p) => editor.selection.has(p.obj.id)));
@@ -2325,7 +2394,7 @@ export function attachTools(
         break;
       case "panel":
         // on a comic page: cut a panel, move a gutter or pick; elsewhere, a new page is drawn
-        if (!madeHandlePress(e, s) && !startComicPress(s, e)) startShape(s, e);
+        if (!startComicHandle(e, s) && !madeHandlePress(e, s) && !startComicPress(s, e)) startShape(s, e);
         break;
       case "path":
         if (!madeHandlePress(e, s)) startPathNode(s, e);
@@ -2551,6 +2620,9 @@ export function attachTools(
       case "comic":
         updateComic(g, s, e, false);
         break;
+      case "comichandle":
+        updateComicHandle(g, s, e, false);
+        break;
       case "text":
         // A box dragged out on empty canvas: a text of that width (a click makes one as wide as its words).
         if (!g.moved && Math.hypot(s.x - g.start.x, s.y - g.start.y) >= DRAG_THRESHOLD_PX && !editor.blockEdit() && !textAt(g.start)) {
@@ -2747,8 +2819,17 @@ export function attachTools(
         if (cancelled) {
           editor.preview = { kind: "none" };
           editor.guides = null;
+          editor.comicKnife = null;
+          editor.handleLabel = null;
           editor.changed();
         } else updateComic(g, s, e, true);
+        break;
+      case "comichandle":
+        if (cancelled) {
+          editor.preview = { kind: "none" };
+          editor.handleLabel = null;
+          editor.changed();
+        } else updateComicHandle(g, s, e, true);
         break;
       case "pathnode":
         break; // the node stays; the path goes on until it is closed or ended
@@ -2886,7 +2967,21 @@ export function attachTools(
       }
       return;
     }
-    // The Panel tool: a double-click on a gutter merges the two panels across it (ADR 0206)
+    // A double-click on a gutter's middle handle merges the two panels across it (ADR 0206), with the Select or the Panel tool
+    if ((effectiveTool() === "panel" || effectiveTool() === "select") && !editor.readOnly && !editor.blockEdit()) {
+      const at = local(e), ch = comicHandles(doc, editor, visible()), h = ch && comicHandleAt(ch.handles, at.x, at.y);
+      if (ch && h?.what === "move") {
+        const r = mergeGutter(doc, ch.page, ch.panels, ch.gutters[h.gutter]!);
+        if (r) {
+          doc.commit(doc.transaction("Merge two panels", r.next, r.removed));
+          editor.select([r.next[0]!.id]);
+        } else {
+          editor.message = "This gutter runs along more than two panels: select the two to merge and use Merge panels.";
+          editor.changed();
+        }
+        return;
+      }
+    }
     if (effectiveTool() === "panel" && !editor.readOnly) {
       const hit = comicAt(local(e));
       if (hit && !hit.panel && !editor.blockEdit()) {

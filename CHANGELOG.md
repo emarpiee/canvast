@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.61.8 — Comic panels with their own handles, a reference window of the theme, Esc in every note style (2026-11-22)
+
+- **Changed:** comic panels have their own handles, as a balloon has: on each gutter a bar to move it (double-click: merge the two panels) and a handle at each end to turn it to any angle; the selected panel's corners move one by one. A cut shows only its line and the gutter it will leave until it is let go. Panels are their own kind (Layers, outline, no sheet handles) and follow their page when it is resized. ([Comics and storyboards](README.md#comics-and-storyboards))
+- **Fixed before release:** the Panel tool's Gutter, Margin and Border fields always failed (*the value of Set a comic option is text*). ([Comics and storyboards](README.md#comics-and-storyboards))
+- **Fixed before release:** the reference window now uses the theme's own parts: the Styles panel's chooser for what it shows (one menu: boards, all pictures, folders), its search field, the picture count by its title, the panels' spacing and corners at every density. ([The Library](README.md#the-library))
+- **Fixed:** `Esc` did not close a note on a canvas in the editor styles that show a toolbar (the toolbar was taken for an open menu); it closes it in every style, in the panel and in the window. ([Notes on a canvas](README.md#notes-on-a-canvas))
+
+### For developers
+
+- `check:components` now fails a floating panel whose header buttons are not `.layer-btn`, whose list button in the strip under the header is not `.pick-current`, or whose search field is not in `.layers-filter`; `themeProblems` (`tests/e2e/harness.ts`) checks every open floating panel at every density for corners and text sizes off the theme (`components.spec`). A test presses Escape in every notes editor style, in the panel and the window (`notes.spec`).
+
 ## 0.61.7 — Reference window controls and speed, notes' embeds follow renames, a knife for comic panels, Esc (2026-11-22)
 
 - **Fixed before release:** the reference window's list of what it shows opened as a dropdown cut off beside the window; it is now a list inside the window, with the folders as a tree and a search. ([The Library](README.md#the-library))
