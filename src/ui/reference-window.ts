@@ -14,6 +14,8 @@ import { ICONS } from "./icons";
 import { commandRows, openMoreMenu } from "./more-menu";
 import type { MenuItem } from "./more-menu";
 import { panelHtml } from "./panel";
+import { openTreeChooser } from "./tree-chooser";
+import type { ChoiceNode, ChooserView } from "./tree-chooser";
 import { showMoreButton } from "./show-more";
 
 /**
@@ -221,14 +223,17 @@ export function mountReferenceWindows(deps: ReferenceDeps): { open(source?: RefS
     // What it shows: the shared menu, as the Styles panel's kinds (moodboards first, each with its own ⋯; then the gallery: all pictures and each folder)
     pickBtn.addEventListener("click", async () => {
       const l = await listing();
-      const folders = (l?.folders ?? []).filter((f) => deps.hidden() || !f.hidden).map((f) => ({ f, path: folderPath(l!.folders, f.id) })).sort((a, b) => a.path.join("\u0000").localeCompare(b.path.join("\u0000")));
+      // (a library may hold thousands of folders: the menu lists the last few shown, and Choose a folder… finds any, by its name, in the shared tree)
+      const known = new Map((l?.folders ?? []).filter((f) => deps.hidden() || !f.hidden).map((f) => [f.id, f]));
+      const folders = recentFolders.filter((fid) => known.has(fid)).map((fid) => ({ f: known.get(fid)!, path: folderPath(l!.folders, fid) }));
       const row = (value: string, label: string, icon: string, hint: string, sep = false) => ({ label, icon, hint, command: "reference.show", checked: value === win.source, sep, run: () => void pressCommand("reference.show", { window: id, source: value }) });
       openMoreMenu(pickBtn, [
         ...boards().map((b, i) => ({ ...row(`board:${b.id}`, b.name, ICONS.referenceWindow, `Moodboard · ${plural(b.items.length, "picture")}`, i === 0), more: boardRows(b.id, win) })),
         { label: "New moodboard…", icon: ICONS.plus, hint: "An empty one in this window", command: "reference.newBoard", run: () => void newBoard(win) },
         { label: "Manage moodboards…", icon: ICONS.settings, hint: "Rename, copy, open or delete them", command: "reference.manage", run: () => void pressCommand("reference.manage", { window: id }) },
         row("all", "All pictures", ICONS.images, "Gallery of the library", true),
-        ...folders.map((x) => row(`folder:${x.f.id}`, x.path.join(" › "), ICONS.folder, "Gallery of a folder")),
+        ...folders.map((x) => row(`folder:${x.f.id}`, x.path.join(" › "), ICONS.folder, "A folder shown lately")),
+        { label: "Choose a folder…", icon: ICONS.folderTree, hint: "Find any folder by its name", command: "reference.show", run: () => void chooseFolder(win) },
       ], "What it shows");
     });
     // More: what can be done to this moodboard, how the gallery is ordered and sized, and the window itself
@@ -795,6 +800,48 @@ export function mountReferenceWindows(deps: ReferenceDeps): { open(source?: RefS
   const addTo = (board: string, hashes: readonly string[], at: { x: number; y: number }): void => {
     if (hashes.length) void pressCommand("reference.add", { board, ids: [...hashes], x: at.x, y: at.y });
   };
+  /** The folders a gallery showed lately (newest first), for the chooser's menu; kept on this device. */
+  const RECENT_KEY = "canvast.reference.recentFolders";
+  let recentFolders: string[] = (() => {
+    try {
+      const v = JSON.parse(localStorage.getItem(RECENT_KEY) ?? "[]") as unknown;
+      return Array.isArray(v) ? v.filter((x): x is string => typeof x === "string").slice(0, 8) : [];
+    } catch {
+      return [];
+    }
+  })();
+  const rememberFolder = (fid: string): void => {
+    recentFolders = [fid, ...recentFolders.filter((x) => x !== fid)].slice(0, 8);
+    try {
+      localStorage.setItem(RECENT_KEY, JSON.stringify(recentFolders));
+    } catch {
+      /* (no storage: remembered while the page is open) */
+    }
+  };
+  /** Any folder of the library, found by its name in the shared tree chooser (its search, its tree), shown in the window. */
+  const chooseFolder = async (w: Win): Promise<void> => {
+    const l = await listing();
+    if (!l) return;
+    const cur = w.source.startsWith("folder:") ? w.source.slice(7) : "";
+    const done = await openTreeChooser({
+      title: "Show a folder",
+      applyLabel: "Show",
+      view: chooserView,
+      onView: (v) => void (chooserView = v),
+      tabs: [{
+        id: "folder", title: "Folder", icon: ICONS.folder, openIcon: ICONS.folderOpen, one: true, noun: "folders",
+        nodes: [
+          { id: "", name: "All pictures", parent: null, icon: ICONS.images, hint: "Every picture of the library", state: cur ? "off" : "on" },
+          ...l.folders.filter((f) => deps.hidden() || !f.hidden).map((f): ChoiceNode => ({ id: f.id, name: f.name, parent: f.parentId, state: f.id === cur ? "on" : "off" })),
+        ],
+      }],
+    });
+    const on = done?.get("folder")?.on[0];
+    if (on === undefined) return;
+    void pressCommand("reference.show", { window: w.id, source: on ? `folder:${on}` : "all" });
+  };
+  let chooserView: ChooserView = "tree";
+
   /** What can be done to one moodboard: one list of rows for its ⋯ in the chooser and for the window's More menu (DRY). */
   const boardRows = (bid: string, w: Win): MenuItem[] => {
     const go = (command: string, label: string, icon: string, hint: string, extra: Partial<MenuItem> = {}): MenuItem => ({ label, icon, hint, command, run: () => void pressCommand(command, { window: w.id, board: bid }), ...extra });
@@ -938,6 +985,7 @@ let d=null;addEventListener("pointerdown",(e)=>{d={x:e.clientX-v.x,y:e.clientY-v
       const w = winOf(o), src = String(o["source"]);
       if (!w) return { ok: false, error: "No such window." };
       if (!/^(all|folder:.+|board:.+)$/.test(src)) return { ok: false, error: '"source" is all, folder:<id> or board:<id>.' };
+      if (src.startsWith("folder:")) rememberFolder(src.slice(7));
       w.source = src;
       keepNow();
       void w.render();

@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.61.16 — Find any folder for a reference window (2026-11-22)
+
+- **Changed:** a reference window's list of what it shows no longer lists every folder of the library (thousands made it unusable): it lists the folders shown lately, and *Choose a folder…* finds any by its name in the Library's own folder chooser (its search and tree). ([The Library](README.md#the-library))
+
 ## 0.61.15 — Moodboards: pictures flipped, greyed, placed on the canvas; managed; windows folded and floated (2026-11-22)
 
 - **Changed:** a reference window's board is now a **moodboard** (a board is the workspace's level). Each moodboard has its own ⋯ in the chooser (open in a new window, rename, duplicate, arrange, fit, save as a picture, delete), and *Manage moodboards…* lists them all. ([The Library](README.md#the-library))
