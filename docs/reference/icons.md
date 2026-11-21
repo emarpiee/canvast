@@ -4,6 +4,9 @@ One icon per function: two buttons that do different things never share an icon,
 
 | Icon (lucide) | Function(s) |
 | --- | --- |
+| `book-image` | The Panel tool, a comic page and its panels: the tool, its options' section, the Actions bar's Comic page menu |
+| `rows-2`, `columns-2` | Cut a comic panel in two: across, or down (the Sheets menu of the Actions bar) |
+| `app-window` | The reference window: its button and its title bar |
 | `save` | Save: Save as a style, Save to library (the export dialog, the Actions bar, the context menu), Save from the text, Save the adjustments (nothing else carries it) |
 | `arrow-down-to-line` | Import: every import button and menu row, the Import tool of the rail, Import styles (nothing else carries it) |
 | `refresh-cw` | Update: Update from the picked picture, from the Pattern panel, to the current view, the bookmark pictures, the initial state, a saved search to the look shown now (nothing else carries it) |

@@ -368,7 +368,8 @@ export interface PathObject extends ObjectBase {
   readonly cap?: Cap;
   /** Present: this path is a sheet (ADR 0108): a rectangle that holds objects (they name it as their `parent`) and, with `clip`, hides what lies outside it. */
   /** A sheet (ADR 0108). `scale`: when the sheet is resized, everything on it grows with it, whatever its pins say (ADR 0133). `layout`: auto layout (ADR 0186). */
-  readonly container?: { readonly clip: boolean; readonly scale?: true; readonly mask?: true; readonly was?: { readonly fill: Paint | null; readonly stroke: Paint | null }; readonly layout?: SheetLayout };
+  /** `comic`: a comic page (ADR 0206), its panels the sheets on it; its gutter between them, in thousandths of its shorter side. */
+  readonly container?: { readonly clip: boolean; readonly scale?: true; readonly mask?: true; readonly was?: { readonly fill: Paint | null; readonly stroke: Paint | null }; readonly layout?: SheetLayout; readonly comic?: { readonly gutter: number } };
   /** Absent: a solid outline. Dash and gap, in widths of the outline (ADR 0107). */
   readonly dash?: Dash;
   /** Corners sharper than this many degrees (1 to 90) are cut to a bevel instead of a point; absent = the default (29°). */
@@ -713,7 +714,7 @@ export function validateObject(o: CanvasObject): CanvasObject {
     if (!(finite(o.width, "width") > 0)) throw new InvalidObjectError("width must be positive");
     if (o.join !== undefined && o.join !== "miter" && o.join !== "bevel") throw new InvalidObjectError("bad join");
     if (o.cap !== undefined && o.cap !== "butt" && o.cap !== "square") throw new InvalidObjectError("bad cap");
-    if (o.container !== undefined && !(typeof o.container === "object" && o.container !== null && typeof o.container.clip === "boolean" && (o.container.scale === undefined || o.container.scale === true) && (o.container.mask === undefined || o.container.mask === true) && (o.container.was === undefined || (typeof o.container.was === "object" && o.container.was !== null && [o.container.was.fill, o.container.was.stroke].every((v) => v === null || isPaint(v)))) && (o.container.layout === undefined || validLayout(o.container.layout)))) throw new InvalidObjectError("bad container");
+    if (o.container !== undefined && !(typeof o.container === "object" && o.container !== null && typeof o.container.clip === "boolean" && (o.container.scale === undefined || o.container.scale === true) && (o.container.mask === undefined || o.container.mask === true) && (o.container.was === undefined || (typeof o.container.was === "object" && o.container.was !== null && [o.container.was.fill, o.container.was.stroke].every((v) => v === null || isPaint(v)))) && (o.container.layout === undefined || validLayout(o.container.layout)) && (o.container.comic === undefined || (typeof o.container.comic === "object" && o.container.comic !== null && Number.isFinite(o.container.comic.gutter) && o.container.comic.gutter >= 0)))) throw new InvalidObjectError("bad container");
     if (o.dash !== undefined && !(Array.isArray(o.dash) && o.dash.length === 2 && o.dash.every((v: unknown) => typeof v === "number" && Number.isFinite(v) && v >= 0) && o.dash[0] + o.dash[1] > 0)) throw new InvalidObjectError("bad dash");
     if (o.profile !== undefined && !PROFILE_NAMES.includes(o.profile)) throw new InvalidObjectError("bad width profile");
     if (o.net !== undefined && o.net !== true) throw new InvalidObjectError("net is true or absent");

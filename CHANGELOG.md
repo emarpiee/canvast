@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.61.3 — Comic pages, storyboard and comic guide options (2026-11-21)
+
+- **Added:** comic pages: the **Panel** tool (`J`) makes a page of a chosen size laid out in panels that hold and clip what is drawn or placed in them; a drag across a panel cuts it in two with the gutter kept (Shift: straight), a gutter dragged moves the panels on both sides, a double-click on a gutter merges two panels. Its options (page size, way up, layout, gutter, margin, border) also change a selected page; the Sheets menu cuts and merges selected panels. ([Comics and storyboards](README.md#comics-and-storyboards))
+- **Added:** the *Storyboard Frames* and *Comic Panels* guides have a **Page** size (A4, Letter, a comic book, manga, 16:9 and more, portrait or landscape, or custom) that gives their sheet its shape. Storyboards: a custom frame ratio and more ratios, notes beside the frames, gutters across and down apart, number boxes, a title block, safe areas and a cross or thirds in each frame. Comic panels: five more layouts, slanted gutters, right to left, a safe area. ([Comics and storyboards](README.md#comics-and-storyboards))
+
+### For developers
+
+- `doc/comic.ts` (panel geometry, unit-tested in `tests/unit/comic.test.ts`), `app/comic.ts`, `gen/pages.ts`; `container.comic` on a sheet ([ADR 0206](docs/adr/0206-comic-pages.md)); the `comic.setOption`, `comic.cutAcross`, `comic.cutDown` and `comic.merge` commands.
+
 ## 0.61.2 — Adjusted big pictures, note links that follow, pages filed with their PDF (2026-11-21)
 
 - **Fixed:** a picture of more than 8 million pixels lost its adjustments when zoomed in on it (it was drawn as it is), and zoomed in so far that its pixels show one by one it lost its blur, sharpening, grain and pixelation; it is now adjusted at every zoom. ([Adjust](README.md#adjust))

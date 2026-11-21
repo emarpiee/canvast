@@ -442,25 +442,44 @@ export const pixelGrid: Generator = {
 };
 
 const COMIC: Record<string, readonly (readonly number[])[]> = {
-  six: [[1, 1], [1, 1], [1, 1]], four: [[1, 1], [1, 1]], nine: [[1, 1, 1], [1, 1, 1], [1, 1, 1]], splash: [[1], [1, 1, 1]], strip: [[1, 1, 1, 1]], stagger: [[2, 1], [1, 2], [1, 1, 1]],
+  six: [[1, 1], [1, 1], [1, 1]], four: [[1, 1], [1, 1]], nine: [[1, 1, 1], [1, 1, 1], [1, 1, 1]], eight: [[1, 1], [1, 1], [1, 1], [1, 1]], tiers: [[1, 1], [1, 1, 1], [1, 1]],
+  splash: [[1], [1, 1, 1]], bigTop: [[1], [1, 1], [1, 1]], bigBottom: [[1, 1], [1, 1], [1]], manga: [[1, 2], [1, 1, 1], [2, 1]], wide: [[1], [1], [1], [1]], strip: [[1, 1, 1, 1]], stagger: [[2, 1], [1, 2], [1, 1, 1]],
 };
-export const comicPanels = guide("comic-panels", "Comic Panels", "Art study", "Panels and gutters for a page of comics; Random follows the seed", [Ch("layout", "Layout", [["six", "Six"], ["four", "Four"], ["nine", "Nine"], ["splash", "Splash"], ["strip", "Strip"], ["stagger", "Stagger"], ["random", "Random"], ["own", "Your own"]], "six"), ...[1, 2, 3, 4, 5, 6].map((i) => when("layout", ["own"], R(`row${i}`, `Panels in row ${i}`, 0, 6, i < 4 ? 2 : 0))), R("gutter", "Gutter across", 0, 60, 12), R("gutterY", "Gutter down", 0, 60, 12), T("bands", "Filled", true)], (p, { n, s, b }, rng) => {
+export const COMIC_LAYOUTS: ReadonlyArray<[string, string]> = [["six", "Six"], ["four", "Four"], ["nine", "Nine"], ["eight", "Eight"], ["tiers", "Three tiers"], ["splash", "Splash"], ["bigTop", "Big first"], ["bigBottom", "Big last"], ["manga", "Manga"], ["wide", "Wide tiers"], ["strip", "Strip"], ["stagger", "Stagger"]];
+/** The rows of a layout (each row the widths of its panels, as shares), for the guide and the comic page alike. */
+export const comicRows = (layout: string): readonly (readonly number[])[] => COMIC[layout] ?? COMIC["six"]!;
+export const comicPanels = guide("comic-panels", "Comic Panels", "Art study", "Panels and gutters for a page of comics; Random follows the seed", [
+  Ch("layout", "Layout", [...COMIC_LAYOUTS, ["random", "Random"], ["own", "Your own"]], "six", true),
+  ...[1, 2, 3, 4, 5, 6].map((i) => when("layout", ["own"], R(`row${i}`, `Panels in row ${i}`, 0, 6, i < 4 ? 2 : 0))),
+  R("gutter", "Gutter across", 0, 60, 12), R("gutterY", "Gutter down", 0, 60, 12),
+  R("slant", "Slant", -30, 30, 0), T("flipX", "Right to left", false),
+  T("safeLines", "Safe area", false), when("safeLines", ["true"], R("safeIn", "Safe inset", 0, 20, 5)),
+  T("bands", "Filled", true),
+], (p, { n, s, b }, rng) => {
   const rows: readonly (readonly number[])[] = s("layout") === "random"
     ? Array.from({ length: 2 + Math.floor(rng() * 3) }, () => Array.from({ length: 1 + Math.floor(rng() * 3) }, () => 1 + Math.floor(rng() * 2)))
     : s("layout") === "own" ? [1, 2, 3, 4, 5, 6].map((i) => Array.from({ length: n(`row${i}`) }, () => 1)).filter((r) => r.length)
-    : COMIC[s("layout")]!;
+    : comicRows(s("layout"));
   const u = Math.min(p.w, p.h) / 1000, gx = n("gutter") * u, gy = n("gutterY") * u, rowH = (p.h - (rows.length - 1) * gy) / Math.max(1, rows.length);
+  // (a slant leans the gutters between panels of a row; the page's own edges stay upright)
+  const lean = Math.tan((n("slant") * Math.PI) / 180) * rowH / 2;
   rows.forEach((row, j) => {
     const y = p.y0 + j * (rowH + gy), room = p.w - (row.length - 1) * gx, all = row.reduce((a, c) => a + c, 0);
     let x = p.x0;
-    for (const c of row) {
+    row.forEach((c, i) => {
       const pw = (room * c) / all;
-      if (b("bands")) p.band(x, y, pw, rowH);
-      p.rect(x, y, pw, rowH, true);
+      const [l, r] = [i ? lean : 0, i < row.length - 1 ? lean : 0];
+      const pts: Array<[number, number]> = [[x + l, y], [x + pw + r, y], [x + pw - r, y + rowH], [x - l, y + rowH]];
+      if (b("bands")) p.bandPoly(pts);
+      p.poly(pts, true, true);
       x += pw + gx;
-    }
+    });
   });
-}, { frame: false });
+  if (b("safeLines")) {
+    const k = (n("safeIn") / 100) * Math.min(p.w, p.h);
+    p.rect(p.x0 + k, p.y0 + k, p.w - 2 * k, p.h - 2 * k);
+  }
+}, { frame: false, page: "portrait" });
 
 export const GUIDES: readonly Generator[] = [
   goldenRatio, goldenSpiral, fibonacciGrid, rootRectangles, modularScale, ...MORE_GUIDES.proportion,

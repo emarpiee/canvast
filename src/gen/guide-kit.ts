@@ -3,6 +3,7 @@ import { curve, ellipse, line, poly, rect, rotated, solid } from "./geom";
 import type { P } from "./geom";
 import { C, Ch, R, T, reader, steady, when } from "./kit";
 import type { Rng } from "./rng";
+import { pageSection } from "./pages";
 import type { GenShape, Generator, Section, Setting, Values } from "./types";
 
 /** What every guide shares: its colours, its look, and a pen that draws with them, so that a guide says only where its lines go. */
@@ -47,6 +48,8 @@ export interface Pen {
   readonly rect: (x: number, y: number, w: number, h: number, strong?: boolean) => void;
   /** A soft area, under the lines (a column, a panel). */
   readonly band: (x: number, y: number, w: number, h: number) => void;
+  /** A soft area of any outline, under the lines (a slanted panel). */
+  readonly bandPoly: (pts: readonly P[]) => void;
   /** A shape filled with a colour of its own, under the lines (a step of a scale, a wedge of a wheel). */
   readonly fill: (pts: readonly P[], colour: string) => void;
   /** Whether strong lines are drawn apart (their colour may be hidden). */
@@ -123,6 +126,7 @@ export function pen(v: Values, w: number, h: number): Pen {
       const pts = xf([[x, y], [x + rw, y], [x + rw, y + rh], [x, y + rh]]);
       bands.push(a ? poly(pts) : rect(Math.min(pts[0]![0], pts[2]![0]), Math.min(pts[0]![1], pts[2]![1]), rw, rh));
     },
+    bandPoly: (pts) => void bands.push(poly(xf(pts))),
     fill: (pts, colour) => void fills.push(solid([poly(xf(pts))], colour)),
     done() {
       if (v["frame"]) {
@@ -135,10 +139,10 @@ export function pen(v: Values, w: number, h: number): Pen {
 }
 
 /** A guide: its own settings (Randomize leaves them, so that it stays what it is, and changes its look), then the colours and the look of every guide. */
-export function guide(id: string, label: string, family: Generator["family"], about: string, items: readonly Setting[], draw: (p: Pen, v: ReturnType<typeof reader>, rng: Rng) => void, more: { frame?: boolean; readout?: Generator["readout"] } = {}): Generator {
+export function guide(id: string, label: string, family: Generator["family"], about: string, items: readonly Setting[], draw: (p: Pen, v: ReturnType<typeof reader>, rng: Rng) => void, more: { frame?: boolean; readout?: Generator["readout"]; /** Laid out on a page: a Page section sets the sheet's size (gen/pages.ts), standing this way up at first. */ page?: "portrait" | "landscape" } = {}): Generator {
   return {
     id, label, family, about, guide: true,
-    sections: [COLOURS, { title: label, items: items.map((i) => wide(steady(i))) }, { title: "Look", items: [WEIGHT, STRONG_WIDTH, DASH, ...MARGINS, frameSetting(more.frame ?? true)] }],
+    sections: [COLOURS, { title: label, items: items.map((i) => wide(steady(i))) }, ...(more.page ? [pageSection(more.page)] : []), { title: "Look", items: [WEIGHT, STRONG_WIDTH, DASH, ...MARGINS, frameSetting(more.frame ?? true)] }],
     run(v, rng, w, h) {
       const p = pen(v, w, h);
       draw(p, reader(v), rng);

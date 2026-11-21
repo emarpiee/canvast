@@ -1,3 +1,5 @@
+import { COMIC_DEFAULTS } from "./comic";
+import type { ComicOptions } from "./comic";
 import type { Camera } from "../core/camera";
 import { readOnlyLine } from "../storage/guest-page";
 import type { Dyadic } from "../core/dyadic";
@@ -14,7 +16,7 @@ import { roundCorners } from "../doc/rounding";
 import type { Paint } from "../doc/paint";
 import type { AlignChoice, CapChoice, DashChoice, JoinChoice } from "../doc/stroke-look";
 
-export type Tool = "select" | "pen" | "lasso" | "hand" | "text" | "note" | "eraser" | "shape" | "balloon" | "path" | "node" | "sheet";
+export type Tool = "select" | "pen" | "lasso" | "hand" | "text" | "note" | "eraser" | "shape" | "balloon" | "panel" | "path" | "node" | "sheet";
 
 const EMPTY: ReadonlySet<ObjectId> = new Set();
 
@@ -191,6 +193,8 @@ export class EditorState {
   shapeAlign: AlignChoice = "centre";
   shapeDash: DashChoice = "solid";
   shapeSides = 6;
+  /** The Panel tool (ADR 0206): the page, layout, gutter, margin and border of the next comic page. */
+  comic: ComicOptions = { ...COMIC_DEFAULTS };
   shapeTips = 5;
   /** Waiting for a click on the object to attach the picked ones to (ADR 0109). */
   attachMode = false;

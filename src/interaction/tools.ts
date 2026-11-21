@@ -1,3 +1,6 @@
+import { cutPanel, gutterOf, isComicPage, mergeAt, movedGutter, newComicPage, panelPoly, panelsOf } from "../app/comic";
+import { insidePoly } from "../doc/comic";
+import { pageRatio } from "../gen/pages";
 import { lookFromChoices } from "../doc/stroke-look";
 import type { NavDir } from "./item-navigation";
 import { canvasShortcutsActive } from "./shortcut-scope";
@@ -60,7 +63,7 @@ import type { SelectionFrame } from "../render/selection-frame";
 import { TURN, angleFromRadians, cosSin, normAngle, radiansFromAngle } from "../core/angle";
 import { formatRatio } from "../app/export-size";
 import { PanGesture } from "./navigation";
-import { autoLayoutOf, patchAutoLayout, drawSheetOver, finishShapeBuilder, fillGapAt, finishGapFill, attachSelection, commitCornerAt, commitCornerSet, commitCorners, commitShape as commitShapeNumbers, balloonText, setShapeText, setTextStyle, setBalloonLink, commitPaint, deleteSelection, duplicateSelection, previewPaint, redo, undo } from "../app/actions";
+import { showReplaced, autoLayoutOf, patchAutoLayout, drawSheetOver, finishShapeBuilder, fillGapAt, finishGapFill, attachSelection, commitCornerAt, commitCornerSet, commitCorners, commitShape as commitShapeNumbers, balloonText, setShapeText, setTextStyle, setBalloonLink, commitPaint, deleteSelection, duplicateSelection, previewPaint, redo, undo } from "../app/actions";
 import { expandToUnits, groupObjects, isInside, unitsWithin } from "../doc/groups";
 import { boolGroupsOf, isResult } from "../doc/boolean-group";
 
@@ -266,6 +269,8 @@ type Gesture =
   | { kind: "grad"; pointerId: number; id: ObjectId; which: "fill" | "stroke"; handle: GradHandle; g: Gradient }
   /** Dragging the corner radius dot or a star's ratio handle (ADR 0105): `r0` the radius in px and `proj0` where along the corner's bisector the press was. */
   | { kind: "round"; pointerId: number; id: ObjectId; what: "main" | "corner" | "ratio" | "count" | "balloon" | "pathtext"; balloon?: { part: BalloonPart; tail: number }; /** A text along a path's handle, and its lift and the point pressed (local units) when it was taken. */ pathText?: { part: "along" | "lift"; lift0: number; l0: { x: number; y: number } }; snap?: SnapContext | null; index: number; ax: number; ay: number; r0: number; proj0: number; x0: number; start: ScreenPoint; moved: boolean; opened: boolean; timer: number; /** Every picked corner taken along (its radius and the most it can have), by node. */ multi?: ReadonlyMap<number, { r0: number; max: number }> }
+  /** The Panel tool on a comic page (ADR 0206): a cut across a panel, a gutter moved, or a click that selects (`target`). */
+  | { kind: "comic"; pointerId: number; page: ObjectId; mode: "cut" | "gutter" | "click"; target: ObjectId; start: readonly [number, number]; startScreen: ScreenPoint; found: ReturnType<typeof gutterOf> }
   /** Dragging a shape out (Shape tool). */
   | { kind: "shape"; pointerId: number; start: ScreenPoint; /** What a corner being drawn snaps to (null: snapping off). */ snap: SnapContext | null }
   /** A side handle of words in a shape: the shape sets their box, so what it changes is the padding. */
@@ -499,6 +504,82 @@ export function attachTools(
       if (insideBody(po, x, y)) return o;
     }
     return null;
+  };
+  const nextPageName = (): string => {
+    let n = 0;
+    for (const o of doc.all()) if (isComicPage(o)) n = Math.max(n, Number(/^Page (\d+)$/.exec(o.name ?? "")?.[1] ?? 0));
+    return `Page ${n + 1}`;
+  };
+  // ---- the Panel tool on a comic page (ADR 0206)
+  /** The comic page under a point, where the point is on it (its units), and the panel there if any. */
+  const comicAt = (s: ScreenPoint): { page: PathObject; po: ProjectedObject; at: [number, number]; panel: PathObject | null } | null => {
+    const list = visible();
+    for (let i = list.length - 1; i >= 0; i--) {
+      const po = list[i]!;
+      const o = po.obj;
+      if (!isComicPage(o) || o.hidden || o.locked || !insideBody(po, s.x, s.y)) continue;
+      const l = localOf(po, s.x, s.y);
+      const at: [number, number] = [l.x, l.y];
+      const panel = panelsOf(doc, o).find((p) => !p.hidden && insidePoly(panelPoly(doc, o, p), at)) ?? null;
+      return { page: o, po, at, panel };
+    }
+    return null;
+  };
+  const startComicPress = (s: ScreenPoint, e: PointerEvent): boolean => {
+    const hit = comicAt(s);
+    if (!hit || editor.blockEdit()) return false;
+    const reach = 10 / hit.po.proj.ppu; // (a gutter is found within 10 px of the pointer)
+    const found = hit.panel ? null : gutterOf(doc, hit.page, hit.at, reach);
+    g = { kind: "comic", pointerId: e.pointerId, page: hit.page.id, mode: hit.panel ? "cut" : found ? "gutter" : "click", target: hit.panel?.id ?? hit.page.id, start: hit.at, startScreen: s, found };
+    return true;
+  };
+  const updateComic = (gc: Extract<Gesture, { kind: "comic" }>, s: ScreenPoint, e: PointerEvent, final: boolean): void => {
+    const page = doc.get(gc.page) as PathObject | undefined;
+    const po = page && visible().find((p) => p.obj.id === page.id);
+    const far = Math.hypot(s.x - gc.startScreen.x, s.y - gc.startScreen.y) >= DRAG_THRESHOLD_PX;
+    const done = (): void => {
+      editor.preview = { kind: "none" };
+      editor.guides = null;
+      editor.changed();
+    };
+    if (!page || !po || gc.mode === "click" || !far) {
+      if (final) {
+        done();
+        if (!far && doc.get(gc.target)) editor.select([gc.target]);
+      }
+      return;
+    }
+    const l = localOf(po, s.x, s.y);
+    let to: [number, number] = [l.x, l.y];
+    if (gc.mode === "cut") {
+      // Shift: straight across, down, or at 45 degrees
+      if (keys(e).shift) {
+        const dx = to[0] - gc.start[0], dy = to[1] - gc.start[1], a = Math.round(Math.atan2(dy, dx) / (Math.PI / 4)) * (Math.PI / 4), len = Math.hypot(dx, dy);
+        to = [gc.start[0] + len * Math.cos(a), gc.start[1] + len * Math.sin(a)];
+      }
+      const panel = doc.get(gc.target) as PathObject | undefined;
+      const next = panel ? cutPanel(doc, page, panel, gc.start, to) : null;
+      // the knife's line, across the screen as far as the page goes
+      const k = po.proj.ppu, sx = (x: number): number => gc.startScreen.x + (x - gc.start[0]) * k, sy = (y: number): number => gc.startScreen.y + (y - gc.start[1]) * k;
+      const ex = to[0] - gc.start[0], ey = to[1] - gc.start[1], n = Math.hypot(ex, ey) || 1, far2 = 1e5 / k;
+      editor.guides = final ? null : { seg: [sx(gc.start[0] - (ex / n) * far2), sy(gc.start[1] - (ey / n) * far2), sx(gc.start[0] + (ex / n) * far2), sy(gc.start[1] + (ey / n) * far2)] };
+      if (!final) return showReplaced(editor, next ?? []);
+      done();
+      if (next) {
+        doc.commit(doc.transaction("Cut the panel", next));
+        editor.select([next[0]!.id, next[1]!.id]);
+      } else {
+        editor.message = "That cut leaves no room for two panels.";
+        editor.changed();
+      }
+      return;
+    }
+    if (!gc.found) return;
+    const d = (to[0] - gc.start[0]) * gc.found.g.nx + (to[1] - gc.start[1]) * gc.found.g.ny;
+    const next = movedGutter(doc, page, gc.found, d);
+    if (!final) return void (next && showReplaced(editor, next));
+    done();
+    if (next) doc.commit(doc.transaction("Move the gutter", next));
   };
   const nextSheetName = (): string => {
     let n = 0;
@@ -764,15 +845,15 @@ export function attachTools(
       frame: view.frame,
       anchor: world(s),
       unit: -cam.zi,
-      kind: editor.tool === "sheet" ? "rect" : editor.tool === "balloon" ? "balloon" : editor.shapeKind,
+      kind: editor.tool === "sheet" || editor.tool === "panel" ? "rect" : editor.tool === "balloon" ? "balloon" : editor.shapeKind,
       bx: 0,
       by: 0,
       bw: 0,
       bh: 0,
       sides: editor.shapeSides,
       tips: editor.shapeTips,
-      fill: editor.tool === "sheet" ? "#ffffff" : editor.tool === "balloon" ? (paintOf(editor.shapeFill) ?? "#ffffff") : editor.shapeKind === "line" ? null : paintOf(editor.shapeFill),
-      stroke: editor.tool === "sheet" ? null : editor.tool === "balloon" && editor.shapeStroke === null ? newInk("#1f2329") : editor.shapeKind === "line" && editor.shapeStroke === null ? newInk("#1f2329") : paintOf(editor.shapeStroke),
+      fill: editor.tool === "sheet" || editor.tool === "panel" ? "#ffffff" : editor.tool === "balloon" ? (paintOf(editor.shapeFill) ?? "#ffffff") : editor.shapeKind === "line" ? null : paintOf(editor.shapeFill),
+      stroke: editor.tool === "sheet" || editor.tool === "panel" ? null : editor.tool === "balloon" && editor.shapeStroke === null ? newInk("#1f2329") : editor.shapeKind === "line" && editor.shapeStroke === null ? newInk("#1f2329") : paintOf(editor.shapeStroke),
       width,
     };
     sheetStart = sheetAt(s.x, s.y)?.id;
@@ -793,6 +874,13 @@ export function attachTools(
     const s = snapPoint(s0, sn);
     const l = localIn(d.frame, d.anchor, d.unit, s);
     const box = shapeBox(d.kind, l.x, l.y, keys(e).shift, keys(e).alt);
+    // (a comic page of a chosen size keeps its shape: as wide as dragged)
+    const ratio = editor.tool === "panel" && editor.comic.page !== "free" ? pageRatio(editor.comic.page, editor.comic.orient) : null;
+    if (ratio !== null && box.bw !== 0) {
+      const h = Math.abs(box.bw) / ratio;
+      box.by = keys(e).alt ? -h / 2 : l.y < 0 ? -h : 0; // (from the middle with Alt; upward when dragged up)
+      box.bh = h;
+    }
     editor.shapeDraft = { ...d, ...box };
     // (a line has no shape to give: only boxes show their ratio)
     if (d.kind !== "line") showRatio(s, Math.abs(box.bw), Math.abs(box.bh));
@@ -826,6 +914,15 @@ export function attachTools(
     // A press without a drag makes nothing (a stray click must not leave a shape behind).
     if (cancelled || !d || Math.hypot(s.x - start.x, s.y - start.y) < DRAG_THRESHOLD_PX || !(Math.abs(d.bw) > 0 || Math.abs(d.bh) > 0)) return;
     const drawn = shapeObject(d, doc.topZ() + 1);
+    if (editor.tool === "panel") {
+      // a comic page: a sheet, laid out in panels as the tool's options say (ADR 0206)
+      const { shape: _s, params: _p, ...plain } = drawn;
+      const sheet = homeObject(normalizeUnit(sheetStart && doc.get(sheetStart) ? { ...plain, shape: "rect", stroke: null, container: { clip: true }, name: nextPageName(), parent: sheetStart } : { ...plain, shape: "rect", stroke: null, container: { clip: true }, name: nextPageName() }), doc.space) as PathObject;
+      const made = newComicPage(doc, sheet, editor.comic);
+      doc.commit(doc.transaction("Make a comic page", made));
+      editor.selectMade([made[0]!.id]);
+      return;
+    }
     const made: PathObject = editor.tool === "sheet" ? { ...drawn, stroke: null, container: { clip: true }, name: nextSheetName() } : drawn;
     const obj = homeObject(normalizeUnit(sheetStart && doc.get(sheetStart) ? { ...made, parent: sheetStart } : made), doc.space);
     // A sheet drawn over objects takes the ones wholly inside it that are at its level (not on another sheet, unless the sheet is drawn on that one).
@@ -2221,6 +2318,10 @@ export function attachTools(
       case "sheet":
         if (!madeHandlePress(e, s)) startShape(s, e);
         break;
+      case "panel":
+        // on a comic page: cut a panel, move a gutter or pick; elsewhere, a new page is drawn
+        if (!madeHandlePress(e, s) && !startComicPress(s, e)) startShape(s, e);
+        break;
       case "path":
         if (!madeHandlePress(e, s)) startPathNode(s, e);
         break;
@@ -2442,6 +2543,9 @@ export function attachTools(
       case "shape":
         updateShape(s, e);
         break;
+      case "comic":
+        updateComic(g, s, e, false);
+        break;
       case "text":
         // A box dragged out on empty canvas: a text of that width (a click makes one as wide as its words).
         if (!g.moved && Math.hypot(s.x - g.start.x, s.y - g.start.y) >= DRAG_THRESHOLD_PX && !editor.blockEdit() && !textAt(g.start)) {
@@ -2627,6 +2731,13 @@ export function attachTools(
       case "shape":
         commitShape(s, cancelled, e, g.start);
         break;
+      case "comic":
+        if (cancelled) {
+          editor.preview = { kind: "none" };
+          editor.guides = null;
+          editor.changed();
+        } else updateComic(g, s, e, true);
+        break;
       case "pathnode":
         break; // the node stays; the path goes on until it is closed or ended
       case "node":
@@ -2762,6 +2873,18 @@ export function attachTools(
         return;
       }
       return;
+    }
+    // The Panel tool: a double-click on a gutter merges the two panels across it (ADR 0206)
+    if (effectiveTool() === "panel" && !editor.readOnly) {
+      const hit = comicAt(local(e));
+      if (hit && !hit.panel && !editor.blockEdit()) {
+        const r = mergeAt(doc, hit.page, hit.at, 10 / hit.po.proj.ppu);
+        if (r) {
+          doc.commit(doc.transaction("Merge two panels", r.next, r.removed));
+          editor.select([r.next[0]!.id]);
+        }
+        return;
+      }
     }
     // (with a tool that makes things, a double-click on what it has just made does as with the Select tool: a balloon's words, ADR 0198)
     const onMade = editor.editsMade && (() => { const top = pickAll(unlocked(visible()), local(e).x, local(e).y)[0]?.obj; return !!top && editor.made.has(top.id); })();

@@ -355,7 +355,7 @@ input[type="range"], .media-scrub, .tb-count[data-scrub] input, input[data-scrub
 #canvas[data-tool="select"] { cursor: default; }
 #canvas[data-tool="hand"] { cursor: grab; }
 #canvas:is([data-tool="text"], [data-tool="note"]) { cursor: text; }
-#canvas:is([data-tool="pen"], [data-tool="shape"], [data-tool="balloon"], [data-tool="path"], [data-tool="sheet"], [data-tool="lasso"], [data-tool="eraser"], [data-tool="node"]) { cursor: var(--tool-cursor, crosshair); } /* (the tool's icon beside a crosshair: ui/tool-cursor.ts) */
+#canvas:is([data-tool="pen"], [data-tool="shape"], [data-tool="balloon"], [data-tool="panel"], [data-tool="path"], [data-tool="sheet"], [data-tool="lasso"], [data-tool="eraser"], [data-tool="node"]) { cursor: var(--tool-cursor, crosshair); } /* (the tool's icon beside a crosshair: ui/tool-cursor.ts) */
 #canvas[data-hover="ew"] { cursor: ew-resize; }
 #canvas[data-hover="ns"] { cursor: ns-resize; }
 #canvas[data-hover="nwse"] { cursor: nwse-resize; }

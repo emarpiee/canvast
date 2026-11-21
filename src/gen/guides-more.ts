@@ -296,17 +296,53 @@ const tileSheet = guide("tile-sheet", "Tile and Sprite Sheet", "Art study", "Fix
   }
 }, { frame: false, readout: (v, w, h) => { const q = (k: string): number => v[k] as number; return `${Math.max(1, Math.floor((w + q("pad")) / (q("cellW") + q("pad"))))} across, ${Math.max(1, Math.floor((h + q("pad")) / (q("cellH") + q("pad"))))} down`; } });
 
-const storyboard = guide("storyboard", "Storyboard Frames", "Art study", "Rows of frames with lines for notes under each", [R("cols", "Across", 1, 12, 3), R("rows", "Rows", 1, 12, 2), Ch("ratio", "Frame", [["1.778", "16:9"], ["2.39", "2.39"], ["1.333", "4:3"], ["1", "1:1"], ["0.5625", "9:16"]], "1.778"), R("notes", "Note lines", 0, 8, 2), R("gutter", "Gutter", 0, 60, 16), T("bands", "Filled", true)], (p, { n, s, b }) => {
-  const g = (Math.min(p.w, p.h) / 1000) * n("gutter"), [cols, rows] = [n("cols"), n("rows")], ratio = Number(s("ratio"));
-  const [cw, ch] = [(p.w - (cols - 1) * g) / cols, (p.h - (rows - 1) * g) / rows];
-  const room = 1 + 0.14 * n("notes"), fw = Math.min(cw, (ch * ratio) / room), fh = fw / ratio;
+const FRAME_RATIOS: ReadonlyArray<[string, string]> = [["1.778", "16:9"], ["2.39", "2.39"], ["1.85", "1.85"], ["2", "2:1"], ["1.5", "3:2"], ["1.333", "4:3"], ["1", "1:1"], ["0.8", "4:5"], ["0.5625", "9:16"], ["custom", "Custom"]];
+const storyboard = guide("storyboard", "Storyboard Frames", "Art study", "Rows of frames with lines for notes under or beside each", [
+  R("cols", "Across", 1, 12, 3), R("rows", "Rows", 1, 12, 2),
+  Ch("ratio", "Frame", FRAME_RATIOS, "1.778", true),
+  when("ratio", ["custom"], R("frameW", "Frame width", 1, 100, 16)), when("ratio", ["custom"], R("frameH", "Frame height", 1, 100, 9)),
+  R("notes", "Note lines", 0, 8, 2), Ch("notesAt", "Notes", [["under", "Under"], ["beside", "Beside"]], "under"),
+  R("gutter", "Gutter across", 0, 60, 16), R("gutterY", "Gutter down", 0, 60, 16),
+  T("numbers", "Number boxes", true), T("header", "Title block", false),
+  Ch("safe", "Safe areas", [["none", "None"], ["action", "Action"], ["both", "Action and title"]], "none"),
+  Ch("inFrame", "In each frame", [["none", "Nothing"], ["cross", "Centre cross"], ["thirds", "Thirds"]], "none"),
+  T("bands", "Filled", true),
+], (p, { n, s, b }) => {
+  const u = Math.min(p.w, p.h) / 1000, g = u * n("gutter"), gy = u * n("gutterY"), [cols, rows] = [n("cols"), n("rows")];
+  const ratio = s("ratio") === "custom" ? n("frameW") / Math.max(1e-9, n("frameH")) : Number(s("ratio"));
+  // a title block across the top: project, scene, page
+  const head = b("header") ? p.h * 0.08 : 0;
+  if (head) {
+    p.rect(p.x0, p.y0, p.w, head * 0.75, true);
+    p.line(p.x0 + p.w * 0.5, p.y0, p.x0 + p.w * 0.5, p.y0 + head * 0.75);
+    p.line(p.x0 + p.w * 0.75, p.y0, p.x0 + p.w * 0.75, p.y0 + head * 0.75);
+  }
+  const top = p.y0 + head, room = p.h - head;
+  const [cw, ch] = [(p.w - (cols - 1) * g) / cols, (room - (rows - 1) * gy) / rows];
+  const lines = n("notes"), beside = s("notesAt") === "beside" && lines > 0;
+  // under: each line a seventh of the frame's height below it; beside: a column half as wide as the frame
+  const fw = beside ? Math.min(cw / 1.5, ch * ratio) : Math.min(cw, (ch * ratio) / (1 + 0.14 * lines)), fh = fw / ratio;
+  const span = beside ? fw * 1.5 : fw;
   for (let i = 0; i < cols; i++) for (let j = 0; j < rows; j++) {
-    const [x, y] = [p.x0 + i * (cw + g) + (cw - fw) / 2, p.y0 + j * (ch + g)];
+    const [x, y] = [p.x0 + i * (cw + g) + (cw - span) / 2, top + j * (ch + gy)];
     if (b("bands")) p.band(x, y, fw, fh);
     p.rect(x, y, fw, fh, true);
-    for (let l = 1; l <= n("notes"); l++) p.line(x, y + fh + l * 0.14 * fh, x + fw, y + fh + l * 0.14 * fh);
+    if (beside) for (let l = 1; l <= lines; l++) p.line(x + fw * 1.08, y + (l * fh) / (lines + 1), x + span, y + (l * fh) / (lines + 1));
+    else for (let l = 1; l <= lines; l++) p.line(x, y + fh + l * 0.14 * fh, x + fw, y + fh + l * 0.14 * fh);
+    if (b("numbers")) {
+      const k = Math.min(fw, fh) * 0.12;
+      p.rect(x, y, k * 1.5, k);
+    }
+    for (const [on, f] of [[s("safe") !== "none", 0.05], [s("safe") === "both", 0.1]] as const) if (on) p.rect(x + fw * f, y + fh * f, fw * (1 - 2 * f), fh * (1 - 2 * f));
+    if (s("inFrame") === "cross") {
+      p.line(x + fw * 0.45, y + fh / 2, x + fw * 0.55, y + fh / 2);
+      p.line(x + fw / 2, y + fh / 2 - fw * 0.05, x + fw / 2, y + fh / 2 + fw * 0.05);
+    } else if (s("inFrame") === "thirds") for (const f of [1 / 3, 2 / 3]) {
+      p.line(x + fw * f, y, x + fw * f, y + fh);
+      p.line(x, y + fh * f, x + fw, y + fh * f);
+    }
   }
-}, { frame: false });
+}, { frame: false, page: "landscape" });
 
 const valueScale = guide("value-scale", "Value Scale", "Art study", "Steps from dark to light, to study values against", [R("valueSteps", "Steps", 2, 32, 9), Ch("along", "Direction", [["across", "Across"], ["down", "Down"]], "across"), T("reversed", "Light first", false), T("separators", "Lines between", true)], (p, { n, s, b }) => {
   const k = n("valueSteps"), across = s("along") === "across";

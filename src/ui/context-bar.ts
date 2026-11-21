@@ -65,6 +65,10 @@ export interface ContextActions {
   sheetEach(): void;
   fitSheet(): void;
   canFitSheet(): boolean;
+  /** Comic pages (ADR 0206): how many panels of one page are selected (-1: a page itself, none of its panels), and what to do to them. */
+  comicPanels(): number;
+  cutPanels(dir: "across" | "down"): void;
+  mergePanels(): void;
   /** Attach the picked objects to the object clicked next, and detach them (ADR 0109). */
   attach(): void;
   detach(): void;
@@ -261,6 +265,9 @@ export function mountContextBar(host: HTMLElement, editor: EditorState, doc: Doc
       return cmd(`size.match:${axis}:${pick}`, `${word} of the ${pick}`, `All take its ${word.toLowerCase()}, in proportion`, axis === "w" ? ICONS.sameWidth : ICONS.sameHeight, () => actions.matchSize(axis, pick), () => sel() ?? ([...editor.selection].filter((id) => actions.isSizable(id)).length < 2 ? "Select two or more that can be sized." : null));
     })),
     cmd("sheet.each", "Put each on its own sheet", "A sheet for each selected object", ICONS.sheetEach, () => actions.sheetEach(), can(() => actions.canSheetEach(), "Select objects that are not on sheets.")),
+    cmd("comic.cutAcross", "Cut across", "Each selected panel in two, a gutter across its middle", ICONS.cutAcross, () => actions.cutPanels("across"), can(() => actions.comicPanels() > 0, "Select panels of a comic page.")),
+    cmd("comic.cutDown", "Cut down", "Each selected panel in two, a gutter down its middle", ICONS.cutDown, () => actions.cutPanels("down"), can(() => actions.comicPanels() > 0, "Select panels of a comic page.")),
+    cmd("comic.merge", "Merge panels", "The selected panels become one", ICONS.comicPanel, () => actions.mergePanels(), can(() => actions.comicPanels() > 1, "Select two or more panels of one comic page.")),
     cmd("sheet.fit", "Fit the sheet to its contents", "The sheet shrinks or grows to what is on it", ICONS.shrink, () => actions.fitSheet(), can(() => actions.canFitSheet(), "Select a sheet with something on it.")),
     cmd("sheet.autoLayout", "Auto layout", "A row, a column, a wrap or a grid (Shift+A)", ICONS.autoLayout, () => actions.setAutoLayout(actions.autoLayout() !== true), can(() => actions.autoLayout() !== null, "Select a sheet.")),
     cmd("sheet.autoLayoutNew", "Auto layout on a new sheet", "Round them, laid out as a row (Shift+A)", ICONS.autoLayout, () => { closeMoreMenu(); actions.layoutOnSheet(); }),
@@ -370,6 +377,9 @@ export function mountContextBar(host: HTMLElement, editor: EditorState, doc: Doc
           ...(actions.canSheetEach() ? ["sheet.each"] : []),
           ...(actions.canReleaseSheet() ? [["edit.releaseSheet", { hint: "Keeps what is on it", icon: ICONS.releaseSheet }] as const] : []),
           ...(actions.canFitSheet() ? ["sheet.fit"] : []),
+          // (a comic page's panels: cut and merge, as the Panel tool does by hand)
+          ...(actions.comicPanels() > 0 ? ["comic.cutAcross", "comic.cutDown"] : []),
+          ...(actions.comicPanels() > 1 ? ["comic.merge"] : []),
           actions.autoLayout() !== null ? tick("sheet.autoLayout", actions.autoLayout() === true) : "sheet.autoLayoutNew",
         ]));
         break;

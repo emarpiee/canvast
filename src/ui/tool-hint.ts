@@ -33,6 +33,8 @@ export function toolHint(editor: EditorState, doc: DocumentStore): string | null
       return editor.shapeDraft ? null : SHAPE_HINT[editor.shapeKind];
     case "balloon":
       return editor.shapeDraft ? null : SHAPE_HINT.balloon;
+    case "panel":
+      return editor.shapeDraft ? null : "Drag to make a comic page · drag across a panel to cut it (Shift: straight) · drag a gutter to move it · double-click a gutter to merge its two panels";
     case "sheet":
       return "Drag to draw a sheet · what you draw or move into it is held and cut by it · Ctrl+Alt+G puts the selected objects on a sheet";
     case "path":

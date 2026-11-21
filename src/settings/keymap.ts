@@ -120,6 +120,7 @@ export const KEY_COMMANDS: readonly KeyCommand[] = [
   cmd("tool.pen", "Pen", TOOLS_GROUP, "P"),
   cmd("tool.shape", "Shape", TOOLS_GROUP, "U"),
   cmd("tool.balloon", "Speech balloon", TOOLS_GROUP, "K"),
+  cmd("tool.panel", "Comic panel", TOOLS_GROUP, "J"),
   cmd("tool.path", "Path (curves)", TOOLS_GROUP, "B"),
   cmd("tool.sheet", "Sheet", TOOLS_GROUP, "C"),
   cmd("tool.lasso", "Lasso", TOOLS_GROUP, "L"),

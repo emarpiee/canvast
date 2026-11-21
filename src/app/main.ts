@@ -1,3 +1,4 @@
+import { mergeSelectedPanels, panelCount, selectedComicPage, setComicOption, splitSelectedPanels } from "./comic";
 import { useMediaAddress } from "../assets/thumb";
 import { setSnapPx } from "../interaction/snap";
 import { followHost, sendView } from "./follow";
@@ -1699,6 +1700,22 @@ async function start(): Promise<void> {
   const hintLine = { current: null as null | { refresh(): void } };
   const propsBar = mountToolbar(document.getElementById("toolbar")!, editor, doc, {
     importFiles,
+    comic: {
+      options: () => editor.comic,
+      selected: () => selectedComicPage(doc, editor) !== null,
+      // (a page's size and way up: the sheet's own Ratio, on the page selected)
+      setOption: (name, value) => setComicOption(doc, editor, name, value, (r) => {
+        const keep = editor.selection;
+        const page = selectedComicPage(doc, editor);
+        if (!page) return;
+        editor.selection = new Set([page.id]);
+        try {
+          setSheetRatio(doc, editor, r, true);
+        } finally {
+          editor.selection = new Set([...keep].filter((id) => !!doc.get(id)));
+        }
+      }),
+    },
     openSearch: (prefix) => canvasSearch.open(prefix),
     screenshot: () => void takeScreenshot(),
     undo: () => undo(doc, editor),
@@ -2432,6 +2449,9 @@ async function start(): Promise<void> {
       sheetEach: () => sheetEach(doc, editor),
       fitSheet: () => fitSheet(doc, editor),
       canFitSheet: () => canFitSheet(doc, editor),
+      comicPanels: () => panelCount(doc, editor),
+      cutPanels: (dir) => void splitSelectedPanels(doc, editor, dir),
+      mergePanels: () => void mergeSelectedPanels(doc, editor),
       autoLayout: () => autoLayoutState(doc, editor),
       setAutoLayout: (on) => setAutoLayout(doc, editor, on),
       layoutOnSheet: () => autoLayoutShortcut(doc, editor),

@@ -1027,3 +1027,48 @@ test("Arrange and auto layout (ADR 0194): Keep it tidy makes the grid a sheet wi
   await key(app, "Escape");
   expect(app.consoleErrors).toEqual([]);
 });
+
+test("comic page (ADR 0206): the Panel tool makes a page laid out in panels; a drag across a panel cuts it, a gutter dragged moves the panels on both sides, a double-click on a gutter merges two; each one undo step", async ({ app }) => {
+  const p = app.page;
+  type Comic = Obj & { container?: { clip: boolean; comic?: { gutter: number } } };
+  const panels = async () => ((await objs(app)) as Comic[]).filter((o) => o.container && !o.container.comic);
+  const boxOf = (id: string) => p.evaluate((i) => window.__canvastDebug.objectScreen(i)!.box, id);
+  await key(app, "j");
+  await drag(app, [420, 120], [780, 600]);
+  const page = ((await objs(app)) as Comic[]).find((o) => o.container?.comic);
+  expect(page, "a page").toBeTruthy();
+  expect(page!.name).toMatch(/^Page \d+$/);
+  await expect.poll(async () => (await panels()).length, { message: "Six, the default layout" }).toBe(6);
+  for (const o of await panels()) expect(o.parent).toBe(page!.id);
+  // A cut: Shift down the middle of the first panel, as a knife does.
+  const first = (await panels()).find((o) => o.name === "Panel 1")!;
+  const b = await boxOf(first.id);
+  const mx = Math.round((b.minX + b.maxX) / 2);
+  await p.keyboard.down("Shift");
+  await drag(app, [mx, Math.round(b.minY) + 4], [mx + 3, Math.round(b.maxY) - 4]);
+  await p.keyboard.up("Shift");
+  await expect.poll(async () => (await panels()).length).toBe(7);
+  const halves = (await panels()).filter((o) => o.id === first.id || o.name === "Panel 7");
+  expect(halves).toHaveLength(2);
+  const [l, r] = await Promise.all(halves.map((o) => boxOf(o.id)));
+  expect(Math.abs(l!.minY - r!.minY), "cut straight down: as tall as each other").toBeLessThan(2);
+  // A gutter: between the first and second rows, under the right column; dragged down, the panel above grows and the one below shrinks.
+  const right = (await panels()).find((o) => o.name === "Panel 2")!, below = (await panels()).find((o) => o.name === "Panel 4")!;
+  const [ra, rb] = [await boxOf(right.id), await boxOf(below.id)];
+  const gx = Math.round((ra.minX + ra.maxX) / 2), gy = Math.round((ra.maxY + rb.minY) / 2);
+  await drag(app, [gx, gy], [gx, gy + 20]);
+  await expect.poll(async () => Math.round((await boxOf(right.id)).maxY - ra.maxY)).toBeGreaterThan(14);
+  expect(Math.round((await boxOf(below.id)).minY - rb.minY)).toBeGreaterThan(14);
+  // A double-click on the gutter between the two panels of the last row merges them.
+  const [p5, p6] = await Promise.all(["Panel 5", "Panel 6"].map(async (n) => boxOf((await panels()).find((o) => o.name === n)!.id)));
+  await p.mouse.dblclick(Math.round((p5!.maxX + p6!.minX) / 2), Math.round((p5!.minY + p5!.maxY) / 2));
+  await expect.poll(async () => (await panels()).length).toBe(6);
+  // each one undo step: the merge, the gutter, the cut
+  await key(app, "Control+z");
+  await expect.poll(async () => (await panels()).length).toBe(7);
+  await key(app, "Control+z");
+  await expect.poll(async () => Math.round((await boxOf(right.id)).maxY)).toBe(Math.round(ra.maxY));
+  await key(app, "Control+z");
+  await expect.poll(async () => (await panels()).length).toBe(6);
+  expect(app.consoleErrors).toEqual([]);
+});

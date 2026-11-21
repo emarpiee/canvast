@@ -26,6 +26,10 @@ import starShapeSvg from "lucide-static/icons/sparkle.svg";
 import shapeToolSvg from "lucide-static/icons/pentagon.svg";
 import sheetEachSvg from "lucide-static/icons/book-copy.svg";
 import speechBalloonSvg from "lucide-static/icons/message-circle.svg";
+import comicPanelSvg from "lucide-static/icons/book-image.svg";
+import cutAcrossSvg from "lucide-static/icons/rows-2.svg";
+import cutDownSvg from "lucide-static/icons/columns-2.svg";
+import referenceWindowSvg from "lucide-static/icons/app-window.svg";
 import pathToolSvg from "lucide-static/icons/spline-pointer.svg";
 import balloonTailSvg from "lucide-static/icons/navigation-2.svg";
 import balloonConnectorSvg from "lucide-static/icons/git-commit-horizontal.svg";
@@ -711,6 +715,13 @@ export const ICONS = {
   shapeTool: clean(shapeToolSvg),
   sheetEach: clean(sheetEachSvg),
   speechBalloon: clean(speechBalloonSvg),
+  /** The Panel tool, a comic page and its panels (ADR 0206). */
+  comicPanel: clean(comicPanelSvg),
+  /** A comic panel cut in two: a gutter across its middle, or down it. */
+  cutAcross: clean(cutAcrossSvg),
+  cutDown: clean(cutDownSvg),
+  /** The reference window (ADR 0207). */
+  referenceWindow: clean(referenceWindowSvg),
   balloonTail: clean(balloonTailSvg),
   balloonConnector: clean(balloonConnectorSvg),
   tailAdd: clean(tailAddSvg),

@@ -1,3 +1,4 @@
+import { pageRatioOf } from "../gen/pages";
 import * as D from "../core/dyadic";
 import { screenToWorld } from "../core/camera";
 import type { Frame } from "../core/frames";
@@ -172,6 +173,17 @@ export function makePattern(doc: DocumentStore, editor: EditorState, view: ViewS
   let unit: number;
   let box: { x: number; y: number; w: number; h: number };
 
+  // A guide laid out on a page (a storyboard, a comic page): its Page setting gives the sheet its shape (its width kept, from its top-left corner)
+  const ratio = g.guide ? pageRatioOf(values) : null;
+  let resized: PathObject | null = null;
+  if (t?.kind === "sheet" && ratio !== null && !t.obj.rot && (t.obj.shape === "rect" || t.obj.shape === undefined)) {
+    const b0 = sizeOf(t.obj);
+    if (b0.w > 0 && b0.h > 0 && Math.abs(b0.w / b0.h - ratio) > 1e-3) {
+      const h = b0.w / ratio, params = drawnParams("rect", b0.x, b0.y, b0.w, h, 6, 5);
+      resized = { ...t.obj, sub: drawnSubs("rect", b0.x, b0.y, b0.w, h, 6, 5), ...(params ? { params } : {}), shape: "rect" };
+      t.obj = resized;
+    }
+  }
   if (t) {
     const b = sizeOf(t.obj);
     if (!(b.w > 0 && b.h > 0) || !Number.isFinite(b.w + b.h)) {
@@ -190,10 +202,16 @@ export function makePattern(doc: DocumentStore, editor: EditorState, view: ViewS
       fresh.push(host);
     }
   } else {
+    if (session.sheet && ratio !== null && Math.abs(session.sheet.w / session.sheet.h - ratio) > 1e-3) {
+      // (its page changed: the new sheet of this result takes the new shape, as large, from the same corner)
+      const area = session.sheet.w * session.sheet.h;
+      session.sheet = { ...session.sheet, w: Math.sqrt(area * ratio), h: Math.sqrt(area / ratio) };
+    }
     if (!session.sheet) {
       const cam = view.camera, vp = view.viewport;
       const px = 0.62 * Math.min(vp.width, vp.height * 1.5), k = 1 / 2 ** cam.zf;
-      const w = px * k, h = ((px * 2) / 3) * k, u = -cam.zi;
+      const r = ratio ?? 1.5, side = r >= 1 ? px : px * 0.9; // (a page standing up is as tall as a landscape one is wide, nearly)
+      const w = (r >= 1 ? side : side * r) * k, h = (r >= 1 ? side / r : side) * k, u = -cam.zi;
       const at = screenToWorld(cam, vp, { x: vp.width / 2, y: vp.height / 2 });
       session.sheet = { frame: view.frame === doc.space.world ? undefined : view.frame, anchor: { x: D.sub(at.x, D.shift(D.fromNumber(w / 2), u)), y: D.sub(at.y, D.shift(D.fromNumber(h / 2), u)) }, unit: u, w, h };
     }
@@ -213,6 +231,7 @@ export function makePattern(doc: DocumentStore, editor: EditorState, view: ViewS
   const gid = editing !== null && (again || old.length === 0) ? editing : newObjectId(); // (taken back and made again, it is still the same pattern)
   const grouped = patternPieces(doc, g, { id: g.id, gid, seed, v: cleanValues(g, values) }, { ...host, frame, anchor, unit } as PathObject, box, again ? old : null, z0 + 2);
 
+  if (resized && !fresh.some((o) => o.id === resized!.id)) fresh.unshift(resized);
   const tx = doc.transaction(`Pattern: ${g.label}`, [...fresh, ...grouped], again ? old.map((o) => o.id) : []);
   doc.commit(tx);
   session.top = tx;
