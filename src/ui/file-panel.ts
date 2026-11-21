@@ -137,15 +137,14 @@ export function mountFilePanel(
   const showing = (q: Element): boolean => (q as HTMLElement).getClientRects().length > 0 && getComputedStyle(q).visibility !== "hidden";
   window.addEventListener("keydown", (e) => {
     if (e.key !== "Escape" || e.ctrlKey || e.altKey || e.metaKey || e.shiftKey || e.isComposing || !note || el.hidden) return;
-    // in the file; in the window wherever the focus is (it covers the canvas); with no focus anywhere; on the canvas with nothing selected
-    // (there, a first Escape clears the selection, as it always does)
-    const inside = e.target instanceof Node && el.contains(e.target);
-    const nowhere = e.target === document.body || e.target === document.documentElement;
-    // (on the canvas: with nothing selected, or only the card the file was opened from; anything else selected is cleared first)
+    // in the file, or in the window wherever the focus is; elsewhere (the canvas, the page, whatever holds the focus after the double-click
+    // that opened it) when nothing is selected or only the card it opened from: never from a field, a dialog or another panel, whose it is
+    const t = e.target instanceof Element ? e.target : null;
+    const inside = !!t && el.contains(t);
     const ed = deps.session.editor;
     const onlyItsCard = [...ed.selection].every((id) => { const o = deps.session.doc.get(id); return o?.kind === "image" && o.assetId.split("#")[0] === note?.hash; });
-    const onCanvas = e.target instanceof HTMLElement && e.target.id === "canvas" && onlyItsCard && !ed.editingText;
-    if (!inside && el !== hosts.window && !nowhere && !onCanvas) return;
+    const elsewhere = !!t && !!t.closest("input, textarea, select, [contenteditable='true'], dialog, .pop-menu, .layers-panel, .ref-window");
+    if (!inside && el !== hosts.window && (elsewhere || !onlyItsCard || ed.editingText)) return;
     if ([...document.querySelectorAll(POPUPS)].some(showing)) return;
     e.preventDefault();
     e.stopImmediatePropagation();

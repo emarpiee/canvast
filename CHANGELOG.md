@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.61.12 — Esc closes a note wherever the focus is (2026-11-22)
+
+- **Fixed before release:** the first `Esc` after a note opened still did not close it when the focus was somewhere other than the canvas itself; from anywhere but a field, a dialog or another panel, it now closes the note when nothing, or only the note's card, is selected. ([Notes on a canvas](README.md#notes-on-a-canvas))
+
+### For developers
+
+- `__canvastDebug.comicHandles()`: the selected comic page's handles on screen and the chosen gutter; the comic test clicks a gutter's handle where it is and checks it was chosen.
+
 ## 0.61.11 — A chosen gutter's width grips, Esc and the reference window fixed (2026-11-22)
 
 - **Added:** a chosen gutter (a click on its middle handle) is drawn solid with a grip on each side: drag one to widen or narrow that gutter alone. ([Comics and storyboards](README.md#comics-and-storyboards))

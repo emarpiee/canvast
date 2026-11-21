@@ -97,6 +97,7 @@ import type { QualityGovernor } from "./quality";
 import { selectedFrame } from "../render/scene-renderer";
 import { shapeHandles } from "../interaction/path-edit";
 import { visibleObjects } from "../render/scene-view";
+import { comicHandles } from "../interaction/comic-handles";
 
 /**
  * Inspection API for automated navigation tests and manual diagnosis.
@@ -158,6 +159,8 @@ export interface DebugHook {
   setLassoFilter(f: LassoFilter): void;
   /** The names drawn above items at the last frame (sheets, pictures, named items). */
   itemLabels(): Array<{ id: string; text: string; x: number; y: number; w: number; h: number }>;
+  /** The selected comic page's handles on screen (ADR 0206), and the gutter chosen on it (its two sides' panels). */
+  comicHandles(): { handles: Array<{ what: string; gutter?: number; x: number; y: number }>; chosen: { a: string[]; b: string[] } | null };
   /** Projected screen geometry of an object (null when offscreen). */
   objectScreen(id: string): { box: ScreenBox; q: number[]; radius: number } | null;
   /** An object's screen box as it is drawn now: with what is being dragged, and what makes room for it (live reflow, ADR 0193). */
@@ -489,6 +492,10 @@ export function installDebugHook(
       editor.changed();
     },
     itemLabels: () => deps.labels().map((l) => ({ id: l.id, text: l.text, x: l.x, y: l.y, w: l.w, h: l.h })),
+    comicHandles: () => {
+      const ch = comicHandles(doc, editor, visibleObjects(doc, deps.index, editor, view.frameCamera, view.viewport));
+      return { handles: (ch?.handles ?? []).map((h) => ({ what: h.what, ...("gutter" in h ? { gutter: h.gutter } : {}), x: h.x, y: h.y })), chosen: editor.comicGutter && { a: editor.comicGutter.a, b: editor.comicGutter.b } };
+    },
     objectScreen: (id) => {
       const o = doc.get(id);
       if (!o) throw new Error(`no object ${id}`);

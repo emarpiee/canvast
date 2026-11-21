@@ -1413,8 +1413,14 @@ test("Escape closes a note open on a canvas in every editor style, in the panel 
       await p.evaluate(([m, s]) => { window.__canvastDebug.setSetting("notes.panelMode", m); window.__canvastDebug.setSetting("notes.panelStyle", s); }, [mode, style] as const);
       // the first Escape right after it opens (double-clicked on its card, nothing else pressed)
       await open(host);
+      // (what holds the focus and what is open over the words, said when it fails)
+      const why = await p.evaluate(() => {
+        const a = document.activeElement as HTMLElement | null;
+        const open = [...document.querySelectorAll(".se-controller, .se-dropdown, .se-select-menu, .se-modal-show, .se-cmd-row, .pop-menu, dialog[open]")].filter((q) => (q as HTMLElement).getClientRects().length > 0).map((q) => q.className);
+        return `focus ${a?.tagName}#${a?.id}.${a?.className}; open ${JSON.stringify(open)}; selected ${window.__canvastDebug.selection().length}`;
+      });
       await p.keyboard.press("Escape");
-      await expect(p.getByTestId(host), `${mode}, ${style}: the first Escape after opening`).toBeHidden();
+      await expect(p.getByTestId(host), `${mode}, ${style}: the first Escape after opening (${why})`).toBeHidden();
       // from the words
       const words = await open(host);
       await words.locator("p").first().click();

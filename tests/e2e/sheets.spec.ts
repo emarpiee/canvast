@@ -1061,7 +1061,12 @@ test("comic page (ADR 0206): the Panel tool makes a page laid out in panels; a d
   expect(Math.round((await boxOf(below.id)).minY - rb.minY)).toBeGreaterThan(14);
   // A click on a gutter's middle handle chooses it: Gutter then widens that gutter alone (row two's), not the others (row three's).
   const [g3, g4, g5] = await Promise.all(["Panel 3", "Panel 4", "Panel 5"].map(async (n) => boxOf((await panels()).find((o) => o.name === n)!.id)));
-  await p.mouse.click(Math.round((g3!.maxX + g4!.minX) / 2), Math.round((g3!.minY + g3!.maxY) / 2));
+  const want = { x: (g3!.maxX + g4!.minX) / 2, y: (g3!.minY + g3!.maxY) / 2 };
+  const ch = await p.evaluate(() => window.__canvastDebug.comicHandles());
+  const bar = ch.handles.filter((h) => h.what === "move").sort((a, b) => Math.hypot(a.x - want.x, a.y - want.y) - Math.hypot(b.x - want.x, b.y - want.y))[0];
+  expect(bar && Math.hypot(bar.x - want.x, bar.y - want.y), `the middle handle between panels 3 and 4: ${JSON.stringify(ch.handles)}`).toBeLessThan(6);
+  await p.mouse.click(Math.round(bar!.x), Math.round(bar!.y));
+  await expect.poll(async () => (await p.evaluate(() => window.__canvastDebug.comicHandles())).chosen, { message: "the click chose that gutter" }).not.toBeNull();
   await p.evaluate(() => window.__canvastDebug.runCommand("comic.setOption", { name: "gutter", value: "80" }, "test"));
   await expect.poll(async () => Math.round((await boxOf((await panels()).find((o) => o.name === "Panel 3")!.id)).maxX)).toBeLessThan(Math.round(g3!.maxX) - 4);
   expect(Math.round((await boxOf((await panels()).find((o) => o.name === "Panel 5")!.id)).maxX), "another row's gutter stays").toBe(Math.round(g5!.maxX));
