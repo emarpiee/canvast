@@ -2,7 +2,6 @@ import { cornerMoved, gutterMoved, gutterTurned, mergeGutter, pagePer, cutAcross
 import { insidePoly } from "../doc/comic";
 import { comicHandleAt, comicHandles, pageToScreen } from "./comic-handles";
 import type { ComicHandle, ComicHandles } from "./comic-handles";
-import { pageRatio } from "../gen/pages";
 import { lookFromChoices } from "../doc/stroke-look";
 import type { NavDir } from "./item-navigation";
 import { canvasShortcutsActive } from "./shortcut-scope";
@@ -586,6 +585,12 @@ export function attachTools(
     editor.preview = { kind: "none" };
     editor.handleLabel = null;
     if (far && next) doc.commit(doc.transaction(h.what === "corner" ? "Move the panel's corner" : h.what === "move" ? "Move the gutter" : "Turn the gutter", next));
+    // a click on a gutter's middle handle chooses that gutter (again: lets it go): the Gutter field is then its alone
+    if (!far && h.what === "move") {
+      const gu = ch.gutters[h.gutter]!, ids = (es: readonly { panel: number }[]): string[] => [...new Set(es.map((x) => ch.panels[x.panel]!.id))];
+      const pick = { page: ch.page.id, a: ids(gu.a), b: ids(gu.b) };
+      editor.comicGutter = JSON.stringify(editor.comicGutter) === JSON.stringify(pick) ? null : pick;
+    }
     editor.changed();
   };
   const updateComic = (gc: Extract<Gesture, { kind: "comic" }>, s: ScreenPoint, e: PointerEvent, final: boolean): void => {
@@ -925,7 +930,7 @@ export function attachTools(
       sides: editor.shapeSides,
       tips: editor.shapeTips,
       fill: editor.tool === "sheet" || editor.tool === "panel" ? "#ffffff" : editor.tool === "balloon" ? (paintOf(editor.shapeFill) ?? "#ffffff") : editor.shapeKind === "line" ? null : paintOf(editor.shapeFill),
-      stroke: editor.tool === "sheet" || editor.tool === "panel" ? null : editor.tool === "balloon" && editor.shapeStroke === null ? newInk("#1f2329") : editor.shapeKind === "line" && editor.shapeStroke === null ? newInk("#1f2329") : paintOf(editor.shapeStroke),
+      stroke: editor.tool === "sheet" ? null : editor.tool === "panel" ? (paintOf(editor.shapeStroke) ?? newInk("#1f2329")) : editor.tool === "balloon" && editor.shapeStroke === null ? newInk("#1f2329") : editor.shapeKind === "line" && editor.shapeStroke === null ? newInk("#1f2329") : paintOf(editor.shapeStroke),
       width,
     };
     sheetStart = sheetAt(s.x, s.y)?.id;
@@ -946,13 +951,6 @@ export function attachTools(
     const s = snapPoint(s0, sn);
     const l = localIn(d.frame, d.anchor, d.unit, s);
     const box = shapeBox(d.kind, l.x, l.y, keys(e).shift, keys(e).alt);
-    // (a comic page of a chosen size keeps its shape: as wide as dragged)
-    const ratio = editor.tool === "panel" && editor.comic.page !== "free" ? pageRatio(editor.comic.page, editor.comic.orient) : null;
-    if (ratio !== null && box.bw !== 0) {
-      const h = Math.abs(box.bw) / ratio;
-      box.by = keys(e).alt ? -h / 2 : l.y < 0 ? -h : 0; // (from the middle with Alt; upward when dragged up)
-      box.bh = h;
-    }
     editor.shapeDraft = { ...d, ...box };
     // (a line has no shape to give: only boxes show their ratio)
     if (d.kind !== "line") showRatio(s, Math.abs(box.bw), Math.abs(box.bh));
@@ -990,7 +988,8 @@ export function attachTools(
       // a comic page: a sheet, laid out in panels as the tool's options say (ADR 0206)
       const { shape: _s, params: _p, ...plain } = drawn;
       const sheet = homeObject(normalizeUnit(sheetStart && doc.get(sheetStart) ? { ...plain, shape: "rect", stroke: null, container: { clip: true }, name: nextPageName(), parent: sheetStart } : { ...plain, shape: "rect", stroke: null, container: { clip: true }, name: nextPageName() }), doc.space) as PathObject;
-      const made = newComicPage(doc, sheet, editor.comic);
+      // (its panels' border: the tool's outline, as the Appearance section sets it; ink when it has none)
+      const made = newComicPage(doc, sheet, editor.comic, { stroke: paintOf(editor.shapeStroke) ?? newInk("#1f2329"), width: d.width });
       doc.commit(doc.transaction("Make a comic page", made));
       editor.selectMade([made[0]!.id]);
       return;

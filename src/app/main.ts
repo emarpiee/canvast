@@ -1,6 +1,6 @@
 import { mountReferenceWindows } from "../ui/reference-window";
 import { comicHandles } from "../interaction/comic-handles";
-import { mergeSelectedPanels, panelCount, selectedComicPage, setComicOption, splitSelectedPanels } from "./comic";
+import { chosenGutter, mergeSelectedPanels, pagePer, panelCount, selectedComicPage, setComicOption, splitSelectedPanels } from "./comic";
 import { useMediaAddress } from "../assets/thumb";
 import { setSnapPx } from "../interaction/snap";
 import { followHost, sendView } from "./follow";
@@ -1719,18 +1719,13 @@ async function start(): Promise<void> {
     comic: {
       options: () => editor.comic,
       selected: () => selectedComicPage(doc, editor) !== null,
-      // (a page's size and way up: the sheet's own Ratio, on the page selected)
-      setOption: (name, value) => setComicOption(doc, editor, name, value, (r) => {
-        const keep = editor.selection;
+      setOption: (name, value) => setComicOption(doc, editor, name, value),
+      // (the gutter chosen on the selected page: its width is what the Gutter field shows)
+      chosenGutter: () => {
         const page = selectedComicPage(doc, editor);
-        if (!page) return;
-        editor.selection = new Set([page.id]);
-        try {
-          setSheetRatio(doc, editor, r, true);
-        } finally {
-          editor.selection = new Set([...keep].filter((id) => !!doc.get(id)));
-        }
-      }),
+        const c = page && chosenGutter(doc, editor, page);
+        return c && page ? Math.round((c.g.width / pagePer(page, 1)) * 10) / 10 : null;
+      },
     },
     openSearch: (prefix) => canvasSearch.open(prefix),
     screenshot: () => void takeScreenshot(),

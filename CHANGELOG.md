@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.61.10 — Comic page options without doubles, one gutter at a time (2026-11-22)
+
+- **Changed:** the Panel tool no longer has its own Page size and Border: a page's shape is the sheet's Ratio, a panel's border the Appearance's outline (on the selected panels only; the tool's outline for a new page). A click on a gutter's middle handle chooses that gutter, and Gutter then sets its width alone. ([Comics and storyboards](README.md#comics-and-storyboards))
+
 ## 0.61.9 — Esc closes a note the first time (2026-11-22)
 
 - **Fixed:** the first `Esc` after a note opened on a canvas did not close it: the focus was still on the canvas with the note's card selected, so it cleared the selection. A note now opens with the caret in its words; in the window, and with no focus anywhere, `Esc` closes it at once. ([Notes on a canvas](README.md#notes-on-a-canvas))

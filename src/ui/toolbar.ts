@@ -1,4 +1,3 @@
-import { PAGE_SIZES } from "../gen/pages";
 import { PAGE_LAYOUTS } from "../app/comic";
 import type { ComicOptions } from "../app/comic";
 import { mountBalloonBar, type BalloonActions } from "./balloon-bar";
@@ -124,7 +123,7 @@ export interface ToolbarActions {
   /** A speech balloon's options and a text in a shape's, as groups of this bar (ADR 0198; once a panel). */
   balloon: BalloonActions;
   /** The Panel tool's options (ADR 0206): what the next comic page takes, and the selected page too. */
-  comic: { options(): ComicOptions; selected(): boolean; setOption(name: keyof ComicOptions, value: string | number): boolean };
+  comic: { options(): ComicOptions; selected(): boolean; setOption(name: keyof ComicOptions, value: string | number): boolean; /** The chosen gutter's width (per cent of the page's shorter side), or null. */ chosenGutter(): number | null };
   selectedShape(): { shape: "polygon" | "star"; sides: number; tips: number; inner: number } | null;
   /** Change the sides, points or ratio of the picked polygons and stars: one undo step. */
   shapeSelected(change: { sides?: number; tips?: number; inner?: number }, final?: boolean): void;
@@ -240,7 +239,8 @@ const KIND_LABEL: Record<string, string> = { all: "All", sheet: "Sheet", shape: 
 /** Each kind's icon: the one it has everywhere (the tool that makes it), so "Sheet" here is the Sheet tool's icon. */
 const KIND_ICON: Record<string, string> = { all: ICONS.shapes, sheet: ICONS.sheetTool, shape: ICONS.shapeTool, text: ICONS.type, picture: ICONS.image, stroke: ICONS.pencil };
 /** The kind of picked item the Properties bar sorts its controls by. */
-const kindOf = (o: CanvasObject): string => (isContainer(o) ? "sheet" : o.kind === "path" ? "shape" : o.kind === "image" ? "picture" : o.kind);
+/** (a comic page's panel is a shape here: its fill and border are the Appearance's, not a sheet's, ADR 0206) */
+const kindOf = (o: CanvasObject, get?: (id: string) => CanvasObject | undefined): string => (isContainer(o) && !(get && o.parent !== undefined && (get(o.parent) as { container?: { comic?: unknown } } | undefined)?.container?.comic) ? "sheet" : o.kind === "path" ? "shape" : o.kind === "image" ? "picture" : o.kind);
 
 /** The features of a font worth offering, with the words that name them (a font only shows the ones it has). */
 const FONT_FEATURES: Record<string, string> = { liga: "Ligatures", dlig: "Discretionary ligatures", smcp: "Small capitals", c2sc: "Capitals to small capitals", tnum: "Tabular numbers", pnum: "Proportional numbers", onum: "Old-style numbers", lnum: "Lining numbers", frac: "Fractions", zero: "Slashed zero", case: "Case-sensitive forms", sups: "Superscript", subs: "Subscript", titl: "Titling forms", swsh: "Swashes", salt: "Stylistic alternates", ordn: "Ordinals" };
@@ -325,12 +325,9 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
         <button type="button" class="swatch swatch-current" data-colour-open aria-haspopup="dialog" aria-expanded="false" aria-label="Pen colour" title="Pen colour: open the colour picker (new text takes it too, until its own colour is set)"><span data-colour-chip></span></button>
       </div>
       <div class="tb-group tb-options" data-for="panel" data-comic role="group" aria-label="Comic page">
-        <label class="tb-count">Page <select data-comic-opt="page" data-name="Page size" aria-label="Page size">${([["free", "As drawn"], ...PAGE_SIZES.map(([id, label]): [string, string] => [id, label])] as Array<[string, string]>).map(([v, l]) => `<option value="${v}">${esc(l)}</option>`).join("")}</select></label>
-        <label class="tb-count" data-comic-orient>Way up <select data-comic-opt="orient" data-name="Orientation" aria-label="Orientation"><option value="portrait">Portrait</option><option value="landscape">Landscape</option></select></label>
         <label class="tb-count">Layout <select data-comic-opt="layout" data-name="Layout" aria-label="Layout">${PAGE_LAYOUTS.map(([v, l]) => `<option value="${v}">${esc(l)}</option>`).join("")}</select></label>
-        <label class="tb-count" title="Between panels, in per cent of the page's shorter side">Gutter <input type="number" data-comic-opt="gutter" data-name="Gutter" min="0" max="20" step="0.1" inputmode="decimal" aria-label="Gutter (per cent of the page's shorter side)"></label>
+        <label class="tb-count" title="Between panels, in per cent of the page's shorter side: the gutter chosen (a click on its middle handle), else every gutter of the page">Gutter <input type="number" data-comic-opt="gutter" data-name="Gutter" min="0" max="20" step="0.1" inputmode="decimal" aria-label="Gutter (per cent of the page's shorter side)"></label>
         <label class="tb-count" title="Round the panels, in per cent of the page's shorter side">Margin <input type="number" data-comic-opt="margin" data-name="Margin" min="0" max="30" step="0.1" inputmode="decimal" aria-label="Margin (per cent of the page's shorter side)"></label>
-        <label class="tb-count" title="The panels' borders, in per cent of the page's shorter side">Border <input type="number" data-comic-opt="border" data-name="Border" min="0" max="10" step="0.1" inputmode="decimal" aria-label="Border width (per cent of the page's shorter side)"></label>
       </div>
       <div class="tb-group tb-options" data-for="shape">
         <label class="tb-count" data-sides-wrap hidden>Sides <input type="number" data-sides min="3" max="24" step="1" inputmode="numeric" aria-label="Polygon sides"></label>
@@ -399,13 +396,13 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
         ${TEXT_FITS.map((a) => `<button type="button" role="radio" class="shape-kind" data-text-wrap hidden data-text-fit="${a.id}" aria-label="${a.label}" title="${a.title}">${a.icon}</button>`).join("")}
       </div>
       <div class="tb-group tb-options" data-for="select node" data-sel-colours data-no-command hidden role="group" aria-label="Colours of the selection"></div>
-      <div class="tb-group tb-options" data-for="shape balloon path select node" data-kind="shape sheet picture">
+      <div class="tb-group tb-options" data-for="shape balloon panel path select node" data-kind="shape sheet picture">
         <button type="button" class="swatch swatch-paint" data-kind="shape sheet" data-paint="fill" aria-haspopup="dialog" aria-expanded="false" aria-label="Fill" title="Fill colour: open the colour picker"><span data-paint-chip></span><b class="swatch-name">Fill</b></button>
         <button type="button" class="swatch swatch-paint" data-paint="stroke" aria-haspopup="dialog" aria-expanded="false" aria-label="Outline" title="Outline colour: open the colour picker"><span data-paint-chip></span><b class="swatch-name">Outline</b></button>
       <label class="tb-count" data-scrub="outline-w" data-outline-w-wrap hidden title="Outline width, in px at this zoom (0: none). Drag the field left or right to change it">Width <input type="number" data-outline-w min="0" step="0.5" inputmode="decimal" aria-label="Outline width (px at this zoom)"></label>
       <button type="button" class="swatch swatch-outline" data-outline-options aria-haspopup="dialog" aria-expanded="false" aria-label="Outline options" title="Outline options: width, position (inside, centre, outside), corners and ends">${ICONS.outlineOptions}</button>
       </div>
-      <div class="tb-group tb-options" data-for="shape balloon path">
+      <div class="tb-group tb-options" data-for="shape balloon panel path">
         <input type="range" class="size" data-shape-width min="0" max="100" step="1" aria-label="Outline width" title="Outline width (screen px at this zoom); all the way left: no outline">
         <span class="size-out" data-shape-out></span>
       </div>
@@ -465,7 +462,7 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
   // Each control's section (ADR 0198), for the ways the bar can be shown (value chips, the Properties panel, beside the selection): a control's
   // own, else its group's.
   // A speech balloon's options and a text in a shape's, after Look: four groups, four chips (they were the Speech balloon panel).
-  const balloonBar = mountBalloonBar(q<HTMLElement>('.tb-group[data-for="shape balloon path select node"][data-kind]')!, actions.balloon);
+  const balloonBar = mountBalloonBar(q<HTMLElement>('.tb-group[data-for="shape balloon panel path select node"][data-kind]')!, actions.balloon);
   assignSections(barRow, [
     ['[data-bl-group="body"]', "balloon"],
     ['[data-bl-group="tail"]', "tail"],
@@ -489,8 +486,8 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
     ["[data-text-outline], label:has([data-text-outline-w])", "textoutline"],
     ['label:has([data-text-line]), label:has([data-text-track]), [data-text-box], .tb-group[data-kind="text"][role="radiogroup"]', "paragraph"],
     ['.tb-group[data-kind="text"]', "text"],
-    ['.tb-group[data-for="shape balloon path select node"]', "look"],
-    ['.tb-group[data-for="shape balloon path"]', "look"],
+    ['.tb-group[data-for="shape balloon panel path select node"]', "look"],
+    ['.tb-group[data-for="shape balloon panel path"]', "look"],
     ['.tb-group[aria-label="Size"][data-for="pen select"], .tb-group[aria-label="Smooth"], .tb-group[aria-label="Keep size"]', "brush"],
     ['.tb-group[data-for="eraser"]', "eraser"],
     ['.tb-group[data-for="lasso"]', "lasso"],
@@ -577,9 +574,9 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
       else editor[n] = !editor[n];
       editor.changed();
     }, () => null),
-    prop("comic.setOption", "Set a comic page option", "The page size, way up, layout, gutter, margin or border of the next page, and of the selected one", [{ name: "name", type: "choice", doc: "which option", required: true, choices: ["page", "orient", "layout", "gutter", "margin", "border"] }, { name: "value", type: "text", doc: "a page size or layout id, portrait or landscape, or a number in thousandths of the page's shorter side", required: true }], (o) => {
+    prop("comic.setOption", "Set a comic page option", "The layout, gutter or margin of the next page, and of the selected one (its chosen gutter alone)", [{ name: "name", type: "choice", doc: "which option", required: true, choices: ["layout", "gutter", "margin"] }, { name: "value", type: "text", doc: "a layout id, or a number in thousandths of the page's shorter side", required: true }], (o) => {
       const name = o["name"] as keyof ComicOptions, raw = o["value"];
-      const value = name === "gutter" || name === "margin" || name === "border" ? Number(raw) : String(raw);
+      const value = name === "gutter" || name === "margin" ? Number(raw) : String(raw);
       return actions.comic.setOption(name, value) ? { ok: true } : { ok: false, error: `That is not a value for "${name}".` };
     }, () => null),
     prop("tools.choose", "Choose a tool's kind or colour", "The pen's kind or colour, the shape's kind, what the lasso takes", [{ name: "name", type: "choice", doc: "which choice", required: true, choices: ["penKind", "penColour", "shapeKind", "lassoFilter"] }, { name: "value", type: "text", doc: "a pen kind, a colour (#rrggbb), a shape kind, or strokes or all", required: true }], (o) => {
@@ -1457,19 +1454,18 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
     // The Panel tool's options: the next page's, and the selected page's too (with the Select tool as well)
     const comicGroup = q<HTMLElement>("[data-comic]")!;
     comicGroup.dataset["for"] = actions.comic.selected() ? "panel select node" : "panel";
-    const co = actions.comic.options();
+    const co = actions.comic.options(), oneGutter = actions.comic.chosenGutter();
     for (const el of qa<HTMLInputElement | HTMLSelectElement>("[data-comic-opt]")) {
       if (document.activeElement === el) continue;
-      const v = co[el.dataset["comicOpt"] as keyof ComicOptions];
-      el.value = el instanceof HTMLInputElement ? String(Number(v) / 10) : String(v);
+      const k = el.dataset["comicOpt"] as keyof ComicOptions;
+      el.value = k === "gutter" && oneGutter !== null ? String(oneGutter) : el instanceof HTMLInputElement ? String(Number(co[k]) / 10) : String(co[k]);
     }
-    q<HTMLElement>("[data-comic-orient]")!.hidden = co.page === "free";
     const penSize = q<HTMLElement>("[data-size]")!.closest<HTMLElement>(".tb-options")!;
     penSize.dataset["for"] = editor.tool === "select" && editor.selection.size > 0 && ![...editor.selection].some((id) => doc.get(id)?.kind === "stroke") ? "pen" : "pen select";
     // One row, one kind at a time (ADR 0128): when the picked items are of different kinds, chips at the start choose which kind's
     // properties the row shows; what is for another kind is switched off, never moved into a menu.
     const picking = editor.editsSelection && !editor.gesturing;
-    const kinds = picking ? [...new Set([...editor.selection].flatMap((id) => { const o = doc.get(id); return o ? [kindOf(o)] : []; }))] : [];
+    const kinds = picking ? [...new Set([...editor.selection].flatMap((id) => { const o = doc.get(id); return o ? [kindOf(o, (x) => doc.get(x))] : []; }))] : [];
     // (`all`, chosen by its chip, shows only what is for any kind in this row; the Actions bar below follows the same choice)
     const chosen = editor.subject === "all" && kinds.length > 1 ? "all" : kinds.includes(editor.subject ?? "") ? editor.subject! : (kinds[0] ?? null);
     const chips = q<HTMLElement>(".tb-subject")!;

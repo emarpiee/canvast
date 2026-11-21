@@ -197,6 +197,8 @@ export class EditorState {
   comic: ComicOptions = { ...COMIC_DEFAULTS };
   /** A cut being drawn with the Panel tool (screen px): the knife's line, as far as the page goes, and half the gutter beside it; nothing changes until it is let go. */
   comicKnife: { a: readonly [number, number]; b: readonly [number, number]; half: number } | null = null;
+  /** The gutter chosen on a comic page (a click on its middle handle): its two sides' panels. The Gutter field and its grips are its alone. */
+  comicGutter: { page: string; a: string[]; b: string[] } | null = null;
   shapeTips = 5;
   /** Waiting for a click on the object to attach the picked ones to (ADR 0109). */
   attachMode = false;

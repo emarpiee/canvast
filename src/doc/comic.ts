@@ -298,3 +298,16 @@ export function turnGutter(panels: readonly Poly[], g: Pick<Gutter, "a" | "b" | 
     }
   return out;
 }
+
+/** The panels with gutter `g` made `width` wide, half on each side of its middle line. Null when a panel would vanish. */
+export function setGutterWidth(panels: readonly Poly[], g: Pick<Gutter, "a" | "b" | "nx" | "ny" | "width">, width: number, min: number): Pt[][] | null {
+  const half = (Math.max(0, width) - g.width) / 2;
+  const out = panels.map((p) => p.map((q) => q as Pt));
+  for (const [side, k] of [[g.a, -1], [g.b, 1]] as const)
+    for (const e of side) {
+      const next = moveEdge(out[e.panel]!, e.edge, g.nx * half * k, g.ny * half * k);
+      if (!next || !big(next, min)) return null;
+      out[e.panel] = next;
+    }
+  return out;
+}

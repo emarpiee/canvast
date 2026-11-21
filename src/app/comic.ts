@@ -2,14 +2,14 @@ import * as D from "../core/dyadic";
 import type { DocumentStore } from "../doc/document-store";
 import { isContainer } from "../doc/containers";
 import { normalizeUnit, worldBounds } from "../doc/edit-ops";
-import { gutterAt, insidePoly, layoutPanels, mergePanels, moveCorner, moveGutter, polySub, segmentHits, splitPanel, subPoly, turnGutter, widenGutters } from "../doc/comic";
+import { gutterAt, guttersOf, insidePoly, layoutPanels, mergePanels, moveCorner, moveGutter, polySub, segmentHits, setGutterWidth, splitPanel, subPoly, turnGutter, widenGutters } from "../doc/comic";
 import type { Gutter } from "../doc/comic";
 import type { Poly, Pt } from "../doc/comic";
 import type { CanvasObject, ObjectId, PathObject } from "../doc/model";
+import type { Paint } from "../doc/paint";
 import { expressObjectIn, homeObject, newObjectId } from "../doc/model";
 import { geometryBounds } from "../doc/path";
 import { COMIC_LAYOUTS, comicRows } from "../gen/guides";
-import { PAGE_SIZES, pageRatio } from "../gen/pages";
 import { plural } from "../doc/plural";
 import type { EditorState } from "./editor-state";
 
@@ -24,16 +24,16 @@ import type { EditorState } from "./editor-state";
 export const PAGE_LAYOUTS: ReadonlyArray<[string, string]> = [["one", "One panel"], ...COMIC_LAYOUTS];
 const rowsOf = (layout: string): readonly (readonly number[])[] => (layout === "one" ? [[1]] : comicRows(layout));
 
-/** What the Panel tool makes next: sizes in thousandths of the page's shorter side (as the guides' gutters are). */
+/**
+ * What the Panel tool makes next, besides what other tools already set (ADR 0206): the page's shape is the Sheet's Ratio, the panels' border
+ * the Appearance's outline. Sizes in thousandths of the page's shorter side (as the guides' gutters are).
+ */
 export interface ComicOptions {
-  page: string;
-  orient: "portrait" | "landscape";
   layout: string;
   gutter: number;
   margin: number;
-  border: number;
 }
-export const COMIC_DEFAULTS: ComicOptions = { page: "a4", orient: "portrait", layout: "six", gutter: 14, margin: 40, border: 4 };
+export const COMIC_DEFAULTS: ComicOptions = { layout: "six", gutter: 14, margin: 40 };
 
 export const isComicPage = (o: CanvasObject | undefined | null): o is PathObject & { container: { clip: boolean; comic: { gutter: number } } } => isContainer(o) && !!o.container.comic;
 /** The page `o` is (or is a panel of), else null. */
@@ -75,7 +75,7 @@ const per = (page: PathObject, k: number): number => (Math.min(pageSize(page).w,
 const minOf = (page: PathObject): number => per(page, 10);
 
 /** A panel with this outline on the page, in the page's frame and units: `from` gives it its id, look, name and place in the stack; else a new one. */
-function panelObject(doc: DocumentStore, page: PathObject, poly: Poly, from: PathObject | null, z: number, look: { border: number }, name: string): PathObject {
+function panelObject(doc: DocumentStore, page: PathObject, poly: Poly, from: PathObject | null, z: number, look: { stroke?: Paint | null; width?: number }, name: string): PathObject {
   const place = { ...(page.frame ? { frame: page.frame } : {}), anchor: page.anchor, unit: page.unit, sub: [polySub(poly)] };
   if (from) {
     const { frame: _f, ...rest } = from;
@@ -84,7 +84,7 @@ function panelObject(doc: DocumentStore, page: PathObject, poly: Poly, from: Pat
   }
   return {
     id: newObjectId(), kind: "path", ...place, z, opacity: 1, attachmentTargetId: null,
-    fill: "#ffffff", stroke: "#000000", width: Math.max(look.border, Number.MIN_VALUE), align: "outside", join: "miter",
+    fill: "#ffffff", stroke: look.stroke === undefined ? "#000000" : look.stroke, width: Math.max(look.width ?? pagePer(page, 4), Number.MIN_VALUE), align: "outside", join: "miter",
     container: { clip: true }, parent: page.id, name, constraint: { h: "scale", v: "scale" }, // (a page resized: its panels with it)
   };
 }
@@ -108,11 +108,11 @@ function rehome(doc: DocumentStore, page: PathObject, from: readonly ObjectId[],
  * A new comic page: the sheet `sheet` (drawn, in its frame) becomes a page with `opts`' gutter, laid out in panels inside its margin. The
  * objects to commit, the page first.
  */
-export function newComicPage(doc: DocumentStore, sheet: PathObject, opts: ComicOptions): PathObject[] {
+export function newComicPage(doc: DocumentStore, sheet: PathObject, opts: ComicOptions, look: { stroke: Paint | null; width: number }): PathObject[] {
   const s = pageSize(sheet), short = Math.min(s.w, s.h) / 1000;
   const page: PathObject = { ...sheet, container: { clip: true, comic: { gutter: opts.gutter } }, name: sheet.name?.replace(/^Sheet/, "Page") ?? "Page" };
   const polys = layoutPanels(s.w, s.h, opts.margin * short, opts.gutter * short, rowsOf(opts.layout)).map((p) => p.map(([x, y]): Pt => [x + s.x, y + s.y]));
-  return [page, ...polys.map((p, i) => withSpace(panelObject(doc, page, p, null, page.z + (i + 1) / (polys.length + 1), { border: opts.border * short }, `Panel ${i + 1}`), doc.space))];
+  return [page, ...polys.map((p, i) => withSpace(panelObject(doc, page, p, null, page.z + (i + 1) / (polys.length + 1), look, `Panel ${i + 1}`), doc.space))];
 }
 
 /** (an object put in its frame's best place: kept exact) */
@@ -124,8 +124,8 @@ export function cutPanel(doc: DocumentStore, page: PathObject, panel: PathObject
   const parts = splitPanel(panelPoly(doc, page, panel), a, b, gutter, minOf(page));
   if (!parts) return null;
   const [one, two] = parts;
-  const kept = withSpace(panelObject(doc, page, one, panel, panel.z, { border: panel.width }, panel.name ?? "Panel"), doc.space);
-  const made = withSpace({ ...panelObject(doc, page, two, panel, panel.z, { border: panel.width }, ""), id: newObjectId(), z: panel.z + 1e-6, name: nextPanelName(panelsOf(doc, page), skip) }, doc.space);
+  const kept = withSpace(panelObject(doc, page, one, panel, panel.z, {}, panel.name ?? "Panel"), doc.space);
+  const made = withSpace({ ...panelObject(doc, page, two, panel, panel.z, {}, ""), id: newObjectId(), z: panel.z + 1e-6, name: nextPanelName(panelsOf(doc, page), skip) }, doc.space);
   return [kept, made, ...rehome(doc, page, [panel.id], [{ id: kept.id, poly: one }, { id: made.id, poly: two }])];
 }
 
@@ -159,7 +159,7 @@ export function movedGutter(doc: DocumentStore, page: PathObject, found: NonNull
   const next = moveGutter(found.polys, found.g, d, minOf(page));
   if (!next) return null;
   const touched = new Set([...found.g.a, ...found.g.b].map((e) => e.panel));
-  return [...touched].map((k) => withSpace(panelObject(doc, page, next[k]!, found.panels[k]!, found.panels[k]!.z, { border: 0 }, ""), doc.space));
+  return [...touched].map((k) => withSpace(panelObject(doc, page, next[k]!, found.panels[k]!, found.panels[k]!.z, {}, ""), doc.space));
 }
 
 /** The two panels across the gutter under the point become one (the outline round both), with what was in them. */
@@ -172,7 +172,7 @@ export function mergeAt(doc: DocumentStore, page: PathObject, at: Pt, reachPage:
 function mergeThese(doc: DocumentStore, page: PathObject, panels: readonly PathObject[]): { next: CanvasObject[]; removed: ObjectId[] } {
   const [keep, ...rest] = [...panels].sort((a, b) => a.z - b.z);
   const poly = panels.map((p) => panelPoly(doc, page, p)).reduce((acc, p) => mergePanels(acc, p));
-  const merged = withSpace(panelObject(doc, page, poly, keep!, keep!.z, { border: 0 }, ""), doc.space);
+  const merged = withSpace(panelObject(doc, page, poly, keep!, keep!.z, {}, ""), doc.space);
   return { next: [merged, ...rehome(doc, page, rest.map((p) => p.id), [{ id: merged.id, poly }])], removed: rest.map((p) => p.id) };
 }
 
@@ -197,7 +197,7 @@ export function layOutPage(doc: DocumentStore, editor: EditorState, layout: stri
   const old = panelsOf(doc, page), s = pageSize(page), gutter = per(page, isComicPage(page) ? page.container.comic.gutter : opts.gutter);
   const polys = layoutPanels(s.w, s.h, per(page, opts.margin), gutter, rowsOf(layout)).map((p) => p.map(([x, y]): Pt => [x + s.x, y + s.y]));
   const look = old[0] ?? null;
-  const made = polys.map((p, i) => withSpace(old[i] ? panelObject(doc, page, p, old[i]!, old[i]!.z, { border: 0 }, "") : { ...panelObject(doc, page, p, look, page.z + 0.5 + i * 1e-3, { border: per(page, opts.border) }, ""), id: newObjectId(), name: `Panel ${i + 1}` }, doc.space));
+  const made = polys.map((p, i) => withSpace(old[i] ? panelObject(doc, page, p, old[i]!, old[i]!.z, {}, "") : { ...panelObject(doc, page, p, look, page.z + 0.5 + i * 1e-3, {}, ""), id: newObjectId(), name: `Panel ${i + 1}` }, doc.space));
   const removed = old.slice(polys.length).map((p) => p.id);
   const moved = rehome(doc, page, old.map((p) => p.id), made.map((m, i) => ({ id: m.id, poly: polys[i]! })));
   doc.commit(doc.transaction(`Lay out the page: ${PAGE_LAYOUTS.find(([id]) => id === layout)![1]}`, [...made, ...moved], removed));
@@ -217,7 +217,7 @@ export function setPageGutter(doc: DocumentStore, editor: EditorState, k: number
     editor.changed();
     return false;
   }
-  const out: CanvasObject[] = [{ ...page, container: { ...page.container, comic: { gutter: k } } }, ...panels.map((p, i) => withSpace(panelObject(doc, page, wide[i]!, p, p.z, { border: 0 }, ""), doc.space))];
+  const out: CanvasObject[] = [{ ...page, container: { ...page.container, comic: { gutter: k } } }, ...panels.map((p, i) => withSpace(panelObject(doc, page, wide[i]!, p, p.z, {}, ""), doc.space))];
   doc.commit(doc.transaction("Gutter width", out));
   editor.changed();
   return true;
@@ -263,46 +263,48 @@ export const panelCount = (doc: DocumentStore, editor: EditorState): number => {
   return page ? selectedPanels(doc, editor, page).length : 0;
 };
 
-/** The selected page's panels' borders made `k` thousandths of its shorter side. */
-export function setPanelBorder(doc: DocumentStore, editor: EditorState, k: number): boolean {
-  const page = selectedComicPage(doc, editor);
-  if (!page || editor.blockEdit() || !(k >= 0 && k <= 100)) return false;
-  const panels = panelsOf(doc, page);
-  const out = panels.map((p): PathObject => {
-    const scale = 2 ** (expressObjectIn(p, page.frame ?? doc.space.world).unit - page.unit); // (the page's units in the panel's)
-    return k === 0 ? { ...p, stroke: null } : { ...p, stroke: p.stroke ?? "#000000", width: per(page, k) / scale, align: "outside" };
-  });
-  if (!out.length) return false;
-  doc.commit(doc.transaction("Panel borders", out));
-  editor.changed();
-  return true;
-}
-
-/** The Panel tool's option set (and, when a comic page is selected, made on it: its layout, gutter, border, or its size and way up). */
-export function setComicOption(doc: DocumentStore, editor: EditorState, name: keyof ComicOptions, value: string | number, setRatio: (r: number) => void): boolean {
-  const ok =
-    name === "page" ? value === "free" || PAGE_SIZES.some(([id]) => id === value)
-    : name === "orient" ? value === "portrait" || value === "landscape"
-    : name === "layout" ? PAGE_LAYOUTS.some(([id]) => id === value)
-    : typeof value === "number" && Number.isFinite(value) && value >= 0 && value <= (name === "border" ? 100 : name === "gutter" ? 200 : 300);
+/**
+ * The Panel tool's option set (and, when a comic page is selected, made on it): its layout, or its gutter. The gutter of the selected gutter
+ * (a click on its middle handle) is that gutter's alone; with none selected, every gutter of the page.
+ */
+export function setComicOption(doc: DocumentStore, editor: EditorState, name: keyof ComicOptions, value: string | number): boolean {
+  const ok = name === "layout" ? PAGE_LAYOUTS.some(([id]) => id === value) : typeof value === "number" && Number.isFinite(value) && value >= 0 && value <= (name === "gutter" ? 200 : 300);
   if (!ok) return false;
-  editor.comic = { ...editor.comic, [name]: value };
-  if (selectedComicPage(doc, editor) && !editor.blockEdit()) {
+  const page = selectedComicPage(doc, editor);
+  const one = name === "gutter" && page ? chosenGutter(doc, editor, page) : null;
+  if (!one) editor.comic = { ...editor.comic, [name]: value };
+  if (page && !editor.blockEdit()) {
     if (name === "layout") layOutPage(doc, editor, String(value), editor.comic);
-    else if (name === "gutter") setPageGutter(doc, editor, Number(value));
-    else if (name === "border") setPanelBorder(doc, editor, Number(value));
-    else if (name === "page" || name === "orient") {
-      const r = pageRatio(editor.comic.page, editor.comic.orient);
-      if (r !== null) setRatio(r);
-    }
+    else if (name === "gutter" && one) {
+      const next = gutterWidened(doc, page, one.panels, one.polys, one.g, pagePer(page, Number(value)));
+      if (next) doc.commit(doc.transaction("Gutter width", next));
+      else editor.message = "That gutter cannot be so wide: a panel would vanish.";
+    } else if (name === "gutter") setPageGutter(doc, editor, Number(value));
   }
   editor.changed();
   return true;
 }
 
+/** The gutter chosen on the selected page (a click on its middle handle), as it is now; null when none is, or it is gone. */
+export function chosenGutter(doc: DocumentStore, editor: EditorState, page: PathObject): { panels: PathObject[]; polys: Pt[][]; g: Gutter } | null {
+  const c = editor.comicGutter;
+  if (!c || c.page !== page.id || !isComicPage(page)) return null;
+  const panels = panelsOf(doc, page).filter((p) => !p.hidden), polys = panels.map((p) => panelPoly(doc, page, p));
+  const ids = (es: readonly { panel: number }[]): string => [...new Set(es.map((e) => panels[e.panel]!.id))].sort().join(",");
+  const want = [c.a.slice().sort().join(","), c.b.slice().sort().join(",")].sort().join("|");
+  const g = guttersOf(polys, Math.max(pagePer(page, page.container.comic.gutter) * 2.5, pagePer(page, 4)) * 4).find((x) => [ids(x.a), ids(x.b)].sort().join("|") === want);
+  return g ? { panels, polys, g } : null;
+}
+
+/** A gutter made `width` wide (page units), half on each side of its middle: the panels on both sides, or null when one would vanish. */
+export function gutterWidened(doc: DocumentStore, page: PathObject, panels: readonly PathObject[], polys: readonly Poly[], g: Gutter, width: number): PathObject[] | null {
+  const next = setGutterWidth(polys, g, width, minOf(page));
+  return next && panelsAt(doc, page, panels, next, [...g.a, ...g.b].map((e) => e.panel));
+}
+
 /** The panels of `idx` given these outlines, as objects to commit (each keeps its id, look and place in the stack). */
 function panelsAt(doc: DocumentStore, page: PathObject, panels: readonly PathObject[], polys: readonly Poly[], idx: Iterable<number>): PathObject[] {
-  return [...new Set(idx)].map((k) => withSpace(panelObject(doc, page, polys[k]!, panels[k]!, panels[k]!.z, { border: 0 }, ""), doc.space));
+  return [...new Set(idx)].map((k) => withSpace(panelObject(doc, page, polys[k]!, panels[k]!, panels[k]!.z, {}, ""), doc.space));
 }
 
 /** A gutter's handle moved by `d` across it (page units): the panels on both sides, or null when one would fold. */
