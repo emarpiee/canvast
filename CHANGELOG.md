@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.61.6 — Reference window controls marked as view state (2026-11-22)
+
+### For developers
+
+- The reference window's source list and gallery clicks carry their `view-state` marks where `check:commands` reads them.
+
 ## 0.61.5 — A gutter of a comic page is the panels facing across it (2026-11-21)
 
 - **Fixed before release:** on a comic page, the gutters of two rows that line up were taken as one, so a double-click between two panels merged nothing and a drag moved panels of another row; a gutter is now the panels that face each other across it (one panel above two still moves all three). ([Comics and storyboards](README.md#comics-and-storyboards))

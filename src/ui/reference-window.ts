@@ -128,8 +128,8 @@ export function mountReferenceWindows(deps: ReferenceDeps): { open(source?: RefS
       wins.delete(id);
       keepWindows();
     };
+    // view-state: (which gallery or board this window shows; a new board is the command's)
     pick.addEventListener("change", () => {
-      // view-state: (which gallery or board this window shows; a new board is the command's)
       if (pick.value === "new") return void newBoard(win);
       win.source = pick.value;
       keepWindows();
@@ -194,9 +194,9 @@ export function mountReferenceWindows(deps: ReferenceDeps): { open(source?: RefS
       }, { root: body, rootMargin: "200px" });
       for (const t of body.querySelectorAll(".ref-thumb")) io.observe(t);
     };
+    // view-state: (one picture large, the next or the one before, back to the gallery)
     body.addEventListener("click", (e) => {
       const t = e.target as HTMLElement;
-      // view-state: (one picture large, the next or the one before, back to the gallery)
       const th = t.closest<HTMLElement>(".ref-thumb");
       if (th) one = Number(th.dataset["refI"]);
       else if (t.closest("[data-ref-back]")) one = null;
