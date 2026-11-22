@@ -2729,6 +2729,7 @@ export function attachTools(
     }
     if (!("pointerId" in g) || g.pointerId !== e.pointerId) return;
     const cancelled = e.type === "pointercancel";
+    el.dataset["lastGesture"] = `${g.kind}${cancelled ? " (cancelled)" : ""}`; // (what the last release ended, for a test or a bug report to read)
     const s = local(e);
     if (g.kind === "scale" || g.kind === "rotate") editor.handleLabel = null; // (the number beside the pointer goes with the drag)
     switch (g.kind) {

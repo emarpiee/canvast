@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.61.29 — The canvas says what its last release ended (2026-11-22)
+
+### For developers
+
+- The canvas keeps the gesture its last release ended in `data-last-gesture`; the reference window spec says it, and how many were selected, when a drop off the canvas fails.
+
 ## 0.61.28 — Reference window spec: the picture selected before it is dragged (2026-11-22)
 
 ### For developers
