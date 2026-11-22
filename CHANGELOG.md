@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.61.33 — F in a reference window is the canvas's own (2026-11-22)
+
+- **Fixed before release:** F in a reference window did not go on to every picture as on the canvas: it is now the canvas's own cycle (the selected pictures in view; again, every picture; a new selection or a moved view starts again), shared code, not a copy. ([The Library](README.md#the-library))
+
+### For developers
+
+- `focusCycleOf` (`interaction/item-navigation.ts`) is the focus key's cycle for any view; the canvas's `createFocusCycle` and a reference window (`reference.focus`) use it. A window's `fit()` sets its view at once, for `reference.fit`, the 0 key and F.
+
 ## 0.61.32 — F fits in a reference window (2026-11-22)
 
 - **Fixed before release:** F did nothing in a reference window over the canvas: the keymap sends it on as the canvas's own key for it (Ctrl+Space), which the window took for Space held to pan. It now fits the selected pictures, then every picture, as on the canvas. ([The Library](README.md#the-library))

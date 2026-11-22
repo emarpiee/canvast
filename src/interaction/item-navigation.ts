@@ -337,31 +337,29 @@ export function fitAllVisible(doc: DocumentStore, view: ViewState, editor?: Edit
  * The focus key (F at first; Settings > Shortcuts) cycles the view: the selection, then everything visible at this zoom, then the selection again.
  * A press with nothing selected fits everything. The cycle only continues while the view is where it left it.
  */
-export function createFocusCycle(doc: DocumentStore, view: ViewState, editor: EditorState, zoomOnSelection: () => boolean): { tap(): void; fit(kind: "selection" | "all"): void } {
+/**
+ * The focus key's cycle, for any view (the canvas, a reference window's moodboard): the selection in view; pressed again, everything.
+ * It goes on only while the view is where it was left AND the same things are selected: a different selection is a new focus (select
+ * another item, press the key: the view goes to that one, not out to everything). With nothing selected: everything. `fitAll` and
+ * `fitSelection` say whether they could (nothing to fit: the cycle does not move on).
+ */
+export function focusCycleOf(v: { selected(): readonly string[]; here(): string; fitSelection(): boolean; fitAll(): boolean }): { tap(): void; fit(kind: "selection" | "all"): void } {
   let last: { kind: "selection" | "all"; cam: string; sel: string } | null = null;
-  const selKey = (): string => [...editor.selection].sort().join(",");
-  const here = (): string => JSON.stringify(serializeFrameCamera(view.frameCamera));
+  const selKey = (): string => [...v.selected()].sort().join(",");
   const remember = (kind: "selection" | "all"): void => {
-    last = { kind, cam: here(), sel: selKey() };
+    last = { kind, cam: v.here(), sel: selKey() };
   };
   const all = (): void => {
-    if (fitAllVisible(doc, view, editor)) remember("all");
-    else {
-      editor.message = "Nothing to fit at this zoom.";
-      editor.changed();
-    }
+    if (v.fitAll()) remember("all");
   };
   const selection = (): void => {
-    if (!editor.selection.size) return all();
-    focusObjects(doc, view, [...editor.selection], zoomOnSelection());
-    remember("selection");
+    if (!v.selected().length) return all();
+    if (v.fitSelection()) remember("selection");
   };
   return {
     tap() {
-      // The cycle goes on only while the view is where it was left AND the same things are selected: a different selection is a new
-      // focus (select another item, press the focus key: the view goes to that one, not out to everything).
-      const same = last !== null && last.cam === here() && last.sel === selKey();
-      if (!editor.selection.size) return all();
+      const same = last !== null && last.cam === v.here() && last.sel === selKey();
+      if (!v.selected().length) return all();
       if (same && last!.kind === "selection") return all();
       return selection();
     },
@@ -370,4 +368,18 @@ export function createFocusCycle(doc: DocumentStore, view: ViewState, editor: Ed
       else selection();
     },
   };
+}
+
+export function createFocusCycle(doc: DocumentStore, view: ViewState, editor: EditorState, zoomOnSelection: () => boolean): { tap(): void; fit(kind: "selection" | "all"): void } {
+  return focusCycleOf({
+    selected: () => [...editor.selection],
+    here: () => JSON.stringify(serializeFrameCamera(view.frameCamera)),
+    fitSelection: () => (focusObjects(doc, view, [...editor.selection], zoomOnSelection()), true),
+    fitAll: () => {
+      if (fitAllVisible(doc, view, editor)) return true;
+      editor.message = "Nothing to fit at this zoom.";
+      editor.changed();
+      return false;
+    },
+  });
 }

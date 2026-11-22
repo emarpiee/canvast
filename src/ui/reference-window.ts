@@ -17,6 +17,7 @@ import { panelHtml } from "./panel";
 import { openTreeChooser } from "./tree-chooser";
 import type { ChoiceNode, ChooserView } from "./tree-chooser";
 import { showMoreButton } from "./show-more";
+import { focusCycleOf } from "../interaction/item-navigation";
 import { artTile, makeThumb } from "../assets/thumb";
 import { isArtFile } from "../assets/art-preview";
 import { mountSettings } from "./setting-rows";
@@ -172,7 +173,7 @@ export function mountReferenceWindows(deps: ReferenceDeps): { open(source?: RefS
   // (what a window shows is kept at once; where it is once it rests, and in any case before the page goes)
   window.addEventListener("pagehide", keepNow);
 
-  interface Win { id: string; source: RefSource; el: HTMLElement; prefs: Prefs; unfoldedH: number; render(): Promise<void>; sync(): void; close(): void; applyPrefs(): void; slideshow(): void }
+  interface Win { id: string; source: RefSource; el: HTMLElement; prefs: Prefs; unfoldedH: number; render(): Promise<void>; sync(): void; close(): void; applyPrefs(): void; slideshow(): void; /** The moodboard's pictures (these only, else all) fitted in the window; false: none to fit. */ fit(indices?: readonly number[]): boolean; /** F: the selection, again everything (the canvas's cycle). */ focus(): void }
 
   /** The pictures copied in a reference window last (Ctrl+C there), to paste on another board. */
   let copied: string[] = [];
@@ -231,7 +232,7 @@ export function mountReferenceWindows(deps: ReferenceDeps): { open(source?: RefS
     const win: Win = {
       id, source, el, unfoldedH: Math.max(MIN_H, box.h),
       prefs: { ...(at?.folded ? { folded: true } : {}), ...(at?.opacity ? { opacity: at.opacity } : {}), ...(at?.through ? { through: true } : {}), ...(at?.sort ? { sort: at.sort } : {}), ...(at?.size ? { size: at.size } : {}), ...(at?.look ? { look: true } : {}) },
-      render: async () => undefined, sync: () => undefined, close: () => undefined, applyPrefs: () => undefined, slideshow: () => undefined,
+      render: async () => undefined, sync: () => undefined, close: () => undefined, applyPrefs: () => undefined, slideshow: () => undefined, fit: () => false, focus: () => undefined,
     };
     // Folded to its title, see-through, letting clicks through to what is under it (its title still takes them)
     win.applyPrefs = (): void => {
@@ -584,8 +585,27 @@ export function mountReferenceWindows(deps: ReferenceDeps): { open(source?: RefS
       view.x = Math.min(w - 40 - minX * view.k, Math.max(40 - maxX * view.k, view.x));
       view.y = Math.min(h - 40 - minY * view.k, Math.max(40 - maxY * view.k, view.y));
     };
-    /** The selection F fitted last (a second F fits every picture). */
-    let fitted = "";
+    /** Pictures of the moodboard fitted in the window at once (the view set here, saved after): these, or every one. */
+    const fitView = (only?: readonly number[]): boolean => {
+      const b = boardOf();
+      const these = b ? (only ? only.map((j) => b.items[j]).filter((x): x is Item => !!x) : b.items) : [];
+      if (!b || !area || !these.length) return false;
+      const ex = extentOf(these), pad = 12, w = area.clientWidth - 2 * pad, h = area.clientHeight - 2 * pad;
+      const k = Math.min(8, Math.max(0.05, Math.min(w / Math.max(1, ex.w), h / Math.max(1, ex.h))));
+      view = { k, x: pad - ex.minX * k + (w - ex.w * k) / 2, y: pad - ex.minY * k + (h - ex.h * k) / 2 };
+      placeStage();
+      saveView();
+      return true;
+    };
+    // F: the canvas's own cycle (item-navigation's focusCycleOf): the selected pictures, again: every picture
+    const focus = focusCycleOf({
+      selected: () => [...picked].map(String),
+      here: () => JSON.stringify(view),
+      fitSelection: () => fitView([...picked]),
+      fitAll: () => fitView(),
+    });
+    win.fit = fitView;
+    win.focus = () => focus.tap();
     /** The nearest picture in a direction (w a s d) from the selected one, or from the middle of the view: selected, and centred when out of sight. */
     const step = (b: Board, key: string, sel: readonly number[]): void => {
       if (!area) return;
@@ -603,7 +623,6 @@ export function mountReferenceWindows(deps: ReferenceDeps): { open(source?: RefS
       if (best < 0) return;
       picked.clear();
       picked.add(best);
-      fitted = "";
       void syncItems(b);
       const m = mid(b.items[best]!), sx = m.x * view.k + view.x, sy = m.y * view.k + view.y;
       if (sx < 0 || sy < 0 || sx > area.clientWidth || sy > area.clientHeight) {
@@ -808,12 +827,7 @@ export function mountReferenceWindows(deps: ReferenceDeps): { open(source?: RefS
       else if (!mod && (e.key === "-" || e.key === "_")) zoomAt(mid.x, mid.y, e.shiftKey ? 0.5 : 0.8);
       else if (!mod && (e.key === "0" || e.key === "Home")) void pressCommand("reference.fit", { window: id, board: b.id });
       // F, as on the canvas: the selected pictures in view; again (or none selected): every picture
-      else if (fit) {
-        const which = sel.join(",");
-        const all = !sel.length || fitted === which;
-        fitted = all ? "" : which;
-        void pressCommand("reference.fit", all ? { window: id, board: b.id } : { window: id, board: b.id, indices: sel });
-      }
+      else if (fit) void pressCommand("reference.focus", { window: id }); // (the window's F: its command, as the canvas's)
       // W A S D, as on the canvas: the next picture that way selected, and brought into view
       else if (!mod && !e.shiftKey && "wasd".includes(key) && key.length === 1 && b.items.length) step(b, key, sel);
       else if (!mod && e.key.startsWith("Arrow")) {
@@ -1304,13 +1318,14 @@ let d=null;addEventListener("pointerdown",(e)=>{d={x:e.clientX-v.x,y:e.clientY-v
     rc("reference.fit", "Fit the moodboard", "Every picture in sight, or the ones named", "read", [{ name: "window", type: "text", doc: "the window", required: true }, ID, { name: "indices", type: "json", doc: "only these pictures (from 0), as a list" }], (o) => {
       const w = winOf(o), b = hasBoard(o);
       if (!w || !b) return { ok: false, error: "No such window or moodboard." };
-      const area = w.el.querySelector<HTMLElement>("[data-ref-board]");
-      const these = o["indices"] === undefined ? b.items : indices(o["indices"], b).map((j) => b.items[j]!);
-      if (!area || !these.length) return { ok: true };
-      const ex = extentOf(these), minX = ex.minX, minY = ex.minY, maxX = ex.minX + ex.w, maxY = ex.minY + ex.h;
-      const k = Math.min(8, Math.max(0.05, Math.min((area.clientWidth - 24) / Math.max(1, maxX - minX), (area.clientHeight - 24) / Math.max(1, maxY - minY))));
-      updateBoard(b.id, (bd) => ({ ...bd, view: { k, x: 12 - minX * k + (area.clientWidth - 24 - (maxX - minX) * k) / 2, y: 12 - minY * k } }), false);
-      void w.render();
+      if (w.source !== `board:${b.id}`) return { ok: false, error: "That window does not show that moodboard." };
+      w.fit(o["indices"] === undefined ? undefined : indices(o["indices"], b));
+      return { ok: true };
+    }),
+    rc("reference.focus", "Fit the selection in a reference window", "Again: every picture (F, as on the canvas)", "read", [{ name: "window", type: "text", doc: "the window", required: true }], (o) => {
+      const w = winOf(o);
+      if (!w || !w.source.startsWith("board:")) return { ok: false, error: "No such window showing a moodboard." };
+      w.focus();
       return { ok: true };
     }),
   ]);

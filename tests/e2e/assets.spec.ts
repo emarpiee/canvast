@@ -2993,13 +2993,21 @@ test("reference window (ADR 0207): over the Library and the canvas, a gallery of
   await expect(w2.locator(".ref-item.is-picked")).toHaveCount(0);
   await p.keyboard.press("d");
   await expect(w2.locator(".ref-item.is-picked"), "D selected a picture").toHaveCount(1);
-  // F (sent by the keymap as Ctrl+Space, as on the canvas) fits the selected picture to the window
+  // F (sent by the keymap as Ctrl+Space, as on the canvas) fits the selected picture to the window; again, every picture
+  // (the large picture moved far off first, the small red one selected: the two fits differ)
+  await p.evaluate((id) => window.__canvastDebug.runCommand("reference.place", { board: id, moves: [{ i: 2, x: 3000, y: 3000 }] }, "test"), sid);
+  const red = (await w2.locator('[data-ref-item="0"]').boundingBox())!;
+  await p.mouse.click(red.x + red.width - 3, red.y + red.height - 3); // (its corner: the smaller green one pasted after it lies over its middle)
+  await expect(w2.locator('.ref-item.is-picked[data-ref-item="0"]')).toHaveCount(1);
   await p.keyboard.press("f");
   const fills = async () => {
     const [it, bd] = [await w2.locator(".ref-item.is-picked").boundingBox(), await w2.locator("[data-ref-board]").boundingBox()];
     return it && bd ? Math.max(it.width / bd.width, it.height / bd.height) : 0;
   };
   await expect.poll(fills, { message: "F fitted the selected picture" }).toBeGreaterThan(0.8);
+  // F again, as on the canvas (the same cycle): every picture
+  await p.keyboard.press("f");
+  await expect.poll(fills, { message: "F again fitted every picture" }).toBeLessThan(0.8);
   expect(await p.evaluate(() => window.__canvastDebug.objects().length), "nothing reached the canvas").toBe(2);
   // a picture hidden out of hidden mode shows a padlock in its place
   await p.evaluate((h) => window.__canvastDebug.libraryOp("hide", h, "1"), (await items())[0]!.h);
