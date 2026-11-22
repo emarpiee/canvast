@@ -66,6 +66,11 @@ test("a Pins window shows pictures of the library in the library's own viewer (i
   await expect(pins.getByTestId("slide-view")).toBeVisible();
   await expect(pins.locator(".film-item")).toHaveCount(2);
   await expect(pins.locator(".assets-side")).toBeHidden();
+  // its right-click menu works there, with the Library view hidden (the Library's commands are the window's while it is in use)
+  await pins.locator(".viewer-stage").click({ button: "right" });
+  await expect(p.locator('.pop-menu [data-command="library.place"]'), "no Place in a Pins window").toHaveCount(0);
+  await p.locator('.pop-menu [data-command="library.favorite"]').click();
+  await expect.poll(async () => (await p.evaluate(() => window.__canvastDebug.catalogEntries())).filter((e) => e.favorite).length, { message: "made a favourite from the Pins window" }).toBe(1);
   // the main view is still the canvas, and the Library view kept its own state
   await expect(p.locator("#assets-view")).toBeHidden();
   expect(app.consoleErrors).toEqual([]);

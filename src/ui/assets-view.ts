@@ -312,6 +312,26 @@ const COL_W_MAX = 900;
 const libraryRoots = new Set<HTMLElement>();
 let lastPress: Element | null = null;
 if (typeof window !== "undefined") window.addEventListener("pointerdown", (e) => void (lastPress = e.target as Element | null), { capture: true });
+/** The Library in use: an embedded one the last press was in, else the main one. */
+const libraryInUse = (root: HTMLElement): boolean => (libraryRoots.has(root) ? !!lastPress && root.contains(lastPress) : ![...libraryRoots].some((r) => !!lastPress && r.contains(lastPress)));
+/**
+ * The Library's commands (ADR 0205), by name: each Library (the Library view, and each Pins window's) gives its own, and the registry has those
+ * of the Library in use, under the same ids. So a command acts with the state of the Library it was given from, whichever is in use.
+ */
+const libraryProviders = new Map<string, Map<HTMLElement, () => Command[]>>();
+function provideLibraryCommands(root: HTMLElement, name: string, make: () => Command[]): void {
+  let byRoot = libraryProviders.get(name);
+  if (!byRoot) {
+    const all = (byRoot = new Map());
+    libraryProviders.set(name, all);
+    commands.setProvider(name, () => {
+      const roots = [...all.keys()].filter((r) => r.isConnected);
+      const now = roots.find((r) => libraryInUse(r)) ?? roots.find((r) => !libraryRoots.has(r));
+      return now ? all.get(now)!() : [];
+    });
+  }
+  byRoot.set(root, make);
+}
 
 export function mountAssetsView(root: HTMLElement, session: Session, assets: AssetLibrary, showCanvas: () => void, notices: { subscribe(fn: (text: string) => void): void }, settings: SettingsStore, /** The fonts of the library, loaded (the notes editor's font list). */ fonts: () => Promise<Array<{ hash: string; name: string; unusable: string }>> = async () => [], /** Edit in PhotoCraft (Settings > ArtCraft > PhotoCraft); absent where it is not offered. */ editInPhotoCraft?: (hash: string) => void, /** A second Library in a Pins window (ADR 0208): no details panel, no commands of its own (the main Library's are the app's), its keys only while it is in use. */ opts: { embedded?: boolean } = {}): AssetsView {
   root.innerHTML = `
@@ -686,7 +706,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   root.classList.toggle("is-embedded", embedded);
   if (embedded) libraryRoots.add(root);
   /** This Library is the one in use: the last press was in it (an embedded one), or in no embedded one (the main Library). Its keys only then. */
-  const mine = (): boolean => (embedded ? !!lastPress && root.contains(lastPress) : ![...libraryRoots].some((r) => !!lastPress && r.contains(lastPress)));
+  const mine = (): boolean => libraryInUse(root);
   applyUi();
   let listing: CatalogListing | null = null;
   // ---- the desktop app lists a page at a time (`CatalogStore.pages`): the library is never in the page whole. `listing.entries` is
@@ -4150,7 +4170,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   /** The details' commands that show the person their own dialog first (ADR 0205: an agent's run is asked there, once). */
   const ASKS = new Set(["delete", "delete-all", "delete-everywhere"]);
   const panelData: OptionSpec = { name: "data", type: "json", doc: "what the button carries: canvas (an id), tag, index" };
-  if (!embedded) commands.setProvider("library-panel", () => Object.entries(PANEL_COMMANDS).map(([action, [id, title, hint, risk]]): Command => ({
+  provideLibraryCommands(root, "library-panel", () => Object.entries(PANEL_COMMANDS).map(([action, [id, title, hint, risk]]): Command => ({
     id, group: "Library", kind: "library", title, hint, risk, ...(ASKS.has(action) ? { asks: true } : {}),
     options: [{ name: "hash", type: "id", doc: "the item (default: the one shown in the details)" }, { name: "hashes", type: "ids", doc: "the items (default: the selected)" }, panelData, { name: "on", type: "boolean", doc: "on or off (default: the other of what it is now)" }],
     why: () => (!visible ? "This works in the Library." : session.readOnly && risk !== "read" && action !== "download" && action !== "show" ? REASON.readOnly : !selected ? REASON.noSelection : null),
@@ -4992,7 +5012,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     export: ["folder.export", "Export the folder", "Its items as a .canvast archive", "confirm"],
     delete: ["folder.delete", "Delete the folder", "Its items stay in the library", "confirm"],
   };
-  if (!embedded) commands.setProvider("library-folders", () => Object.entries(FOLDER_COMMANDS).map(([action, [id, title, hint, risk]]): Command => ({
+  provideLibraryCommands(root, "library-folders", () => Object.entries(FOLDER_COMMANDS).map(([action, [id, title, hint, risk]]): Command => ({
     id, group: "Library", kind: "library", title, hint, risk, ...(action === "hide" || action === "show" || action === "delete" ? { asks: true } : {}),
     options: [{ name: "id", type: "id", doc: "the folder", required: action !== "new" }],
     why: () => (!listing ? "The Library is not open yet." : session.readOnly && action !== "conceal" && action !== "pin" && action !== "export" ? REASON.readOnly : null),
@@ -5714,7 +5734,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   const HASHES: OptionSpec = { name: "hashes", type: "ids", doc: "the items (default: the selected)" };
   const itemsOf = (o: Options): string[] => (o["hashes"] as string[] | undefined) ?? (picked.size ? [...picked] : selected ? [selected] : []);
   const lib = (id: string, title: string, hint: string, risk: Risk, exec: NonNullable<Command["exec"]>, why: () => string | null = inLibrary, extra: Partial<Command> = {}): Command => ({ id, group: "Library", kind: "library", title, hint, risk, why, exec, ...extra });
-  if (!embedded) commands.setProvider("library", () => [
+  provideLibraryCommands(root, "library", () => [
     lib("library.import", "Import files", "Pictures, video, audio and other files", "edit", () => fileInput.click(), writable),
     lib("library.importFolder", "Import a folder", "With its subfolders", "edit", () => folderInput.click(), writable),
     lib("library.newNote", "New note", "A markdown note, opened to write in", "edit", () => newNote(), writable),

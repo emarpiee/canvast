@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.61.51 — The menu of a Pins window's viewer works (2026-11-22)
+
+- **Fixed before release:** the right-click menu of a Pins window's viewer (favourite, copy, open elsewhere) refused with "This works in the Library" while the Library view was not shown: each Library (the Library view, and each Pins window's) gives its commands, and those of the one in use (the last pressed) run. ([Pins](README.md#pins))
+
+### For developers
+
+- `provideLibraryCommands` (`ui/assets-view.ts`): the Library's command providers (`library-panel`, `library-folders`, `library`) answer for the Library in use, under the same ids.
+
 ## 0.61.50 — A shorter right-click menu in a Pins window (2026-11-22)
 
 - **Changed:** right-clicking a picture in a Pins window's viewer offers what a reference needs: favourite, copy (the picture, its name, its file), Edit in PhotoCraft, open it in its app or file manager. Placing, organizing, hiding, renaming, downloading, exporting and deleting stay in the Library. ([Pins](README.md#pins))
