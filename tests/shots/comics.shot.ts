@@ -161,7 +161,7 @@ test("comic-panels", async ({ scene: s }) => {
   const pg = (await s.objects()).find((o) => o.container && !o.parent)!.id;
   const b = (await s.box([pg]))!;
   const at = (x: number, y: number): { x: number; y: number } => ({ x: b.minX + (b.maxX - b.minX) * x, y: b.minY + (b.maxY - b.minY) * y });
-  await s.app.drag(at(0.015, 0.37), at(0.985, 0.28), 8); // (from its margin to its margin: a clean slanted gutter across the row; a drag off the page would draw another)
+  await s.app.drag(at(0.015, 0.25), at(0.985, 0.13), 8); // (from its margin to its margin, across the top row: a slanted gutter; a drag off the page would draw another)
   await s.fit([pg], 0.72); // (fitting leaves the selection empty: the page is selected after, so its handles show)
   await s.tool("panel");
   await s.select([pg]);

@@ -33,7 +33,11 @@ test("pins-gallery", async ({ scene: s }) => {
   await s.fit(placed, 0.6, [0.68, 0.5]);
   await s.p.evaluate(() => window.__canvastDebug.runCommand("pins.open", { source: "all" }, "test"));
   const pins = s.p.getByTestId("pins");
-  await expect(pins.locator(".asset-card img.is-loaded")).toHaveCount(6);
+  // (a gallery loads the cards in sight: every one of those shown with its picture)
+  await expect.poll(async () => {
+    const box = (await pins.locator(".panel-body").boundingBox())!;
+    return pins.locator(".asset-card").evaluateAll((cards, b) => cards.filter((c) => { const r = c.getBoundingClientRect(); return r.top < b.y + b.height && r.bottom > b.y; }).every((c) => c.querySelector("img.is-loaded")), box);
+  }, { timeout: 20_000 }).toBe(true);
   await s.settle(800);
   await s.shot("pins-gallery", await s.around({ objects: placed, els: ['[data-testid="pins"]'], pad: 20 }));
 });
