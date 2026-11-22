@@ -20,14 +20,16 @@ test("Pins (ADR 0208): Shift+R pins the open canvas in a window above every view
   await p.keyboard.press("f");
   await p.waitForTimeout(400);
   const before = await mainBox();
-  await p.mouse.move(mid.x, mid.y);
+  // (pressed inside it, off its middle: the middle of a selection is its turn handle, as on the canvas)
+  const at = { x: mid.x - 50, y: mid.y + 30 };
+  await p.mouse.move(at.x, at.y);
   await p.mouse.down();
-  await p.mouse.move(mid.x + 30, mid.y + 20, { steps: 5 });
+  await p.mouse.move(at.x + 30, at.y + 20, { steps: 5 });
   await p.mouse.up();
   const said = await view.evaluate((c, at) => {
     const under = document.elementFromPoint(at.x, at.y);
     return `canvas ${(c as HTMLCanvasElement).width}x${(c as HTMLCanvasElement).height}; under the press ${under === c ? "its canvas" : `${under?.tagName}.${under?.className}`}; the release ended ${(c as HTMLElement).dataset["lastGesture"] ?? "no gesture"}; turn ${(c as HTMLElement).dataset["lastTurn"] ?? "none"}`;
-  }, mid);
+  }, at);
   await expect.poll(async () => (await mainBox()).minX - before.minX, { message: `moved in Pins, moved on the canvas (${said})` }).toBeGreaterThan(10);
   expect(await p.evaluate(() => window.__canvastDebug.selection().length), "the main view's selection is its own").toBe(0);
   // the canvas's keys act on the view in use: Delete takes what Pins selected; Ctrl+Z brings it back

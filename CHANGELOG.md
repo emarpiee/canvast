@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.61.41 — Pins replace the reference windows (2026-11-22)
+
+- **Changed:** the reference windows are now **Pins** (Shift+R): a window shows a canvas, or the library's pictures, with the canvas's and the library's own tools. Your moodboards became canvases of a board named **Pins**, once, every picture where it was. ([The Library](README.md#the-library))
+- **Added:** a Pins window's More menu: its opacity on a slider, clicks through it, and (desktop app) float a picture of it above other apps. A picture dragged off the canvas onto a pinned canvas is placed there too. ([The Library](README.md#the-library))
+- **Removed:** the reference window's own moodboards, gallery, large view and slideshow: Pins shows canvases and the library's cards and viewer instead.
+
+### Before you update
+
+- Moodboards are converted into canvases of a new board **Pins** at the first start; a grey look given in the old window is not kept.
+
+### For developers
+
+- `src/ui/reference-window.ts`, its commands (`reference.*`), its CSS and the setting `reference.windows` are gone; `pins/migrate.ts` reads `reference.boards` once. ADR 0207 is superseded by ADR 0208.
+
 ## 0.61.40 — A Pins window shows the library's pictures too (2026-11-22)
 
 - **Added:** a Pins window shows, besides a canvas, a gallery of the library's pictures (all of them, or a folder's, chosen by its name): the library's own cards, its search, its viewer on a double-click (with its zoom and slideshow). A card dragged onto a canvas, or a pinned one, is placed there; so is a file from another app dropped on a pinned canvas. ([The Library](README.md#the-library))

@@ -6,9 +6,8 @@ One icon per function: two buttons that do different things never share an icon,
 | --- | --- |
 | `book-image` | The Panel tool, a comic page and its panels: the tool, its options' section, the Actions bar's Comic page menu |
 | `rows-2`, `columns-2` | Cut a comic panel in two: across, or down (the Sheets menu of the Actions bar) |
-| `iteration-cw`, `droplet-off` | A reference board's picture: turn it a quarter, show it in grey |
-| `panel-top-close`, `ghost`, `mouse-pointer-2-off`, `monitor-up` | A reference window: fold to its title, see-through, let clicks through, float over other apps |
-| `app-window` | The reference window: its button and its title bar |
+| `ghost`, `mouse-pointer-2-off`, `monitor-up` | A Pins window: its opacity, let clicks through, float over other apps |
+| `app-window` | Pins: its button and its commands |
 | `save` | Save: Save as a style, Save to library (the export dialog, the Actions bar, the context menu), Save from the text, Save the adjustments (nothing else carries it) |
 | `arrow-down-to-line` | Import: every import button and menu row, the Import tool of the rail, Import styles (nothing else carries it) |
 | `refresh-cw` | Update: Update from the picked picture, from the Pattern panel, to the current view, the bookmark pictures, the initial state, a saved search to the look shown now (nothing else carries it) |

@@ -151,7 +151,7 @@ export function mountFilePanel(
     const inside = !!t && el.contains(t);
     const ed = deps.session.editor;
     const onlyItsCard = [...ed.selection].every((id) => { const o = deps.session.doc.get(id); return o?.kind === "image" && o.assetId.split("#")[0] === (note?.hash ?? opening); });
-    const elsewhere = !!t && !!t.closest("input, textarea, select, [contenteditable='true'], dialog, .pop-menu, .layers-panel, .ref-window");
+    const elsewhere = !!t && !!t.closest("input, textarea, select, [contenteditable='true'], dialog, .pop-menu, .layers-panel");
     // (why an Escape did not close it, kept on the panel for a test or a bug report to read)
     const why = (w: string): void => void (el.dataset["escape"] = w);
     if (!inside && el !== hosts.window && (elsewhere || !onlyItsCard || ed.editingText)) return why(elsewhere ? "a field or another panel" : ed.editingText ? "editing text" : "something else selected");

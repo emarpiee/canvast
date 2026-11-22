@@ -1,6 +1,6 @@
 # ADR 0207: Reference windows: a gallery or a board, floating over every view
 
-- Status: **accepted** (2026-11-21)
+- Status: **superseded** by ADR 0208 (Pins), 2026-11-22
 - Related: ADR 0011 (the library), 0096 (layers), 0156 (panels), 0205 (every action a command)
 
 ## Context

@@ -1,4 +1,4 @@
-import { mountReferenceWindows } from "../ui/reference-window";
+import { moodboardsToCanvases } from "../pins/migrate";
 import { createCanvasView } from "../canvas/canvas-view";
 import { LIBRARY_DRAG } from "../ui/assets-view";
 import { addCanvasView, focusCanvasView, focusedCanvasView, routedActions } from "../canvas/focus";
@@ -793,13 +793,13 @@ async function start(): Promise<void> {
   // here, or while hidden mode is on outside the library (Stay in hidden mode); and, in the desktop app, while their key is open. What makes a file uses `filesAssets`, and a capture of the screen is drawn with
   // padlocks first (`padlocked`), so nothing readable of them leaves the app.
   // The file panel (file-panel.ts): made once the library view is, which it imports through.
-  let references: { open(source?: string): void; refresh(): void } | null = null;
+  let pinsWindows: ReturnType<typeof mountPins> | null = null;
   let notePanel: { open(hash: string, card?: CardActions): Promise<boolean>; close(): Promise<boolean>; closeHidden(): void } = { open: async () => false, close: async () => true, closeHidden: () => undefined };
   const syncReveal = (): void => {
     const on = ((settings.get("library.hiddenRemember") && hiddenRemembered()) || hiddenModeOn()) && (storage?.hidden ? storage.hidden.isOpen() : true);
     if (on === assets.revealing) return;
     if (!on) notePanel.closeHidden(); // (nothing hidden stays open on a canvas once hidden items are no longer shown)
-    references?.refresh(); // (the reference windows show hidden pictures only while they show here)
+    pinsWindows?.refresh(); // (Pins' galleries show hidden pictures only while they show here)
     assets.reveal(on);
     assetNames.clear();
     tiles.clear();
@@ -1155,19 +1155,17 @@ async function start(): Promise<void> {
   attachTools(canvas, view, doc, index, editor, {
     ...toolHooksFor(doc, editor, view, focusCycle, () => engine.labels()),
     setMaker: (fn) => void (makeShape = fn),
-    // canvas pictures dragged onto a reference window's board go onto it (ADR 0207)
     active: () => focusedCanvasView() === "main",
+    // canvas pictures dragged onto a pinned canvas (Pins) are placed there too, and stay where they were (ADR 0208)
     droppedOff: (ids, cx, cy) => {
       const under = document.elementFromPoint(cx, cy);
-      const board = under?.closest<HTMLElement>("[data-ref-board]");
-      const win = board?.closest<HTMLElement>(".ref-window");
+      const pinned = !!under?.closest(".pins-canvas");
       // (what the last drop off the canvas found, for a test or a bug report to read)
-      document.body.dataset["droppedOff"] = board && win ? "a moodboard" : `${under?.tagName}.${under?.className} at ${Math.round(cx)},${Math.round(cy)}`;
-      if (!board || !win) return false;
+      document.body.dataset["droppedOff"] = pinned ? "a pinned canvas" : `${under?.tagName}.${under?.className} at ${Math.round(cx)},${Math.round(cy)}`;
+      if (!pinned) return false;
       const hashes = ids.flatMap((id) => { const o = doc.get(id); return o?.kind === "image" ? [o.assetId] : []; });
       if (!hashes.length) return void (document.body.dataset["droppedOff"] = "no pictures among what was dragged"), false;
-      board.dispatchEvent(new CustomEvent("ref-drop", { detail: { hashes, x: cx, y: cy }, bubbles: true }));
-      return true;
+      return !!pinsWindows?.dropAt(cx, cy, hashes);
     },
   });
   const side = document.createElement("div");
@@ -2508,24 +2506,9 @@ async function start(): Promise<void> {
     redrawNoteCards();
     wantNoteSync();
   };
-  // Reference windows (ADR 0207): over every view; the pictures selected on the canvas, else copied there last, paste into a board
-  references = mountReferenceWindows({
-    session, assets, settings, hidden: () => assets.revealing,
-    importFiles: (files) => assetsView.importFiles(files),
-    canvasPictures: () => {
-      const sel = [...editor.selection].flatMap((id) => { const o = doc.get(id); return o?.kind === "image" ? [o.assetId] : []; });
-      return sel.length ? sel : copiedPictureHashes();
-    },
-    say: (text) => {
-      editor.message = text;
-      editor.changed();
-    },
-    place: (hashes, at) => placeOnCanvas(hashes, at),
-    ...(desktopBridge()?.floatWindow ? { float: (title: string, html: string) => desktopBridge()!.floatWindow!(title, html) } : {}),
-  });
-  // (the library changed: a picture renamed, hidden, filed or deleted shows so in the reference windows; usage counts alone change nothing there)
-  session.subscribeAssets((_meta, usageOnly) => void (!usageOnly && references?.refresh()));
-  // (the button by Settings and Shift+R: a Pins window of the canvas open; the old reference window stays in the command palette until Pins has its gallery)
+  // (the library changed: a picture renamed, hidden, filed or deleted shows so in Pins' galleries; usage counts alone change nothing there)
+  session.subscribeAssets((_meta, usageOnly) => void (!usageOnly && pinsWindows?.refresh()));
+  // (the button by Settings and Shift+R: a Pins window of the canvas open)
   document.querySelector('[data-testid="reference-open"]')?.addEventListener("click", () => void pressCommand("pins.open", {}));
   window.addEventListener("keydown", (e) => {
     if (e.repeat || typing(e.target) || (e.target as HTMLElement | null)?.closest?.("dialog") || comboOfEvent(e) !== "Shift+R") return;
@@ -3289,7 +3272,7 @@ async function start(): Promise<void> {
   // (the main canvas: its files from other apps have their own import, which places them as it reads them)
   takeDrops({ doc, view, editor, el: canvas }, false);
   // Pins (ADR 0208, src/pins/): windows above every view that show a canvas, from the canvas's own engine, tools and actions
-  const pinsWindows = mountPins({
+  pinsWindows = mountPins({
     dock, session, main: { doc },
     engine: (o) => createCanvasView({
       canvas: o.canvas, ctx: o.ctx, doc: o.doc, view: o.view, stats: new FrameStats(),
@@ -3302,10 +3285,18 @@ async function start(): Promise<void> {
     gallery: { hidden: () => assets.revealing, thumb: (h) => assetsView.thumb(h), open: (h) => { setView("assets"); assetsView.openViewer(h); } },
     takeDrops: (t) => takeDrops(t, true),
     dpr: () => dpr,
-    read: () => { try { return (JSON.parse(settings.get("pins.windows")) as Array<{ c: string }>).map((w) => w.c); } catch { return []; } },
-    write: (cs) => void settings.set("pins.windows", JSON.stringify(cs.map((c) => ({ c })))),
+    read: () => { try { return JSON.parse(settings.get("pins.windows")) as Array<{ c: string; o?: number; t?: boolean }>; } catch { return []; } },
+    write: (ws) => void settings.set("pins.windows", JSON.stringify(ws)),
+    place: (t, hashes, at) => placeIn(t, hashes, at),
+    ...(desktopBridge()?.floatWindow ? { float: (title: string, html: string) => desktopBridge()!.floatWindow!(title, html) } : {}),
   });
-  session.subscribe(() => pinsWindows.refresh());
+  session.subscribe(() => pinsWindows?.refresh());
+  // The moodboards of the old reference windows become canvases of a board "Pins", once (nothing is lost)
+  void moodboardsToCanvases({ session, assets, read: () => settings.get("reference.boards"), clear: () => void settings.set("reference.boards", "[]") }).then((n) => {
+    if (!n) return;
+    editor.message = `Your ${n === 1 ? "moodboard is now a canvas" : `${n} moodboards are now canvases`} of the board Pins: pin ${n === 1 ? "it" : "one"} with Shift+R.`;
+    editor.changed();
+  }).catch(() => undefined);
   // view-state: (the main view pressed: the commands, keys and menus act on it again)
   canvas.addEventListener("pointerdown", () => focusCanvasView("main"), true);
   // A drag that starts inside the app (a picture dragged out of the library, a layer row) is never a file import: the browser would hand
@@ -3398,8 +3389,12 @@ async function start(): Promise<void> {
     else if (appView === "canvas" && !textEditor.isOpen && pasteWords(e.clipboardData?.getData("text/plain") ?? "")) e.preventDefault();
   };
   window.addEventListener("paste", (e) => {
-    // (a paste in a reference window is its own: never also on the canvas behind it; this listener runs first, in capture)
-    if ((e.target as HTMLElement | null)?.closest?.(".ref-window")) return;
+    // (a paste in a Pins window is its own: what was copied in the app goes on its canvas, never also on the main one; this listener runs first, in capture)
+    if ((e.target as HTMLElement | null)?.closest?.(".pins-panel")) {
+      e.preventDefault();
+      if (focusedCanvasView() !== "main") void pressCommand("edit.paste", {}, "key");
+      return;
+    }
     onPaste(e);
     // (taken here, and sent to something that does not have the keys, Firefox's hidden editable box: it does not paste it a second time)
     if (e.defaultPrevented && typing(e.target) && e.target !== document.activeElement) e.stopPropagation();

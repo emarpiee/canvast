@@ -339,37 +339,36 @@ test("a list column made wider: the rows hold every column, with no empty room a
   await expect.poll(() => p.locator(".assets-scroll").evaluate((s) => s.scrollWidth - s.querySelector<HTMLElement>(".assets-grid")!.offsetWidth - s.querySelector<HTMLElement>(".assets-grid")!.offsetLeft)).toBeLessThanOrEqual(3); // (the grid's own small inset)
 });
 
-test("every floating panel follows the theme at every density: corners and text sizes of the theme, the panel's header buttons, the shared chooser and search field (the reference window too)", async ({ app }) => {
+test("every floating panel follows the theme at every density: corners and text sizes of the theme, the panel's header buttons, the shared chooser and search field (Pins too)", async ({ app }) => {
   const p = app.page;
-  // every panel of the dock open, and a reference window as a gallery and as a board
+  // every panel of the dock open, and a Pins window as a gallery and as a canvas
   for (const b of ["data-layers", "data-tags", "data-styles", "data-pattern-panel", "data-bookmarks", "data-adjust-panel"]) await p.locator(`[${b}]`).first().click();
-  // (by its command: Shift+R opens Pins now; this window stays until Pins has its gallery)
-  await p.evaluate(() => window.__canvastDebug.runCommand("reference.open", {}, "test"));
-  const win = p.getByTestId("reference-window");
+  await p.evaluate(() => window.__canvastDebug.runCommand("pins.open", { source: "all" }, "test"));
+  const win = p.getByTestId("pins");
   await expect(win).toHaveCount(1);
   for (const density of ["dense", "compact", "comfortable"]) {
     await p.evaluate((d) => window.__canvastDebug.setSetting("ui.density", d), density);
     await p.waitForTimeout(150);
     expect(await themeProblems(p), `density ${density}`).toEqual([]);
   }
-  await p.evaluate(() => window.__canvastDebug.runCommand("reference.newBoard", { name: "Audit" }, "test"));
-  await expect(p.getByTestId("reference-window").locator("[data-ref-board]").first()).toBeVisible();
-  expect(await themeProblems(p), "a board").toEqual([]);
+  await p.evaluate(() => window.__canvastDebug.runCommand("pins.open", {}, "test"));
+  await expect(p.getByTestId("pins").locator(".pins-canvas").first()).toBeVisible();
+  expect(await themeProblems(p), "a pinned canvas").toEqual([]);
 });
 
 test("every slider of the panels follows a mouse drag to where it is let go: no panel is drawn again under it (issue #2)", async ({ app }) => {
   const p = app.page;
-  // the Pattern panel's settings, and a reference window's Opacity strip (the window's slider changes the window at each step)
+  // the Pattern panel's settings, and a Pins window's Opacity strip (the window's slider changes the window at each step)
   await p.locator("[data-pattern-panel]").first().click();
   const pattern = p.getByTestId("pattern-panel");
   await expect(pattern.locator('input[type="range"]').first()).toBeVisible();
   expect(await sliderDragProblems(p, pattern), "the Pattern panel").toEqual([]);
   // (by its command: Shift+R is a key the Pattern panel's field keeps while it has the focus)
-  await p.evaluate(() => window.__canvastDebug.runCommand("reference.open", {}, "test"));
-  const win = p.getByTestId("reference-window");
+  await p.evaluate(() => window.__canvastDebug.runCommand("pins.open", {}, "test"));
+  const win = p.getByTestId("pins");
   await expect(win).toHaveCount(1);
-  await win.locator("[data-ref-more]").click();
-  await p.locator('.pop-menu [data-command="reference.window"]').filter({ hasText: "Opacity" }).click();
-  await expect(win.locator('[data-ref-look] input[type="range"]')).toBeVisible();
-  expect(await sliderDragProblems(p, win.locator("[data-ref-look]")), "the reference window's opacity").toEqual([]);
+  await win.locator("[data-pins-more]").click();
+  await p.locator('.pop-menu [data-command="pins.window"]').filter({ hasText: "Opacity" }).click();
+  await expect(win.locator('[data-pins-look] input[type="range"]')).toBeVisible();
+  expect(await sliderDragProblems(p, win.locator("[data-pins-look]")), "the Pins window's opacity").toEqual([]);
 });
