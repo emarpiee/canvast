@@ -2,7 +2,7 @@
 // harness's `app` fixture: a fresh page of the built app, input that must land where it says, waits on the app's own state (never on
 // time alone), and a trace when it fails. The scene helpers below build real work (public-domain art, fonts, SVG, text) and take the
 // picture of just what the README section is about. Every shot is declared in manifest.ts; `npm run check:shots` matches it to the README.
-import { readFileSync, mkdirSync, readdirSync } from "node:fs";
+import { copyFileSync, readFileSync, mkdirSync, readdirSync } from "node:fs";
 import { resolve } from "node:path";
 import type { Locator, Page } from "@playwright/test";
 import { test as base, expect, barControl, chooseInMenu, type App } from "../e2e/harness";
@@ -285,6 +285,11 @@ export class Scene {
     await this.settle(400);
     mkdirSync(OUT, { recursive: true });
     await p.screenshot({ path: resolve(OUT, `${name}.png`), ...(clip ? { clip } : {}) });
+    // (a screenshot for app stores too: the whole picture, PNG, as the AppStream file names it)
+    if (SHOTS[name]!.store) {
+      mkdirSync(resolve(OUT, "store"), { recursive: true });
+      copyFileSync(resolve(OUT, `${name}.png`), resolve(OUT, "store", `${name}.png`));
+    }
   }
 }
 

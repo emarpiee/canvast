@@ -56,6 +56,13 @@ jobs:
         with:
           name: screenshots
           path: shots/*.webp
+      # (the app's screenshots for app stores, whole and as PNG: docs/screenshots/store/, named by the AppStream file, B32)
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: store-shots
+          path: shots/store/*.png
+          if-no-files-found: ignore
       - uses: actions/upload-artifact@v4
         if: always()
         with:

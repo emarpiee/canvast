@@ -35,6 +35,10 @@ if (!existsSync(join(root, "node_modules/electron/dist"))) execFileSync("node", 
 run("scripts/build-desktop.mjs");
 const icons = mkdtempSync(join(tmpdir(), "canvast-icons-"));
 run("scripts/brand/icons.mjs", [icons]);
+// What app stores and catalogs show (AppStream, B32): desktop/canvast.metainfo.xml with this version and its date (its CHANGELOG title's, else today)
+const released = readFileSync(join(root, "CHANGELOG.md"), "utf8").match(new RegExp(`^## ${pkg.version.replace(/\./g, "\\.")} .*\\((\\d{4}-\\d{2}-\\d{2})\\)`, "m"))?.[1] ?? new Date().toISOString().slice(0, 10);
+const metainfo = join(icons, "app.canvast.desktop.metainfo.xml");
+writeFileSync(metainfo, readFileSync(join(root, "desktop/canvast.metainfo.xml"), "utf8").replaceAll("@VERSION@", pkg.version).replaceAll("@DATE@", released));
 
 /** This machine's architecture: electron-builder's name for it, and the one in the file names. */
 const ARCH = { x64: { builder: Arch.x64, label: "x86_64" }, arm64: { builder: Arch.arm64, label: "aarch64" } }[process.arch];
@@ -98,6 +102,8 @@ await build({
     directories: { output: out, buildResources: icons },
     files: ["main.cjs", "preload.cjs", "canvast.html", "package.json", "*.node"],
     asar: true,
+    // (in the AppImage at usr/share/metainfo/, where catalogs and software centres read it)
+    extraFiles: [{ from: metainfo, to: "usr/share/metainfo/app.canvast.desktop.metainfo.xml" }],
     asarUnpack: ["*.node"], // (a native module cannot load from inside the asar)
     // (the .deb and .rpm name the project's home and say what it is)
     extraMetadata: { homepage: `https://github.com/${repo.replace("|", "/")}`, description: "An offline-first endless canvas for drawing and references", license: pkg.license },

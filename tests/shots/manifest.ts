@@ -6,6 +6,8 @@ export interface ShotSpec {
   readonly alt: string;
   /** The pointer stays where the shot left it (a hover is part of the picture). */
   readonly pointer?: boolean;
+  /** Also a screenshot of the app for app stores and catalogs (the AppStream file, B32): kept whole, as PNG, in docs/screenshots/store/. */
+  readonly store?: boolean;
 }
 
 export const SHOTS: Record<string, ShotSpec> = {
@@ -55,7 +57,7 @@ export const SHOTS: Record<string, ShotSpec> = {
   "text": { section: "#text", use: "Set a cover's type: a title and a subtitle in fonts of your own.", alt: "Hokusai's Great Wave with the title THE CROSSING being set in Bangers above it and a subtitle in Cormorant Garamond italic under it, the title's format bar between them" },
 
   // The Library
-  "library": { section: "#the-library", use: "Keep every reference once, in folders by subject, and see a print's details beside the grid.", alt: "The Library in the light theme: folders Japanese prints, Horses, Dancers, Landscapes and Botanical in the sidebar, the gallery of prints and drawings, Hokusai's Great Wave selected with its tags and folder in the details" },
+  "library": { section: "#the-library", use: "Keep every reference once, in folders by subject, and see a print's details beside the grid.", alt: "The Library in the light theme: folders Japanese prints, Horses, Dancers, Landscapes and Botanical in the sidebar, the gallery of prints and drawings, Hokusai's Great Wave selected with its tags and folder in the details", store: true },
   "library-list": { section: "#the-gallery", use: "Read a collection as a list, with each file's size, pixels and tags.", alt: "The Library as a list: name, pixels, type, size and tags of each drawing and print, Rosa Bonheur's study selected" },
   "sidebar": { section: "#folders-and-tags", use: "Pin the folder you work from most, nest tags by subject and keep the searches you repeat.", alt: "The Library's sidebar: Japanese prints pinned first among the folders, tags nested as animal/horse, animal/bird and figure/dance, and two saved searches" },
   "search": { section: "#search", use: "Find the figure drawings in a tall format with one search.", alt: "The search #drawing #figure orientation:portrait finding Degas's dancer drawings, with the chip of what is filtered" },
@@ -85,7 +87,7 @@ export const SHOTS: Record<string, ShotSpec> = {
   "lock-screen": { section: "#hidden-mode", use: "A workspace with a password shows nothing until it is given.", alt: "The lock screen: This workspace is locked, a password field and Open" },
 
   // The endless canvas
-  "hero": { section: "#the-endless-canvas", use: "Go anywhere on one canvas: the showcase's Solar System at home.", alt: "The showcase canvas at home: the Solar System, with the title canvast and its two lines" },
+  "hero": { section: "#the-endless-canvas", use: "Go anywhere on one canvas: the showcase's Solar System at home.", alt: "The showcase canvas at home: the Solar System, with the title canvast and its two lines", store: true },
   "deep-zoom": { section: "#try-the-showcase-powers-of-two", use: "Zoom in past any limit: one million levels below home, everything still works.", alt: "A heart one million zoom levels below the Solar System, with the title One million zoom levels" },
   "zoom-out": { section: "#try-the-showcase-powers-of-two", use: "Zoom out as far as in: the multiverse a thousand levels above.", alt: "The multiverse, a thousand zoom levels above the Solar System: bubbles of universes, ours marked" },
   "tour": { section: "#bookmarks-and-tours", use: "Play a canvas's bookmarks as a tour, for a talk or a review.", alt: "A tour of the showcase's bookmarks, in the light theme: the bookmark list and the tour's bar at the bottom" },
