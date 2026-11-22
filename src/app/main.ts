@@ -2260,7 +2260,7 @@ async function start(): Promise<void> {
       findCommand: () => palette.open(),
   });
   setBarActions("main", barActionsFor(doc, editor, view));
-  // The Actions bar follows the view in use (the main view, or a Pins window pressed last): in a pinned view it has its Adjust and Arrange only
+  // The Actions bar follows the view in use (the main view, or a Pins window pressed last): in a pinned view it has its Arrange only
   const contextBar = mountContextBar(
     host,
     editorInUse,
@@ -2268,15 +2268,13 @@ async function start(): Promise<void> {
     routedBarActions(),
     () => (focusedCanvasView() === "main" ? appView !== "canvas" : false) || textEditor.isOpen,
     () => (focusedCanvasView() === "main" ? settings.get("ui.actions") : "bottom"),
-    () => (focusedCanvasView() === "main" ? null : ["Adjust", "Arrange"]),
+    () => (focusedCanvasView() === "main" ? null : ["Arrange"]),
   );
   // (the one Actions bar goes where the view in use is: along the bottom of a Pins window while its canvas is, so it shows over any view)
   editorInUse.subscribe(() => {
     const v = focusedCanvasView();
     const into = v === "main" ? host : (pinsWindows?.barHost(v) ?? host);
     if (contextBar.wrap.parentElement !== into) into.appendChild(contextBar.wrap);
-    // (its Adjust panel too: above every view while a pinned canvas is in use, as the window is)
-    dock.everywhere("adjust", v !== "main");
   });
   contextUpdate = contextBar.update;
   // (where the Actions bar stands is no longer a row of Settings: a change by a command or the debug hook takes effect at once, not at the next frame)

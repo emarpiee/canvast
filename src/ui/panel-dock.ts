@@ -179,29 +179,6 @@ export class PanelDock {
     this.layout();
   }
 
-  /**
-   * For a while, a panel floats above every view (`everywhere`), as a Pins window does: the Adjust panel while a pinned canvas is the view in
-   * use, so it shows over any view. Off again, it goes back where it was. Its place there is not kept.
-   */
-  everywhere(id: string, on: boolean): void {
-    const it = this.items.get(id);
-    if (!it || !!it.spec.everywhere === on) return;
-    it.spec = { ...it.spec, everywhere: on };
-    const s = this.state.get(id)!;
-    if (on) {
-      this.before.set(id, { ...s });
-      const r = it.box.getBoundingClientRect();
-      Object.assign(s, { s: "float", x: r.width ? r.left : 120, y: r.width ? r.top : 140 });
-    } else {
-      const was = this.before.get(id);
-      if (was) Object.assign(s, was);
-      this.before.delete(id);
-    }
-    this.layout();
-  }
-  /** Where a panel was before it floated above every view (`everywhere`). */
-  private readonly before = new Map<string, PanelState>();
-
   /** Take a panel out of the dock (it is closed for good: a pinned view's window); its place is forgotten. */
   remove(id: string): void {
     const it = this.items.get(id);
