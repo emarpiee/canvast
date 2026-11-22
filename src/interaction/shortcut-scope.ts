@@ -1,3 +1,4 @@
+import { focusedCanvasView } from "../canvas/focus";
 /**
  * Whether a key event may act as a canvas shortcut. Not while typing in a text
  * field, not in Assets view, and not inside a modal dialog (where Escape and
@@ -10,5 +11,6 @@ export function canvasShortcutsActive(e: KeyboardEvent): boolean {
   if (t && (t.isContentEditable || /^(TEXTAREA|SELECT)$/.test(t.tagName))) return false;
   if (t?.tagName === "INPUT" && !/^(range|checkbox|radio|button|color)$/.test((t as HTMLInputElement).type)) return false;
   if (t?.closest?.("dialog")) return false;
-  return (document.body.dataset["view"] ?? "canvas") === "canvas";
+  // (a Pins window in use takes the canvas's keys over any view: its own canvas's handlers answer, the main view's stand down)
+  return (document.body.dataset["view"] ?? "canvas") === "canvas" || focusedCanvasView() !== "main";
 }

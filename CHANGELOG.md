@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.61.53 — Keys stay in the Pins window in use (2026-11-22)
+
+- **Fixed before release:** keys typed while a Pins window was in use also reached the main canvas (its tools, copy and cut of its selection, bookmarks, view history, Zen, Find), and a pinned canvas over another view (the Library, PhotoCraft) took none. The window last pressed, showing a canvas or pictures, has the canvas's keys over any view; the main view's stand down until it is pressed again. ([Pins](README.md#pins))
+
 ## 0.61.52 — A Pins window's folder as the Library's grid first (2026-11-22)
 
 - **Changed:** a folder (or All pictures) in a Pins window shows first as the Library's own grid of its pictures, smallest cards, no bar, sidebar or details; a double-click opens the viewer, whose back arrow returns to the grid. A card's right-click menu is the short one of the viewer. ([Pins](README.md#pins))

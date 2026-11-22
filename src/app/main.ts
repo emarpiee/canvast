@@ -2567,13 +2567,13 @@ async function start(): Promise<void> {
   // Alt+Shift+Left and Alt+Shift+Right: previous and next view (ADR 0116), on the canvas. (Alt with an arrow alone pans, as ever.)
   window.addEventListener("keydown", (e) => {
     if (!e.altKey || !e.shiftKey || e.ctrlKey || e.metaKey || (e.key !== "ArrowLeft" && e.key !== "ArrowRight")) return;
-    if (document.body.dataset["view"] !== "canvas" || typing(e.target) || (e.target as HTMLElement | null)?.closest?.("dialog")) return;
+    if (document.body.dataset["view"] !== "canvas" || focusedCanvasView() !== "main" || typing(e.target) || (e.target as HTMLElement | null)?.closest?.("dialog")) return;
     e.preventDefault(); // (not the browser's Back and Forward)
     pressCommand(e.key === "ArrowLeft" ? "view.back" : "view.forward", {}, "key");
   });
   // Bookmark keys (Settings > Shortcuts): previous and next, and the first nine by number.
   window.addEventListener("keydown", (e) => {
-    if (e.repeat || document.body.dataset["view"] !== "canvas" || typing(e.target) || (e.target as HTMLElement | null)?.closest?.("dialog")) return;
+    if (e.repeat || document.body.dataset["view"] !== "canvas" || focusedCanvasView() !== "main" || typing(e.target) || (e.target as HTMLElement | null)?.closest?.("dialog")) return;
     const c = comboOfEvent(e);
     const n = c === "[" ? -1 : c === "]" ? 1 : /^Alt\+[1-9]$/.test(c ?? "") ? 0 : null;
     if (n === null) return;
@@ -2587,7 +2587,7 @@ async function start(): Promise<void> {
   // The Zen key (Settings > Shortcuts, Z at first) fades the floating bars and panels out and back, on the canvas.
   window.addEventListener("keydown", (e) => {
     if (e.ctrlKey || e.metaKey || e.altKey || e.repeat || e.key.toLowerCase() !== "z") return;
-    if (document.body.dataset["view"] !== "canvas" || typing(e.target) || (e.target as HTMLElement | null)?.closest?.("dialog")) return;
+    if (document.body.dataset["view"] !== "canvas" || focusedCanvasView() !== "main" || typing(e.target) || (e.target as HTMLElement | null)?.closest?.("dialog")) return;
     e.preventDefault();
     pressCommand("view.zen", {}, "key");
   });
@@ -2595,7 +2595,7 @@ async function start(): Promise<void> {
   // from anywhere. The browser's own find is not used for these.
   window.addEventListener("keydown", (e) => {
     if (!(e.ctrlKey || e.metaKey) || e.altKey || e.key.toLowerCase() !== "f") return;
-    if (document.querySelector("dialog[open]") || appView === "settings") return;
+    if (document.querySelector("dialog[open]") || appView === "settings" || focusedCanvasView() !== "main") return; // (a Pins window in use keeps its keys)
     e.preventDefault();
     pressCommand(e.shiftKey || appView === "assets" ? "find.library" : "find.canvas", {}, "key");
   });
@@ -3615,7 +3615,7 @@ async function start(): Promise<void> {
   // copied or cut all the same, right after the keys, when no event came.
   window.addEventListener("keydown", (e) => {
     const k = e.key.toLowerCase();
-    if (!(e.ctrlKey || e.metaKey) || e.altKey || e.shiftKey || (k !== "c" && k !== "x") || typing(e.target) || appView !== "canvas" || textEditor.isOpen || !editor.selection.size) return;
+    if (!(e.ctrlKey || e.metaKey) || e.altKey || e.shiftKey || (k !== "c" && k !== "x") || typing(e.target) || appView !== "canvas" || focusedCanvasView() !== "main" || textEditor.isOpen || !editor.selection.size) return;
     const at = performance.now();
     setTimeout(() => { if (clipEventAt < at && !document.querySelector("dialog:modal")) copyOrCut(k === "c" ? "copy" : "cut"); }, 0);
   }, true);

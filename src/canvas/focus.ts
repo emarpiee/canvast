@@ -32,7 +32,8 @@ export const setViewActions = (id: string, actions: CanvasActions): void => {
 };
 /** The view in use now: a press or the focus in it. */
 export const focusCanvasView = (id: string): void => {
-  const next = views.some((v) => v.id === id) ? id : "main";
+  // (any id: a Pins window that shows pictures of the library is in use too, so the main view's keys stand down; its actions fall back to the main view's)
+  const next = id;
   if (next === focused) return;
   focused = next;
   tell(); // (what follows the view in use shows it)

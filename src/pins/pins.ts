@@ -236,6 +236,7 @@ export function mountPins(deps: PinsDeps): { open(source?: PinSource): void; ref
       show: (c) => void show(c),
       close: () => {
         stop?.();
+        focusCanvasView("main"); // (closed: its keys go back to the main view)
         pins.delete(id);
         deps.dock.remove(`pins:${id}`);
         keep();
@@ -313,7 +314,7 @@ export function mountPins(deps: PinsDeps): { open(source?: PinSource): void; ref
     // view-state: (the view in use: the commands, keys and menus act on it while it is)
     el.addEventListener("pointerdown", () => {
       here = true;
-      if (canvasOf(pin.source)) focusCanvasView(id);
+      focusCanvasView(id); // (the view in use, a canvas or the library's pictures: the main view's keys stand down)
     }, true);
     // view-state: (another view pressed: this one is no longer in use)
     window.addEventListener("pointerdown", (e) => {
@@ -350,6 +351,11 @@ export function mountPins(deps: PinsDeps): { open(source?: PinSource): void; ref
     pin.apply();
     void show(source);
   };
+
+  // view-state: (a press outside every Pins window: the main view is in use again, its keys its own)
+  window.addEventListener("pointerdown", (e) => {
+    if (!(e.target as Element | null)?.closest?.(".pins-panel, .pop-menu, dialog")) focusCanvasView("main");
+  }, true);
 
   // ---- commands (ADR 0205): every action of the windows, for the buttons, menus, keys and outside callers alike
   const pc = (id: string, title: string, hint: string, options: readonly OptionSpec[], exec: NonNullable<Command["exec"]>): Command => ({ id, group: "Pins", kind: "pins", title, hint, icon: ICONS.referenceWindow, risk: "read", options, why: () => null, exec });
