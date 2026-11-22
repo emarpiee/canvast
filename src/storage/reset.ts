@@ -30,6 +30,11 @@ export async function resetAllData(o: ResetOptions): Promise<void> {
     });
   }
   if (!o.keepSettings) try {
+    // (until the reload, nothing of canvast is written back: a save timed before, the dock's or the settings', would bring it back)
+    const set = Storage.prototype.setItem;
+    Storage.prototype.setItem = function (this: Storage, k: string, v: string): void {
+      if (!k.startsWith("canvast") || k === "canvast-writer-lease") set.call(this, k, v);
+    };
     for (const k of Object.keys(localStorage)) if (k.startsWith("canvast")) localStorage.removeItem(k);
     for (const k of Object.keys(sessionStorage)) if (k.startsWith("canvast")) sessionStorage.removeItem(k);
   } catch {

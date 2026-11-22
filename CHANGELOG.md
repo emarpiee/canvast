@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.61.61 — Start from scratch leaves nothing behind (2026-11-23)
+
+- **Fixed:** Start from scratch could leave canvast's settings behind: a save timed just before (the panels' places, a setting) was written again between the deletion and the reload. Nothing of canvast is written until the page has reloaded. ([Your workspace and data](README.md#your-workspace-and-data))
+- **Docs:** the Pins picture shows the Library's grid in the window. ([Pins](README.md#pins))
+
+### For developers
+
+- `pins.spec.ts`: the viewer's menu closes with its row (no Escape after it, which closed the viewer and left the test waiting for its back arrow).
+
 ## 0.61.60 — A Pins window sizes smoothly (2026-11-23)
 
 - **Fixed before release:** sizing a Pins window made its canvas again and drew it at every step, so the grip lagged: its picture stretches while it is sized and is drawn again once it rests. ([Pins](README.md#pins))

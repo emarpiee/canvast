@@ -89,7 +89,7 @@ test("a Pins window shows pictures of the library as the Library's own grid, the
   await expect(p.locator('.pop-menu [data-command="library.place"]'), "no Place in a Pins window").toHaveCount(0);
   await p.locator('.pop-menu [data-command="library.favorite"]').click();
   await expect.poll(async () => (await p.evaluate(() => window.__canvastDebug.catalogEntries())).filter((e) => e.favorite).length, { message: "made a favourite from the Pins window" }).toBe(1);
-  await p.keyboard.press("Escape"); // (the menu)
+  await expect(p.locator(".pop-menu"), "the menu closes with its row").toHaveCount(0); // (an Escape now would close the viewer)
   await pins.locator('[data-act="close"]').click();
   await expect(cards).toHaveCount(2);
   // the main view is still the canvas, and the Library view kept its own state
