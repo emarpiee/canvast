@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.61.45 — The app starts again (2026-11-22)
+
+- **Fixed before release:** 0.61.44 did not start: the Actions bar asked for the view in use before the main view was known. The main view is known from its start; its actions come after. ([Pins](README.md#pins))
+
 ## 0.61.44 — Pins: the Library itself, the Actions bar, smooth drags (2026-11-22)
 
 - **Changed:** a Pins window shows **the Library itself** (its folders, search, cards and viewer) without its details panel, instead of a gallery of its own; its keys act only while you use it, and the Library view is left as it was. ([Pins](README.md#pins))

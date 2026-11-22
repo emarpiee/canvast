@@ -1,7 +1,7 @@
 import { moodboardsToCanvases } from "../pins/migrate";
 import { createCanvasView } from "../canvas/canvas-view";
 import { LIBRARY_DRAG } from "../ui/assets-view";
-import { addCanvasView, docInUse, editorInUse, focusCanvasView, focusedCanvasView, routedActions, routedBarActions, setBarActions } from "../canvas/focus";
+import { addCanvasView, docInUse, editorInUse, focusCanvasView, focusedCanvasView, routedActions, routedBarActions, setBarActions, setViewActions } from "../canvas/focus";
 import { mountPins } from "../pins/pins";
 import type { FrameIndex } from "../scene/frame-index";
 import type { Choice } from "../canvas/canvas-view";
@@ -282,6 +282,7 @@ async function start(): Promise<void> {
   const { index, indexSync, tiles, density, objectsUsers, fillUsersOf, invalidate, renderNow } = engine;
   const editor = new EditorState();
   engine.follow(editor); // (drawn again on every change, as every view of a canvas is)
+  addCanvasView("main", null, editor, doc); // (the main view, from its start: what follows the view in use reads it; its actions come later)
   /** The main view's parts, by names a function made for any view can default to (its own parameters take the short names). */
   const mainDoc = doc, mainEditor = editor, mainView = view;
   const notices = mountNotices(document.body, editor);
@@ -3040,7 +3041,7 @@ async function start(): Promise<void> {
     checkLibraryFiles: storage?.folderSync ? (quick) => checkLibraryFiles(quick) : null,
     hidden: storage?.hidden ? { isOpen: () => !!storage.hidden?.isOpen(), lock: () => lockHidden(session).then(() => { editor.message = HIDDEN_LOCKED; editor.changed(); }) } : null,
   });
-  addCanvasView("main", canvasActionsFor(doc, editor, view, index, focusCycle), editor, doc);
+  setViewActions("main", canvasActionsFor(doc, editor, view, index, focusCycle));
   registry.setProvider("app", () => canvasCommands(routedActions()));
   for (const [old, now] of Object.entries(OLD_CANVAS_IDS)) registry.alias(old, now);
   registry.onFail((_c, error) => { editor.message = error; editor.changed(); });

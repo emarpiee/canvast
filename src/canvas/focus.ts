@@ -8,13 +8,14 @@ import type { DocumentStore } from "../doc/document-store";
  * that follow the view in use (the Actions bar, the Adjust panel) read and change it through `editorInUse` and `docInUse`, and hear every
  * view's changes.
  */
-interface View { id: string; actions: CanvasActions; editor: EditorState; doc: DocumentStore; offs: Array<() => void> }
+interface View { id: string; actions: CanvasActions | null; editor: EditorState; doc: DocumentStore; offs: Array<() => void> }
 let views: View[] = [];
 let focused = "main";
 const heard = { editor: new Set<() => void>(), redraw: new Set<() => void>(), doc: new Set<(...a: unknown[]) => void>() };
 const tell = (): void => heard.editor.forEach((f) => f());
 
-export function addCanvasView(id: string, actions: CanvasActions, editor: EditorState, doc: DocumentStore): () => void {
+/** A view of a canvas: its actions (null until they are made: the main view's come later in its start than its editor), its editor and document. */
+export function addCanvasView(id: string, actions: CanvasActions | null, editor: EditorState, doc: DocumentStore): () => void {
   views.find((v) => v.id === id)?.offs.forEach((f) => f());
   const offs = [editor.subscribe(() => heard.editor.forEach((f) => f())), editor.subscribeRedraw(() => heard.redraw.forEach((f) => f())), doc.subscribe((...a: unknown[]) => heard.doc.forEach((f) => f(...a)))];
   views = [...views.filter((v) => v.id !== id), { id, actions, editor, doc, offs }];
@@ -24,6 +25,11 @@ export function addCanvasView(id: string, actions: CanvasActions, editor: Editor
     if (focused === id) (focused = "main"), tell();
   };
 }
+/** A view's actions, made after it was added (the main view's). */
+export const setViewActions = (id: string, actions: CanvasActions): void => {
+  const v = views.find((x) => x.id === id);
+  if (v) v.actions = actions;
+};
 /** The view in use now: a press or the focus in it. */
 export const focusCanvasView = (id: string): void => {
   const next = views.some((v) => v.id === id) ? id : "main";
@@ -37,7 +43,7 @@ const mainView = (): View => views.find((v) => v.id === "main")!;
 
 /** The actions of the view in use, as one object (the registry's commands read it at each call). */
 export function routedActions(): CanvasActions {
-  return new Proxy({} as CanvasActions, { get: (_t, k) => inUse().actions[k as keyof CanvasActions] });
+  return new Proxy({} as CanvasActions, { get: (_t, k) => (inUse().actions ?? mainView().actions)?.[k as keyof CanvasActions] });
 }
 
 /** Whether the app's panels are open is the app's, not a view's: it stays with the main view's editor. */
