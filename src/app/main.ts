@@ -3649,6 +3649,8 @@ async function start(): Promise<void> {
     else if (appView === "canvas" && !textEditor.isOpen && pasteWords(e.clipboardData?.getData("text/plain") ?? "")) e.preventDefault();
   };
   window.addEventListener("paste", (e) => {
+    // (a paste in a reference window is its own: never also on the canvas behind it; this listener runs first, in capture)
+    if ((e.target as HTMLElement | null)?.closest?.(".ref-window")) return;
     onPaste(e);
     // (taken here, and sent to something that does not have the keys, Firefox's hidden editable box: it does not paste it a second time)
     if (e.defaultPrevented && typing(e.target) && e.target !== document.activeElement) e.stopPropagation();

@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.61.25 — A paste in a reference window stays in it (2026-11-22)
+
+- **Fixed before release:** a picture pasted in a reference window from another app was also pasted on the canvas behind it. ([The Library](README.md#the-library))
+
+### For developers
+
+- A file panel keeps why an Escape did not close it in `data-escape`; the Escape and the reference window specs say it, and what lay under the drop, when they fail. The styles registry test lists the kinds in their order.
+
 ## 0.61.24 — Tests of the reference window fixed (2026-11-22)
 
 ### For developers

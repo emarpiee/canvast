@@ -1405,6 +1405,7 @@ test("Escape closes a note open on a canvas in every editor style, in the panel 
     await p.mouse.dblclick((at.minX + at.maxX) / 2, (at.minY + at.maxY) / 2);
     const words = p.getByTestId(host).locator(".sun-editor-editable").first();
     await expect(words).toBeVisible();
+    await p.evaluate(() => document.querySelectorAll<HTMLElement>("[data-escape]").forEach((x) => delete x.dataset["escape"])); // (what the last Escape did, forgotten)
     return words;
   };
   for (const mode of ["panel", "window"] as const) {
@@ -1420,7 +1421,8 @@ test("Escape closes a note open on a canvas in every editor style, in the panel 
         return `focus ${a?.tagName}#${a?.id}.${a?.className}; open ${JSON.stringify(open)}; selected ${window.__canvastDebug.selection().length}`;
       });
       await p.keyboard.press("Escape");
-      await expect(p.getByTestId(host), `${mode}, ${style}: the first Escape after opening (${why})`).toBeHidden();
+      const said = () => p.evaluate(() => [...document.querySelectorAll<HTMLElement>("[data-escape]")].map((x) => x.dataset["escape"]).join(", ") || "no Escape heard");
+      await expect(p.getByTestId(host), `${mode}, ${style}: the first Escape after opening (${why}; ${await said()})`).toBeHidden();
       // from the words
       const words = await open(host);
       await words.locator("p").first().click();
@@ -1432,7 +1434,7 @@ test("Escape closes a note open on a canvas in every editor style, in the panel 
       await p.mouse.click(400, 680); // (empty canvas, clear of the tools and the dev panel)
       await p.evaluate(() => window.__canvastDebug.select([]));
       await p.keyboard.press("Escape");
-      await expect(p.getByTestId(host), `${mode}, ${style}: Escape on the canvas`).toBeHidden();
+      await expect(p.getByTestId(host), `${mode}, ${style}: Escape on the canvas (${await said()})`).toBeHidden();
     }
   }
   // An editor's own menu open: the first Escape closes it, the note stays; the next closes the note.

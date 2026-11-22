@@ -144,11 +144,15 @@ export function mountFilePanel(
     const ed = deps.session.editor;
     const onlyItsCard = [...ed.selection].every((id) => { const o = deps.session.doc.get(id); return o?.kind === "image" && o.assetId.split("#")[0] === note?.hash; });
     const elsewhere = !!t && !!t.closest("input, textarea, select, [contenteditable='true'], dialog, .pop-menu, .layers-panel, .ref-window");
-    if (!inside && el !== hosts.window && (elsewhere || !onlyItsCard || ed.editingText)) return;
-    if ([...document.querySelectorAll(POPUPS)].some(showing)) return;
+    // (why an Escape did not close it, kept on the panel for a test or a bug report to read)
+    const why = (w: string): void => void (el.dataset["escape"] = w);
+    if (!inside && el !== hosts.window && (elsewhere || !onlyItsCard || ed.editingText)) return why(elsewhere ? "a field or another panel" : ed.editingText ? "editing text" : "something else selected");
+    const pop = [...document.querySelectorAll(POPUPS)].find(showing);
+    if (pop) return why(`a menu open: ${pop.className}`);
     e.preventDefault();
     e.stopImmediatePropagation();
-    void leave();
+    why("closing");
+    void leave().then((ok) => why(ok ? "closed" : "the note refused to leave (unsaved, not saved)"));
   }, true);
   return {
     open: (hash, card) => open(hash, card),
