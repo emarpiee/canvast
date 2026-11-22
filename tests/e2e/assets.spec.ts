@@ -2915,7 +2915,8 @@ test("reference window (ADR 0207): over the Library and the canvas, a gallery of
   await p.getByTestId("view-assets").click();
   await p.getByTestId("assets-import-input").setInputFiles([
     { name: "red.png", mimeType: "image/png", buffer: makePng(40, 30, () => [200, 40, 40, 255]) },
-    { name: "blue.png", mimeType: "image/png", buffer: makePng(30, 40, () => [40, 40, 200, 255]) },
+    // (large enough that a press in its middle is on it, not on its corners' radius dots)
+    { name: "blue.png", mimeType: "image/png", buffer: makePng(150, 200, () => [40, 40, 200, 255]) },
   ]);
   await expect(p.getByTestId("asset-card")).toHaveCount(2);
   // Shift+R opens it, over the Library

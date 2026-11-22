@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.61.30 — Reference window spec: a picture large enough to drag (2026-11-22)
+
+### For developers
+
+- The reference window spec drags a picture large enough that its middle is not on its corners' radius dots (a 30 by 40 picture's dots met in its middle: the drag rounded its corners).
+
 ## 0.61.29 — The canvas says what its last release ended (2026-11-22)
 
 ### For developers
