@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.61.28 — Reference window spec: the picture selected before it is dragged (2026-11-22)
+
+### For developers
+
+- The reference window spec selects the picture before dragging it off the canvas (only what is selected moves; a drag from anything else draws the selection box).
+
 ## 0.61.27 — Escape closes a note still opening (2026-11-22)
 
 - **Fixed before release:** Escape pressed right after a note was double-clicked open on the canvas, while its words were shown but it was still opening, did nothing: it now closes it as soon as it is open. ([Notes](README.md#notes))

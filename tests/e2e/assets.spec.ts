@@ -2972,6 +2972,8 @@ test("reference window (ADR 0207): over the Library and the canvas, a gallery of
   await p.evaluate((h) => window.__canvastDebug.runCommand("reference.toCanvas", { ids: [h] }, "test"), blue);
   await expect.poll(() => p.evaluate(() => window.__canvastDebug.objects().length)).toBe(1);
   await p.evaluate(() => window.__canvastDebug.setTool("select")); // (by the hook: the focus may be in the window, which keeps its keys)
+  // (selected first: on the canvas only what is selected moves; a drag from anything else draws the selection box)
+  await p.evaluate(() => { const d = window.__canvastDebug; d.select([d.objects()[0]!.id]); });
   const pic = await p.evaluate(() => { const d = window.__canvastDebug; return d.objectScreen(d.objects()[0]!.id)!.box; });
   const wb = (await w2.locator("[data-ref-board]").boundingBox())!;
   const to = { x: wb.x + wb.width / 2, y: wb.y + wb.height / 2 };
