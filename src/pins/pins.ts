@@ -315,9 +315,12 @@ export function mountPins(deps: PinsDeps): { open(source?: PinSource): void; ref
       if (doc !== deps.main.doc && !got.placed) fitAllVisible(doc, view, editor); // (no view kept for it: all of it in sight)
     };
     // view-state: (the view in use: the commands, keys and menus act on it while it is)
-    el.addEventListener("pointerdown", () => {
+    el.addEventListener("pointerdown", (e) => {
       here = true;
       focusCanvasView(id); // (the view in use, a canvas or the library's pictures: the main view's keys stand down)
+      // (the keys come to this page: a press the canvas takes for itself moves no focus, so a view in a frame, PhotoCraft, kept them)
+      const had = document.activeElement as HTMLElement | null;
+      if (had && had !== document.body && !el.contains(had) && !(e.target as Element).closest("input, textarea, select, [contenteditable]")) had.blur();
     }, true);
     // view-state: (another view pressed: this one is no longer in use)
     window.addEventListener("pointerdown", (e) => {

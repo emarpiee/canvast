@@ -510,9 +510,12 @@ async function start(): Promise<void> {
     tiles.clear(); // text drawn before the font was ready used the interim fallback
     invalidate();
   });
+  /** The other views of canvases (Pins), drawn again too when a picture finished loading. */
+  const assetsReady = new Set<() => void>();
   const assets = new AssetLibrary(storage?.originals ?? null, () => {
     tiles.dropPending(); // an original finished loading: redraw tiles that showed its placeholder
     invalidate();
+    for (const fn of assetsReady) fn();
   });
   // The library folder (ADR 0159): a restart asks permission again, which needs a click in the storage panel.
   externalFolder.subscribe(() => assets.retryAll());
@@ -2895,7 +2898,7 @@ async function start(): Promise<void> {
   const keysOf = (id: string): string => keymap.bindings(id).map(displayCombo).join(", ");
   // The canvas's actions for a view of a canvas (its document, editor, camera and focus key): the main view's, and a pinned one's (Pins)
   const canvasActionsFor = (doc: DocumentStore, editor: EditorState, view: ViewState, index: FrameIndex, focusCycle: ReturnType<typeof createFocusCycle>): CanvasActions => ({
-    onCanvas: () => appView === "canvas",
+    onCanvas: () => editor !== mainEditor || appView === "canvas", // (a Pins window is on its canvas over any view)
     selectionSize: () => editor.selection.size,
     readOnly: () => session.readOnly,
     select: (ids) => editor.select([...ids]),
@@ -3313,11 +3316,16 @@ async function start(): Promise<void> {
   // Pins (ADR 0208, src/pins/): windows above every view that show a canvas, from the canvas's own engine, tools and actions
   pinsWindows = mountPins({
     dock, session, main: { doc },
-    engine: (o) => createCanvasView({
-      canvas: o.canvas, ctx: o.ctx, doc: o.doc, view: o.view, stats: new FrameStats(),
-      editor: () => o.editor, settings: () => settings, assets: () => assets, assetNames: () => assetNames, theme: () => theme, dpr: () => dpr,
-      choicesAt: () => [], hintRefresh: () => undefined, shown: o.shown, drawn: () => undefined,
-    }),
+    engine: (o) => {
+      const e = createCanvasView({
+        canvas: o.canvas, ctx: o.ctx, doc: o.doc, view: o.view, stats: new FrameStats(),
+        editor: () => o.editor, settings: () => settings, assets: () => assets, assetNames: () => assetNames, theme: () => theme, dpr: () => dpr,
+        choicesAt: () => [], hintRefresh: () => undefined, shown: o.shown, drawn: () => undefined,
+      });
+      const ready = (): void => { e.tiles.dropPending(); e.invalidate(); };
+      // (followed while the window shows it: its pictures that finish loading are drawn too, over any view)
+      return { ...e, follow: (ed: EditorState) => { const off = e.follow(ed); assetsReady.add(ready); return () => { off(); assetsReady.delete(ready); }; } };
+    },
     // (a Pins window's surface wired as the main view's is: one function, so it has whatever the canvas has)
     // shortcut: a pinned view edits text, lists what is under the pointer and searches through the main view for now; give them its own when they need it
     wire: (el, now) => wireCanvasView(el, now, false, { editText: () => undefined, revealList: () => false, openSearch: () => undefined }),

@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.61.59 — A Pins canvas works over every view (2026-11-23)
+
+- **Fixed before release:** over another view (PhotoCraft, the Library), a Pins window's canvas refused its commands (undo, redo, F, Delete: they asked for the canvas view), PhotoCraft kept the keys after a press in the window, and its pictures stayed empty boxes (a picture that finished loading redrew only the main canvas). ([Pins](README.md#pins))
+
 ## 0.61.58 — The viewer stays on a picture saved again (2026-11-22)
 
 - **Fixed:** a picture open in the Library's viewer (or a Pins window's) and saved again, in PhotoCraft or another program, closed the viewer back to the grid: the viewer stays and shows the new version. ([The Library](README.md#the-library))

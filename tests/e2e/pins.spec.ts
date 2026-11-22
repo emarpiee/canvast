@@ -50,6 +50,12 @@ test("Pins (ADR 0208): Shift+R pins the open canvas in a window above every view
   // above every view: still shown over the Library
   await p.getByTestId("view-assets").click();
   await expect(pins).toBeVisible();
+  // and its canvas's keys and commands work there too (Delete, Ctrl+Z): a Pins window is on its canvas over any view
+  await p.mouse.click(at.x + 30, at.y + 20);
+  await p.keyboard.press("Delete");
+  await expect.poll(() => p.evaluate(() => window.__canvastDebug.objects().length), { message: "Delete in Pins over the Library" }).toBe(0);
+  await p.keyboard.press("Control+z");
+  await expect.poll(() => p.evaluate(() => window.__canvastDebug.objects().length), { message: "Ctrl+Z in Pins over the Library" }).toBe(1);
   // opened again after a reload
   await p.reload();
   await p.waitForFunction(() => typeof window.__canvastDebug !== "undefined");
