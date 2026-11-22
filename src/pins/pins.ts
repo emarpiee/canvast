@@ -267,10 +267,16 @@ export function mountPins(deps: PinsDeps): { open(source?: PinSource): void; ref
         view.setViewport({ width: Math.max(1, r.width), height: Math.max(1, r.height) });
         engine.invalidate();
       };
-      const ro = new ResizeObserver(size);
+      // (while the window is sized, the last picture stretches and the canvas is made again once it rests: not a new canvas every frame)
+      let resting = 0;
+      const ro = new ResizeObserver(() => {
+        clearTimeout(resting);
+        resting = window.setTimeout(size, 120);
+      });
       ro.observe(host);
       size();
       stop = () => {
+        clearTimeout(resting);
         ro.disconnect();
         for (const u of unsubs) u();
         offTools();

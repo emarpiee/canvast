@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.61.60 — A Pins window sizes smoothly (2026-11-23)
+
+- **Fixed before release:** sizing a Pins window made its canvas again and drew it at every step, so the grip lagged: its picture stretches while it is sized and is drawn again once it rests. ([Pins](README.md#pins))
+
 ## 0.61.59 — A Pins canvas works over every view (2026-11-23)
 
 - **Fixed before release:** over another view (PhotoCraft, the Library), a Pins window's canvas refused its commands (undo, redo, F, Delete: they asked for the canvas view), PhotoCraft kept the keys after a press in the window, and its pictures stayed empty boxes (a picture that finished loading redrew only the main canvas). ([Pins](README.md#pins))
