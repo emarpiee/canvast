@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.61.58 — The viewer stays on a picture saved again (2026-11-22)
+
+- **Fixed:** a picture open in the Library's viewer (or a Pins window's) and saved again, in PhotoCraft or another program, closed the viewer back to the grid: the viewer stays and shows the new version. ([The Library](README.md#the-library))
+
 ## 0.61.57 — The menu rows of a Pins window's pictures act (2026-11-22)
 
 - **Fixed before release:** the right-click rows of a Pins window's pictures (favourite, copy, open elsewhere) did nothing: the press on the menu row counted as leaving the window. A press in a menu or dialog no longer changes which Library is in use. ([Pins](README.md#pins))

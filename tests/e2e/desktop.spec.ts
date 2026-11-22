@@ -1759,12 +1759,18 @@ test("an item's file saved again outside the app, of any kind (a painting in its
     await page.evaluate(() => window.__canvastDebug.flushStorage());
     file = files(ws).find((f) => f.startsWith("library/") && f.endsWith(".kra"))!;
     expect(file).toBeTruthy();
+    // (open in the Library's viewer meanwhile)
+    await page.getByTestId("view-assets").click();
+    await page.getByTestId("asset-card").dblclick();
+    await expect(page.getByTestId("slide-view")).toBeVisible();
     // Saved again by its program while the app runs (a new size): the same item follows it, on the canvas too.
     await page.waitForTimeout(2000); // (a save a moment after the app's own writes, not in the same batch of the folder's changes)
     writeFileSync(join(ws, file), bytes(5200, 2));
     await expect.poll(async () => (await listing()).map((e) => [e.name, e.present, e.instances, e.note, e.hash !== first!.hash]), { timeout: 15_000 }).toEqual([["study.kra", true, 1, "keep me", true]]);
     const [second] = await listing();
     expect(await placed()).toEqual([second!.hash]);
+    await page.waitForTimeout(1000);
+    await expect(page.getByTestId("slide-view"), "the viewer stays open, on the new version").toBeVisible();
     // Saved again at the same size: told apart by its content.
     await page.waitForTimeout(2000);
     writeFileSync(join(ws, file), bytes(5200, 3));

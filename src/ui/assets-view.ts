@@ -1779,6 +1779,19 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     m.addEventListener("loadedmetadata", paintZoom);
   }
 
+  /**
+   * An item saved again (by PhotoCraft or another program) is a new item: the viewer on it stays, on the new version. The library may list
+   * it before it says which item it replaces, so a viewer just closed for the old one opens again on the new.
+   */
+  const versionOf = new Map<string, string>();
+  let goneAt: { hash: string; at: number } | null = null;
+  session.onVersion((from, to) => {
+    if (!root.isConnected) return;
+    versionOf.set(from, to);
+    if (slideHash === from && !viewer.hidden) void showSlide(to);
+    else if (goneAt?.hash === from && performance.now() - goneAt.at < 5000 && viewer.hidden) void showSlide(to);
+    goneAt = null;
+  });
   const showSlide = async (hash: string): Promise<void> => {
     if (!entryOf(hash)) await ensure([hash]).catch(() => undefined); // (a long library: what a link points at need not be on a page read yet)
     if (!entryOf(hash)) {
@@ -2758,7 +2771,12 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
           if (slideHash !== h || viewer.hidden) return;
           if (entryOf(h)) return renderFilm();
           const e = await session.catalog?.entry(h).catch(() => undefined);
-          if (slideHash === h && !viewer.hidden && (!e || e.state !== "active")) closeSlide();
+          if (slideHash === h && !viewer.hidden && (!e || e.state !== "active")) {
+            const next = versionOf.get(h);
+            if (next) return void showSlide(next); // (saved again, by PhotoCraft or another program: its new version, in its place)
+            goneAt = { hash: h, at: performance.now() };
+            closeSlide();
+          }
         })();
       } else if (viewList().list !== filmOf) renderFilm();
     }
