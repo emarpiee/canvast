@@ -534,7 +534,7 @@ Tag the studies on a canvas by what they teach, and find them again.
 
 ### Pins
 
-Keep your references in sight while you work: a canvas of studies, or a folder of the library, in a window that floats above every view.
+Keep your references in sight while you work: a canvas of studies, or a folder of the library, in a simple window that floats above every view (the Library, PhotoCraft too). It is for looking and arranging; writing, editing text and searching are the main canvas's.
 
 ![A canvas of Degas's gesture study pinned in a window over a canvas where Delacroix's Study of a Horse is being worked on](docs/screenshots/pins.webp)
 
@@ -542,10 +542,10 @@ Keep your references in sight while you work: a canvas of studies, or a folder o
 | --- | --- |
 | Open one | `Shift+R`, or the button by Settings: the canvas you are on, in a window. Open as many as you like |
 | What it shows | The list under its title: any canvas of the workspace, by board, or **All pictures**, a folder shown lately, or **Choose a folder…** (any folder, found by its name) |
-| A pinned canvas | The canvas itself: its tools (the ones the toolbar sets), keys, wheel and pinch, right-click menu and undo, on the view you pressed last; the Actions bar, floating over the bottom of the window, has its **Arrange** (without Keep it tidy); the right-click menu is a short one (copy, paste, duplicate, order, delete, select all, fit). The canvas you are on is the same in both: what you change in one is changed in the other |
+| A pinned canvas | The canvas itself: its tools (the ones the toolbar sets), keys, wheel and pinch, right-click menu and undo, over any view, on the view you pressed last; the Actions bar, floating over the bottom of the window, has its **Arrange** (without Keep it tidy); the right-click menu, and a finger held still on a touch screen, give a short one (copy, paste, duplicate, order, delete, select all, fit). The canvas you are on is the same in both: what you change in one is changed in the other |
 | Pictures of the library | The library's own grid of the folder's pictures (no bar, sidebar or details); a double-click opens its viewer in the window (the picture large, its filmstrip, zoom and Fit, the slideshow), and its back arrow returns to the grid |
-| Bringing pictures over | Drag a gallery's card, or a Library card, onto a canvas or a pinned one; drag a picture off the canvas onto a pinned canvas (it stays where it was); drop files from another app onto a pinned canvas |
-| The window | Move it by its title, size it from its bottom corner, press its title to fold it. **More** (⋯): **Opacity…** (a slider), **Let clicks through** (to what is under it; its title still takes them) and, in the desktop app, **Float over other apps** |
+| Bringing pictures over | Drag a gallery's card, or a Library card, onto a canvas or a pinned one; drag a picture off the canvas onto a pinned canvas (it stays where it was); drop files from another app onto a pinned canvas, or paste a picture copied there (it goes into the library and in the middle of the window) |
+| The window | Move it by its title, size it from its bottom corner, press its title to fold it. **More** (⋯): **Opacity…** (a slider), **Let clicks through** (to what is under it; its title still takes them) and, in the desktop app, **Float over other apps** (a live picture of it in a window above every app, view only) |
 
 A folder of prints beside the canvas you draw on, as the library's own grid and viewer.
 
@@ -2575,7 +2575,7 @@ What canvast does not do today, for both versions, then each. **The limits that 
 | Text | No Indic shaping; other computers can wrap missing characters differently |
 | Partial backups | ⚠️ An Advanced export can only be added, never used to update a workspace. Links in notes to items left out find nothing until those items are there |
 | Pins | A pinned canvas edits text, lists what lies under the pointer and searches only through the main view; the Actions and Properties bars follow the main view |
-| Pins | A paste in a Pins window pastes what was copied in the app (a picture copied in another app: drop it instead); Float over other apps shows a still picture |
+| Pins | A pinned canvas is for looking and arranging: a text is written or edited, the list of what is under the pointer opened and the canvas searched in the main view; Float over other apps is a picture of the window, updated as it changes, not a window you can work in |
 | Comic pages | Panels are convex: an L-shaped panel is two panels |
 | AI agents | In alpha: command options and answers may change between versions; many commands work only on what is selected |
 | AI agents | canvast must be open: an agent cannot use it without a window |

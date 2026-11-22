@@ -746,8 +746,9 @@ function installFileCalls(win: BrowserWindow, root: string, partition: string): 
     await writeFile(file, bytes, { mode: 0o600 });
     return process.env["CANVAST_NO_OPEN"] === "1" ? "" : shell.openPath(file); // (tests: the copy is made, no app is started)
   });
-  // A reference window floated over every app (ADR 0207): the page the app made of its pictures (view only: pan and zoom), in a small
-  // window kept on top of the others, sandboxed, with nothing to reach but its own pictures; its file goes when it closes.
+  // A Pins window floated over every app (ADR 0208): a page of the picture of its canvas (view only), in a small window kept on top of
+  // the others, sandboxed, with nothing to reach but its picture; the app sends a new picture as the canvas changes (`floatFrame`). Its file goes when it closes.
+  const floats = new Map<string, BrowserWindow>();
   ipcMain.handle("canvast:floatWindow", async (e, title: unknown, html: unknown) => {
     own(e);
     if (typeof title !== "string" || typeof html !== "string" || html.length > 200 * 1024 * 1024) throw new Error("not a reference window");
@@ -759,8 +760,23 @@ function installFileCalls(win: BrowserWindow, root: string, partition: string): 
     float.setAlwaysOnTop(true, "floating");
     float.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
     float.webContents.on("will-navigate", (ev) => ev.preventDefault());
-    float.on("closed", () => void rm(dir, { recursive: true, force: true }).catch(() => undefined));
+    const id = randomUUID();
+    floats.set(id, float);
+    float.on("closed", () => {
+      floats.delete(id);
+      void rm(dir, { recursive: true, force: true }).catch(() => undefined);
+    });
     await float.loadFile(file);
+    return id;
+  });
+  // (its page runs no script of its own: the new picture is put in by this process, a PNG as a data URL and nothing else)
+  ipcMain.handle("canvast:floatFrame", async (e, id: unknown, picture: unknown) => {
+    own(e);
+    const float = typeof id === "string" ? floats.get(id) : undefined;
+    if (!float || float.isDestroyed()) return false;
+    if (typeof picture !== "string" || !picture.startsWith("data:image/png;base64,") || picture.length > 64 * 1024 * 1024) return true;
+    await float.webContents.executeJavaScript(`void (document.querySelector("img").src = ${JSON.stringify(picture)})`).catch(() => undefined);
+    return true;
   });
   // Real files on the system clipboard, of any kind: the workspace's own, and readable copies of hidden items (made as for opening them, deleted the same way).
   ipcMain.handle("canvast:copyFiles", async (e, rels: unknown, copies: unknown, also: unknown) => {

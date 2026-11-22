@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.61.63 — Pins: paste, a live float, a touch menu (2026-11-23)
+
+- **Added:** a picture copied in another app and pasted in a Pins window goes into the library and in the middle of the window, over any view (PhotoCraft's too). ([Pins](README.md#pins))
+- **Changed:** Float over other apps shows the window live: the floated picture follows the canvas as it changes. ([Pins](README.md#pins))
+- **Changed:** a finger held still on a Pins window's canvas opens its short menu, the one of a right click. ([Pins](README.md#pins))
+- **Docs:** Pins is a simple reference view: writing and editing text, the list under the pointer and search are the main canvas's, by design. ([Pins](README.md#pins))
+
+### For developers
+
+- ADR 0208 revised to what Pins is now (the view in use over any view, the second Library, the live float, paste).
+- Tests: the main view does not move with a key held in Pins (`pins.spec.ts`); over PhotoCraft, a press in Pins takes the keys back from its frame, Ctrl+A, Delete and Ctrl+Z act there, and its picture is drawn (`photocraft.spec.ts`).
+- Desktop bridge: `floatWindow` answers its window's id, `floatFrame(id, picture)` sends it a new picture.
+
 ## 0.61.62 — Packaging cleans up after itself (2026-11-23)
 
 ### For developers

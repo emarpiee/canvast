@@ -254,3 +254,30 @@ test("a file of any kind saved in PhotoCraft goes back into that file, session a
   }
   expect((await itemNames(p)).some((n) => n.includes("-edited"))).toBe(false);
 });
+
+test("a Pins window over PhotoCraft: a press in it takes the keys back from PhotoCraft's frame, its canvas's keys and undo act on it, and its pictures are drawn there", async ({ app }) => {
+  const p = app.page;
+  await place(app, "study.png");
+  await p.evaluate(() => window.__canvastDebug.select([]));
+  await p.keyboard.press("Shift+R");
+  const pins = p.getByTestId("pins");
+  await expect(pins).toBeVisible();
+  await p.getByTestId("view-photocraft").click();
+  await running(p);
+  // the keys in PhotoCraft's frame, as after working in it
+  await p.evaluate(() => document.querySelector<HTMLIFrameElement>(".photocraft-frame")!.focus());
+  expect(await p.evaluate(() => document.activeElement?.tagName)).toBe("IFRAME");
+  // a press in the Pins window takes them: Ctrl+A, Delete and Ctrl+Z act on its canvas
+  const r = (await pins.locator("canvas").boundingBox())!;
+  await p.mouse.click(r.x + 6, r.y + 6);
+  expect(await p.evaluate(() => document.activeElement?.tagName), "the keys left PhotoCraft's frame").not.toBe("IFRAME");
+  await p.keyboard.press("Control+a");
+  await p.keyboard.press("Delete");
+  await expect.poll(async () => (await objs(app)).length, { message: "Delete in Pins over PhotoCraft" }).toBe(0);
+  await p.keyboard.press("Control+z");
+  await expect.poll(async () => (await objs(app)).length, { message: "Ctrl+Z in Pins over PhotoCraft" }).toBe(1);
+  // its picture drawn there, though leaving the canvas let the decoded pictures go: the middle of Pins, fitted to it, is the picture's colour
+  await p.evaluate(() => window.__canvastDebug.runCommand("view.fitAll", {}, "test"));
+  const middle = (): Promise<number[]> => pins.locator("canvas").evaluate((c: HTMLCanvasElement) => [...c.getContext("2d")!.getImageData(c.width >> 1, c.height >> 1, 1, 1).data]);
+  await expect.poll(async () => { const [r0, g, b] = await middle(); return Math.abs(r0! - 90) < 30 && Math.abs(g! - 120) < 30 && Math.abs(b! - 120) < 30; }, { message: "the picture drawn in Pins", timeout: 15_000 }).toBe(true);
+});

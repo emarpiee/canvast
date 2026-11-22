@@ -9,7 +9,7 @@ import type { ItemLabel } from "../render/item-label";
 import { createFocusCycle, fitAllVisible } from "../interaction/item-navigation";
 import { deserializeFrameCamera } from "../core/frames";
 import { deserializeCamera } from "../core/camera";
-import { addCanvasView, dropBarActions, focusCanvasView, setBarActions } from "../canvas/focus";
+import { addCanvasView, dropBarActions, focusCanvasView, focusedCanvasView, setBarActions } from "../canvas/focus";
 import type { PanelDock } from "../ui/panel-dock";
 import { panelHtml } from "../ui/panel";
 import { openMoreMenu } from "../ui/more-menu";
@@ -44,6 +44,8 @@ export interface PinsDeps {
     invalidate(): void;
     follow(editor: EditorState): () => void;
     labels(): ItemLabel[];
+    /** How many frames it has drawn: a floated window is sent a new picture when this changes. */
+    draws(): number;
   };
   /** A drawing surface wired as the main view's is (app/main.ts `wireCanvasView`): its menu and drops on what `now` shows, and `attach`
    * for each canvas it shows, which returns what takes it off. */
@@ -62,7 +64,10 @@ export interface PinsDeps {
   read(): WindowPrefs[];
   write(windows: WindowPrefs[]): void;
   /** The desktop app: a window above every app, showing this page (view only). */
-  float?(title: string, html: string): Promise<unknown>;
+  /** A window above every app (desktop): its id, for `floatFrame`. */
+  float?(title: string, html: string): Promise<string | void>;
+  /** A new picture for that window; false once it was closed. */
+  floatFrame?(id: string, picture: string): Promise<boolean>;
 }
 
 /** The parts of a view of a canvas the wiring needs (app/main.ts `ViewParts`). */
@@ -84,6 +89,10 @@ interface Pin {
   onMain: boolean;
   /** The canvas it shows, while it shows one. */
   target: ViewTarget | null;
+  /** Its engine's frame count, while it shows a canvas. */
+  drawn: (() => number) | null;
+  /** Stops the live picture of it floated over other apps. */
+  unfloat: (() => void) | null;
   again(): void;
   show(source: PinSource): void;
   apply(): void;
@@ -93,7 +102,7 @@ interface Pin {
 /** A Pins window's canvas menu: what a board of references needs (ordering, copying, removing, finding its way); the rest is the main canvas's. */
 export const PINS_MENU_ROWS: ReadonlySet<string> = new Set(["Copy", "Copy file", "Paste", "Duplicate", "Bring to front", "Send to back", "Delete the selection", "Select everything", "Fit everything in view"]);
 
-export function mountPins(deps: PinsDeps): { open(source?: PinSource): void; refresh(): void; dropAt(x: number, y: number, hashes: readonly string[]): boolean; barHost(id: string): HTMLElement | null } {
+export function mountPins(deps: PinsDeps): { open(source?: PinSource): void; refresh(): void; dropAt(x: number, y: number, hashes: readonly string[]): boolean; barHost(id: string): HTMLElement | null; inUse(at?: EventTarget | null): { canvas: ViewTarget | null } | null } {
   const pins = new Map<string, Pin>();
   const keep = (): void => deps.write([...pins.values()].map((p) => ({ c: p.source, ...(p.opacity < 1 ? { o: p.opacity } : {}), ...(p.through ? { t: true } : {}) })));
   const canvasOf = (src: PinSource): string | null => (src.startsWith("canvas:") ? src.slice(7) : null);
@@ -234,11 +243,14 @@ export function mountPins(deps: PinsDeps): { open(source?: PinSource): void; ref
       el,
       onMain: false,
       target: null,
+      drawn: null,
+      unfloat: null,
       apply: () => undefined,
       again: () => void show(pin.source),
       show: (c) => void show(c),
       close: () => {
         stop?.();
+        pin.unfloat?.();
         focusCanvasView("main"); // (closed: its keys go back to the main view)
         pins.delete(id);
         deps.dock.remove(`pins:${id}`);
@@ -259,6 +271,7 @@ export function mountPins(deps: PinsDeps): { open(source?: PinSource): void; ref
       const offView = addCanvasView(id, deps.actionsFor(doc, editor, view, engine.index, focus), editor, doc);
       setBarActions(id, deps.barActionsFor(doc, editor, view));
       pin.target = { doc, view, editor, el: canvas };
+      pin.drawn = engine.draws;
       const unsubs = [engine.follow(editor)]; // (drawn again on every change, a drag's too, as the main view is)
       const size = (): void => {
         const r = host.getBoundingClientRect(), dpr = deps.dpr();
@@ -284,6 +297,7 @@ export function mountPins(deps: PinsDeps): { open(source?: PinSource): void; ref
         dropBarActions(id);
         parts = null;
         pin.target = null;
+        pin.drawn = null;
         release();
       };
     };
@@ -356,7 +370,7 @@ export function mountPins(deps: PinsDeps): { open(source?: PinSource): void; ref
     el.querySelector("[data-pins-more]")!.addEventListener("click", (e) => openMoreMenu(e.currentTarget as HTMLElement, [
       { label: "Opacity…", icon: ICONS.windowOpacity, hint: "A slider; see what is behind it", command: "pins.window", checked: !lookHost.hidden, run: () => void ((lookHost.hidden = !lookHost.hidden), look.build()) },
       { label: "Let clicks through", icon: ICONS.clickThrough, hint: "To what is under it; not its title", command: "pins.window", checked: pin.through, run: () => void pressCommand("pins.window", { window: id, through: !pin.through }) },
-      ...(deps.float ? [{ label: "Float over other apps", icon: ICONS.floatOnTop, hint: "A picture of it in a window above every app", command: "pins.float", run: () => void pressCommand("pins.float", { window: id }) }] : []),
+      ...(deps.float ? [{ label: "Float over other apps", icon: ICONS.floatOnTop, hint: "Live, in a window above every app", command: "pins.float", run: () => void pressCommand("pins.float", { window: id }) }] : []),
     ], "More"));
     document.body.append(el);
     deps.dock.add(el, { id: `pins:${id}`, title: "Pins", side: "float", everywhere: true, width: canvasOf(source) ? 360 : 640, height: canvasOf(source) ? 300 : 480 });
@@ -402,15 +416,29 @@ export function mountPins(deps: PinsDeps): { open(source?: PinSource): void; ref
       keep();
       return { ok: true };
     }),
-    pc("pins.float", "Float a Pins window over other apps", "A picture of it, in a window above every app (view only)", [WINDOW], (o) => {
+    pc("pins.float", "Float a Pins window over other apps", "Live, in a window above every app (view only)", [WINDOW], (o) => {
       const p = pins.get(String(o["window"]));
       if (!p || !deps.float) return { ok: false, error: deps.float ? "No such window." : "Only in the desktop app." };
       const c = p.el.querySelector<HTMLCanvasElement>(".pins-canvas");
       const pic = canvasOf(p.source) && c ? c.toDataURL("image/png") : null;
       if (!pic) return { ok: false, error: "Float a window that shows a canvas." };
       const title = nameOf(p.source);
-      // (a page of its own, no script: the picture fitted in the window)
-      void deps.float(title, `<!doctype html><html><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src data:; style-src 'unsafe-inline'"><title>${esc(title)}</title><style>html,body{margin:0;height:100%;background:#1e1e1e}img{width:100%;height:100%;object-fit:contain;display:block}</style></head><body><img src="${pic}" alt="${esc(title)}"></body></html>`);
+      // (a page of its own, no script: the picture fitted in the window; the app sends it a new one when the canvas is drawn again, a few a second at most)
+      void deps.float(title, `<!doctype html><html><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src data:; style-src 'unsafe-inline'"><title>${esc(title)}</title><style>html,body{margin:0;height:100%;background:#1e1e1e}img{width:100%;height:100%;object-fit:contain;display:block}</style></head><body><img src="${pic}" alt="${esc(title)}"></body></html>`).then((fid) => {
+        if (!fid || !deps.floatFrame) return;
+        p.unfloat?.();
+        let last = p.drawn?.() ?? -1;
+        const timer = window.setInterval(() => {
+          const now = p.drawn?.();
+          if (now === undefined || now === last || !c?.isConnected) return;
+          last = now;
+          void deps.floatFrame!(fid, c!.toDataURL("image/png")).then((open) => void (!open && p.unfloat?.()));
+        }, 250);
+        p.unfloat = () => {
+          clearInterval(timer);
+          p.unfloat = null;
+        };
+      });
       return { ok: true };
     }),
     pc("pins.close", "Close a Pins window", "What it shows stays as it is", [WINDOW], (o) => {
@@ -427,6 +455,12 @@ export function mountPins(deps: PinsDeps): { open(source?: PinSource): void; ref
     open,
     // (where a window's canvas, when it is the view in use, has the app's Actions bar)
     barHost: (id) => pins.get(id)?.el.querySelector<HTMLElement>("[data-pins-bar]") ?? null,
+    // (the window a key or a paste is for: the one it happened in, else the one pressed last; its canvas, or null while it shows pictures of the library)
+    inUse: (at) => {
+      const el = (at as Element | null)?.closest?.(".pins-panel");
+      const p = [...pins.values()].find((x) => (el ? x.el.contains(el) || el.contains(x.el) : focusedCanvasView() === x.id));
+      return p ? { canvas: p.target } : null;
+    },
     // (pictures dragged off the main canvas, let go over a pinned canvas: placed there)
     dropAt: (x, y, hashes) => {
       for (const p of pins.values()) {

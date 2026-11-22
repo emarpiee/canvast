@@ -30,6 +30,7 @@ const bridge: DesktopBridge = {
   openFile: (path) => ipcRenderer.invoke("canvast:openFile", path),
   openCopy: (name, bytes) => ipcRenderer.invoke("canvast:openCopy", name, bytes),
   floatWindow: (title, html) => ipcRenderer.invoke("canvast:floatWindow", title, html),
+  floatFrame: (id, picture) => ipcRenderer.invoke("canvast:floatFrame", id, picture),
   copyFiles: (files, copies, also) => ipcRenderer.invoke("canvast:copyFiles", files, copies, also),
   startDrag: (files) => ipcRenderer.send("canvast:startDrag", files),
   frame: () => ipcRenderer.invoke("canvast:frame"),

@@ -72,7 +72,7 @@ import { dimHits, revealHits, scrollReveal, type RevealWhy } from "../interactio
 import { ownerOf } from "../doc/belongs";
 import { syncScroll } from "../ui/bar";
 import { parseHex, rgbToOklch } from "../colour-picker/colour";
-import { canvasItems, mountContextMenu } from "../ui/context-menu";
+import { canvasItems, mountContextMenu, showContextMenu } from "../ui/context-menu";
 import { openBatchRename } from "../ui/batch-rename";
 import { HIDDEN_LOCKED, askCurrentPassword, forgetHiddenPassword, hiddenModeOn, hiddenRemembered, lockHidden, onHiddenRemembered } from "../ui/hidden-access";
 import { typeOfName } from "../storage/workspace-names";
@@ -1150,17 +1150,27 @@ async function start(): Promise<void> {
    */
   function wireCanvasView(el: HTMLCanvasElement, now: () => ViewParts | null, main: boolean, own: Partial<ToolHooks> = {}): (p: ViewParts) => () => void {
     el.classList.add("canvas-surface");
+    const only = main ? undefined : PINS_MENU_ROWS;
+    const pickAt = (x: number, y: number): boolean => {
+      const p = now();
+      if (!p) return false;
+      const hit = pickAll(visibleObjects(p.doc, p.index, null, p.view.frameCamera, p.view.viewport).filter((po) => !po.obj.hidden && !po.obj.locked), x, y)[0]?.obj;
+      if (hit && !p.editor.selection.has(hit.id)) p.editor.select([hit.id]);
+      return !!hit; // (empty canvas: the menu of the canvas, whatever is picked)
+    };
     mountContextMenu(el, commands, {
-      ...(main ? {} : { only: PINS_MENU_ROWS }),
+      ...(only ? { only } : {}),
       active: () => { const p = now(); return !!p && (!main || appView === "canvas") && !textEditor.isOpen && performance.now() - p.editor.fingerListAt > 1500; },
-      pickAt: (x, y) => {
-        const p = now();
-        if (!p) return false;
-        const hit = pickAll(visibleObjects(p.doc, p.index, null, p.view.frameCamera, p.view.viewport).filter((po) => !po.obj.hidden && !po.obj.locked), x, y)[0]?.obj;
-        if (hit && !p.editor.selection.has(hit.id)) p.editor.select([hit.id]);
-        return !!hit; // (empty canvas: the menu of the canvas, whatever is picked)
-      },
+      pickAt,
     });
+    // (a pinned view lists nothing under a finger held still: it opens its short menu there, the one of a right click)
+    if (!main) own = { ...own, revealList: (at, _pick, o) => {
+      if (!o.touch) return false;
+      const r = el.getBoundingClientRect();
+      showContextMenu(r.left + at.x, r.top + at.y, canvasItems(commands, pickAt(at.x, at.y), only), "Canvas actions");
+      o.onOpen();
+      return true;
+    } };
     // (the main canvas's files from other apps have their own import, which places them as it reads them)
     takeDrops(el, () => { const p = now(); return p && { doc: p.doc, view: p.view, editor: p.editor, el }; }, !main);
     return (p) => {
@@ -3327,7 +3337,7 @@ async function start(): Promise<void> {
       return { ...e, follow: (ed: EditorState) => { const off = e.follow(ed); assetsReady.add(ready); return () => { off(); assetsReady.delete(ready); }; } };
     },
     // (a Pins window's surface wired as the main view's is: one function, so it has whatever the canvas has)
-    // shortcut: a pinned view edits text, lists what is under the pointer and searches through the main view for now; give them its own when they need it
+    // (Pins is a simple reference view: text is edited, the list under the pointer opened and the canvas searched in the main view, by design)
     wire: (el, now) => wireCanvasView(el, now, false, { editText: () => undefined, revealList: () => false, openSearch: () => undefined }),
     actionsFor: canvasActionsFor,
     barActionsFor,
@@ -3337,7 +3347,7 @@ async function start(): Promise<void> {
     read: () => { try { return JSON.parse(settings.get("pins.windows")) as Array<{ c: string; o?: number; t?: boolean }>; } catch { return []; } },
     write: (ws) => void settings.set("pins.windows", JSON.stringify(ws)),
     place: (t, hashes, at) => placeIn(t, hashes, at),
-    ...(desktopBridge()?.floatWindow ? { float: (title: string, html: string) => desktopBridge()!.floatWindow!(title, html) } : {}),
+    ...(desktopBridge()?.floatWindow ? { float: (title: string, html: string) => desktopBridge()!.floatWindow!(title, html), floatFrame: (id: string, picture: string) => desktopBridge()!.floatFrame?.(id, picture) ?? Promise.resolve(false) } : {}),
   });
   session.subscribe(() => pinsWindows?.refresh());
   // The moodboards of the old reference windows become canvases of a board "Pins", once (nothing is lost)
@@ -3397,11 +3407,13 @@ async function start(): Promise<void> {
     const at = pasteKeyAt;
     // A browser may send no paste event for the keys when the system clipboard holds only a picture and nothing on the page takes text
     // (Firefox, after a copy here put the copied things' picture there): what was copied here is pasted all the same, once.
-    if (typing(e.target) || appView !== "canvas" || textEditor.isOpen || !isCopiedPicture()) return;
+    const inPins = focusedCanvasView() !== "main"; // (a Pins window in use, over any view: its canvas takes it)
+    if (typing(e.target) || (appView !== "canvas" && !inPins) || textEditor.isOpen || !isCopiedPicture()) return;
     setTimeout(() => {
       if (pasteEventAt >= at || pasteKeyAt !== at || document.querySelector("dialog:modal")) return;
       pasteEventAt = at; // (a paste event that comes later still is this one: not a second paste)
-      pasteObjects(doc, editor, view, null);
+      if (inPins) void pressCommand("edit.paste", {}, "key");
+      else pasteObjects(doc, editor, view, null);
     }, PASTE_EVENT_WAIT_MS);
   }, true);
   // (first, before anything on the page: Firefox sends the paste to a hidden editable box that holds a selection, whose own handler would take it)
@@ -3438,10 +3450,19 @@ async function start(): Promise<void> {
     else if (appView === "canvas" && !textEditor.isOpen && pasteWords(e.clipboardData?.getData("text/plain") ?? "")) e.preventDefault();
   };
   window.addEventListener("paste", (e) => {
-    // (a paste in a Pins window is its own: what was copied in the app goes on its canvas, never also on the main one; this listener runs first, in capture)
-    if ((e.target as HTMLElement | null)?.closest?.(".pins-panel")) {
+    // (a paste in a Pins window is its own, over any view, PhotoCraft's too: what was copied in the app goes on its canvas, and pictures copied in
+    // another app are taken into the library and placed in its middle; never also on the main one. This listener runs first, in capture.)
+    const pin = typing(clipTarget(e)) || document.querySelector("dialog:modal") ? null : pinsWindows.inUse(e.target);
+    if (pin) {
       e.preventDefault();
-      if (focusedCanvasView() !== "main") void pressCommand("edit.paste", {}, "key");
+      pasteEventAt = performance.now(); // (the keys' fallback does not paste it again)
+      if (!pin.canvas) return; // (pictures of the library: nothing is pasted there)
+      const files = namePasted(onePerPicture([...(e.clipboardData?.files ?? [])]), [...(e.clipboardData?.types ?? [])], settings.get("library.pasteName"), nameWords(session));
+      const own = e.clipboardData?.getData("text/plain") ?? "";
+      if (files.length && own === "" && !isCopiedPicture()) {
+        const r = pin.canvas.el.getBoundingClientRect(), t = pin.canvas;
+        void assetsView.importFiles(files).then((hs) => placeIn(t, hs, { x: r.left + r.width / 2, y: r.top + r.height / 2 }));
+      } else void pressCommand("edit.paste", {}, "key");
       return;
     }
     onPaste(e);

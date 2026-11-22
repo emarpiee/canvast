@@ -47,6 +47,12 @@ test("Pins (ADR 0208): Shift+R pins the open canvas in a window above every view
   await expect.poll(() => p.evaluate(() => window.__canvastDebug.objects().length), { message: "Delete in Pins" }).toBe(0);
   await p.keyboard.press("Control+z");
   await expect.poll(() => p.evaluate(() => window.__canvastDebug.objects().length), { message: "Ctrl+Z in Pins" }).toBe(1);
+  // the main view's keys stand down while Pins is in use: D held pans Pins, never also the main view
+  const cam = await p.evaluate(() => window.__canvastDebug.camera());
+  await p.keyboard.down("d");
+  await p.waitForTimeout(250);
+  await p.keyboard.up("d");
+  expect(await p.evaluate(() => window.__canvastDebug.camera()), "the main view did not move with a key pressed in Pins").toEqual(cam);
   // above every view: still shown over the Library
   await p.getByTestId("view-assets").click();
   await expect(pins).toBeVisible();
