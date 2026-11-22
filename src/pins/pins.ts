@@ -212,9 +212,7 @@ export function mountPins(deps: PinsDeps): { open(source?: PinSource): void; ref
       title: "Pins",
       tools: `<button type="button" class="layer-btn" data-pins-more aria-haspopup="menu" aria-label="More" title="More: opacity, clicks through, float over other apps">${ICONS.ellipsis}</button>`,
       sub: `<div class="styles-kinds"><button type="button" class="pick-current" data-pins-source aria-haspopup="menu" aria-label="What it shows" title="What it shows: a canvas, or pictures of the library"></button></div><div class="pins-look" data-pins-look hidden></div>`,
-      body: `<div class="pins-view" data-pins-view><canvas class="pins-canvas" tabindex="0" aria-label="A pinned canvas: the canvas's tools, keys and menus"></canvas></div><div class="pins-library" data-pins-library hidden></div>`,
-      // (the app's Actions bar comes here while this window's canvas is the view in use: app/main.ts places it)
-      foot: `<div class="pins-bar" data-pins-bar></div>`,
+      body: `<div class="pins-view" data-pins-view><canvas class="pins-canvas" tabindex="0" aria-label="A pinned canvas: the canvas's tools, keys and menus"></canvas></div><div class="pins-library" data-pins-library hidden></div><div class="pins-bar" data-pins-bar></div>`,
     });
     const host = el.querySelector<HTMLElement>("[data-pins-view]")!;
     const canvas = el.querySelector<HTMLCanvasElement>("canvas")!;

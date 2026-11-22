@@ -1031,9 +1031,11 @@ dialog.confirm .secret-field .prompt-input { padding-right: calc(var(--icon-xl) 
 .ctx-wrap:has(> .ctx-bar[hidden]) { display: none; }
 .ctx-wrap.is-following { bottom: auto; transform: none; } /* (placed from the selection) */
 /* (the Actions bar inside a Pins window, along its bottom, while its canvas is the view in use: its own bar only) */
-.pins-bar .ctx-wrap { position: static; transform: none; max-width: 100%; }
+/* (it floats over the bottom of the canvas, as it does over the main one: the view under it never moves) */
+.pins-panel .panel-body { position: relative; }
+.pins-bar { position: absolute; left: 0; right: 0; bottom: var(--near); display: flex; justify-content: center; pointer-events: none; z-index: 1; }
+.pins-bar .ctx-wrap { position: static; transform: none; max-width: calc(100% - 2 * var(--near)); pointer-events: auto; }
 .pins-bar .ctx-wrap > :not(.ctx-bar) { display: none; }
-.pins-panel .panel-foot:has(> .pins-bar:empty), .pins-panel .panel-foot:has(.ctx-bar[hidden]) { display: none; }
 .ctx-wrap > .toolbar { flex: none; }
 .ctx-bar { display: flex; align-items: center; min-width: 0; overflow-x: auto; scrollbar-width: none; backdrop-filter: blur(6px); }
 .ctx-bar::-webkit-scrollbar { display: none; }

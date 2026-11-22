@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.61.48 — The Actions bar floats in the Pins window (2026-11-22)
+
+- **Fixed before release:** the Actions bar in a Pins window took a row of its own under the canvas, so the view moved each time it showed: it floats over the bottom of the canvas, as over the main one. ([Pins](README.md#pins))
+
 ## 0.61.47 — Pins: pictures in the library's own viewer (2026-11-22)
 
 - **Changed:** a Pins window shows pictures of the library (All pictures, a recent folder, or **Choose a folder…**) in **the library's own viewer**: the picture large, its filmstrip, zoom and Fit, the slideshow and Place. The whole Library in the window is gone; the Library view keeps its own folder and look. ([Pins](README.md#pins))
