@@ -1449,11 +1449,14 @@ async function start(): Promise<void> {
     revealList: (at, pick, opts) => openChoiceList(at, pick, opts),
     // canvas pictures dragged onto a reference window's board go onto it (ADR 0207)
     droppedOff: (ids, cx, cy) => {
-      const board = document.elementFromPoint(cx, cy)?.closest<HTMLElement>("[data-ref-board]");
+      const under = document.elementFromPoint(cx, cy);
+      const board = under?.closest<HTMLElement>("[data-ref-board]");
       const win = board?.closest<HTMLElement>(".ref-window");
+      // (what the last drop off the canvas found, for a test or a bug report to read)
+      document.body.dataset["droppedOff"] = board && win ? "a moodboard" : `${under?.tagName}.${under?.className} at ${Math.round(cx)},${Math.round(cy)}`;
       if (!board || !win) return false;
       const hashes = ids.flatMap((id) => { const o = doc.get(id); return o?.kind === "image" ? [o.assetId] : []; });
-      if (!hashes.length) return false;
+      if (!hashes.length) return void (document.body.dataset["droppedOff"] = "no pictures among what was dragged"), false;
       board.dispatchEvent(new CustomEvent("ref-drop", { detail: { hashes, x: cx, y: cy }, bubbles: true }));
       return true;
     },

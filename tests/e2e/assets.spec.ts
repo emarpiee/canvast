@@ -2977,7 +2977,7 @@ test("reference window (ADR 0207): over the Library and the canvas, a gallery of
   const to = { x: wb.x + wb.width / 2, y: wb.y + wb.height / 2 };
   const under = await p.evaluate(([x, y]) => { const t = document.elementFromPoint(x!, y!); return t?.closest("[data-ref-board]") ? "the board" : `${t?.tagName}.${t?.className}`; }, [to.x, to.y]);
   await app.drag({ x: (pic.minX + pic.maxX) / 2, y: (pic.minY + pic.maxY) / 2 }, to, 8);
-  await expect.poll(async () => (await items()).length, { message: `dragged off the canvas (under the drop: ${under}; picture at ${Math.round(pic.minX)},${Math.round(pic.minY)}; still ${await p.evaluate(() => window.__canvastDebug.objects().length)} on the canvas; tool ${await p.evaluate(() => window.__canvastDebug.tool())}; moodboard ${JSON.stringify((await items()).map((x) => x.h.slice(0, 6)))}, blue ${blue.slice(0, 6)})` }).toBe(3);
+  await expect.poll(async () => (await items()).length, { message: `dragged off the canvas (under the drop: ${under}; picture at ${Math.round(pic.minX)},${Math.round(pic.minY)}; still ${await p.evaluate(() => window.__canvastDebug.objects().length)} on the canvas; tool ${await p.evaluate(() => window.__canvastDebug.tool())}; the drop found ${await p.evaluate(() => document.body.dataset["droppedOff"] ?? "nothing: no drop off the canvas")}; moodboard ${JSON.stringify((await items()).map((x) => x.h.slice(0, 6)))}, blue ${blue.slice(0, 6)})` }).toBe(3);
   expect(await p.evaluate(() => window.__canvastDebug.objects().length), "still on the canvas").toBe(1);
   // its right-click menu places a picture on the canvas
   await w2.locator('[data-ref-item="1"]').click({ button: "right" });

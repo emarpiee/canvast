@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.61.27 — Escape closes a note still opening (2026-11-22)
+
+- **Fixed before release:** Escape pressed right after a note was double-clicked open on the canvas, while its words were shown but it was still opening, did nothing: it now closes it as soon as it is open. ([Notes](README.md#notes))
+
+### For developers
+
+- A drop off the canvas keeps what it found in `body[data-dropped-off]`; the reference window spec says it.
+
 ## 0.61.26 — Diagnostics for two failing tests (2026-11-22)
 
 ### For developers

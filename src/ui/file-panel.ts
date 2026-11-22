@@ -29,6 +29,8 @@ export function mountFilePanel(
   mode: () => "panel" | "window",
 ): { open(hash: string, card?: CardActions): Promise<boolean>; close(): Promise<boolean>; closeHidden(): void; readonly hash: string | null } {
   let el = hosts.panel; // (the host of the file open now)
+  /** The file being opened (its view shown, not ready: its hash), and whether Escape came meanwhile. */
+  let opening = "", escaped = false;
   let note: OpenView | null = null;
   let kind: FileViewKind | null = null;
   let name = "";
@@ -88,7 +90,11 @@ export function mountFilePanel(
     el.querySelector("[data-rename]")?.addEventListener("click", () => void rename()); // view-state: (opens the rename dialog of this file)
     el.hidden = false;
     try {
-      note = await k.open(el.querySelector<HTMLElement>(".viewer-note > div")!, { hash, name: name0, blob: rec.blob }, deps, { ...place, ...card });
+      opening = hash;
+      escaped = false;
+      note = await k.open(el.querySelector<HTMLElement>(".viewer-note > div")!, { hash, name: name0, blob: rec.blob }, deps, { ...place, ...card }).finally(() => void (opening = ""));
+      // (Escape pressed while it was still opening, its words already shown: it closes now)
+      if (escaped) return void (await leave()), true;
       if (k.id !== "note") el.querySelector<HTMLElement>(".viewer-note [tabindex]")?.focus({ preventScroll: true });
       // a note: the caret in its words at once, so the keys (Escape too) are the note's from the first one, not the canvas's behind it
       // (after the double-click that opened it has ended: its last release would take the focus back to the canvas)
@@ -137,13 +143,14 @@ export function mountFilePanel(
   const showing = (q: Element): boolean => (q as HTMLElement).getClientRects().length > 0 && getComputedStyle(q).visibility !== "hidden";
   window.addEventListener("keydown", (e) => {
     if (e.key !== "Escape" || e.ctrlKey || e.altKey || e.metaKey || e.shiftKey || e.isComposing) return;
-    if (!note || el.hidden) return void (hosts.panel.dataset["escape"] = !note ? "no note open" : `its host hidden (${el === hosts.window ? "window" : "panel"})`);
+    if (el.hidden) return void (hosts.panel.dataset["escape"] = `its host hidden (${el === hosts.window ? "window" : "panel"})`);
+    if (!note && !opening) return void (hosts.panel.dataset["escape"] = "no note open");
     // in the file, or in the window wherever the focus is; elsewhere (the canvas, the page, whatever holds the focus after the double-click
     // that opened it) when nothing is selected or only the card it opened from: never from a field, a dialog or another panel, whose it is
     const t = e.target instanceof Element ? e.target : null;
     const inside = !!t && el.contains(t);
     const ed = deps.session.editor;
-    const onlyItsCard = [...ed.selection].every((id) => { const o = deps.session.doc.get(id); return o?.kind === "image" && o.assetId.split("#")[0] === note?.hash; });
+    const onlyItsCard = [...ed.selection].every((id) => { const o = deps.session.doc.get(id); return o?.kind === "image" && o.assetId.split("#")[0] === (note?.hash ?? opening); });
     const elsewhere = !!t && !!t.closest("input, textarea, select, [contenteditable='true'], dialog, .pop-menu, .layers-panel, .ref-window");
     // (why an Escape did not close it, kept on the panel for a test or a bug report to read)
     const why = (w: string): void => void (el.dataset["escape"] = w);
@@ -153,6 +160,7 @@ export function mountFilePanel(
     e.preventDefault();
     e.stopImmediatePropagation();
     why("closing");
+    if (!note) return void (escaped = true); // (still opening: closed as soon as it is open)
     void leave().then((ok) => why(ok ? "closed" : "the note refused to leave (unsaved, not saved)"));
   }, true);
   return {
