@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.61.50 — A shorter right-click menu in a Pins window (2026-11-22)
+
+- **Changed:** right-clicking a picture in a Pins window's viewer offers what a reference needs: favourite, copy (the picture, its name, its file), Edit in PhotoCraft, open it in its app or file manager. Placing, organizing, hiding, renaming, downloading, exporting and deleting stay in the Library. ([Pins](README.md#pins))
+
 ## 0.61.49 — No full screen or Place in a Pins window (2026-11-22)
 
 - **Changed:** the library's viewer in a Pins window has no Full screen and no Place buttons. ([Pins](README.md#pins))

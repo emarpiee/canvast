@@ -5196,6 +5196,8 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     [["rename", "Give it a new name", ICONS.textCursorInput, "Rename…"], ["rename-all", "Give them new names", ICONS.textCursorInput], ["download", "Save a copy", ICONS.download, "Download"], ["photocraft", "The photo editor; saves a new item", ICONS.photoCraft], ["open-tab", "In a new browser tab", ICONS.externalLink], ["open-app", "In your usual program", ICONS.externalLink], ["show-file", "In your file manager", ICONS.folderOpen], ["export", "A file to keep or share", ICONS.fileArchive, "Export as archive"], ["export-all", "A file to keep or share", ICONS.fileArchive], ["export-files-all", "The files, in a ZIP", ICONS.fileArchive]],
     [["delete", "From the library", ICONS.trash2], ["delete-all", "From the library", ICONS.trash2], ["delete-everywhere", "Library and every canvas", ICONS.trash2]],
   ];
+  /** The item rows a Pins window's viewer keeps (ADR 0208): favourite, copy, and open it in another program. */
+  const PINNED_ROWS = new Set(["favorite", "copy", "copy-name", "copy-file", "photocraft", "open-app", "open-tab", "show-file"]);
   const panelGroups = (): MenuItem[][] =>
     PANEL_GROUPS.map((g) =>
       g.flatMap(([action, hint, icon, label]): MenuItem[] => {
@@ -5326,7 +5328,9 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       if (!hash) return [];
       if (!picked.has(hash) || picked.size > 1) await select(hash); // (the menu is about the item on show)
       const g = panelGroups();
-      return groupedMenu([g[0]!, clipboardGroup([hash]), g[1]!, g[2]!]);
+      // (a Pins window's viewer is for looking: what changes the library, places, or opens it elsewhere in the app is left to the Library)
+      const pinned = (items: MenuItem[]): MenuItem[] => (opts.embedded ? items.filter((i) => PINNED_ROWS.has(i.id ?? "")) : items);
+      return groupedMenu([pinned(g[0]!), pinned(clipboardGroup([hash])), pinned(g[1]!), pinned(g[2]!)]);
     },
   });
   // ---- the list's columns: drag a header onto another to move it
