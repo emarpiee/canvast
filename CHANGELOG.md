@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.62.0 — Pins, comic pages, and an AppImage that runs anywhere (2026-11-23)
+
+Pins keep your references in sight while you work: any canvas, or a folder of the library, in a simple window above every view, the Library and PhotoCraft too, drawn by the canvas's own engine and working as the canvas does. Comic pages get their panels, gutters and styles, and the Linux AppImage now starts on systems without the FUSE library and describes itself to app catalogs.
+
+### Highlights
+
+- **Pins:** `Shift+R` pins the canvas you are on in a window above every view; choose any canvas, or the library's pictures as its grid and viewer. Arrange, copy, paste and undo work there, over the Library and PhotoCraft too, and it can float live over other apps. ([Pins](README.md#pins))
+- **Comic pages:** panels with their own handles, a knife to cut them, gutters you can widen, and page styles. ([Comic pages](README.md#comic-pages))
+- **The AppImage runs anywhere:** it no longer needs `libfuse2`, and it carries a description and screenshots for app catalogs and software centres. ([Installation](README.md#installation))
+- **The Library's viewer stays on a picture you save again** in PhotoCraft or another program, showing its new version.
+- **Start from scratch leaves nothing behind**, and Esc closes a note wherever the focus is.
+
+### Before you update
+
+- The reference windows' moodboards become canvases, once, in a board named **Pins**: every picture where it was, flipped, turned and see-through as it was. The reference windows are replaced by Pins.
+
 ## 0.61.64 — First modules out of the canvas start-up (2026-11-23)
 
 ### For developers
