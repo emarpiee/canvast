@@ -136,7 +136,8 @@ export function mountFilePanel(
   const POPUPS = ".se-controller, .se-dropdown, .se-select-menu, .se-modal-show, .se-cmd-row, .pop-menu, dialog[open]";
   const showing = (q: Element): boolean => (q as HTMLElement).getClientRects().length > 0 && getComputedStyle(q).visibility !== "hidden";
   window.addEventListener("keydown", (e) => {
-    if (e.key !== "Escape" || e.ctrlKey || e.altKey || e.metaKey || e.shiftKey || e.isComposing || !note || el.hidden) return;
+    if (e.key !== "Escape" || e.ctrlKey || e.altKey || e.metaKey || e.shiftKey || e.isComposing) return;
+    if (!note || el.hidden) return void (hosts.panel.dataset["escape"] = !note ? "no note open" : `its host hidden (${el === hosts.window ? "window" : "panel"})`);
     // in the file, or in the window wherever the focus is; elsewhere (the canvas, the page, whatever holds the focus after the double-click
     // that opened it) when nothing is selected or only the card it opened from: never from a field, a dialog or another panel, whose it is
     const t = e.target instanceof Element ? e.target : null;

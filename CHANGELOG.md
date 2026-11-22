@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.61.26 — Diagnostics for two failing tests (2026-11-22)
+
+### For developers
+
+- `data-escape` also says when an Escape found no note open or its host hidden; the reference window spec picks the Select tool by the debug hook (a key pressed while the window has the focus stays in it) and says the tool and the moodboard's pictures when the drop fails.
+
 ## 0.61.25 — A paste in a reference window stays in it (2026-11-22)
 
 - **Fixed before release:** a picture pasted in a reference window from another app was also pasted on the canvas behind it. ([The Library](README.md#the-library))
