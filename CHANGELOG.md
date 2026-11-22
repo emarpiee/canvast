@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.62.1 — A welcome page in the desktop app (2026-11-23)
+
+- **Changed:** the desktop app's first start (and a start whose last workspace folder is gone) shows a welcome page in canvast's own look, its logo and a card with **New workspace…**, **Open a folder…**, the recent workspaces and **Quit**, instead of a system message box. ([Switching workspaces](README.md#switching-workspaces))
+
+### For developers
+
+- `desktop/welcome.ts`: the page, made of the app's stylesheet, logo, icons and the lock screen's look, with no script (each choice is a link the main process reads); the desktop build loads `.css` and `.svg` as text. A desktop test starts with no workspace and quits from the page.
+
 ## 0.62.0 — Pins, comic pages, and an AppImage that runs anywhere (2026-11-23)
 
 Pins keep your references in sight while you work: any canvas, or a folder of the library, in a simple window above every view, the Library and PhotoCraft too, drawn by the canvas's own engine and working as the canvas does. Comic pages get their panels, gutters and styles, and the Linux AppImage now starts on systems without the FUSE library and describes itself to app catalogs.

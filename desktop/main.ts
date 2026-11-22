@@ -8,10 +8,11 @@
  */
 import { COPY_MARK, clipboardEntries, type ClipboardAlso } from "./clipboard-entries";
 import { app, BrowserWindow, dialog, ipcMain, Menu, nativeImage, nativeTheme, net, protocol, session, shell, clipboard, ClipboardItem } from "electron";
+import { welcomeChoiceOf, welcomeHtml, type WelcomeChoice } from "./welcome";
 import { execFile } from "node:child_process";
 import { createHash, randomBytes, randomUUID, scrypt } from "node:crypto";
 import { createReadStream, existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, statSync, watch, writeFileSync } from "node:fs";
-import { lstat, mkdir, open, type FileHandle, readFile, readdir, realpath, rename, rm, rmdir, stat, unlink, utimes, writeFile } from "node:fs/promises";
+import { lstat, mkdir, mkdtemp, open, type FileHandle, readFile, readdir, realpath, rename, rm, rmdir, stat, unlink, utimes, writeFile } from "node:fs/promises";
 import { basename, dirname, join, resolve, sep } from "node:path";
 import { cleanWholeName } from "../src/doc/file-names";
 import { agentsFile } from "./tools-home";
@@ -114,32 +115,59 @@ async function newWorkspaceFolder(near: string | null): Promise<string | null> {
   return p;
 }
 
+/** While the welcome page is between its window and the workspace's: the app does not quit when its last window closes. */
+let starting = false;
+
 /**
- * The start dialog, when there is no workspace to open: the recent ones that are still there, open a folder, a new workspace.
- * `missing`: the last workspace, whose folder is not there any more (moved or deleted). The folder chosen, or null to quit.
+ * The welcome page, when there is no workspace to open (welcome.ts): the recent ones that are still there, open a folder, a new
+ * workspace, quit. `missing`: the last workspace, whose folder is not there any more (moved or deleted). The folder chosen, or null to quit.
  */
 async function startDialog(missing: string | null): Promise<string | null> {
-  for (;;) {
-    const others = readRecent().workspaces.filter((w) => isFolder(w.path)).slice(0, 3);
-    const buttons = [...others.map((w) => `Open “${basename(w.path)}”`), "Open a folder…", "New workspace…", "Quit"];
-    const { response } = await dialog.showMessageBox({
-      type: missing ? "warning" : "question",
-      title: "canvast",
-      message: missing ? `The workspace folder “${basename(missing)}” is not there any more` : "Choose a workspace",
-      detail: [
-        missing ? `It was at ${missing}. It may have been moved or deleted (a deleted folder may still be in the system trash).` : "A workspace is a folder: your boards, canvases and library are files in it.",
-        others.length ? `Recent workspaces:\n${others.map((w) => w.path).join("\n")}` : "",
-      ].filter(Boolean).join("\n\n"),
-      buttons,
-      defaultId: 0,
-      cancelId: buttons.length - 1,
-      noLink: true,
-    });
-    if (response < others.length) return others[response]!.path;
-    const k = response - others.length;
-    if (k === 2) return null;
-    const p = k === 0 ? await pickFolder() : await newWorkspaceFolder(missing);
-    if (p) return p;
+  const dir = await mkdtemp(join(app.getPath("temp"), "canvast-welcome-"));
+  const file = join(dir, "welcome.html");
+  const win = new BrowserWindow({
+    width: 560,
+    height: 640,
+    title: "canvast",
+    show: process.env["CANVAST_HIDDEN"] !== "1",
+    autoHideMenuBar: true,
+    backgroundColor: nativeTheme.shouldUseDarkColors ? "#171615" : "#f1f0ee", // (as the app's window: Electron takes no oklch())
+    webPreferences: { sandbox: true, contextIsolation: true, nodeIntegration: false, javascript: false },
+  });
+  win.setMenuBarVisibility(false);
+  win.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
+  win.webContents.on("will-navigate", (e) => e.preventDefault()); // (its links move only within the page)
+  starting = true;
+  try {
+    for (;;) {
+      const others = readRecent().workspaces.filter((w) => isFolder(w.path)).slice(0, 3);
+      await writeFile(file, welcomeHtml({ recent: others.map((w) => ({ name: basename(w.path), path: w.path })), missing }), { mode: 0o600 });
+      await win.loadFile(file); // (again after a choice that came to nothing: the page as it was, its links ready again)
+      const choice = await new Promise<WelcomeChoice | null>((done) => {
+        const onLink = (_e: unknown, url: string): void => {
+          const c = welcomeChoiceOf(new URL(url).hash);
+          if (c) off(), done(c);
+        };
+        const onClosed = (): void => (off(), done(null));
+        const off = (): void => {
+          win.webContents.off("did-navigate-in-page", onLink);
+          win.off("closed", onClosed);
+        };
+        win.webContents.on("did-navigate-in-page", onLink);
+        win.on("closed", onClosed);
+      });
+      if (!choice || choice.kind === "quit") return null;
+      if (choice.kind === "recent") {
+        const w = others[choice.index];
+        if (w && isFolder(w.path)) return w.path;
+        continue;
+      }
+      const p = choice.kind === "open" ? await pickFolder() : await newWorkspaceFolder(missing);
+      if (p) return p;
+    }
+  } finally {
+    if (!win.isDestroyed()) win.destroy();
+    void rm(dir, { recursive: true, force: true }).catch(() => undefined);
   }
 }
 
@@ -1409,7 +1437,7 @@ app.on("web-contents-created", (_e, contents) => {
   contents.on("will-attach-webview", (e) => e.preventDefault());
 });
 
-app.on("window-all-closed", () => app.quit());
+app.on("window-all-closed", () => void (!starting && app.quit())); // (the welcome page's window closing before the workspace's opens: not the end)
 app.on("will-quit", (e) => {
   rmSync(OPENED_DIR, { recursive: true, force: true });
   if (!hiddenCopy) return;
@@ -1425,10 +1453,11 @@ void app.whenReady().then(async () => {
   }
   installMenu();
   const workspace = await chooseWorkspace();
-  if (!workspace) return app.quit();
-  if (!(await holdWorkspace(workspace))) return app.quit();
+  if (!workspace) return (starting = false), app.quit();
+  if (!(await holdWorkspace(workspace))) return (starting = false), app.quit();
   remember(workspace);
   await openWindow(workspace);
+  starting = false;
   void sweepOldCaches().catch(() => undefined);
 });
 

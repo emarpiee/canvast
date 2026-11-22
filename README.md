@@ -1995,7 +1995,7 @@ Illustration studio/
 | --- | --- |
 | The list | The open workspace and the five latest ones whose folders still exist, plus **Open a folder…** (an existing workspace, or any folder to start one in) and **New workspace…** (an empty folder you name). **Clear the recent list** keeps only the open one (no folder is touched) |
 | A switch | Writes your last edits into the folder, closes the window and starts the app again on the other folder |
-| At start-up | The app opens the last workspace. If its folder is gone (moved or deleted), it says so and offers the recent ones, a folder, or a new workspace |
+| At start-up | The app opens the last workspace. The first time, or if its folder is gone (moved or deleted), a welcome page in the app's own look offers **New workspace…**, **Open a folder…**, the recent ones still there, and **Quit**; it says so when the last folder is gone |
 | Opening | A start screen shows what is being done. Each step and its time also go to the developer tools' console (`Ctrl`+`Shift`+`I`) |
 | One window | A workspace is open in one window at a time: starting it while it is still closing waits for it, and one open in another window is asked about |
 | Closing while files are written | When the app is still writing many files into the folder (an import's), closing asks first: *Close anyway* keeps your work safe in the app and writes the rest the next time you open the workspace |
