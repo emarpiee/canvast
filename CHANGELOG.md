@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.61.42 — The README current, and canvast described for app stores (2026-11-22)
+
+- **Added:** the AppImage carries an AppStream description (summary, features, licence, homepage and two screenshots), which app catalogs and software centres show (B32). ([Releasing and project scripts](README.md#releasing-and-project-scripts))
+- **Fixed before release:** a Pins gallery's cards showed no pictures: they now show as the library's cards do, once loaded. ([Pins](README.md#pins))
+- **Docs:** the README describes Pins, comic pages and Repair links in notes, with their keys and limits, and every picture is taken again from this version (B33). ([Pins](README.md#pins))
+
+### For developers
+
+- `desktop/canvast.metainfo.xml` is filled in with the version and its date by `scripts/package-desktop.mjs` and put into the AppImage at `usr/share/metainfo/`; a shot marked `store` in `tests/shots/manifest.ts` (`hero`, `library`) is also kept whole as PNG in `docs/screenshots/store/` (the `Screenshots` workflow's *store-shots*). `thumbSlots` (`ui/assets-view.ts`) shows a thumbnail slot's picture once loaded, for the Library and the gallery.
+
 ## 0.61.41 — Pins replace the reference windows (2026-11-22)
 
 - **Changed:** the reference windows are now **Pins** (Shift+R): a window shows a canvas, or the library's pictures, with the canvas's and the library's own tools. Your moodboards became canvases of a board named **Pins**, once, every picture where it was. ([The Library](README.md#the-library))
