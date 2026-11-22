@@ -1030,6 +1030,10 @@ dialog.confirm .secret-field .prompt-input { padding-right: calc(var(--icon-xl) 
 .ctx-wrap { position: absolute; left: 50%; bottom: calc(2 * var(--s-14) + var(--edge)); z-index: var(--z-edge); display: flex; align-items: center; gap: var(--near); max-width: calc(100% - 2 * var(--edge)); transform: translateX(-50%); }
 .ctx-wrap:has(> .ctx-bar[hidden]) { display: none; }
 .ctx-wrap.is-following { bottom: auto; transform: none; } /* (placed from the selection) */
+/* (the Actions bar inside a Pins window, along its bottom, while its canvas is the view in use: its own bar only) */
+.pins-bar .ctx-wrap { position: static; transform: none; max-width: 100%; }
+.pins-bar .ctx-wrap > :not(.ctx-bar) { display: none; }
+.pins-panel .panel-foot:has(> .pins-bar:empty), .pins-panel .panel-foot:has(.ctx-bar[hidden]) { display: none; }
 .ctx-wrap > .toolbar { flex: none; }
 .ctx-bar { display: flex; align-items: center; min-width: 0; overflow-x: auto; scrollbar-width: none; backdrop-filter: blur(6px); }
 .ctx-bar::-webkit-scrollbar { display: none; }

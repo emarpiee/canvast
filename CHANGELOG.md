@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.61.46 — The Actions bar inside the Pins window (2026-11-22)
+
+- **Changed:** while a pinned canvas is the view in use, the Actions bar (its Adjust and Arrange) is along the bottom of its Pins window, and the Adjust panel floats above every view, so both work over the Library, PhotoCraft or any view. ([Pins](README.md#pins))
+
+### For developers
+
+- `mountContextBar` returns its `wrap`, which `app/main.ts` places where the view in use is (`pins.barHost`); `PanelDock.everywhere(id, on)` floats a panel above every view for a while.
+
 ## 0.61.45 — The app starts again (2026-11-22)
 
 - **Fixed before release:** 0.61.44 did not start: the Actions bar asked for the view in use before the main view was known. The main view is known from its start; its actions come after. ([Pins](README.md#pins))

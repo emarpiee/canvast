@@ -2270,6 +2270,14 @@ async function start(): Promise<void> {
     () => (focusedCanvasView() === "main" ? settings.get("ui.actions") : "bottom"),
     () => (focusedCanvasView() === "main" ? null : ["Adjust", "Arrange"]),
   );
+  // (the one Actions bar goes where the view in use is: along the bottom of a Pins window while its canvas is, so it shows over any view)
+  editorInUse.subscribe(() => {
+    const v = focusedCanvasView();
+    const into = v === "main" ? host : (pinsWindows?.barHost(v) ?? host);
+    if (contextBar.wrap.parentElement !== into) into.appendChild(contextBar.wrap);
+    // (its Adjust panel too: above every view while a pinned canvas is in use, as the window is)
+    dock.everywhere("adjust", v !== "main");
+  });
   contextUpdate = contextBar.update;
   // (where the Actions bar stands is no longer a row of Settings: a change by a command or the debug hook takes effect at once, not at the next frame)
   settings.subscribe((key) => key === "ui.actions" && contextUpdate());

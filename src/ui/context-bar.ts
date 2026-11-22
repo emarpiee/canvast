@@ -191,7 +191,7 @@ const OPS: Array<{ op: BoolOp; icon: string; label: string; aria: string }> = [
   { op: "exclude", icon: ICONS.squaresExclude, label: "Exclude overlap", aria: "Exclude overlap: keep everything but where the shapes overlap" },
 ];
 
-export function mountContextBar(host: HTMLElement, editor: EditorState, doc: DocumentStore, actions: ContextActions, hidden: () => boolean, placement: () => "bottom" | "follow" = () => "bottom", /** Only these groups (by name), or all: a pinned view's bar (Pins). */ onlyGroups: () => readonly string[] | null = () => null): { update(): void } {
+export function mountContextBar(host: HTMLElement, editor: EditorState, doc: DocumentStore, actions: ContextActions, hidden: () => boolean, placement: () => "bottom" | "follow" = () => "bottom", /** Only these groups (by name), or all: a pinned view's bar (Pins). */ onlyGroups: () => readonly string[] | null = () => null): { update(): void; /** Its wrapper: placed where the view in use is (app/main.ts). */ wrap: HTMLElement } {
   const bar = document.createElement("div");
   bar.className = "ctx-bar";
   bar.dataset["testid"] = "context-bar";
@@ -566,5 +566,5 @@ export function mountContextBar(host: HTMLElement, editor: EditorState, doc: Doc
     follow();
   };
   editor.subscribe(update);
-  return { update };
+  return { update, wrap };
 }

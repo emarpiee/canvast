@@ -85,7 +85,7 @@ interface Pin {
   close(): void;
 }
 
-export function mountPins(deps: PinsDeps): { open(source?: PinSource): void; refresh(): void; dropAt(x: number, y: number, hashes: readonly string[]): boolean } {
+export function mountPins(deps: PinsDeps): { open(source?: PinSource): void; refresh(): void; dropAt(x: number, y: number, hashes: readonly string[]): boolean; barHost(id: string): HTMLElement | null } {
   const pins = new Map<string, Pin>();
   const keep = (): void => deps.write([...pins.values()].map((p) => ({ c: p.source, ...(p.opacity < 1 ? { o: p.opacity } : {}), ...(p.through ? { t: true } : {}) })));
   const canvasOf = (src: PinSource): string | null => (src.startsWith("canvas:") ? src.slice(7) : null);
@@ -160,6 +160,8 @@ export function mountPins(deps: PinsDeps): { open(source?: PinSource): void; ref
       tools: `<button type="button" class="layer-btn" data-pins-more aria-haspopup="menu" aria-label="More" title="More: opacity, clicks through, float over other apps">${ICONS.ellipsis}</button>`,
       sub: `<div class="styles-kinds"><button type="button" class="pick-current" data-pins-source aria-haspopup="menu" aria-label="What it shows" title="What it shows: a canvas, or the Library"></button></div><div class="pins-look" data-pins-look hidden></div>`,
       body: `<div class="pins-view" data-pins-view><canvas class="pins-canvas" tabindex="0" aria-label="A pinned canvas: the canvas's tools, keys and menus"></canvas></div><div class="pins-library" data-pins-library hidden></div>`,
+      // (the app's Actions bar comes here while this window's canvas is the view in use: app/main.ts places it)
+      foot: `<div class="pins-bar" data-pins-bar></div>`,
     });
     const host = el.querySelector<HTMLElement>("[data-pins-view]")!;
     const canvas = el.querySelector<HTMLCanvasElement>("canvas")!;
@@ -351,6 +353,8 @@ export function mountPins(deps: PinsDeps): { open(source?: PinSource): void; ref
   for (const w of deps.read()) open(w.c.startsWith("canvas:") ? w.c : /^(folder:|all$|library$)/.test(w.c) ? "library" : `canvas:${w.c}`, w);
   return {
     open,
+    // (where a window's canvas, when it is the view in use, has the app's Actions bar)
+    barHost: (id) => pins.get(id)?.el.querySelector<HTMLElement>("[data-pins-bar]") ?? null,
     // (pictures dragged off the main canvas, let go over a pinned canvas: placed there)
     dropAt: (x, y, hashes) => {
       for (const p of pins.values()) {

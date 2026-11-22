@@ -542,7 +542,7 @@ Keep your references in sight while you work: a canvas of studies, or the Librar
 | --- | --- |
 | Open one | `Shift+R`, or the button by Settings: the canvas you are on, in a window. Open as many as you like |
 | What it shows | The list under its title: any canvas of the workspace, by board, or **The Library** |
-| A pinned canvas | The canvas itself: its tools (the ones the toolbar sets), keys, wheel and pinch, right-click menu and undo, on the view you pressed last; the Actions bar shows its **Adjust** and **Arrange**. The canvas you are on is the same in both: what you change in one is changed in the other |
+| A pinned canvas | The canvas itself: its tools (the ones the toolbar sets), keys, wheel and pinch, right-click menu and undo, on the view you pressed last; the Actions bar, along the bottom of the window, has its **Adjust** and **Arrange** (the Adjust panel floats above every view meanwhile). The canvas you are on is the same in both: what you change in one is changed in the other |
 | The Library | The Library itself, without its details panel: its folders, search, cards and viewer (zoom, slideshow) |
 | Bringing pictures over | Drag a gallery's card, or a Library card, onto a canvas or a pinned one; drag a picture off the canvas onto a pinned canvas (it stays where it was); drop files from another app onto a pinned canvas |
 | The window | Move it by its title, size it from its bottom corner, press its title to fold it. **More** (⋯): **Opacity…** (a slider), **Let clicks through** (to what is under it; its title still takes them) and, in the desktop app, **Float over other apps** |
