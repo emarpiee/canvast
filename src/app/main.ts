@@ -1,5 +1,6 @@
 import { mountReferenceWindows } from "../ui/reference-window";
 import { createCanvasView } from "../canvas/canvas-view";
+import { LIBRARY_DRAG } from "../ui/assets-view";
 import { addCanvasView, focusCanvasView, focusedCanvasView, routedActions } from "../canvas/focus";
 import { mountPins } from "../pins/pins";
 import type { FrameIndex } from "../scene/frame-index";
@@ -3018,24 +3019,6 @@ async function start(): Promise<void> {
     hidden: storage?.hidden ? { isOpen: () => !!storage.hidden?.isOpen(), lock: () => lockHidden(session).then(() => { editor.message = HIDDEN_LOCKED; editor.changed(); }) } : null,
   });
   addCanvasView("main", canvasActionsFor(doc, editor, view, index, focusCycle));
-  // Pins (ADR 0208, src/pins/): windows above every view that show a canvas, from the canvas's own engine, tools and actions
-  const pinsWindows = mountPins({
-    dock, session, main: { doc },
-    engine: (o) => createCanvasView({
-      canvas: o.canvas, ctx: o.ctx, doc: o.doc, view: o.view, stats: new FrameStats(),
-      editor: () => o.editor, settings: () => settings, assets: () => assets, assetNames: () => assetNames, theme: () => theme, dpr: () => dpr,
-      choicesAt: () => [], hintRefresh: () => undefined, shown: o.shown, drawn: () => undefined,
-    }),
-    // shortcut: a pinned view edits text, lists what is under the pointer and searches through the main view for now; give them its own when they need it
-    tools: (el, v, d, ix, ed, focus, labels, active) => attachTools(el, v, d, ix, ed, { ...toolHooksFor(d, ed, v, focus, labels), editText: () => undefined, revealList: () => false, openSearch: () => undefined, active }),
-    actionsFor: canvasActionsFor,
-    dpr: () => dpr,
-    read: () => { try { return (JSON.parse(settings.get("pins.windows")) as Array<{ c: string }>).map((w) => w.c); } catch { return []; } },
-    write: (cs) => void settings.set("pins.windows", JSON.stringify(cs.map((c) => ({ c })))),
-  });
-  session.subscribe(() => pinsWindows.refresh());
-  // view-state: (the main view pressed: the commands, keys and menus act on it again)
-  canvas.addEventListener("pointerdown", () => focusCanvasView("main"), true);
   registry.setProvider("app", () => canvasCommands(routedActions()));
   for (const [old, now] of Object.entries(OLD_CANVAS_IDS)) registry.alias(old, now);
   registry.onFail((_c, error) => { editor.message = error; editor.changed(); });
@@ -3249,17 +3232,14 @@ async function start(): Promise<void> {
    * Library pictures placed on the open canvas (a reference window's, ADR 0207): each where it is let go (else in the middle of the view), one
    * after another a little apart. How many.
    */
-  const placeOnCanvas = async (hashes: readonly string[], at?: { x: number; y: number }): Promise<number> => {
-    // (from another view, Place on the canvas goes to the canvas first: a drop is only ever on it)
-    if (appView !== "canvas" && !at) {
-      setView("canvas");
-      await new Promise((r) => requestAnimationFrame(r));
-    }
-    if (appView !== "canvas" || editor.blockEdit()) return 0;
-    const r = canvas.getBoundingClientRect();
+  /** Library items placed on a view of a canvas (the main one, or a Pins window's), where they were let go or in its middle. */
+  const placeIn = async (t: { doc: DocumentStore; view: ViewState; editor: EditorState; el: HTMLElement }, hashes: readonly string[], at?: { x: number; y: number }): Promise<number> => {
+    if (t.editor.blockEdit()) return 0;
+    const { doc, view, editor } = t;
+    const r = t.el.getBoundingClientRect();
     let n = 0;
     for (const h of hashes) {
-      const id = await session.placeAsset(h);
+      const id = await session.placeAsset(h, false, undefined, doc === session.doc ? undefined : { doc, view });
       const o = id ? doc.get(id) : undefined;
       if (!o) continue;
       if (at) {
@@ -3273,24 +3253,61 @@ async function start(): Promise<void> {
     editor.changed();
     return n;
   };
-  // A picture of a reference window (a gallery's, or one shown large) dropped on the canvas: placed where it is let go
-  canvas.addEventListener("dragover", (e) => {
-    if (!e.dataTransfer?.types.includes("application/x-canvast-assets")) return;
-    e.preventDefault();
-    e.dataTransfer.dropEffect = "copy";
-  });
-  canvas.addEventListener("drop", (e) => {
-    const lib = e.dataTransfer?.getData("application/x-canvast-assets");
-    if (!lib) return;
-    e.preventDefault();
-    e.stopPropagation();
-    internalDrag = false;
-    try {
-      void placeOnCanvas((JSON.parse(lib) as unknown[]).filter((h): h is string => typeof h === "string"), { x: e.clientX, y: e.clientY });
-    } catch {
-      /* (not a list of library files) */
+  const placeOnCanvas = async (hashes: readonly string[], at?: { x: number; y: number }): Promise<number> => {
+    // (from another view, Place on the canvas goes to the canvas first: a drop is only ever on it)
+    if (appView !== "canvas" && !at) {
+      setView("canvas");
+      await new Promise((r) => requestAnimationFrame(r));
     }
+    if (appView !== "canvas") return 0;
+    return placeIn({ doc, view, editor, el: canvas }, hashes, at);
+  };
+  // Library items (a Library card, a Pins gallery's) dropped on a view of a canvas: placed where they are let go; files from another app go into the library first
+  const takeDrops = (t: { doc: DocumentStore; view: ViewState; editor: EditorState; el: HTMLElement }, files: boolean): void => {
+    t.el.addEventListener("dragover", (e) => {
+      const types = e.dataTransfer?.types ?? [];
+      if (!types.includes(LIBRARY_DRAG) && !(files && types.includes("Files"))) return;
+      e.preventDefault();
+      e.dataTransfer!.dropEffect = "copy";
+    });
+    t.el.addEventListener("drop", (e) => {
+      const lib = e.dataTransfer?.getData(LIBRARY_DRAG);
+      const dropped = files && !lib ? [...(e.dataTransfer?.files ?? [])] : [];
+      if (!lib && !dropped.length) return;
+      e.preventDefault();
+      e.stopPropagation();
+      internalDrag = false;
+      const at = { x: e.clientX, y: e.clientY };
+      if (dropped.length) return void assetsView.importFiles(dropped).then((hs) => placeIn(t, hs, at));
+      try {
+        void placeIn(t, (JSON.parse(lib!) as unknown[]).filter((h): h is string => typeof h === "string"), at);
+      } catch {
+        /* (not a list of library files) */
+      }
+    });
+  };
+  // (the main canvas: its files from other apps have their own import, which places them as it reads them)
+  takeDrops({ doc, view, editor, el: canvas }, false);
+  // Pins (ADR 0208, src/pins/): windows above every view that show a canvas, from the canvas's own engine, tools and actions
+  const pinsWindows = mountPins({
+    dock, session, main: { doc },
+    engine: (o) => createCanvasView({
+      canvas: o.canvas, ctx: o.ctx, doc: o.doc, view: o.view, stats: new FrameStats(),
+      editor: () => o.editor, settings: () => settings, assets: () => assets, assetNames: () => assetNames, theme: () => theme, dpr: () => dpr,
+      choicesAt: () => [], hintRefresh: () => undefined, shown: o.shown, drawn: () => undefined,
+    }),
+    // shortcut: a pinned view edits text, lists what is under the pointer and searches through the main view for now; give them its own when they need it
+    tools: (el, v, d, ix, ed, focus, labels, active) => attachTools(el, v, d, ix, ed, { ...toolHooksFor(d, ed, v, focus, labels), editText: () => undefined, revealList: () => false, openSearch: () => undefined, active }),
+    actionsFor: canvasActionsFor,
+    gallery: { hidden: () => assets.revealing, thumb: (h) => assetsView.thumb(h), open: (h) => { setView("assets"); assetsView.openViewer(h); } },
+    takeDrops: (t) => takeDrops(t, true),
+    dpr: () => dpr,
+    read: () => { try { return (JSON.parse(settings.get("pins.windows")) as Array<{ c: string }>).map((w) => w.c); } catch { return []; } },
+    write: (cs) => void settings.set("pins.windows", JSON.stringify(cs.map((c) => ({ c })))),
   });
+  session.subscribe(() => pinsWindows.refresh());
+  // view-state: (the main view pressed: the commands, keys and menus act on it again)
+  canvas.addEventListener("pointerdown", () => focusCanvasView("main"), true);
   // A drag that starts inside the app (a picture dragged out of the library, a layer row) is never a file import: the browser would hand
   // the dragged thumbnail over as a new file and store it as an asset of its own.
   let internalDrag = false;

@@ -1717,6 +1717,8 @@ export function attachTools(
     if (sel && canRotate(vis, editor) && !editor.blockEdit()) {
       const { frame, handle } = sel;
       if (inRotateZone(s, frame, handle) && !itemLabelAt(hooks.labels(), s.x, s.y)) { // (a name above a sheet or picture is picked, not turned, even near a corner)
+        // (where a turn began and the box it turns, for a test or a bug report to read)
+        el.dataset["lastTurn"] = JSON.stringify({ at: [Math.round(s.x), Math.round(s.y)], corners: frame.corners.map((c) => c.map(Math.round)), handle: handle.map(Math.round), view: [view.viewport.width, view.viewport.height] });
         const ids = [...editor.selection].filter((id) => doc.get(id));
         const centre = { x: frame.centre[0], y: frame.centre[1] };
         const single = ids.length === 1 ? doc.get(ids[0]!) : null;

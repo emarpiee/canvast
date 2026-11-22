@@ -989,7 +989,7 @@ export class Session {
   }
 
   /** Place a new instance of a library asset at the centre of the open canvas. */
-  async placeAsset(hash: string, withTags = false, card?: CardLook): Promise<ObjectId | null> {
+  async placeAsset(hash: string, withTags = false, card?: CardLook, /** Another view of a canvas (a Pins window): its document and camera; the open canvas's when left out. */ into?: { doc: DocumentStore; view: ViewState }): Promise<ObjectId | null> {
     if (this.editor.blockEdit() || !this.assets) return null;
     const rec = await this.assets.record(hash);
     if (!rec) {
@@ -1000,7 +1000,7 @@ export class Session {
     const tags = withTags ? (entry?.tags ?? []) : [];
     // (a copy of a file elsewhere in the library is placed as its content: a canvas names contents, which every version of the app reads)
     const r = { ...(await withGifFrames({ ...rec, hash: contentOf(rec.hash) })), ...placedNameOf(entry) };
-    return placeImage(card ? { ...r, pixelW: card.size.w, pixelH: card.size.h } : r, this.doc, this.view, 0, "Place item", tags, card?.preview).id;
+    return placeImage(card ? { ...r, pixelW: card.size.w, pixelH: card.size.h } : r, into?.doc ?? this.doc, into?.view ?? this.view, 0, "Place item", tags, card?.preview).id;
   }
 
   /**

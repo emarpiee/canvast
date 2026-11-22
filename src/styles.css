@@ -60,6 +60,7 @@
   --ref-min-w: 13.75rem; /* a reference window at its smallest */
   --ref-min-h: 10rem;
   --ref-thumb: 5.5rem; /* a picture of a reference gallery (its medium size) */
+  --pins-thumb: 5.5rem; /* the height of a row of a Pins gallery (the library's cards, smaller: a window is narrow) */
   --ref-thumb-s: 3.5rem;
   --ref-thumb-l: 9rem;
   /* Spacing: gaps, paddings and margins, set by Density (Settings > Appearance; these are Compact's). --sp-* are fixed lengths, for what is not spacing. */
@@ -2970,6 +2971,8 @@ input[data-scrub-input]:focus { cursor: text; }
 .pins-view { position: relative; width: 100%; height: 100%; }
 .pins-canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
 .pins-canvas:focus { outline: none; }
+.pins-gallery { height: 100%; overflow: auto; padding: var(--s-4); box-sizing: border-box; }
+.pins-gallery .assets-grid { --thumb: var(--pins-thumb); }
 .dock-zone { position: absolute; top: 0; bottom: 0; width: calc(var(--sp-15) * 1.6); background: color-mix(in oklch, var(--hud-accent) 16%, transparent); border: 2px dashed var(--hud-accent); pointer-events: none; }
 .dock-zone[hidden] { display: none; }
 .dock-zone.is-left { left: 0; }

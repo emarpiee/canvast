@@ -131,7 +131,28 @@ export interface AssetsView {
   importFiles(files: File[], here?: boolean): Promise<string[]>;
   /** Draw the notes' cards again (the preview look changed). */
   redrawNotes(): void;
+  /** An item's picture as the library's cards show it (its custom thumbnail, its stored one, one made now, an art file's): its address. Pins' gallery. */
+  thumb(hash: string): Promise<string>;
+  /** Open an item in the library's viewer (its zoom, its slideshow, its details), the library being shown. */
+  openViewer(hash: string): void;
 }
+
+/**
+ * A library card (one markup for every list of library items: the Library's grid and a Pins gallery): its cell, its button, its picture's slot
+ * and what it says under it. `thumb` is the slot's inside (the picture, or a file's tile); `info` the words (the Library's columns, or a name).
+ */
+export function libraryCardHtml(o: { hash: string; label: string; title: string; draggable: boolean; missing?: boolean; testid?: string; thumb: string; info: string; attrs?: string }): string {
+  return `<div class="asset-cell" role="listitem"${o.attrs ?? ""}>
+        <button type="button" class="asset-card${o.missing ? " is-missing" : ""}"${o.testid ? ` data-testid="${o.testid}"` : ""} data-hash="${esc(o.hash)}" draggable="${o.draggable ? "true" : "false"}"
+          aria-pressed="false" aria-label="${esc(o.label)}" title="${esc(o.title)}">
+        <span class="asset-thumb thumb-slot">${o.thumb}</span>
+        ${o.info}
+      </button>
+      </div>`;
+}
+
+/** What a dragged library item carries: its hashes, as JSON (the canvas, a Pins canvas and a sidebar row take it). */
+export const LIBRARY_DRAG = "application/x-canvast-assets";
 
 /** The columns of the list layout: each can be shown or hidden and moved (Name always shows). */
 /** How wide the library panel (left) and the details panel (right) can be made on a wide screen, in pixels. */
@@ -2364,11 +2385,11 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     if (cached) return cached;
     const small = Math.max(e.pixelW, e.pixelH) < THUMB_PX ? " is-pixelated" : "";
     const name = e.name || "Untitled";
-    const html = `<div class="asset-cell" role="listitem">
-        <button type="button" class="asset-card${e.present ? "" : " is-missing"}" data-testid="asset-card" data-hash="${e.hash}" draggable="${session.readOnly ? "false" : "true"}"
-          aria-pressed="false" aria-label="${esc(name)}, ${e.pixelW} × ${e.pixelH} px" title="${esc(name)}${isAutoCopy(e.name) ? `. ${AUTO_COPY_NOTE}` : ""}">
-        <span class="asset-thumb thumb-slot">${!hasThumb(e) && !meta(e).thumb ? fileTile(e) : `<img alt="" draggable="false" class="${small.trim()}${isFontFile(e) ? " is-font-thumb" : ""}" data-hash="${e.hash}"><span class="ext-chip">${esc(chipOf(e.name, e.type))}${isAutoCopy(e.name) ? " backup" : ""}</span>`}</span>
-        ${e.present ? "" : `<span class="asset-missing-label">File missing</span>`}
+    const html = libraryCardHtml({
+      hash: e.hash, testid: "asset-card", draggable: !session.readOnly, missing: !e.present,
+      label: `${name}, ${e.pixelW} × ${e.pixelH} px`, title: `${name}${isAutoCopy(e.name) ? `. ${AUTO_COPY_NOTE}` : ""}`,
+      thumb: `${!hasThumb(e) && !meta(e).thumb ? fileTile(e) : `<img alt="" draggable="false" class="${small.trim()}${isFontFile(e) ? " is-font-thumb" : ""}" data-hash="${e.hash}"><span class="ext-chip">${esc(chipOf(e.name, e.type))}${isAutoCopy(e.name) ? " backup" : ""}</span>`}`,
+      info: `        ${e.present ? "" : `<span class="asset-missing-label">File missing</span>`}
         <span class="asset-info">
           <span class="asset-name">${esc(name)}</span>
           <span class="asset-meta">${e.pixelW} × ${e.pixelH} px</span>
@@ -2386,9 +2407,8 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
           <span class="asset-added">${addedDate.format(e.importedAt)}</span>
           <span class="asset-uses" data-testid="asset-uses">${usesText(e.instances, e.canvases)}</span>
           ${meta(e).tags.length ? `<span class="asset-tags" data-testid="asset-card-tags">${meta(e).tags.map((t) => `<span class="tag-pill">#${esc(t)}</span>`).join(" ")}</span>` : `<span class="asset-tags"></span>`}
-        </span>
-      </button>
-      </div>`;
+        </span>`,
+    });
     cardHtml.set(e, html);
     return html;
   };
@@ -4484,7 +4504,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
 
   // ---- sidebar: scope, folders
   // ---- dragging items onto the sidebar: a folder moves them into it, Unfiled out of theirs, a tag adds it, Favourites marks them
-  const DRAG_TYPE = "application/x-canvast-assets";
+  const DRAG_TYPE = LIBRARY_DRAG;
   // Dragging out of the app (desktop, with Alt): a drag starts at once, so what its files are is read when the pointer goes down. Hidden items stay in: their files are
   // encrypted, and a drag cannot stop to ask, as Copy file does, before a readable copy leaves the app.
   const outPaths = new Map<string, string>();
@@ -6058,6 +6078,8 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       root.hidden = true;
       syncViewing();
     },
+    thumb: (hash) => thumbFor(hash),
+    openViewer: (hash) => void showSlide(hash),
     redrawNotes() {
       redrawCards((listing?.entries ?? []).filter((e) => noteKindOf(e.name)).map((e) => e.hash));
     },

@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.61.40 — A Pins window shows the library's pictures too (2026-11-22)
+
+- **Added:** a Pins window shows, besides a canvas, a gallery of the library's pictures (all of them, or a folder's, chosen by its name): the library's own cards, its search, its viewer on a double-click (with its zoom and slideshow). A card dragged onto a canvas, or a pinned one, is placed there; so is a file from another app dropped on a pinned canvas. ([The Library](README.md#the-library))
+
+### For developers
+
+- `src/pins/gallery.ts`; the library's card markup is one function, `libraryCardHtml` (`ui/assets-view.ts`), for the Library and the gallery; `AssetsView.thumb` and `openViewer`; `LIBRARY_DRAG`; `session.placeAsset(…, into)` and `placeIn` / `takeDrops` (`app/main.ts`) place library items on any view of a canvas. The tools keep where a turn began in `data-last-turn`.
+
 ## 0.61.39 — The AppImage needs no FUSE library (2026-11-22)
 
 - **Changed:** the Linux AppImage carries the newer static AppImage runtime: it starts on systems without `libfuse2` (B31). ([Installation](README.md#installation))
