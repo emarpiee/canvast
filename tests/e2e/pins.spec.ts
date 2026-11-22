@@ -56,7 +56,7 @@ test("a Pins window shows the library's pictures as a gallery of the library's o
   const pins = p.getByTestId("pins");
   const card = pins.locator(".asset-card");
   await expect(card, "the library's card").toHaveCount(1);
-  await expect(card.locator("img")).toHaveAttribute("src", /.+/);
+  await expect(card.locator("img.is-loaded"), "its picture shown, as in the library").toHaveCount(1);
   // the search narrows it
   await pins.locator(".layers-filter input").fill("blue");
   await expect(card).toHaveCount(0);

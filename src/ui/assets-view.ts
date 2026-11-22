@@ -151,6 +151,19 @@ export function libraryCardHtml(o: { hash: string; label: string; title: string;
       </div>`;
 }
 
+/**
+ * The pictures of the thumbnail slots under `root` (library cards, wherever they are: the Library, a Pins gallery): each shows once it has
+ * loaded (its place shimmers until then), and one that cannot be shown leaves its place plain, never the browser's broken-picture mark.
+ */
+export function thumbSlots(root: HTMLElement): void {
+  root.addEventListener("load", (e) => {
+    if (e.target instanceof HTMLImageElement && e.target.parentElement?.classList.contains("thumb-slot")) e.target.classList.add("is-loaded");
+  }, true);
+  root.addEventListener("error", (e) => {
+    if (e.target instanceof HTMLImageElement && e.target.parentElement?.classList.contains("thumb-slot")) e.target.classList.add("is-broken");
+  }, true);
+}
+
 /** What a dragged library item carries: its hashes, as JSON (the canvas, a Pins canvas and a sidebar row take it). */
 export const LIBRARY_DRAG = "application/x-canvast-assets";
 
@@ -4281,14 +4294,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     }
   });
 
-  // A thumbnail shows once it has loaded (its place shimmers until then), and one that cannot be shown leaves its place plain: never the browser's broken-picture mark.
-  root.addEventListener(
-    "error",
-    (e) => {
-      if (e.target instanceof HTMLImageElement && e.target.parentElement?.classList.contains("thumb-slot")) e.target.classList.add("is-broken");
-    },
-    true,
-  );
+  thumbSlots(root);
   // A thumbnail with see-through pixels gets a chequered ground (cards, filmstrip and the details picture) so it reads as transparent.
   const alphaOf = new Map<string, boolean>();
   root.addEventListener(
@@ -4296,7 +4302,6 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     (e) => {
       const img = e.target;
       if (!(img instanceof HTMLImageElement) || img === slideImg) return;
-      if (img.parentElement?.classList.contains("thumb-slot")) img.classList.add("is-loaded");
       const host = img.closest<HTMLElement>(".asset-card, .film-item, .asset-preview");
       if (!host) return;
       const key = img.dataset["hash"] ?? img.src;

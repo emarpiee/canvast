@@ -16,6 +16,10 @@ test("pins", async ({ scene: s }) => {
   await s.fit(work, 0.6, [0.66, 0.5]);
   await s.p.evaluate((c) => window.__canvastDebug.runCommand("pins.open", { canvas: c }, "test"), cid);
   await expect(s.p.getByTestId("pins").locator(".pins-canvas")).toBeVisible();
+  await s.settle(600);
+  // (the studies in sight in the window: the window is the view in use, then everything on its canvas is fitted, as F does)
+  await s.p.getByTestId("pins").evaluate((el) => el.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true })));
+  await s.p.evaluate(() => window.__canvastDebug.runCommand("view.fitAll", {}, "test"));
   await s.settle(800);
   await s.shot("pins", await s.around({ objects: work, els: ['[data-testid="pins"]'], pad: 20 }));
 });
@@ -29,7 +33,7 @@ test("pins-gallery", async ({ scene: s }) => {
   await s.fit(placed, 0.6, [0.68, 0.5]);
   await s.p.evaluate(() => window.__canvastDebug.runCommand("pins.open", { source: "all" }, "test"));
   const pins = s.p.getByTestId("pins");
-  await expect(pins.locator(".asset-card img").first()).toHaveAttribute("src", /.+/);
+  await expect(pins.locator(".asset-card img.is-loaded")).toHaveCount(6);
   await s.settle(800);
   await s.shot("pins-gallery", await s.around({ objects: placed, els: ['[data-testid="pins"]'], pad: 20 }));
 });

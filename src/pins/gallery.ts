@@ -1,6 +1,6 @@
 import type { Session } from "../app/session";
 import type { AssetFolder, CatalogEntry } from "../assets/asset-catalog";
-import { LIBRARY_DRAG, libraryCardHtml } from "../ui/assets-view";
+import { LIBRARY_DRAG, libraryCardHtml, thumbSlots } from "../ui/assets-view";
 import { showMoreButton } from "../ui/show-more";
 import { esc } from "../ui/format";
 import { ICONS } from "../ui/icons";
@@ -73,6 +73,7 @@ export function mountGallery(host: HTMLElement, deps: GalleryDeps, folder: strin
     }, { root: host.closest(".panel-body"), rootMargin: "200px" });
     host.querySelectorAll(".asset-cell").forEach((c) => io!.observe(c));
   };
+  thumbSlots(host); // (a card's picture shows once loaded, as in the library)
   // view-state: (more of the folder's pictures drawn)
   host.addEventListener("click", (e) => {
     if (!(e.target as HTMLElement).closest("[data-pins-more]")) return;
