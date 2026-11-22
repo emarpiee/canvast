@@ -6,6 +6,7 @@
 
 ### For developers
 
+- `tiles.spec.ts`: the sub-pixel pan and edit tests count tiles once the load has settled too (the same race as 0.62.0's fix: a slower machine still building the load's tiles counted them as the pan's).
 - `desktop/welcome.ts`: the page, made of the app's stylesheet, logo, icons and the lock screen's look, with no script (each choice is a link the main process reads); the desktop build loads `.css` and `.svg` as text. A desktop test starts with no workspace and quits from the page.
 
 ## 0.62.0 — Pins, comic pages, and an AppImage that runs anywhere (2026-11-23)

@@ -152,7 +152,7 @@ test("panning reuses tiles; a still camera renders none; the zoom changing rende
 test("a pan that is not a whole number of device pixels keeps the tiles while the view moves, and builds them exactly once it rests", async ({ app }) => {
   const p = app.page;
   await p.evaluate(() => window.__canvastDebug.benchLoad({ kind: "dense", n: 1000 }));
-  await tilesShown(p);
+  await settled(p); // (the load's whole build done, however many frames a slower machine needs: not counted as the pan's)
   const full = (await stats(p)).last!.tiles;
   // (a pointer between pixels, as Wayland, scaled screens and touchpads give: a few moves of a fraction of a pixel)
   const subPixelPan = () =>
@@ -175,7 +175,7 @@ test("a pan that is not a whole number of device pixels keeps the tiles while th
 test("edits refresh exactly the affected tiles: draw, move, undo, delete, opacity", async ({ app }) => {
   const p = app.page;
   await p.evaluate(() => window.__canvastDebug.benchLoad({ kind: "dense", n: 300 }));
-  await tilesShown(p);
+  await settled(p); // (the load's whole build done first: only the edit's tiles are counted)
   const full = (await stats(p)).last!.tiles;
   // Draw a stroke with the pen (the stroke in progress is an overlay; the committed one goes into tiles).
   await p.keyboard.press("p");
