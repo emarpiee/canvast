@@ -191,7 +191,7 @@ const OPS: Array<{ op: BoolOp; icon: string; label: string; aria: string }> = [
   { op: "exclude", icon: ICONS.squaresExclude, label: "Exclude overlap", aria: "Exclude overlap: keep everything but where the shapes overlap" },
 ];
 
-export function mountContextBar(host: HTMLElement, editor: EditorState, doc: DocumentStore, actions: ContextActions, hidden: () => boolean, placement: () => "bottom" | "follow" = () => "bottom"): { update(): void } {
+export function mountContextBar(host: HTMLElement, editor: EditorState, doc: DocumentStore, actions: ContextActions, hidden: () => boolean, placement: () => "bottom" | "follow" = () => "bottom", /** Only these groups (by name), or all: a pinned view's bar (Pins). */ onlyGroups: () => readonly string[] | null = () => null): { update(): void } {
   const bar = document.createElement("div");
   bar.className = "ctx-bar";
   bar.dataset["testid"] = "context-bar";
@@ -557,8 +557,10 @@ export function mountContextBar(host: HTMLElement, editor: EditorState, doc: Doc
     const kinds = new Set(sel.map((o) => (isContainer(o) ? "sheet" : o!.kind === "path" ? "shape" : o!.kind === "image" ? "picture" : o!.kind))); // (as the Properties bar tells them apart)
     const only = kinds.size > 1 && editor.subject && editor.subject !== "all" ? (BAR_KINDS[editor.subject] ?? null) : null;
     for (const el of bar.querySelectorAll<HTMLElement>("[data-for]")) el.toggleAttribute("data-off", only !== null && !el.dataset["for"]!.split(",").some((k) => only.includes(k)));
+    // (a pinned view's bar has only the groups it names: Pins, ADR 0208)
+    const groups = onlyGroups();
     bar.hidden = false;
-    syncGroups(bar, () => true);
+    syncGroups(bar, (g) => !groups || groups.includes(g.getAttribute("aria-label") ?? ""));
     syncScroll(bar);
     if (bar.matches(":hover, :focus-within")) placeNames();
     follow();

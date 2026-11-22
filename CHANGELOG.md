@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.61.44 — Pins: the Library itself, the Actions bar, smooth drags (2026-11-22)
+
+- **Changed:** a Pins window shows **the Library itself** (its folders, search, cards and viewer) without its details panel, instead of a gallery of its own; its keys act only while you use it, and the Library view is left as it was. ([Pins](README.md#pins))
+- **Added:** the Actions bar follows the view you use: on a pinned canvas it shows its Adjust and Arrange, and the Adjust panel adjusts what is selected there. ([Pins](README.md#pins))
+- **Fixed before release:** dragging on a pinned canvas showed nothing until it was let go: every view of a canvas is now drawn again on the same changes (`follow`). ([Pins](README.md#pins))
+
+### For developers
+
+- `mountAssetsView(…, { embedded })`: no commands of its own, its window keys only while in use; the Library's look is the class `.library-view` (was `#assets-view`). `src/canvas/focus.ts`: `editorInUse`, `docInUse` (the view in use; the panels' open flags stay the main view's), `setBarActions` and `routedBarActions`; `barActionsFor` (`app/main.ts`) makes the Actions bar's actions for a view, `runLayout` takes one; `mountContextBar(…, onlyGroups)`. `createCanvasView().follow(editor)`. The Pins gallery (`pins/gallery.ts`), its large view and `pins.picture` are gone.
+
 ## 0.61.43 — A Pins canvas works as the main one; pictures large in the window (2026-11-22)
 
 - **Fixed before release:** a pinned canvas could not be zoomed or panned, had no right-click menu and no tool cursor, and kept its own tools: it is now wired by the very function that wires the main canvas (its tools and keys, the wheel and pinch, the cursor, the menu, drops), and its tools are the ones the toolbar sets. ([Pins](README.md#pins))

@@ -1263,8 +1263,12 @@ body:not([data-view="assets"]):has(.ctx-wrap:not(.is-following) > .ctx-bar:not([
 /* ---- Assets view (ui/assets-view.ts, ADR 0054) ------------------------------------------------------------------------
    One flat page under the view tabs: a library bar on the tabs' row, the library on the left, a gallery (or the viewer) in the middle
    and the details on the right. Cards carry the picture only; the rest appears on hover, focus and selection. */
-#assets-view { position: fixed; inset: 0; z-index: 2; display: flex; flex-direction: column; padding: var(--edge) var(--edge) 0; background: var(--theme-bg); font: var(--text-md)/1.4 var(--font-ui); }
-#assets-view[hidden] { display: none; }
+.library-view { position: fixed; inset: 0; z-index: 2; display: flex; flex-direction: column; padding: var(--edge) var(--edge) 0; background: var(--theme-bg); font: var(--text-md)/1.4 var(--font-ui); }
+.library-view[hidden] { display: none; }
+/* (a Library in a Pins window, ADR 0208: the same view, laid out in the window, without its details panels) */
+.library-view.is-embedded { position: relative; inset: auto; z-index: auto; height: 100%; padding: var(--s-4) var(--s-4) 0; box-sizing: border-box; }
+.library-view.is-embedded :is(.asset-inspector, .viewer-details, [data-action="details"]) { display: none; }
+.pins-panel .pins-library { height: 100%; }
 /* A font's thumbnail: its letters in the theme's text colour, the whole picture shown (never cropped). */
 .is-font-thumb { filter: var(--font-thumb-filter); object-fit: contain !important; }
 .assets-btn[hidden] { display: none; }
@@ -1301,14 +1305,14 @@ body:has(.assets-place-zone:not([hidden])) :is(#nav, .view-settings, .assets-bar
 /* The status bar: the canvas's own readout and controls (the same classes, so one look), in a row under the library instead of floating. */
 /* The library's status bar is the canvas's (.hud-bottom): the full-width strip at the bottom. Here it sits in the page's column, from edge
    to edge, and the view controls are inside the strip at its right (nothing floats over the grid). */
-#assets-view .assets-statusbar { position: static; flex: none; flex-direction: row; align-items: center; margin: var(--near) calc(-1 * var(--edge)) 0; background: var(--hud-bg); border-top: 1px solid var(--hud-border); pointer-events: auto; }
-#assets-view .assets-statusbar > :is(.hud-readout, .hud-controls) { opacity: 1; }
-#assets-view .assets-statusbar > .hud-readout { order: 1; flex: 1; background: none; border: 0; backdrop-filter: none; }
-#assets-view .assets-statusbar > .hud-controls > [hidden] { display: none; }
-#assets-view .assets-statusbar > .hud-controls { order: 2; align-self: center; align-items: center; margin: 0 var(--edge) 0 0; padding: var(--status-pad) 0; background: none; border: 0; box-shadow: none; backdrop-filter: none; }
+.library-view .assets-statusbar { position: static; flex: none; flex-direction: row; align-items: center; margin: var(--near) calc(-1 * var(--edge)) 0; background: var(--hud-bg); border-top: 1px solid var(--hud-border); pointer-events: auto; }
+.library-view .assets-statusbar > :is(.hud-readout, .hud-controls) { opacity: 1; }
+.library-view .assets-statusbar > .hud-readout { order: 1; flex: 1; background: none; border: 0; backdrop-filter: none; }
+.library-view .assets-statusbar > .hud-controls > [hidden] { display: none; }
+.library-view .assets-statusbar > .hud-controls { order: 2; align-self: center; align-items: center; margin: 0 var(--edge) 0 0; padding: var(--status-pad) 0; background: none; border: 0; box-shadow: none; backdrop-filter: none; }
 .assets-count { font-variant-numeric: tabular-nums; white-space: nowrap; }
 .assets-picked, .assets-total { color: var(--hud-muted); }
-#assets-view.is-viewing .assets-statusbar { display: none; }
+.library-view.is-viewing .assets-statusbar { display: none; }
 @media (max-width: 900px) { .assets-total { display: none; } }
 .assets-size { display: inline-flex; align-items: center; gap: var(--s-4); padding: 0 var(--s-4); color: var(--hud-muted); }
 .assets-size svg { width: 16px; height: 16px; }
@@ -1338,9 +1342,9 @@ body:has(.assets-place-zone:not([hidden])) :is(#nav, .view-settings, .assets-bar
 .assets-grid::after { content: ""; flex-grow: 1000000; }
 .asset-cell { position: relative; flex: calc(var(--ar) * 100) 1 calc(var(--ar) * var(--row-h)); min-width: 64px; aspect-ratio: var(--ar); }
 /* Only the cards near the view are in the page, each placed where the layout (library-layout.ts) puts it; the grid is as tall as all of them. */
-#assets-view .assets-grid.is-virtual { position: relative; display: block; height: var(--grid-h, 0px); }
-#assets-view .assets-grid.is-virtual::after { display: none; }
-#assets-view .assets-grid.is-virtual > .asset-cell { position: absolute; left: var(--x); top: var(--y); width: var(--w); height: var(--h); min-width: 0; margin: 0; aspect-ratio: auto; }
+.library-view .assets-grid.is-virtual { position: relative; display: block; height: var(--grid-h, 0px); }
+.library-view .assets-grid.is-virtual::after { display: none; }
+.library-view .assets-grid.is-virtual > .asset-cell { position: absolute; left: var(--x); top: var(--y); width: var(--w); height: var(--h); min-width: 0; margin: 0; aspect-ratio: auto; }
 .asset-card { position: absolute; inset: 0; width: 100%; height: 100%; padding: 0; overflow: hidden; content-visibility: auto; color: inherit; text-align: left; background: var(--hud-hover); border: 0; border-radius: var(--r-md); cursor: pointer; }
 .asset-thumb { position: absolute; inset: 0; display: block; }
 .asset-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
@@ -1715,8 +1719,8 @@ body *:has(.has-full-note) { z-index: var(--z-pop); }
 .assets-body.is-list .asset-meta, .assets-body.is-list .asset-uses, .assets-body.is-list .asset-tags { color: var(--hud-muted); font-variant-numeric: tabular-nums; }
 
 /* The viewer takes the page: what does not apply to it leaves the library bar, and with the controls hidden so does the bar. */
-#assets-view.is-viewing .assets-import, #assets-view.is-viewing .assets-bar [data-action="slideshow"], #assets-view.is-viewing .assets-bar [data-action="details"] { display: none; }
-#assets-view.is-viewing.no-controls .assets-bar { display: none; }
+.library-view.is-viewing .assets-import, .library-view.is-viewing .assets-bar [data-action="slideshow"], .library-view.is-viewing .assets-bar [data-action="details"] { display: none; }
+.library-view.is-viewing.no-controls .assets-bar { display: none; }
 .viewer-quick { display: none; }
 .assets-body.no-details .viewer-quick { display: contents; }
 .viewer img:not(:where(.viewer-note *)), .viewer video:not(:where(.viewer-note *)) { cursor: zoom-in; }
@@ -1746,8 +1750,8 @@ body *:has(.has-full-note) { z-index: var(--z-pop); }
 @media (max-width: 960px) { .assets-bar .assets-sep { display: none; } .assets-bar { flex-wrap: wrap; padding-left: 0; padding-top: calc(var(--ctl) + 2 * var(--pad) + var(--near) + var(--s-1)); } }
 
 /* In the viewer the library bar is not needed and the view tabs are away (body[data-viewing]): the viewer gets the whole page. */
-#assets-view.is-viewing .assets-bar { display: none; }
-#assets-view.is-viewing { padding: 0; }
+.library-view.is-viewing .assets-bar { display: none; }
+.library-view.is-viewing { padding: 0; }
 
 /* Hidden controls: the way back fades out and returns when the pointer or the keyboard is near it; while a slideshow plays a pause button stays beside it. */
 .viewer-handle { position: absolute; left: 50%; bottom: 0; transform: translateX(-50%); display: flex; align-items: flex-end; justify-content: center; gap: var(--s-4); width: 240px; height: 72px; padding: 0 0 var(--s-4); background: none; border: 0; opacity: 0; transition: opacity var(--dur-base) var(--ease-out); }
@@ -1820,7 +1824,7 @@ body[data-viewing] #nav, body[data-viewing] .view-settings { display: none; }
 .assets-body.hide-tags.is-list .asset-tags, .assets-body.hide-tags .assets-list-head [data-col="tags"],
 .assets-body.hide-added.is-list .asset-added, .assets-body.hide-added .assets-list-head [data-col="added"] { display: none; }
 .assets-body.is-list .asset-added { color: var(--hud-muted); font-size: var(--text-sm); font-variant-numeric: tabular-nums; white-space: nowrap; }
-#assets-view:not(.is-list) [data-action="columns"] { display: none; }
+.library-view:not(.is-list) [data-action="columns"] { display: none; }
 .assets-columns { position: fixed; z-index: 30; width: 280px; padding: var(--s-6); background: var(--hud-bg); border: 1px solid var(--hud-border); border-radius: var(--r-lg); box-shadow: var(--hud-lift); backdrop-filter: blur(10px); }
 .assets-columns[hidden] { display: none; }
 .assets-columns h2 { margin: 0 0 var(--s-2); font-size: var(--text-lg); }
@@ -2090,7 +2094,7 @@ body[data-viewing] #nav, body[data-viewing] .view-settings { display: none; }
   .assets-body.is-viewing .asset-inspector { display: none; }
   .assets-body.is-viewing .viewer { position: absolute; inset: 0; top: 0; }
   /* The viewer takes the whole screen (the tabs are not shown while viewing): the library bar steps aside, its controls wrap in two rows. */
-  #assets-view:has(.assets-body.is-viewing) .assets-bar { display: none; }
+  .library-view:has(.assets-body.is-viewing) .assets-bar { display: none; }
   /* The previews stay, as a row of their own above the controls, and the controls are centred under them. */
   .viewer-bar { flex-wrap: wrap; justify-content: center; gap: var(--s-2) var(--s-4); padding: var(--s-4) var(--s-4) calc(var(--s-4) + env(safe-area-inset-bottom, 0px)); }
   .viewer-film { order: -1; flex: 1 1 100%; justify-content: safe center; }
@@ -2391,7 +2395,7 @@ body[data-viewing] #nav, body[data-viewing] .view-settings { display: none; }
 :is(.assets-hidden-bar, .assets-filtered) button:hover, .assets-hidden-bar button[aria-pressed="true"] { background: color-mix(in oklch, var(--hud-accent-fg) 22%, transparent); }
 :is(.assets-hidden-bar, .assets-filtered) button svg { width: var(--icon-sm); height: var(--icon-sm); }
 @media (max-width: 640px) { .assets-hidden-label, .assets-hidden-bar [data-action="hidden-stay"] { display: none; } }
-@media (max-width: 640px) { #assets-view .assets-statusbar > .hud-readout:has(.assets-hidden-bar:not([hidden])) { flex-wrap: nowrap; column-gap: var(--s-4); } }
+@media (max-width: 640px) { .library-view .assets-statusbar > .hud-readout:has(.assets-hidden-bar:not([hidden])) { flex-wrap: nowrap; column-gap: var(--s-4); } }
 
 
 /* Arrange menu: the space between items, a row of choices (ADR 0074). */
@@ -2595,12 +2599,12 @@ dialog.rename-dialog { width: min(var(--dlg-l), calc(100vw - 2 * var(--edge))); 
 .font-sample { display: flex; flex-direction: column; justify-content: center; gap: var(--s-1); width: 100%; height: 100%; padding: var(--s-4); overflow: hidden; color: var(--file-fg); background: var(--file-bg); text-align: start; opacity: 0; transition: opacity var(--dur-fast); }
 /* A font's sample, in the details and the viewer, lies on the ground of see-through pictures (its button, kept with the workspace), with letters that can be read on it; in the viewer that ground is the stage's own. */
 .font-sample { --file-fg: var(--hud-fg); --file-muted: var(--hud-muted); }
-#assets-view[data-ground="checker"] .font-sample { background: var(--check); }
-#assets-view[data-ground="auto"] .font-sample { background: var(--paper); }
-#assets-view[data-ground="gray"] .font-sample { background: var(--ground-gray); --file-fg: var(--ink-on-light); --file-muted: var(--ink-on-light); }
-#assets-view[data-ground="white"] .font-sample { background: var(--ground-white); --file-fg: var(--ink-on-light); --file-muted: var(--ink-on-light); }
-#assets-view[data-ground="black"] .font-sample { background: var(--ground-black); --file-fg: var(--ink-on-dark); --file-muted: var(--ink-on-dark); }
-#assets-view .viewer-tile .font-sample { background: transparent; }
+.library-view[data-ground="checker"] .font-sample { background: var(--check); }
+.library-view[data-ground="auto"] .font-sample { background: var(--paper); }
+.library-view[data-ground="gray"] .font-sample { background: var(--ground-gray); --file-fg: var(--ink-on-light); --file-muted: var(--ink-on-light); }
+.library-view[data-ground="white"] .font-sample { background: var(--ground-white); --file-fg: var(--ink-on-light); --file-muted: var(--ink-on-light); }
+.library-view[data-ground="black"] .font-sample { background: var(--ground-black); --file-fg: var(--ink-on-dark); --file-muted: var(--ink-on-dark); }
+.library-view .viewer-tile .font-sample { background: transparent; }
 .font-sample.is-ready, .font-sample.is-unreadable { opacity: 1; }
 .font-sample.is-unreadable { align-items: center; justify-content: center; color: var(--file-muted); font: var(--font-meta); }
 .font-sample p { margin: 0; overflow-wrap: anywhere; }
@@ -2719,7 +2723,7 @@ dialog.rename-dialog { width: min(var(--dlg-l), calc(100vw - 2 * var(--edge))); 
 .pop-menu, .nav-menu, .place-menu, .assets-columns, .assets-search-pop, .layers-panel, .bookmarks-panel, .tags-panel, .search-help, .ctx-bar, .ctx-wrap > .toolbar, dialog.confirm[open] { animation: pop-in var(--dur-base) var(--ease-out) both; }
 dialog.confirm[open]::backdrop { animation: fade-in var(--dur-base) var(--ease-out) both; }
 /* A view fades in when it opens; so does a settings tab. */
-#assets-view:not([hidden]), #settings-view:not([hidden]), .set-panels > section:not([hidden]), .viewer:not([hidden]) { animation: fade-in var(--dur-base) var(--ease-out) both; }
+.library-view:not([hidden]), #settings-view:not([hidden]), .set-panels > section:not([hidden]), .viewer:not([hidden]) { animation: fade-in var(--dur-base) var(--ease-out) both; }
 /* Buttons and fields change colour smoothly instead of switching. Anything with its own transition keeps it. */
 button, select, input, textarea, summary, [role="tab"] { transition: background-color var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out), opacity var(--dur-fast) var(--ease-out); }
 .hud-readout .hud-fps:not(.hud-diag):empty { display: none; }

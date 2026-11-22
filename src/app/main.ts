@@ -1,7 +1,7 @@
 import { moodboardsToCanvases } from "../pins/migrate";
 import { createCanvasView } from "../canvas/canvas-view";
 import { LIBRARY_DRAG } from "../ui/assets-view";
-import { addCanvasView, focusCanvasView, focusedCanvasView, routedActions } from "../canvas/focus";
+import { addCanvasView, docInUse, editorInUse, focusCanvasView, focusedCanvasView, routedActions, routedBarActions, setBarActions } from "../canvas/focus";
 import { mountPins } from "../pins/pins";
 import type { FrameIndex } from "../scene/frame-index";
 import type { Choice } from "../canvas/canvas-view";
@@ -121,6 +121,7 @@ import { closeMoreMenu, openMoreMenu, setMenuAvoid } from "../ui/more-menu";
 import type { MenuItem } from "../ui/more-menu";
 import { ICONS } from "../ui/icons";
 import { mountContextBar } from "../ui/context-bar";
+import type { ContextActions } from "../ui/context-bar";
 import { mountPropertiesLayout } from "../ui/properties-layout";
 import { setPropsWhere } from "../ui/tool-hint";
 import { installCombobox } from "../ui/combobox";
@@ -280,6 +281,9 @@ async function start(): Promise<void> {
   });
   const { index, indexSync, tiles, density, objectsUsers, fillUsersOf, invalidate, renderNow } = engine;
   const editor = new EditorState();
+  engine.follow(editor); // (drawn again on every change, as every view of a canvas is)
+  /** The main view's parts, by names a function made for any view can default to (its own parameters take the short names). */
+  const mainDoc = doc, mainEditor = editor, mainView = view;
   const notices = mountNotices(document.body, editor);
   // Device settings (ADR 0017): pen and select options come back after a reload.
   const settings = new SettingsStore();
@@ -905,7 +909,6 @@ async function start(): Promise<void> {
     invalidate();
   });
 
-  view.subscribe(invalidate);
   // Backend recovery (ADR 0023): if the browser takes the 2D drawing surface away (a GPU reset, memory pressure), keep the
   // document and the camera, drop every cached raster (tiles are canvases of their own and may be lost with it), and redraw.
   canvas.addEventListener("contextlost", (e) => {
@@ -919,9 +922,6 @@ async function start(): Promise<void> {
     editor.changed();
     invalidate();
   });
-  doc.subscribe(invalidate);
-  editor.subscribe(invalidate);
-  editor.subscribeRedraw(invalidate);
 
   const importFiles = (files: File[]): Promise<unknown> => importImages(files, assets, doc, view, editor);
   /** The fonts in the library, loaded: for the font choices of the toolbar and of the words selected in a text. */
@@ -1364,13 +1364,14 @@ async function start(): Promise<void> {
   dock.add(panelEl("bookmarks-panel"), { id: "bookmarks", title: "Bookmarks", side: "left" });
   dock.add(panelEl("styles-panel"), { id: "styles", title: "Styles", side: "left" });
   dock.add(panelEl("tags-panel"), { id: "tags", title: "Tags", side: "left" });
-  mountAdjustPanel(side, editor, {
-    selectedAdjust: () => selectedAdjust(doc, editor),
-    previewAdjust: (a) => previewAdjust(doc, editor, a),
-    commitAdjust: (a, label) => commitAdjust(doc, editor, a, label),
+  // (the Adjust panel follows the view in use, as the Actions bar's Adjust does: a pinned view's pictures are adjusted there too)
+  mountAdjustPanel(side, editorInUse, {
+    selectedAdjust: () => selectedAdjust(docInUse, editorInUse),
+    previewAdjust: (a) => previewAdjust(docInUse, editorInUse, a),
+    commitAdjust: (a, label) => commitAdjust(docInUse, editorInUse, a, label),
     adjustStyles: adjustStylesApi,
-    backdropState: () => backdropState(doc, editor),
-    setBackdrop: (on) => setBackdrop(doc, editor, on),
+    backdropState: () => backdropState(docInUse, editorInUse),
+    setBackdrop: (on) => setBackdrop(docInUse, editorInUse, on),
   });
   dock.add(panelEl("adjust-panel"), { id: "adjust", title: "Adjust", side: "right" });
   const patternSession = newPatternSession();
@@ -1435,7 +1436,8 @@ async function start(): Promise<void> {
     }
     return out;
   };
-  const runLayout = async (cmd: LayoutCommand): Promise<void> => {
+  const runLayout = async (cmd: LayoutCommand, on: { doc: DocumentStore; editor: EditorState; view: ViewState } = { doc: mainDoc, editor: mainEditor, view: mainView }): Promise<void> => {
+    const { doc, editor, view } = on; // (the view of a canvas it lays out: the main one, or a pinned one's)
     // Sorting by name needs the file names of the selected images (the document only has their hashes).
     const names = new Map<string, { name: string; date: number }>();
     if ("grid" in cmd && (cmd.grid.startsWith("name") || cmd.grid === "date") && session.catalog) {
@@ -2068,11 +2070,8 @@ async function start(): Promise<void> {
     return { left: Math.min(...xs), top: Math.min(...ys), right: Math.max(...xs), bottom: Math.max(...ys) };
   });
   hintLine.current = mountHintLine(editor, doc, () => settings.get("ui.hints"));
-  const contextBar = mountContextBar(
-    host,
-    editor,
-    doc,
-    {
+  // The Actions bar's actions for a view of a canvas (its document, editor and camera): the main view's, and a pinned one's (Pins, ADR 0208)
+  const barActionsFor = (doc: DocumentStore, editor: EditorState, view: ViewState): ContextActions => ({
       duplicate: () => duplicateSelection(doc, editor, view),
       outline: () => convertTextToPath(doc, editor),
       setOnPath: () => setTextOnPath(doc, editor),
@@ -2245,7 +2244,7 @@ async function start(): Promise<void> {
       canReleaseSheet: () => [...editor.selection].some((id) => isContainer(doc.get(id))),
       ungroup: () => ungroupSelection(doc, editor),
       arrange: (to) => arrangeSelection(doc, editor, to),
-      layout: (cmd) => void runLayout(cmd),
+      layout: (cmd) => void runLayout(cmd, { doc, editor, view }),
       gap: () => settings.get("arrange.gap"),
       laidOutOrder: () => { const s = laidOutSheetOfSelection(doc, editor); return s ? (s.container.layout.sort ?? "stack") : null; },
       keepTidy: () => settings.get("arrange.keepTidy"),
@@ -2258,9 +2257,17 @@ async function start(): Promise<void> {
       setFlag: (flag) => setFlag(doc, editor, flag),
       deleteSelection: () => deleteSelection(doc, editor),
       findCommand: () => palette.open(),
-    },
-    () => appView !== "canvas" || textEditor.isOpen,
-    () => settings.get("ui.actions"),
+  });
+  setBarActions("main", barActionsFor(doc, editor, view));
+  // The Actions bar follows the view in use (the main view, or a Pins window pressed last): in a pinned view it has its Adjust and Arrange only
+  const contextBar = mountContextBar(
+    host,
+    editorInUse,
+    docInUse,
+    routedBarActions(),
+    () => (focusedCanvasView() === "main" ? appView !== "canvas" : false) || textEditor.isOpen,
+    () => (focusedCanvasView() === "main" ? settings.get("ui.actions") : "bottom"),
+    () => (focusedCanvasView() === "main" ? null : ["Adjust", "Arrange"]),
   );
   contextUpdate = contextBar.update;
   // (where the Actions bar stands is no longer a row of Settings: a change by a command or the debug hook takes effect at once, not at the next frame)
@@ -2372,7 +2379,9 @@ async function start(): Promise<void> {
   followScrolling();
   markTab("canvas");
   markNav("canvas");
-  const assetsView = mountAssetsView(assetsRoot, session, assets, () => setView("canvas"), notices, settings, libraryFonts, PHOTOCRAFT_FEATURES.entry.libraryItems && photoCraft.available ? (hash) => void photoCraft.editItem(hash) : undefined);
+  /** A Library view in `root` (the Library view, and a Pins window's: ADR 0208, embedded, without its details panel). */
+  const libraryIn = (root: HTMLElement, embedded = false) => mountAssetsView(root, session, assets, () => setView("canvas"), notices, settings, libraryFonts, PHOTOCRAFT_FEATURES.entry.libraryItems && photoCraft.available ? (hash) => void photoCraft.editItem(hash) : undefined, { embedded });
+  const assetsView = libraryIn(assetsRoot);
   // A font's card on a canvas: the viewer's sample sentence, on its ground (a ground that follows the theme is drawn again with it).
   const fontCardsLook = (): void => {
     setFontCardLook({ sample: session.fontSample, ground: session.viewGround });
@@ -3031,7 +3040,7 @@ async function start(): Promise<void> {
     checkLibraryFiles: storage?.folderSync ? (quick) => checkLibraryFiles(quick) : null,
     hidden: storage?.hidden ? { isOpen: () => !!storage.hidden?.isOpen(), lock: () => lockHidden(session).then(() => { editor.message = HIDDEN_LOCKED; editor.changed(); }) } : null,
   });
-  addCanvasView("main", canvasActionsFor(doc, editor, view, index, focusCycle));
+  addCanvasView("main", canvasActionsFor(doc, editor, view, index, focusCycle), editor, doc);
   registry.setProvider("app", () => canvasCommands(routedActions()));
   for (const [old, now] of Object.entries(OLD_CANVAS_IDS)) registry.alias(old, now);
   registry.onFail((_c, error) => { editor.message = error; editor.changed(); });
@@ -3301,14 +3310,12 @@ async function start(): Promise<void> {
       editor: () => o.editor, settings: () => settings, assets: () => assets, assetNames: () => assetNames, theme: () => theme, dpr: () => dpr,
       choicesAt: () => [], hintRefresh: () => undefined, shown: o.shown, drawn: () => undefined,
     }),
-    // shortcut: a pinned view edits text, lists what is under the pointer and searches through the main view for now; give them its own when they need it
     // (a Pins window's surface wired as the main view's is: one function, so it has whatever the canvas has)
     // shortcut: a pinned view edits text, lists what is under the pointer and searches through the main view for now; give them its own when they need it
     wire: (el, now) => wireCanvasView(el, now, false, { editText: () => undefined, revealList: () => false, openSearch: () => undefined }),
     actionsFor: canvasActionsFor,
-    gallery: { hidden: () => assets.revealing, thumb: (h) => assetsView.thumb(h) },
-    record: (h) => assets.record(h),
-    slideSeconds: () => settings.get("assets.slideSeconds"),
+    barActionsFor,
+    library: (host) => libraryIn(host, true),
     dpr: () => dpr,
     read: () => { try { return JSON.parse(settings.get("pins.windows")) as Array<{ c: string; o?: number; t?: boolean }>; } catch { return []; } },
     write: (ws) => void settings.set("pins.windows", JSON.stringify(ws)),

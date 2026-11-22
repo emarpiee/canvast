@@ -373,7 +373,13 @@ export function createCanvasView(d: CanvasViewDeps) {
     for (const w of waiters) w();
   };
 
+  /** Draw again whenever what it shows changes: its document, its camera, and its editor (a change, or a redraw a drag asks for at each step). Every view of a canvas follows the same ones. */
+  const follow = (editor: EditorState): (() => void) => {
+    const off = [doc.subscribe(() => invalidate()), view.subscribe(() => invalidate()), editor.subscribe(() => invalidate()), editor.subscribeRedraw(() => invalidate())];
+    return () => off.forEach((f) => f());
+  };
   return {
+    follow,
     index, indexSync, tiles, density, objectsUsers, fillUsersOf, invalidate, renderNow, draw,
     labels: (): ItemLabel[] => labels,
     agentPointerAt: () => agentPointerAt,

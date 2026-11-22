@@ -47,33 +47,23 @@ test("Pins (ADR 0208): Shift+R pins the open canvas in a window above every view
   expect(app.consoleErrors).toEqual([]);
 });
 
-test("a Pins window shows the library's pictures as a gallery of the library's own cards: its search narrows them; a double-click shows one large in the window, drawn as on a canvas, with the next one and back", async ({ app }) => {
+test("a Pins window shows the Library itself (its cards, its folders, its viewer) without its details panel; the main Library is left as it was", async ({ app }) => {
   const p = app.page;
   await p.getByTestId("view-assets").click();
-  await p.getByTestId("assets-import-input").setInputFiles([
+  await p.getByTestId("assets-import-input").first().setInputFiles([
     { name: "red.png", mimeType: "image/png", buffer: makePng(60, 40, () => [200, 40, 40, 255]) },
     { name: "teal.png", mimeType: "image/png", buffer: makePng(40, 60, () => [30, 160, 150, 255]) },
   ]);
-  await expect(p.getByTestId("asset-card")).toHaveCount(2);
-  await p.evaluate(() => window.__canvastDebug.runCommand("pins.open", { source: "all" }, "test"));
+  await expect(p.locator("#assets-view").getByTestId("asset-card")).toHaveCount(2);
+  await p.getByTestId("view-canvas").click();
+  await p.evaluate(() => window.__canvastDebug.runCommand("pins.open", { source: "library" }, "test"));
   const pins = p.getByTestId("pins");
-  const card = pins.locator(".asset-card");
-  await expect(card, "the library's cards").toHaveCount(2);
-  await expect(card.locator("img.is-loaded"), "their pictures shown, as in the library").toHaveCount(2);
-  // the search narrows them
-  await pins.locator(".layers-filter input").fill("teal");
-  await expect(card).toHaveCount(1);
-  await pins.locator(".layers-filter input").fill("");
-  await expect(card).toHaveCount(2);
-  // a double-click shows it large in the window (the Library stays where it is); the next one, then back to the gallery
-  const first = await card.first().getAttribute("title");
+  const card = pins.getByTestId("asset-card");
+  await expect(card, "the Library's own cards").toHaveCount(2);
+  await expect(pins.locator(".asset-inspector"), "no details panel").toBeHidden();
+  // a double-click opens its own viewer, in the window (the main view stays the canvas)
   await card.first().dblclick();
-  const name = pins.locator("[data-pins-name]");
-  await expect(name).toHaveText(first!);
-  await expect(pins.locator(".pins-canvas")).toBeVisible();
-  await pins.locator('[data-pins-step="next"]').click();
-  await expect(name).not.toHaveText(first!);
-  await pins.locator('[data-pins-step="back"]').click();
-  await expect(card).toHaveCount(2);
+  await expect(pins.getByTestId("slide-view")).toBeVisible();
+  await expect(p.locator("#assets-view")).toBeHidden();
   expect(app.consoleErrors).toEqual([]);
 });

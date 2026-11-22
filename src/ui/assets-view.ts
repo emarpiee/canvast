@@ -131,8 +131,6 @@ export interface AssetsView {
   importFiles(files: File[], here?: boolean): Promise<string[]>;
   /** Draw the notes' cards again (the preview look changed). */
   redrawNotes(): void;
-  /** An item's picture as the library's cards show it (its custom thumbnail, its stored one, one made now, an art file's): its address. Pins' gallery. */
-  thumb(hash: string): Promise<string>;
 }
 
 /**
@@ -308,7 +306,12 @@ const NO_FILTERS = { usage: "all", sort: "newest", reversed: false, scope: "all"
 /** The widest a list column can be made by dragging its header's edge. */
 const COL_W_MAX = 900;
 
-export function mountAssetsView(root: HTMLElement, session: Session, assets: AssetLibrary, showCanvas: () => void, notices: { subscribe(fn: (text: string) => void): void }, settings: SettingsStore, /** The fonts of the library, loaded (the notes editor's font list). */ fonts: () => Promise<Array<{ hash: string; name: string; unusable: string }>> = async () => [], /** Edit in PhotoCraft (Settings > ArtCraft > PhotoCraft); absent where it is not offered. */ editInPhotoCraft?: (hash: string) => void): AssetsView {
+/** The Libraries embedded in Pins windows, and where the last press was: which Library takes the keys (ADR 0208). */
+const libraryRoots = new Set<HTMLElement>();
+let lastPress: Element | null = null;
+if (typeof window !== "undefined") window.addEventListener("pointerdown", (e) => void (lastPress = e.target as Element | null), { capture: true });
+
+export function mountAssetsView(root: HTMLElement, session: Session, assets: AssetLibrary, showCanvas: () => void, notices: { subscribe(fn: (text: string) => void): void }, settings: SettingsStore, /** The fonts of the library, loaded (the notes editor's font list). */ fonts: () => Promise<Array<{ hash: string; name: string; unusable: string }>> = async () => [], /** Edit in PhotoCraft (Settings > ArtCraft > PhotoCraft); absent where it is not offered. */ editInPhotoCraft?: (hash: string) => void, /** A second Library in a Pins window (ADR 0208): no details panel, no commands of its own (the main Library's are the app's), its keys only while it is in use. */ opts: { embedded?: boolean } = {}): AssetsView {
   root.innerHTML = `
     <div class="assets-place-zone drop-zone" data-testid="assets-place-zone" hidden>${ICONS.mapPin}<span></span></div>
     <div class="assets-bar" role="toolbar" aria-label="Library">
@@ -675,6 +678,12 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     onLayoutChange();
   };
   let visible = false;
+  const embedded = !!opts.embedded;
+  root.classList.add("library-view"); // (its look: the Library view's and a Pins window's, one set of rules)
+  root.classList.toggle("is-embedded", embedded);
+  if (embedded) libraryRoots.add(root);
+  /** This Library is the one in use: the last press was in it (an embedded one), or in no embedded one (the main Library). Its keys only then. */
+  const mine = (): boolean => (embedded ? !!lastPress && root.contains(lastPress) : ![...libraryRoots].some((r) => !!lastPress && r.contains(lastPress)));
   applyUi();
   let listing: CatalogListing | null = null;
   // ---- the desktop app lists a page at a time (`CatalogStore.pages`): the library is never in the page whole. `listing.entries` is
@@ -2123,7 +2132,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   viewer.addEventListener("keydown", viewerKey);
   // (with the focus on nothing, a press having left the words, a key reaches no element of the viewer)
   document.addEventListener("keydown", (e) => {
-    if (e.target === document.body && visible && !viewer.hidden && !document.querySelector("dialog[open]")) viewerKey(e);
+    if (e.target === document.body && visible && mine() && !viewer.hidden && !document.querySelector("dialog[open]")) viewerKey(e);
   });
 
   // ---- data
@@ -4137,7 +4146,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   /** The details' commands that show the person their own dialog first (ADR 0205: an agent's run is asked there, once). */
   const ASKS = new Set(["delete", "delete-all", "delete-everywhere"]);
   const panelData: OptionSpec = { name: "data", type: "json", doc: "what the button carries: canvas (an id), tag, index" };
-  commands.setProvider("library-panel", () => Object.entries(PANEL_COMMANDS).map(([action, [id, title, hint, risk]]): Command => ({
+  if (!embedded) commands.setProvider("library-panel", () => Object.entries(PANEL_COMMANDS).map(([action, [id, title, hint, risk]]): Command => ({
     id, group: "Library", kind: "library", title, hint, risk, ...(ASKS.has(action) ? { asks: true } : {}),
     options: [{ name: "hash", type: "id", doc: "the item (default: the one shown in the details)" }, { name: "hashes", type: "ids", doc: "the items (default: the selected)" }, panelData, { name: "on", type: "boolean", doc: "on or off (default: the other of what it is now)" }],
     why: () => (!visible ? "This works in the Library." : session.readOnly && risk !== "read" && action !== "download" && action !== "show" ? REASON.readOnly : !selected ? REASON.noSelection : null),
@@ -4979,7 +4988,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     export: ["folder.export", "Export the folder", "Its items as a .canvast archive", "confirm"],
     delete: ["folder.delete", "Delete the folder", "Its items stay in the library", "confirm"],
   };
-  commands.setProvider("library-folders", () => Object.entries(FOLDER_COMMANDS).map(([action, [id, title, hint, risk]]): Command => ({
+  if (!embedded) commands.setProvider("library-folders", () => Object.entries(FOLDER_COMMANDS).map(([action, [id, title, hint, risk]]): Command => ({
     id, group: "Library", kind: "library", title, hint, risk, ...(action === "hide" || action === "show" || action === "delete" ? { asks: true } : {}),
     options: [{ name: "id", type: "id", doc: "the folder", required: action !== "new" }],
     why: () => (!listing ? "The Library is not open yet." : session.readOnly && action !== "conceal" && action !== "pin" && action !== "export" ? REASON.readOnly : null),
@@ -5134,7 +5143,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   // Esc clears the selection, Ctrl+A picks everything shown, Enter opens the one selected item in the viewer, the arrow keys, Home and End
   // move through the items in either layout.
   window.addEventListener("keydown", (e) => {
-    if (!visible || !viewer.hidden) return;
+    if (!visible || !mine() || !viewer.hidden) return;
     const target = e.target as HTMLElement | null;
     if (document.querySelector("dialog[open]")) return;
     // From the search box, Down steps into the items (the box keeps its other keys).
@@ -5253,9 +5262,9 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     void copyItems(hashes);
   };
   window.addEventListener("keydown", (e) => {
-    if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && (e.key === "c" || e.key === "C")) copyShortcut(e);
+    if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && (e.key === "c" || e.key === "C") && mine()) copyShortcut(e);
   });
-  document.addEventListener("copy", copyShortcut);
+  document.addEventListener("copy", (e) => void (mine() && copyShortcut(e)));
   const clipboardGroup = (hashes: readonly string[]): MenuItem[] => [
     ...(hashes.length
       ? [
@@ -5697,7 +5706,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   const HASHES: OptionSpec = { name: "hashes", type: "ids", doc: "the items (default: the selected)" };
   const itemsOf = (o: Options): string[] => (o["hashes"] as string[] | undefined) ?? (picked.size ? [...picked] : selected ? [selected] : []);
   const lib = (id: string, title: string, hint: string, risk: Risk, exec: NonNullable<Command["exec"]>, why: () => string | null = inLibrary, extra: Partial<Command> = {}): Command => ({ id, group: "Library", kind: "library", title, hint, risk, why, exec, ...extra });
-  commands.setProvider("library", () => [
+  if (!embedded) commands.setProvider("library", () => [
     lib("library.import", "Import files", "Pictures, video, audio and other files", "edit", () => fileInput.click(), writable),
     lib("library.importFolder", "Import a folder", "With its subfolders", "edit", () => folderInput.click(), writable),
     lib("library.newNote", "New note", "A markdown note, opened to write in", "edit", () => newNote(), writable),
@@ -6081,7 +6090,6 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       root.hidden = true;
       syncViewing();
     },
-    thumb: (hash) => thumbFor(hash),
     redrawNotes() {
       redrawCards((listing?.entries ?? []).filter((e) => noteKindOf(e.name)).map((e) => e.hash));
     },
