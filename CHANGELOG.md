@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.61.35 — Reference window spec: the red picture alone before F (2026-11-22)
+
+### For developers
+
+- The reference window spec moves both other pictures away before clicking the red one for the F cycle.
+
 ## 0.61.34 — The canvas engine in a module of its own (2026-11-22)
 
 ### For developers
