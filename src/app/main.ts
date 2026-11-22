@@ -1,6 +1,7 @@
 import { mountReferenceWindows } from "../ui/reference-window";
 import { createCanvasView } from "../canvas/canvas-view";
-import { addCanvasView, focusedCanvasView, routedActions } from "../canvas/focus";
+import { addCanvasView, focusCanvasView, focusedCanvasView, routedActions } from "../canvas/focus";
+import { mountPins } from "../pins/pins";
 import type { FrameIndex } from "../scene/frame-index";
 import type { Choice } from "../canvas/canvas-view";
 import { validComicStyle } from "../doc/comic";
@@ -54,6 +55,8 @@ import { applyBalloonStyle, balloonStyle, balloonsToPaths, canConnectBalloons, c
 import { copiedPictureHashes, backdropState, setBackdrop, canSplitPaths, splitPaths, placeCardViews, placeLinesBeside, imageAt, pasteCssPaint, copiedText, setCopiedText, renderedStill, isPlaceholderText, markCopiedPicture, isCopiedPicture, forgetCopiedPicture, applyRotation, showReplaced, arrangeSelection, copySelection, cutSelection, duplicateSelection, pasteObjects, layoutSelection, clearFlag, deleteSelection, groupSelection, importImages, moveAbove, moveLayers, setStackOrder, tagObjects, resetRotation, resetProportions, resettable, resetSize, sizeResets, recolourOldInk, svgWarningOfTargets, svgWarningOfSelection, extractFrame, placePictureBeside, applyLayoutStyle, canTakeLayoutStyle, laidOutSheetOfSelection, arrangeAsLayout, pruneSelection, redo, setFlag, setMedia, setFlagOn, setOpacityOn, setBlendOn, renameLayer, ungroupSelection, undo, selectedPaint, previewPaint, commitPaint, combineSelection, canCombine, selectedOutline, commitOutline, selectedDashNumbers, commitDashNumbers, selectedArrows, commitArrows, selectedMiterAngle, commitMiterAngle, selectedShape, commitShape, selectedCorners, commitCorners, selectedSmoothing, commitSmoothing, selectionPaints, recolour, initialShapeState, setInitialShape, resetToInitialShape, groupJoinMode, addToBooleanGroup, takeOutOfBooleanGroup, convertTextToPath, simplifySelection, canSimplify, outlineStroke, setWidthProfile, canOutlineStroke, makeMask, makeClippingMask, canMakeMask, changeMask, selectTheMask, canReleaseMask, selectedMask, startBrushMask, paintMask, divide, startShapeBuilder, finishShapeBuilder, canDivide, canFillGaps, fillAllGaps, startGapFill, finishGapFill, makeNetwork, releaseNetwork, canMakeNetwork, canReleaseNetwork, strokeToPath, canStrokeToPath, setTextOnPath, canSetOnPath, canSetInShape, setTextInShape, takeTextOffPath, canTakeOffPath, canOutline, booleanSelection, releaseBoolean, flattenBoolean, canExportSvg, exportTarget, buildTarget, exportTargets, exportEachTargets, canSheetEach, sheetEach, svgOfTarget, pdfVectorOfTarget, svgOfSelection, importSvg, setSheetClip, sheetSelection, releaseSheets, selectedPin, setPin, canFitSheet, fitSheet, autoLayoutOf, autoLayoutState, setAutoLayout, autoLayoutShortcut, patchAutoLayout, setSheetLayout, selectedInLayout, setInLayout, sheetRatio, ratioOfSheet, setSheetRatio, sheetScalesContents, setSheetScale, boxOnSheet, moveOnSheet, resizeOnSheet, canDetach, detachSelection, selectedTextStyle, setTextStyle, croppablePicture, isCropped, uncropPicture, selectedFlip, flipSelection, unflipPictures, selectedAdjust, pictureCount, applyGradientMap, paintTargetCount, selectionColours, previewAdjust, commitAdjust, copyAdjustments, pasteAdjustments, canPasteAdjustments, copyRenderedPicture, bakePicture, sizeResetBlock, matchSize, sizable } from "./actions";
 import { attachNavigation } from "../interaction/navigation";
 import { attachTools, selectEverything } from "../interaction/tools";
+import type { ToolHooks } from "../interaction/tools";
+import type { ItemLabel } from "../render/item-label";
 import { createFocusCycle, focusObjects, stepToNeighbour } from "../interaction/item-navigation";
 import { gridStep, setGridLook } from "../render/canvas2d-renderer";
 import type { Theme } from "../render/canvas2d-renderer";
@@ -1129,7 +1132,8 @@ async function start(): Promise<void> {
     e.preventDefault();
     e.stopImmediatePropagation();
   }, { capture: true, passive: false });
-  attachTools(canvas, view, doc, index, editor, { setMaker: (fn) => void (makeShape = fn), autoLayout: () => autoLayoutShortcut(doc, editor), listAutoScroll: () => settings.get("select.listAutoScroll"), edgePanSpeed: () => (settings.get("nav.edgePanOn") ? settings.get("nav.edgePan") / 100 : 0), editText: (t, at, box) => textEditor.open(t, at, box), openItem: (h, id) => {
+  // The tools' hooks for a view of a canvas (its document, editor, camera, focus key and names): the main view's, and a pinned one's (Pins)
+  const toolHooksFor = (doc: DocumentStore, editor: EditorState, view: ViewState, focusCycle: { tap(): void }, labels: () => ItemLabel[]): ToolHooks => ({ autoLayout: () => autoLayoutShortcut(doc, editor), listAutoScroll: () => settings.get("select.listAutoScroll"), edgePanSpeed: () => (settings.get("nav.edgePanOn") ? settings.get("nav.edgePan") / 100 : 0), editText: (t, at, box) => textEditor.open(t, at, box), openItem: (h, id) => {
         const o = doc.get(id);
         void notePanel.open(h, o?.kind === "image" ? cardActions(o) : undefined);
       }, newNote: (at, w) => void newNoteAt(at, w), toolForKey: (k) => toolForKey(k), navForKey: (k) => navForKey(k),
@@ -1146,6 +1150,10 @@ async function start(): Promise<void> {
     // press shows or unlocks), then, inside the selection's box, what the selection holds (a group's items, or each selected thing). A row
     // outlines its thing while touched and picks it when pressed; "Add to the selection" keeps what is picked; on touch the right-click menu follows.
     revealList: (at, pick, opts) => openChoiceList(at, pick, opts),
+  });
+  attachTools(canvas, view, doc, index, editor, {
+    ...toolHooksFor(doc, editor, view, focusCycle, () => engine.labels()),
+    setMaker: (fn) => void (makeShape = fn),
     // canvas pictures dragged onto a reference window's board go onto it (ADR 0207)
     active: () => focusedCanvasView() === "main",
     droppedOff: (ids, cx, cy) => {
@@ -2516,11 +2524,12 @@ async function start(): Promise<void> {
   });
   // (the library changed: a picture renamed, hidden, filed or deleted shows so in the reference windows; usage counts alone change nothing there)
   session.subscribeAssets((_meta, usageOnly) => void (!usageOnly && references?.refresh()));
-  document.querySelector('[data-testid="reference-open"]')?.addEventListener("click", () => void pressCommand("reference.open", {}));
+  // (the button by Settings and Shift+R: a Pins window of the canvas open; the old reference window stays in the command palette until Pins has its gallery)
+  document.querySelector('[data-testid="reference-open"]')?.addEventListener("click", () => void pressCommand("pins.open", {}));
   window.addEventListener("keydown", (e) => {
     if (e.repeat || typing(e.target) || (e.target as HTMLElement | null)?.closest?.("dialog") || comboOfEvent(e) !== "Shift+R") return;
     e.preventDefault();
-    pressCommand("reference.open", {}, "key");
+    pressCommand("pins.open", {}, "key");
   });
   notePanelReady({ session, assets, settings, fonts: libraryFonts, importFiles: (files) => assetsView.importFiles(files), showInLibrary: (h) => (setView("assets"), void assetsView.reveal([h])), hidden: hiddenModeOn });
   // Alt+Shift+Left and Alt+Shift+Right: previous and next view (ADR 0116), on the canvas. (Alt with an arrow alone pans, as ever.)
@@ -3009,6 +3018,24 @@ async function start(): Promise<void> {
     hidden: storage?.hidden ? { isOpen: () => !!storage.hidden?.isOpen(), lock: () => lockHidden(session).then(() => { editor.message = HIDDEN_LOCKED; editor.changed(); }) } : null,
   });
   addCanvasView("main", canvasActionsFor(doc, editor, view, index, focusCycle));
+  // Pins (ADR 0208, src/pins/): windows above every view that show a canvas, from the canvas's own engine, tools and actions
+  const pinsWindows = mountPins({
+    dock, session, main: { doc },
+    engine: (o) => createCanvasView({
+      canvas: o.canvas, ctx: o.ctx, doc: o.doc, view: o.view, stats: new FrameStats(),
+      editor: () => o.editor, settings: () => settings, assets: () => assets, assetNames: () => assetNames, theme: () => theme, dpr: () => dpr,
+      choicesAt: () => [], hintRefresh: () => undefined, shown: o.shown, drawn: () => undefined,
+    }),
+    // shortcut: a pinned view edits text, lists what is under the pointer and searches through the main view for now; give them its own when they need it
+    tools: (el, v, d, ix, ed, focus, labels, active) => attachTools(el, v, d, ix, ed, { ...toolHooksFor(d, ed, v, focus, labels), editText: () => undefined, revealList: () => false, openSearch: () => undefined, active }),
+    actionsFor: canvasActionsFor,
+    dpr: () => dpr,
+    read: () => { try { return (JSON.parse(settings.get("pins.windows")) as Array<{ c: string }>).map((w) => w.c); } catch { return []; } },
+    write: (cs) => void settings.set("pins.windows", JSON.stringify(cs.map((c) => ({ c })))),
+  });
+  session.subscribe(() => pinsWindows.refresh());
+  // view-state: (the main view pressed: the commands, keys and menus act on it again)
+  canvas.addEventListener("pointerdown", () => focusCanvasView("main"), true);
   registry.setProvider("app", () => canvasCommands(routedActions()));
   for (const [old, now] of Object.entries(OLD_CANVAS_IDS)) registry.alias(old, now);
   registry.onFail((_c, error) => { editor.message = error; editor.changed(); });

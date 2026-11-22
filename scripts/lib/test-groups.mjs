@@ -4,7 +4,7 @@
 /** Group → its specs (file names under tests/e2e/, without `.spec.ts`). */
 export const GROUPS = {
   navigation: ["navigation", "zoom-controls", "deep-zoom-rendering", "depth-suite", "extreme-depth", "bookmarks", "frames"],
-  drawing: ["editing", "vectors", "text", "sheets", "styles", "pattern"],
+  drawing: ["editing", "vectors", "text", "sheets", "styles", "pattern", "pins"],
   rendering: ["tiles", "density", "lowmem"],
   pictures: ["pictures", "files", "screenshot"],
   library: ["assets", "organize", "components", "library-folder", "notes", "file-views"],
@@ -53,6 +53,7 @@ export const RULES = [
   [/^src\/assets\//, ["library", "pictures"]],
   [/^src\/(ui\/(assets-view|library-[a-z-]+|batch-rename|hidden-access|note-editor|file-views|file-panel|pdf-view|model-view|archive-view|reference-window|view-state|setting-rows)\.ts|notes\/.+\.ts)$/, ["library"]],
   [/^src\/ui\/(archive-ui|library-folder-card|reset-dialog)\.ts$/, ["storage", "library"]],
+  [/^src\/pins\//, ["library", "drawing"]], // (Pins: a canvas in a window above every view)
   [/^src\/app\/(library-filing|asset-names)\.ts$/, ["library"]],
   // pictures, files and export
   [/^src\/(ui\/(export-dialog|file-actions|media-[a-z-]+|adjust-panel)|app\/(export-[a-z-]+|screenshot|svg-export|pdf-vector|download|font-loader))\.ts$/, ["pictures", "drawing"]],

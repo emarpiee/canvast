@@ -18,6 +18,8 @@ export const MAX_WIDTH = 480;
 /** The widest any panel can be saved at (a panel's own `maxWidth` keeps it within that). */
 const WIDEST = 1600;
 const DEFAULT_WIDTH = 268;
+/** The least height of a panel with its own (`DockSpec.height`). */
+const MIN_HEIGHT = 160;
 /** How close to the edge of the view (px) a dragged panel must be to dock there. */
 const ZONE_PX = 96;
 /** How far (px) a title bar must move before it is a drag and not a press. */
@@ -36,6 +38,10 @@ export interface DockSpec {
   maxWidth?: number;
   /** Never folded to its title bar (an editor: a press on its header, or another panel used, would hide what is being written). */
   noFold?: boolean;
+  /** Floats only, above every view (the Library, Settings too), not only the canvas: a pinned view (Pins). */
+  everywhere?: boolean;
+  /** Its own height (px), changed with the grip at its bottom corner, as the width is: a panel whose content fills it (a view). */
+  height?: number;
 }
 
 interface PanelState {
@@ -45,6 +51,8 @@ interface PanelState {
   y: number;
   /** Folded to its title bar. */
   c: boolean;
+  /** Its height, for a panel that has one (`DockSpec.height`). */
+  h?: number;
 }
 
 interface Item {
@@ -74,6 +82,8 @@ export class PanelDock {
   private readonly left: HTMLElement;
   private readonly right: HTMLElement;
   private readonly layer: HTMLElement;
+  /** The free layer above every view (`DockSpec.everywhere`). */
+  private readonly top: HTMLElement;
   private readonly zones: [HTMLElement, HTMLElement];
   private saveTimer = 0;
   /** The width every stacked panel of a side has (each side its own); a panel that is let go takes it along and then has its own. */
@@ -85,6 +95,9 @@ export class PanelDock {
     this.layer = document.createElement("div");
     this.layer.id = "dock-float";
     left.parentElement!.appendChild(this.layer);
+    this.top = document.createElement("div");
+    this.top.id = "dock-top";
+    document.body.appendChild(this.top);
     this.zones = [document.createElement("div"), document.createElement("div")];
     this.zones[0].className = "dock-zone is-left";
     this.zones[1].className = "dock-zone is-right";
@@ -103,7 +116,7 @@ export class PanelDock {
       if (typeof raw.swl === "number") this.sideW.left = clamp(raw.swl, MIN_WIDTH, MAX_WIDTH);
       if (typeof raw.swr === "number") this.sideW.right = clamp(raw.swr, MIN_WIDTH, MAX_WIDTH);
       for (const [id, p] of Object.entries(raw.panels ?? {})) {
-        if (p && (p.s === "left" || p.s === "right" || p.s === "float")) this.state.set(id, { s: p.s, w: clamp(Number(p.w) || 268, MIN_WIDTH, WIDEST), x: Number(p.x) || 0, y: Number(p.y) || 0, c: p.c === true });
+        if (p && (p.s === "left" || p.s === "right" || p.s === "float")) this.state.set(id, { s: p.s, w: clamp(Number(p.w) || 268, MIN_WIDTH, WIDEST), x: Number(p.x) || 0, y: Number(p.y) || 0, c: p.c === true, ...(Number(p.h) > 0 ? { h: Number(p.h) } : {}) });
       }
       if (Array.isArray(raw.order)) this.order = (raw.order as unknown[]).filter((x): x is string => typeof x === "string");
     } catch {
@@ -129,8 +142,17 @@ export class PanelDock {
     const item: Item = { spec, el, box };
     this.items.set(spec.id, item);
     const max = spec.maxWidth ?? MAX_WIDTH;
-    if (!this.state.has(spec.id)) this.state.set(spec.id, { s: spec.side, w: clamp(spec.width ?? this.sideW[spec.side === "right" ? "right" : "left"], MIN_WIDTH, max), x: 80, y: 120, c: false });
+    if (!this.state.has(spec.id)) this.state.set(spec.id, { s: spec.everywhere ? "float" : spec.side, w: clamp(spec.width ?? this.sideW[spec.side === "right" ? "right" : "left"], MIN_WIDTH, max), x: 80, y: 120, c: false, ...(spec.height ? { h: spec.height } : {}) });
     else this.state.get(spec.id)!.w = clamp(this.state.get(spec.id)!.w, MIN_WIDTH, max);
+    if (spec.everywhere) this.state.get(spec.id)!.s = "float";
+    if (spec.height) {
+      // (its height too: a grip at its bottom corner sizes both)
+      const corner = document.createElement("div");
+      corner.className = "dock-corner";
+      corner.setAttribute("aria-hidden", "true");
+      box.append(corner);
+      corner.addEventListener("pointerdown", (e) => this.resize(item, e, true));
+    }
     if (!this.order.includes(spec.id)) this.order.push(spec.id);
     box.hidden = el.hidden;
     new MutationObserver(() => {
@@ -155,6 +177,17 @@ export class PanelDock {
     });
     grip.addEventListener("pointerdown", (e) => this.resize(item, e));
     this.layout();
+  }
+
+  /** Take a panel out of the dock (it is closed for good: a pinned view's window); its place is forgotten. */
+  remove(id: string): void {
+    const it = this.items.get(id);
+    if (!it) return;
+    it.box.remove();
+    this.items.delete(id);
+    this.state.delete(id);
+    this.order = this.order.filter((x) => x !== id);
+    this.save();
   }
 
   /** Mark a panel as used: first (top) in its stack, and (with `open`) unfolded. */
@@ -252,11 +285,13 @@ export class PanelDock {
   private layout(): void {
     const index = (id: string): number => this.order.indexOf(id);
     const sorted = [...this.items.values()].sort((a, b) => index(a.spec.id) - index(b.spec.id));
-    const want = new Map<HTMLElement, HTMLElement[]>([[this.left, []], [this.right, []], [this.layer, []]]);
+    const want = new Map<HTMLElement, HTMLElement[]>([[this.left, []], [this.right, []], [this.layer, []], [this.top, []]]);
     for (const it of sorted) {
       const s = this.state.get(it.spec.id)!;
       const side = this.effective(s);
-      want.get(side === "left" ? this.left : side === "right" ? this.right : this.layer)!.push(it.box);
+      want.get(it.spec.everywhere ? this.top : side === "left" ? this.left : side === "right" ? this.right : this.layer)!.push(it.box);
+      it.box.style.height = it.spec.height && !s.c ? `${s.h ?? it.spec.height}px` : "";
+      it.box.toggleAttribute("data-height", !!it.spec.height);
       it.box.dataset["side"] = side;
       it.box.toggleAttribute("data-folded", s.c && !it.spec.noFold); // (a fold remembered from before it could not be folded is let go)
       const w = side === "float" || it.spec.ownWidth ? s.w : this.sideW[side];
@@ -310,7 +345,7 @@ export class PanelDock {
       s.x = m.clientX - grab.x;
       s.y = m.clientY - grab.y;
       this.layout();
-      const near = m.clientX < ZONE_PX ? 0 : m.clientX > window.innerWidth - ZONE_PX ? 1 : -1;
+      const near = item.spec.everywhere ? -1 : m.clientX < ZONE_PX ? 0 : m.clientX > window.innerWidth - ZONE_PX ? 1 : -1;
       this.zones.forEach((z, i) => (z.hidden = i !== near));
     };
     const up = (u: PointerEvent): void => {
@@ -327,7 +362,8 @@ export class PanelDock {
         this.save();
         return;
       }
-      if (u.clientX < ZONE_PX) s.s = "left";
+      if (item.spec.everywhere) s.s = "float"; // (it floats only)
+      else if (u.clientX < ZONE_PX) s.s = "left";
       else if (u.clientX > window.innerWidth - ZONE_PX) s.s = "right";
       this.order = [...this.order.filter((x) => x !== id), id];
       this.settle();
@@ -340,19 +376,21 @@ export class PanelDock {
 
   // ---- Width ----------------------------------------------------------------------------------------------------------------------
 
-  private resize(item: Item, e: PointerEvent): void {
+  private resize(item: Item, e: PointerEvent, both = false): void {
     e.preventDefault();
     e.stopPropagation();
     const s = this.state.get(item.spec.id)!;
     const side = this.effective(s);
     const own = side === "float" || !!item.spec.ownWidth;
     const startX = e.clientX, startW = own ? s.w : this.sideW[side];
+    const startY = e.clientY, startH = s.h ?? item.spec.height ?? 0;
     const grows = side === "right" ? -1 : 1; // the grip is on the edge towards the canvas
     item.box.classList.add("is-resizing");
     const move = (m: PointerEvent): void => {
       const w = clamp(startW + grows * (m.clientX - startX), MIN_WIDTH, item.spec.maxWidth ?? MAX_WIDTH);
       if (own) s.w = w;
       else this.sideW[side] = w; // the stacked panels of this side share one width
+      if (both) s.h = clamp(startH + (m.clientY - startY), MIN_HEIGHT, window.innerHeight - 40);
       this.layout();
     };
     const up = (): void => {

@@ -2957,6 +2957,19 @@ input[data-scrub-input]:focus { cursor: text; }
 .dock-item[data-folded] > .dock-grip { display: none; }
 #dock-float { position: fixed; inset: 0; pointer-events: none; z-index: var(--z-edge); }
 #dock-float > .dock-item { position: absolute; }
+/* (a panel that floats above every view, the Library too: a pinned view, Pins) */
+#dock-top { position: fixed; inset: 0; pointer-events: none; z-index: var(--z-reference); }
+#dock-top > .dock-item { position: absolute; }
+/* (a panel with its own height: its content fills it; the grip at its bottom corner sizes both) */
+.dock-item[data-height] > .layers-panel { height: 100%; max-height: none; display: flex; flex-direction: column; }
+.dock-corner { position: absolute; right: 0; bottom: 0; width: var(--s-8); height: var(--s-8); cursor: nwse-resize; touch-action: none; z-index: 2; }
+.dock-corner:hover, .dock-item.is-resizing > .dock-corner { background: linear-gradient(135deg, transparent 50%, color-mix(in oklch, var(--hud-accent) 45%, transparent) 50%); border-bottom-right-radius: var(--r-md); }
+.dock-item[data-folded] > .dock-corner { display: none; }
+/* Pins (src/pins/): a canvas in a dock panel; its body is the view, edge to edge */
+.pins-panel .panel-body { flex: 1; min-height: 0; padding: 0; overflow: hidden; }
+.pins-view { position: relative; width: 100%; height: 100%; }
+.pins-canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+.pins-canvas:focus { outline: none; }
 .dock-zone { position: absolute; top: 0; bottom: 0; width: calc(var(--sp-15) * 1.6); background: color-mix(in oklch, var(--hud-accent) 16%, transparent); border: 2px dashed var(--hud-accent); pointer-events: none; }
 .dock-zone[hidden] { display: none; }
 .dock-zone.is-left { left: 0; }

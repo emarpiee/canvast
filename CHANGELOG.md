@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.61.37 — Pins: a canvas in a window above every view (2026-11-22)
+
+- **Added:** **Pins** (Shift+R, or the button by Settings): a window above every view, the Library too, that shows a canvas of the workspace, chosen in it. It is the canvas itself, drawn and edited as in the main view (the same tools, keys, menus and undo); the canvas the main view shows is the same in both. It is a panel you move by its title and size from its corner, and it opens again after a reload. Text editing, the list under the pointer and search work in the main view for now. ([The Library](README.md#the-library))
+
+### For developers
+
+- `src/pins/pins.ts` (ADR 0208): the windows, on `createCanvasView`, `attachTools` (hooks from `toolHooksFor`) and `canvasActionsFor`; commands `pins.open`, `pins.show`, `pins.close`; setting `pins.windows`. The dock (`ui/panel-dock.ts`) gains `everywhere`, `height` and `remove(id)`. The old reference window stays in the command palette (`reference.open`) until Pins has its gallery. New spec `tests/e2e/pins.spec.ts` (group drawing).
+
 ## 0.61.36 — The canvas's commands follow the view in use (2026-11-22)
 
 ### For developers

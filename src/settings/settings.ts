@@ -122,6 +122,8 @@ export const SETTINGS = {
   /** The reference window's boards (ADR 0207): each a name and its pictures (a library file's hash, where it is and how wide). */
   "reference.boards": { scope: "workspace", default: "[]", validate: objectList(100, (b) => typeof b["id"] === "string" && typeof b["name"] === "string" && Array.isArray(b["items"]) && (b["items"] as unknown[]).length <= 1000 && (b["items"] as Array<Record<string, unknown>>).every((i) => typeof i === "object" && i !== null && typeof i["h"] === "string" && finiteN(i["x"]) && finiteN(i["y"]) && finiteN(i["w"]))), effect: "immediate" } as Def<string>,
   /** The reference windows open on this device, to open again: what each shows and where it is. */
+  /** The Pins windows open on this device, to open again: the canvas each shows (the dock keeps where each is). */
+  "pins.windows": { scope: "device", default: "[]", validate: objectList(12, (w) => typeof w["c"] === "string"), effect: "immediate" } as Def<string>,
   "reference.windows": { scope: "device", default: "[]", validate: objectList(12, (w) => typeof w["source"] === "string" && finiteN(w["x"]) && finiteN(w["y"]) && finiteN(w["w"]) && finiteN(w["h"])), effect: "immediate" } as Def<string>,
   /** Concealed library folders, by id: their items are listed only when one of them is opened (a view filter: the folders and items are not changed). */
   "library.concealed": { scope: "workspace", default: "[]", validate: idList, effect: "immediate" } as Def<string>,

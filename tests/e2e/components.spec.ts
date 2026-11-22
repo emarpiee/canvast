@@ -343,7 +343,8 @@ test("every floating panel follows the theme at every density: corners and text 
   const p = app.page;
   // every panel of the dock open, and a reference window as a gallery and as a board
   for (const b of ["data-layers", "data-tags", "data-styles", "data-pattern-panel", "data-bookmarks", "data-adjust-panel"]) await p.locator(`[${b}]`).first().click();
-  await p.keyboard.press("Shift+R");
+  // (by its command: Shift+R opens Pins now; this window stays until Pins has its gallery)
+  await p.evaluate(() => window.__canvastDebug.runCommand("reference.open", {}, "test"));
   const win = p.getByTestId("reference-window");
   await expect(win).toHaveCount(1);
   for (const density of ["dense", "compact", "comfortable"]) {

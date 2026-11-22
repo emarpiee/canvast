@@ -133,7 +133,7 @@ export const KEY_COMMANDS: readonly KeyCommand[] = [
   cmd("nav.right", "Step right", STEP_GROUP, "D"),
   cmd("view.focus", "Bring the selection into view; again: fit everything visible", VIEW_GROUP, "Ctrl+Space", "F"),
   cmd("view.zen", "Zen mode", VIEW_GROUP, "Z"),
-  cmd("reference.open", "Reference window", VIEW_GROUP, "Shift+R"),
+  cmd("pins.open", "Pins: pin the canvas in a window above every view", VIEW_GROUP, "Shift+R"),
   cmd("view.zoomIn", "Zoom in", VIEW_GROUP, ["+", "="]),
   cmd("view.zoomOut", "Zoom out", VIEW_GROUP, ["-", "_"]),
   cmd("view.home", "Return to the origin", VIEW_GROUP, ["0", "Home"]),

@@ -2919,8 +2919,8 @@ test("reference window (ADR 0207): over the Library and the canvas, a gallery of
     { name: "blue.png", mimeType: "image/png", buffer: makePng(150, 200, () => [40, 40, 200, 255]) },
   ]);
   await expect(p.getByTestId("asset-card")).toHaveCount(2);
-  // Shift+R opens it, over the Library
-  await p.keyboard.press("Shift+R");
+  // (by its command: Shift+R opens Pins now; this window stays until Pins has its gallery)
+  await p.evaluate(() => window.__canvastDebug.runCommand("reference.open", {}, "test"));
   const win = p.getByTestId("reference-window");
   await expect(win).toHaveCount(1);
   await expect(win.locator(".ref-thumb")).toHaveCount(2);
