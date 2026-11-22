@@ -2993,7 +2993,13 @@ test("reference window (ADR 0207): over the Library and the canvas, a gallery of
   await expect(w2.locator(".ref-item.is-picked")).toHaveCount(0);
   await p.keyboard.press("d");
   await expect(w2.locator(".ref-item.is-picked"), "D selected a picture").toHaveCount(1);
+  // F (sent by the keymap as Ctrl+Space, as on the canvas) fits the selected picture to the window
   await p.keyboard.press("f");
+  const fills = async () => {
+    const [it, bd] = [await w2.locator(".ref-item.is-picked").boundingBox(), await w2.locator("[data-ref-board]").boundingBox()];
+    return it && bd ? Math.max(it.width / bd.width, it.height / bd.height) : 0;
+  };
+  await expect.poll(fills, { message: "F fitted the selected picture" }).toBeGreaterThan(0.8);
   expect(await p.evaluate(() => window.__canvastDebug.objects().length), "nothing reached the canvas").toBe(2);
   // a picture hidden out of hidden mode shows a padlock in its place
   await p.evaluate((h) => window.__canvastDebug.libraryOp("hide", h, "1"), (await items())[0]!.h);

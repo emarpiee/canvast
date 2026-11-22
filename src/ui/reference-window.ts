@@ -766,7 +766,9 @@ export function mountReferenceWindows(deps: ReferenceDeps): { open(source?: RefS
     el.addEventListener("keydown", (e) => {
       const typing = (e.target as HTMLElement).closest("input, textarea");
       if (typing) return void e.stopPropagation();
-      if (e.key === " ") {
+      // F: the keymap sends it as the canvas's own key for it, Ctrl+Space (Settings > Keys); a plain F comes over the Library, where the keymap leaves it
+      const fit = (e.key === " " && (e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey) || (e.key.toLowerCase() === "f" && !e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey);
+      if (e.key === " " && !fit) {
         space = true;
         area?.classList.add("is-panning");
         e.preventDefault();
@@ -775,7 +777,7 @@ export function mountReferenceWindows(deps: ReferenceDeps): { open(source?: RefS
         const k1 = e.ctrlKey || e.metaKey || e.altKey ? "" : e.key.toLowerCase();
         if (e.key === "Escape") (one = null), stopSlides();
         else if (e.key === "ArrowLeft" || e.key === "ArrowRight" || k1 === "a" || k1 === "d") one = (one + (e.key === "ArrowLeft" || k1 === "a" ? -1 : 1) + shown.length) % shown.length;
-        else if (k1 === "f" || k1 === "0") {
+        else if (fit || k1 === "0") {
           // (fitted again, as a double-click does)
           zoom = { k: 1, x: 0, y: 0 };
           placeZoom();
@@ -806,7 +808,7 @@ export function mountReferenceWindows(deps: ReferenceDeps): { open(source?: RefS
       else if (!mod && (e.key === "-" || e.key === "_")) zoomAt(mid.x, mid.y, e.shiftKey ? 0.5 : 0.8);
       else if (!mod && (e.key === "0" || e.key === "Home")) void pressCommand("reference.fit", { window: id, board: b.id });
       // F, as on the canvas: the selected pictures in view; again (or none selected): every picture
-      else if (!mod && !e.shiftKey && key === "f") {
+      else if (fit) {
         const which = sel.join(",");
         const all = !sel.length || fitted === which;
         fitted = all ? "" : which;

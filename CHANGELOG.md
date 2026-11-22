@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.61.32 — F fits in a reference window (2026-11-22)
+
+- **Fixed before release:** F did nothing in a reference window over the canvas: the keymap sends it on as the canvas's own key for it (Ctrl+Space), which the window took for Space held to pan. It now fits the selected pictures, then every picture, as on the canvas. ([The Library](README.md#the-library))
+
 ## 0.61.31 — Reference window spec: the picture on top right-clicked (2026-11-22)
 
 ### For developers
