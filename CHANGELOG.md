@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.61.34 — The canvas engine in a module of its own (2026-11-22)
+
+### For developers
+
+- The canvas engine (spatial index, tile cache, density preview, item names, `renderNow` and the frame loop) moved as it was out of `app/main.ts` into `src/canvas/canvas-view.ts`: `createCanvasView(deps)`, made once for each view of a canvas (the main view now; a pinned one next). Nothing it does changed. `src/canvas/` runs every test group.
+
 ## 0.61.33 — F in a reference window is the canvas's own (2026-11-22)
 
 - **Fixed before release:** F in a reference window did not go on to every picture as on the canvas: it is now the canvas's own cycle (the selected pictures in view; again, every picture; a new selection or a moved view starts again), shared code, not a copy. ([The Library](README.md#the-library))

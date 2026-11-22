@@ -40,7 +40,7 @@ export const RULES = [
   [/^(src|scripts)\/artcraft\//, ["artcraft"]],
   // the test machinery, the build and the shared heart of the app: everything
   [/^(tests\/e2e\/|playwright\.config\.ts$|scripts\/test-snap\.mjs$|scripts\/build\.mjs$|scripts\/lib\/source-hash\.mjs$|tsconfig\.json$)/, ALL],
-  [/^src\/(styles\.css|app\/(main|session|debug-hook|editor-state)\.ts|doc\/(model|document-store)\.ts)$/, ALL],
+  [/^src\/(styles\.css|app\/(main|session|debug-hook|editor-state)\.ts|canvas\/[a-z-]+\.ts|doc\/(model|document-store)\.ts)$/, ALL], // (canvas/: the engine of every view of a canvas)
   // the desktop app
   [/^(desktop\/|tsconfig\.desktop\.json$|scripts\/(build-desktop|package-desktop)\.mjs$|src\/storage\/(desktop-bridge|desktop-storage|workspace-mirror|library-mirror|hidden-store|canvas-file)\.ts$)/, ["desktop"]],
   [/^scripts\/(release\.mjs|lib\/release-notes\.mjs)$/, ["smoke"]],
