@@ -116,6 +116,26 @@ export const PEN_COLORS = ["#1f2329", "#2563eb", "#dc2626", "#16a34a"] as const;
 /** Pen widths in CSS px at the zoom level where the stroke is drawn. */
 export const PEN_WIDTHS = [1.5, 3, 8] as const;
 
+/**
+ * What the person chose for the tools (the tool, its colours, widths, kinds and options), as opposed to what one view holds (its selection,
+ * its handles, a draft): a pinned view (Pins) takes the main view's, so the toolbar and the Properties bar set the tools of every view.
+ */
+export const TOOL_OPTIONS = [
+  "tool", "lassoFilter", "penColor", "textLook", "penWidthPx", "penKind", "lock", "eraserPx", "eraseWholeGroups", "eraseParts", "snap", "gridStep",
+  "shapeKind", "shapeFill", "shapeStroke", "shapeWidthPx", "lockRadius", "shapeJoin", "shapeCap", "shapeAlign", "shapeDash", "shapeSides", "comic", "comicStyle", "shapeTips", "attachMode",
+] as const;
+
+/** The tools' choices of `from` given to `to` (the main view's to a pinned one); whether any changed. */
+export function copyToolOptions(from: EditorState, to: EditorState): boolean {
+  let changed = false;
+  for (const k of TOOL_OPTIONS) {
+    if (to[k] === from[k]) continue;
+    (to as unknown as Record<string, unknown>)[k] = from[k];
+    changed = true;
+  }
+  return changed;
+}
+
 export class EditorState {
   tool: Tool = "select";
   /** Tool restored when a temporary hand (space) ends. */

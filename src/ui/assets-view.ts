@@ -133,8 +133,6 @@ export interface AssetsView {
   redrawNotes(): void;
   /** An item's picture as the library's cards show it (its custom thumbnail, its stored one, one made now, an art file's): its address. Pins' gallery. */
   thumb(hash: string): Promise<string>;
-  /** Open an item in the library's viewer (its zoom, its slideshow, its details), the library being shown. */
-  openViewer(hash: string): void;
 }
 
 /**
@@ -6084,7 +6082,6 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       syncViewing();
     },
     thumb: (hash) => thumbFor(hash),
-    openViewer: (hash) => void showSlide(hash),
     redrawNotes() {
       redrawCards((listing?.entries ?? []).filter((e) => noteKindOf(e.name)).map((e) => e.hash));
     },

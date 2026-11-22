@@ -47,23 +47,33 @@ test("Pins (ADR 0208): Shift+R pins the open canvas in a window above every view
   expect(app.consoleErrors).toEqual([]);
 });
 
-test("a Pins window shows the library's pictures as a gallery of the library's own cards: its search narrows them, a double-click opens the library's viewer", async ({ app }) => {
+test("a Pins window shows the library's pictures as a gallery of the library's own cards: its search narrows them; a double-click shows one large in the window, drawn as on a canvas, with the next one and back", async ({ app }) => {
   const p = app.page;
   await p.getByTestId("view-assets").click();
-  await p.getByTestId("assets-import-input").setInputFiles({ name: "red.png", mimeType: "image/png", buffer: makePng(60, 40, () => [200, 40, 40, 255]) });
-  await expect(p.getByTestId("asset-card")).toHaveCount(1);
+  await p.getByTestId("assets-import-input").setInputFiles([
+    { name: "red.png", mimeType: "image/png", buffer: makePng(60, 40, () => [200, 40, 40, 255]) },
+    { name: "teal.png", mimeType: "image/png", buffer: makePng(40, 60, () => [30, 160, 150, 255]) },
+  ]);
+  await expect(p.getByTestId("asset-card")).toHaveCount(2);
   await p.evaluate(() => window.__canvastDebug.runCommand("pins.open", { source: "all" }, "test"));
   const pins = p.getByTestId("pins");
   const card = pins.locator(".asset-card");
-  await expect(card, "the library's card").toHaveCount(1);
-  await expect(card.locator("img.is-loaded"), "its picture shown, as in the library").toHaveCount(1);
-  // the search narrows it
-  await pins.locator(".layers-filter input").fill("blue");
-  await expect(card).toHaveCount(0);
-  await pins.locator(".layers-filter input").fill("");
+  await expect(card, "the library's cards").toHaveCount(2);
+  await expect(card.locator("img.is-loaded"), "their pictures shown, as in the library").toHaveCount(2);
+  // the search narrows them
+  await pins.locator(".layers-filter input").fill("teal");
   await expect(card).toHaveCount(1);
-  // a double-click opens it in the library's own viewer
-  await card.dblclick();
-  await expect(p.getByTestId("slide-view")).toBeVisible();
+  await pins.locator(".layers-filter input").fill("");
+  await expect(card).toHaveCount(2);
+  // a double-click shows it large in the window (the Library stays where it is); the next one, then back to the gallery
+  const first = await card.first().getAttribute("title");
+  await card.first().dblclick();
+  const name = pins.locator("[data-pins-name]");
+  await expect(name).toHaveText(first!);
+  await expect(pins.locator(".pins-canvas")).toBeVisible();
+  await pins.locator('[data-pins-step="next"]').click();
+  await expect(name).not.toHaveText(first!);
+  await pins.locator('[data-pins-step="back"]').click();
+  await expect(card).toHaveCount(2);
   expect(app.consoleErrors).toEqual([]);
 });

@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.61.43 — A Pins canvas works as the main one; pictures large in the window (2026-11-22)
+
+- **Fixed before release:** a pinned canvas could not be zoomed or panned, had no right-click menu and no tool cursor, and kept its own tools: it is now wired by the very function that wires the main canvas (its tools and keys, the wheel and pinch, the cursor, the menu, drops), and its tools are the ones the toolbar sets. ([Pins](README.md#pins))
+- **Changed:** a double-click on a Pins gallery's picture shows it large in the window (zoomed and panned as a canvas is, F fits it), with the one before, the next, a slideshow and back to the gallery, instead of the Library's viewer. ([Pins](README.md#pins))
+
+### For developers
+
+- `wireCanvasView` (`app/main.ts`) wires every view of a canvas, the main one and each Pins window's: once per surface the class `.canvas-surface` (the canvas's look and cursors, no longer `#canvas`), the right-click menu and drops; per canvas shown the tools, `attachNavigation` (now with `active`), the cursor and, for a pinned view, `copyToolOptions` (`app/editor-state.ts`, `TOOL_OPTIONS`). Pins' `runView` shows a canvas or a picture on a page of its own; `pins.picture`. `AssetsView.openViewer` is gone.
+
 ## 0.61.42 — The README current, and canvast described for app stores (2026-11-22)
 
 - **Added:** the AppImage carries an AppStream description (summary, features, licence, homepage and two screenshots), which app catalogs and software centres show (B32). ([Releasing and project scripts](README.md#releasing-and-project-scripts))

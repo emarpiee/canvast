@@ -7,8 +7,8 @@ import { ICONS } from "../ui/icons";
 
 /**
  * A Pins window's gallery (ADR 0208): the pictures of a folder of the library (and the folders in it), or all of them, as the library's own
- * cards (its markup and look, its thumbnails through `thumb`), dragged onto a canvas as a library card is. A double-click (or Enter) opens one
- * in the library's viewer, with its zoom and its slideshow: nothing here copies them.
+ * cards (its markup and look, its thumbnails through `thumb`), dragged onto a canvas as a library card is. A double-click (or Enter) shows one
+ * large in its window (pins.ts: on a page of its own, drawn by the canvas engine).
  */
 export interface GalleryDeps {
   session: Session;
@@ -16,8 +16,8 @@ export interface GalleryDeps {
   hidden(): boolean;
   /** A picture's address, as the library's cards show it. */
   thumb(hash: string): Promise<string>;
-  /** Open an item in the library's viewer. */
-  open(hash: string): void;
+  /** Show a picture large (a double-click or Enter on its card), with the pictures of the gallery in their order. */
+  open(hash: string, list: string[]): void;
 }
 
 /** Cards drawn at a time (more by "Show more": a folder may hold thousands). */
@@ -84,14 +84,14 @@ export function mountGallery(host: HTMLElement, deps: GalleryDeps, folder: strin
   // commands: pins.view
   host.addEventListener("dblclick", (e) => {
     const h = hashAt(e.target);
-    if (h) deps.open(h);
+    if (h) deps.open(h, shown.map((x) => x.hash));
   });
   // commands: pins.view
   host.addEventListener("keydown", (e) => {
     const h = e.key === "Enter" ? hashAt(e.target) : undefined;
     if (!h) return;
     e.preventDefault();
-    deps.open(h);
+    deps.open(h, shown.map((x) => x.hash));
   });
   // view-state: (a card carries its picture as a library card does: a canvas, or a pinned one, places it where it is let go)
   host.addEventListener("dragstart", (e) => {

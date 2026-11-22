@@ -20,6 +20,8 @@ import { newObjectId } from "../doc/model";
 import { commands, pressCommand } from "../commands/registry";
 import type { Command, OptionSpec } from "../commands/types";
 import { mountGallery } from "./gallery";
+import { placeImage } from "../app/actions";
+import type { AssetRecord } from "../assets/asset-library";
 import type { GalleryDeps } from "./gallery";
 import { openTreeChooser } from "../ui/tree-chooser";
 import type { ChoiceNode, ChooserView } from "../ui/tree-chooser";
@@ -45,23 +47,29 @@ export interface PinsDeps {
     invalidate(): void;
     labels(): ItemLabel[];
   };
-  /** The tools on a view (the main view's, made for this one); returns what takes them off. */
-  tools(el: HTMLElement, view: ViewState, doc: DocumentStore, index: FrameIndex, editor: EditorState, focus: { tap(): void }, labels: () => ItemLabel[], active: () => boolean): () => void;
+  /** A drawing surface wired as the main view's is (one function for every view: app/main.ts `wireCanvasView`): its menu and drops on what
+   * `now` shows, and `attach` for each canvas it shows (tools, zoom and pan, cursor, the toolbar's tools), which returns what takes them off. */
+  wire(el: HTMLCanvasElement, now: () => ViewParts | null): (p: ViewParts) => () => void;
   /** The canvas's actions for a view (one function for every view). */
   actionsFor(doc: DocumentStore, editor: EditorState, view: ViewState, index: FrameIndex, focus: ReturnType<typeof createFocusCycle>): CanvasActions;
   dpr(): number;
-  /** A gallery's library: its pictures as the library's cards show them, its viewer, hidden mode. */
-  gallery: Omit<GalleryDeps, "session">;
+  /** A gallery's library: its pictures as the library's cards show them, hidden mode. */
+  gallery: Omit<GalleryDeps, "session" | "open">;
+  /** A library item's file, to show it large in a window. */
+  record(hash: string): Promise<AssetRecord | undefined>;
+  /** Seconds a picture stays in a slideshow (Settings > Library). */
+  slideSeconds(): number;
   /** Library items placed on a view of a canvas, where they were let go (the main canvas's own way). */
   place(t: ViewTarget, hashes: readonly string[], at: { x: number; y: number }): Promise<number>;
-  /** A view of a canvas takes library items and files dropped on it (the main canvas's own way). */
-  takeDrops(t: { doc: DocumentStore; view: ViewState; editor: EditorState; el: HTMLElement }): void;
   /** The windows open, kept on this device (what each shows, its opacity, whether clicks go through; the dock keeps their places). */
   read(): WindowPrefs[];
   write(windows: WindowPrefs[]): void;
   /** The desktop app: a window above every app, showing this page (view only). */
   float?(title: string, html: string): Promise<unknown>;
 }
+
+/** The parts of a view of a canvas the wiring needs (app/main.ts `ViewParts`). */
+export interface ViewParts { doc: DocumentStore; view: ViewState; editor: EditorState; index: FrameIndex; focus: { tap(): void }; labels: () => ItemLabel[]; active: () => boolean }
 
 /** A view of a canvas: its document, camera, editor and drawing surface. */
 export interface ViewTarget { doc: DocumentStore; view: ViewState; editor: EditorState; el: HTMLElement }
@@ -86,6 +94,8 @@ interface Pin {
   show(source: PinSource): void;
   /** Its opacity and clicks-through shown. */
   apply(): void;
+  /** A gallery's picture shown large: the next, the one before, back to the gallery, or the slideshow started or stopped. */
+  step(how: "next" | "previous" | "back" | "play"): void;
   /** Its gallery read again (the library changed). */
   refreshGallery(): void;
   /** The canvas it shows, while it shows one. */
@@ -217,11 +227,15 @@ export function mountPins(deps: PinsDeps): { open(source?: PinSource): void; ref
       tools: `<button type="button" class="layer-btn" data-pins-more aria-haspopup="menu" aria-label="More" title="More: opacity, clicks through, float over other apps">${ICONS.ellipsis}</button>`,
       sub: `<div class="styles-kinds"><button type="button" class="pick-current" data-pins-source aria-haspopup="menu" aria-label="What it shows" title="What it shows: a canvas, or a gallery of the library"></button></div><div class="layers-filter" data-pins-search hidden><input type="search" placeholder="Search pictures" aria-label="Search the pictures by name" autocomplete="off"></div><div class="pins-look" data-pins-look hidden></div>`,
       body: `<div class="pins-view" data-pins-view><canvas class="pins-canvas" tabindex="0" aria-label="A pinned canvas: the canvas's tools, keys and menus"></canvas></div><div class="pins-gallery" data-pins-gallery hidden></div>`,
+      foot: `<div class="pins-strip" data-pins-strip hidden><button type="button" class="layer-btn" data-pins-step="back" aria-label="Back to the gallery" title="Back to the gallery">${ICONS.arrowLeft}</button><button type="button" class="layer-btn" data-pins-step="previous" aria-label="The picture before" title="The picture before">${ICONS.chevronLeft}</button><button type="button" class="layer-btn" data-pins-step="next" aria-label="The next picture" title="The next picture">${ICONS.chevronRight}</button><button type="button" class="layer-btn" data-pins-step="play" aria-label="Slideshow" title="Slideshow">${ICONS.presentation}</button><span class="pins-name" data-pins-name></span></div>`,
     });
     const host = el.querySelector<HTMLElement>("[data-pins-view]")!;
     const canvas = el.querySelector<HTMLCanvasElement>("canvas")!;
     const ctx = canvas.getContext("2d", { alpha: false })!;
     const galleryHost = el.querySelector<HTMLElement>("[data-pins-gallery]")!;
+    // (its surface wired once, as the main view's: the menu and drops act on the canvas it shows now)
+    let parts: ViewParts | null = null;
+    const attach = deps.wire(canvas, () => parts);
     const searchRow = el.querySelector<HTMLElement>("[data-pins-search]")!;
     const search = searchRow.querySelector("input")!;
     let gallery: ReturnType<typeof mountGallery> | null = null;
@@ -240,6 +254,7 @@ export function mountPins(deps: PinsDeps): { open(source?: PinSource): void; ref
       el,
       onMain: false,
       target: null,
+      step: () => undefined,
       apply: () => undefined,
       refreshGallery: () => gallery?.refresh(),
       again: () => void show(pin.source),
@@ -253,10 +268,94 @@ export function mountPins(deps: PinsDeps): { open(source?: PinSource): void; ref
     };
     pins.set(id, pin);
     const picker = el.querySelector<HTMLElement>("[data-pins-source]")!;
+    /**
+     * A view of a canvas in the window: its engine, wired as the main view's (`attach`), its actions for the commands, kept the size of the
+     * window. The same for a pinned canvas and for a picture shown large (a page of its own, view only).
+     */
+    const runView = (doc: DocumentStore, view: ViewState, editor: EditorState, release: () => void): void => {
+      const shown = (): boolean => !el.hidden && pins.has(id);
+      const engine = deps.engine({ canvas, ctx, doc, view, editor, shown });
+      const focus = createFocusCycle(doc, view, editor, () => true);
+      parts = { doc, view, editor, index: engine.index, focus, labels: engine.labels, active: () => focusedHere() };
+      const offTools = attach(parts);
+      const offView = addCanvasView(id, deps.actionsFor(doc, editor, view, engine.index, focus));
+      pin.target = editor.readOnly ? null : { doc, view, editor, el: canvas };
+      const unsubs = [view.subscribe(engine.invalidate), doc.subscribe(engine.invalidate), editor.subscribe(engine.invalidate)];
+      const size = (): void => {
+        const r = host.getBoundingClientRect(), dpr = deps.dpr();
+        canvas.width = Math.max(1, Math.round(r.width * dpr));
+        canvas.height = Math.max(1, Math.round(r.height * dpr));
+        view.setViewport({ width: Math.max(1, r.width), height: Math.max(1, r.height) });
+        engine.invalidate();
+      };
+      const ro = new ResizeObserver(size);
+      ro.observe(host);
+      size();
+      stop = () => {
+        ro.disconnect();
+        for (const u of unsubs) u();
+        offTools();
+        offView();
+        parts = null;
+        pin.target = null;
+        release();
+      };
+    };
+    // ---- a gallery's picture shown large in the window: on a page of its own (not saved, view only), drawn, zoomed and panned as a canvas is
+    const strip = el.querySelector<HTMLElement>("[data-pins-strip]")!;
+    let slides = 0;
+    let large: { list: string[]; i: number; back: PinSource } | null = null;
+    const showLarge = async (list: string[], i: number, back: PinSource): Promise<void> => {
+      stop?.();
+      stop = null;
+      large = { list, i: (i + list.length) % list.length, back };
+      host.hidden = false;
+      galleryHost.hidden = true;
+      searchRow.hidden = true;
+      strip.hidden = false;
+      if (count) count.hidden = true;
+      const doc = new DocumentStore();
+      const view = new ViewState(() => doc.space);
+      const editor = new EditorState();
+      editor.readOnly = true;
+      runView(doc, view, editor, () => undefined);
+      const rec = await deps.record(large.list[large.i]!).catch(() => undefined);
+      if (!rec || !parts || parts.doc !== doc) return;
+      placeImage(rec, doc, view, 0, "Place item");
+      fitAllVisible(doc, view, editor);
+      el.querySelector<HTMLElement>("[data-pins-name]")!.textContent = rec.name;
+    };
+    pin.step = (how) => {
+      if (!large) return;
+      if (how === "back") {
+        clearInterval(slides);
+        slides = 0;
+        const back = large.back;
+        large = null;
+        strip.hidden = true;
+        return void show(back);
+      }
+      if (how === "play") {
+        if (slides) return void (clearInterval(slides), (slides = 0), strip.querySelector('[data-pins-step="play"]')!.innerHTML = ICONS.presentation);
+        slides = window.setInterval(() => large && void showLarge(large.list, large.i + 1, large.back), deps.slideSeconds() * 1000);
+        strip.querySelector('[data-pins-step="play"]')!.innerHTML = ICONS.pause;
+        return;
+      }
+      void showLarge(large.list, large.i + (how === "next" ? 1 : -1), large.back);
+    };
+    // commands: pins.picture
+    strip.addEventListener("click", (e) => {
+      const b = (e.target as HTMLElement).closest<HTMLElement>("[data-pins-step]");
+      if (b) void pressCommand("pins.picture", { window: id, step: b.dataset["pinsStep"] });
+    });
     // (one thing shown at a time: a canvas or a gallery takes the place of the last)
     const show = async (src: PinSource): Promise<void> => {
       stop?.();
       stop = null;
+      large = null;
+      clearInterval(slides);
+      slides = 0;
+      strip.hidden = true;
       pin.source = src;
       await loadFolders();
       const cid = canvasOf(src);
@@ -271,7 +370,7 @@ export function mountPins(deps: PinsDeps): { open(source?: PinSource): void; ref
         pin.onMain = false;
         if (src.startsWith("folder:")) remember(src.slice(7));
         search.value = "";
-        gallery = mountGallery(galleryHost, { session: deps.session, ...deps.gallery }, src.startsWith("folder:") ? src.slice(7) : null);
+        gallery = mountGallery(galleryHost, { session: deps.session, ...deps.gallery, open: (hash, list) => void showLarge(list, Math.max(0, list.indexOf(hash)), src) }, src.startsWith("folder:") ? src.slice(7) : null);
         setTimeout(() => void (count && (count.textContent = String(gallery?.count() ?? 0))), 300);
         stop = () => void (gallery = null);
         return;
@@ -286,35 +385,9 @@ export function mountPins(deps: PinsDeps): { open(source?: PinSource): void; ref
       pin.onMain = doc === deps.main.doc;
       const editor = new EditorState();
       editor.setTool("select");
-      const shown = (): boolean => !el.hidden && pins.has(id);
-      const engine = deps.engine({ canvas, ctx, doc, view, editor, shown });
-      const focus = createFocusCycle(doc, view, editor, () => true);
-      const offTools = deps.tools(canvas, view, doc, engine.index, editor, focus, engine.labels, () => focusedHere());
-      const offView = addCanvasView(id, deps.actionsFor(doc, editor, view, engine.index, focus));
-      pin.target = { doc, view, editor, el: canvas };
-      if (!dropsTaken) deps.takeDrops(pin.target), (dropsTaken = true);
-      const unsubs = [view.subscribe(engine.invalidate), doc.subscribe(engine.invalidate), editor.subscribe(engine.invalidate)];
-      const size = (): void => {
-        const r = host.getBoundingClientRect(), dpr = deps.dpr();
-        canvas.width = Math.max(1, Math.round(r.width * dpr));
-        canvas.height = Math.max(1, Math.round(r.height * dpr));
-        view.setViewport({ width: Math.max(1, r.width), height: Math.max(1, r.height) });
-        engine.invalidate();
-      };
-      const ro = new ResizeObserver(size);
-      ro.observe(host);
-      size();
+      runView(doc, view, editor, got.release);
       if (doc !== deps.main.doc && !got.placed) fitAllVisible(doc, view, editor); // (no view kept for it: all of it in sight)
-      stop = () => {
-        ro.disconnect();
-        for (const u of unsubs) u();
-        offTools();
-        offView();
-        got.release();
-      };
     };
-    // shortcut: a drop goes to the document shown when the window first showed a canvas; change it with the canvas when Pins switches canvases often
-    let dropsTaken = false;
     let here = false;
     const focusedHere = (): boolean => here;
     // view-state: (the view in use: the commands, keys and menus act on it while it is)
@@ -402,9 +475,10 @@ export function mountPins(deps: PinsDeps): { open(source?: PinSource): void; ref
       void deps.float(title, `<!doctype html><html><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src data:; style-src 'unsafe-inline'"><title>${esc(title)}</title><style>html,body{margin:0;height:100%;background:#1e1e1e}img{width:100%;height:100%;object-fit:contain;display:block}</style></head><body><img src="${pic}" alt="${esc(title)}"></body></html>`);
       return { ok: true };
     }),
-    pc("pins.view", "Open a picture in the library's viewer", "From a Pins gallery: its zoom, its slideshow", [{ name: "id", type: "text", doc: "the item (its hash)", required: true }], (o) => {
-      if (typeof o["id"] !== "string") return { ok: false, error: "Which item?" };
-      deps.gallery.open(o["id"]);
+    pc("pins.picture", "Go through a Pins gallery's pictures", "The next, the one before, back to the gallery, or a slideshow", [WINDOW, { name: "step", type: "choice", doc: "next, previous, back or play", required: true, choices: ["next", "previous", "back", "play"] }], (o) => {
+      const p = pins.get(String(o["window"]));
+      if (!p) return { ok: false, error: "No such window." };
+      p.step(o["step"] as "next" | "previous" | "back" | "play");
       return { ok: true };
     }),
     pc("pins.close", "Close a Pins window", "Its canvas stays as it is", [WINDOW], (o) => {

@@ -543,7 +543,7 @@ Keep your references in sight while you work: a canvas of studies, or a folder o
 | Open one | `Shift+R`, or the button by Settings: the canvas you are on, in a window. Open as many as you like |
 | What it shows | The list under its title: any canvas of the workspace, by board, or **All pictures**, a folder shown lately, or **Choose a folder…** (any folder, found by its name) |
 | A pinned canvas | The canvas itself, with the canvas's own tools, keys, right-click menu and undo, on the view you pressed last. The canvas you are on is the same in both: what you change in one is changed in the other |
-| A gallery | The library's own cards, with a search by name. A double-click opens a picture in the library's viewer (its zoom, its slideshow) |
+| A gallery | The library's own cards, with a search by name. A double-click shows a picture large in the window, zoomed and panned as a canvas is (`F` fits it), with the one before, the next, a slideshow and back to the gallery |
 | Bringing pictures over | Drag a gallery's card, or a Library card, onto a canvas or a pinned one; drag a picture off the canvas onto a pinned canvas (it stays where it was); drop files from another app onto a pinned canvas |
 | The window | Move it by its title, size it from its bottom corner, press its title to fold it. **More** (⋯): **Opacity…** (a slider), **Let clicks through** (to what is under it; its title still takes them) and, in the desktop app, **Float over other apps** |
 

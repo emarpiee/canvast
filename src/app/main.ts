@@ -49,7 +49,7 @@ import { fileActionsOf, openOriginalInTab } from "../ui/file-actions";
 import { FrameStats } from "./frame-stats";
 import { mountHud } from "./hud";
 import { installDebugHook } from "./debug-hook";
-import { EditorState } from "./editor-state";
+import { EditorState, copyToolOptions } from "./editor-state";
 import type { LayoutCommand } from "./actions";
 import { flattenSelection } from "./actions";
 import { applyBalloonStyle, balloonStyle, balloonsToPaths, canConnectBalloons, connectBalloons, selectedBalloon, selectedLink, selectedShapeText, setBalloonLink, setShapeText } from "./actions";
@@ -920,26 +920,10 @@ async function start(): Promise<void> {
     invalidate();
   });
   doc.subscribe(invalidate);
-  // The cursor of the tool in use: its own icon beside a crosshair (ui/tool-cursor.ts), made again only when the tool or its kind changes.
-  let cursorFor = "";
-  const showTool = (): void => {
-    canvas.dataset["tool"] = editor.tool;
-    const key = `${editor.tool}|${editor.shapeKind}|${editor.penKind}`;
-    if (key === cursorFor) return;
-    cursorFor = key;
-    const icon = toolIcon(editor.tool, editor.shapeKind, editor.penKind);
-    if (icon) canvas.style.setProperty("--tool-cursor", toolCursor(icon));
-    else canvas.style.removeProperty("--tool-cursor");
-  };
-  editor.subscribe(() => {
-    showTool();
-    invalidate();
-  });
+  editor.subscribe(invalidate);
   editor.subscribeRedraw(invalidate);
-  showTool();
 
   const importFiles = (files: File[]): Promise<unknown> => importImages(files, assets, doc, view, editor);
-  attachNavigation(canvas, view);
   /** The fonts in the library, loaded: for the font choices of the toolbar and of the words selected in a text. */
   const libraryFonts = async (): Promise<Array<{ hash: string; name: string; unusable: string }>> => {
     const list = (await session.catalog?.list())?.entries ?? [];
@@ -1152,10 +1136,56 @@ async function start(): Promise<void> {
     // outlines its thing while touched and picks it when pressed; "Add to the selection" keeps what is picked; on touch the right-click menu follows.
     revealList: (at, pick, opts) => openChoiceList(at, pick, opts),
   });
-  attachTools(canvas, view, doc, index, editor, {
-    ...toolHooksFor(doc, editor, view, focusCycle, () => engine.labels()),
+  /** The parts of a view of a canvas: its document, camera, editor, index, focus key and names, and whether it is the view in use. */
+  type ViewParts = { doc: DocumentStore; view: ViewState; editor: EditorState; index: FrameIndex; focus: { tap(): void }; labels: () => ItemLabel[]; active: () => boolean };
+  /**
+   * A drawing surface wired as a view of a canvas (ADR 0208): the main view's and every Pins window's go through here, so whatever the canvas
+   * gains, every view of it gains. Once per surface: the canvas's look (its class), the right-click menu and drops of library items and files,
+   * on the canvas it shows now (`now`). Then, for each canvas it shows (`attach`): the tools and their keys, the wheel and the keys to zoom and
+   * pan, the tool's cursor, and (a pinned view) the tools as the toolbar sets them.
+   */
+  function wireCanvasView(el: HTMLCanvasElement, now: () => ViewParts | null, main: boolean, own: Partial<ToolHooks> = {}): (p: ViewParts) => () => void {
+    el.classList.add("canvas-surface");
+    mountContextMenu(el, commands, {
+      active: () => { const p = now(); return !!p && (!main || appView === "canvas") && !textEditor.isOpen && performance.now() - p.editor.fingerListAt > 1500; },
+      pickAt: (x, y) => {
+        const p = now();
+        if (!p) return false;
+        const hit = pickAll(visibleObjects(p.doc, p.index, null, p.view.frameCamera, p.view.viewport).filter((po) => !po.obj.hidden && !po.obj.locked), x, y)[0]?.obj;
+        if (hit && !p.editor.selection.has(hit.id)) p.editor.select([hit.id]);
+        return !!hit; // (empty canvas: the menu of the canvas, whatever is picked)
+      },
+    });
+    // (the main canvas's files from other apps have their own import, which places them as it reads them)
+    takeDrops(el, () => { const p = now(); return p && { doc: p.doc, view: p.view, editor: p.editor, el }; }, !main);
+    return (p) => {
+      const off: Array<() => void> = [];
+      off.push(attachTools(el, p.view, p.doc, p.index, p.editor, { ...toolHooksFor(p.doc, p.editor, p.view, p.focus, p.labels), active: p.active, ...own }));
+      off.push(attachNavigation(el, p.view, p.active));
+      // the cursor of the tool in use: its own icon beside a crosshair (ui/tool-cursor.ts), made again only when the tool or its kind changes
+      let cursorFor = "";
+      const showTool = (): void => {
+        el.dataset["tool"] = p.editor.tool;
+        const key = `${p.editor.tool}|${p.editor.shapeKind}|${p.editor.penKind}`;
+        if (key === cursorFor) return;
+        cursorFor = key;
+        const icon = toolIcon(p.editor.tool, p.editor.shapeKind, p.editor.penKind);
+        if (icon) el.style.setProperty("--tool-cursor", toolCursor(icon));
+        else el.style.removeProperty("--tool-cursor");
+      };
+      off.push(p.editor.subscribe(showTool));
+      showTool();
+      // a pinned view's tools are the ones the toolbar and the Properties bar set (the main view's editor holds them)
+      if (!main) {
+        copyToolOptions(editor, p.editor);
+        off.push(editor.subscribe(() => void (copyToolOptions(editor, p.editor) && p.editor.changed())));
+      }
+      return () => off.forEach((f) => f());
+    };
+  }
+  const mainParts: ViewParts = { doc, view, editor, index, focus: focusCycle, labels: () => engine.labels(), active: () => focusedCanvasView() === "main" };
+  wireCanvasView(canvas, () => mainParts, true, {
     setMaker: (fn) => void (makeShape = fn),
-    active: () => focusedCanvasView() === "main",
     // canvas pictures dragged onto a pinned canvas (Pins) are placed there too, and stay where they were (ADR 0208)
     droppedOff: (ids, cx, cy) => {
       const under = document.elementFromPoint(cx, cy);
@@ -1167,7 +1197,7 @@ async function start(): Promise<void> {
       if (!hashes.length) return void (document.body.dataset["droppedOff"] = "no pictures among what was dragged"), false;
       return !!pinsWindows?.dropAt(cx, cy, hashes);
     },
-  });
+  })(mainParts);
   const side = document.createElement("div");
   side.id = "side-panels";
   host.appendChild(side);
@@ -3125,14 +3155,6 @@ async function start(): Promise<void> {
   });
   if (settings.get("agents.on")) readToolsCode();
   // The context menu (right click, or the menu key): the commands that fit what is under the pointer and what is picked, from the same registry.
-  mountContextMenu(canvas, registry, {
-    active: () => appView === "canvas" && !textEditor.isOpen && performance.now() - editor.fingerListAt > 1500,
-    pickAt: (x, y) => {
-      const hit = pickAll(visibleObjects(doc, index, null, view.frameCamera, view.viewport).filter((po) => !po.obj.hidden && !po.obj.locked), x, y)[0]?.obj;
-      if (hit && !editor.selection.has(hit.id)) editor.select([hit.id]);
-      return !!hit; // (empty canvas: the menu of the canvas, whatever is picked)
-    },
-  });
   registry.setProvider("panels", () => dock.commands().map((c): Command => ({ ...c, why: () => (appView === "canvas" ? (c.why?.() ?? null) : REASON.notOnCanvas) })));
   registry.setProvider("settings", () => [
     ...SETTINGS_TABS.map((t): Command => ({ id: `settings.tab:${t.id}`, group: "Settings", kind: "settings", title: t.label, hint: "Open this page of Settings", risk: "read", words: "preferences options", exec: () => { setView("settings"); settingsView.show(t.id); } })),
@@ -3246,14 +3268,16 @@ async function start(): Promise<void> {
     return placeIn({ doc, view, editor, el: canvas }, hashes, at);
   };
   // Library items (a Library card, a Pins gallery's) dropped on a view of a canvas: placed where they are let go; files from another app go into the library first
-  const takeDrops = (t: { doc: DocumentStore; view: ViewState; editor: EditorState; el: HTMLElement }, files: boolean): void => {
-    t.el.addEventListener("dragover", (e) => {
+  function takeDrops(el: HTMLElement, now: () => { doc: DocumentStore; view: ViewState; editor: EditorState; el: HTMLElement } | null, files: boolean): void {
+    el.addEventListener("dragover", (e) => {
       const types = e.dataTransfer?.types ?? [];
       if (!types.includes(LIBRARY_DRAG) && !(files && types.includes("Files"))) return;
       e.preventDefault();
       e.dataTransfer!.dropEffect = "copy";
     });
-    t.el.addEventListener("drop", (e) => {
+    el.addEventListener("drop", (e) => {
+      const t = now();
+      if (!t) return;
       const lib = e.dataTransfer?.getData(LIBRARY_DRAG);
       const dropped = files && !lib ? [...(e.dataTransfer?.files ?? [])] : [];
       if (!lib && !dropped.length) return;
@@ -3268,9 +3292,7 @@ async function start(): Promise<void> {
         /* (not a list of library files) */
       }
     });
-  };
-  // (the main canvas: its files from other apps have their own import, which places them as it reads them)
-  takeDrops({ doc, view, editor, el: canvas }, false);
+  }
   // Pins (ADR 0208, src/pins/): windows above every view that show a canvas, from the canvas's own engine, tools and actions
   pinsWindows = mountPins({
     dock, session, main: { doc },
@@ -3280,10 +3302,13 @@ async function start(): Promise<void> {
       choicesAt: () => [], hintRefresh: () => undefined, shown: o.shown, drawn: () => undefined,
     }),
     // shortcut: a pinned view edits text, lists what is under the pointer and searches through the main view for now; give them its own when they need it
-    tools: (el, v, d, ix, ed, focus, labels, active) => attachTools(el, v, d, ix, ed, { ...toolHooksFor(d, ed, v, focus, labels), editText: () => undefined, revealList: () => false, openSearch: () => undefined, active }),
+    // (a Pins window's surface wired as the main view's is: one function, so it has whatever the canvas has)
+    // shortcut: a pinned view edits text, lists what is under the pointer and searches through the main view for now; give them its own when they need it
+    wire: (el, now) => wireCanvasView(el, now, false, { editText: () => undefined, revealList: () => false, openSearch: () => undefined }),
     actionsFor: canvasActionsFor,
-    gallery: { hidden: () => assets.revealing, thumb: (h) => assetsView.thumb(h), open: (h) => { setView("assets"); assetsView.openViewer(h); } },
-    takeDrops: (t) => takeDrops(t, true),
+    gallery: { hidden: () => assets.revealing, thumb: (h) => assetsView.thumb(h) },
+    record: (h) => assets.record(h),
+    slideSeconds: () => settings.get("assets.slideSeconds"),
     dpr: () => dpr,
     read: () => { try { return JSON.parse(settings.get("pins.windows")) as Array<{ c: string; o?: number; t?: boolean }>; } catch { return []; } },
     write: (ws) => void settings.set("pins.windows", JSON.stringify(ws)),

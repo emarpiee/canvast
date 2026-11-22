@@ -66,7 +66,7 @@ export function goHome(view: ViewState): void {
   view.home();
 }
 
-export function attachNavigation(el: HTMLElement, view: ViewState): () => void {
+export function attachNavigation(el: HTMLElement, view: ViewState, /** This view is the one in use (several views of canvases): its keys only then. */ active: () => boolean = () => true): () => void {
   const local = (e: { clientX: number; clientY: number }): ScreenPoint => {
     const r = el.getBoundingClientRect();
     return { x: e.clientX - r.left, y: e.clientY - r.top };
@@ -93,7 +93,7 @@ export function attachNavigation(el: HTMLElement, view: ViewState): () => void {
   };
 
   const onKeyDown = (e: KeyboardEvent): void => {
-    if (!canvasShortcutsActive(e)) return;
+    if (!active() || !canvasShortcutsActive(e)) return;
     if (e.ctrlKey || e.metaKey || e.altKey) return;
     // (each key runs its command, ADR 0205; Shift goes four times as far)
     const levels = e.shiftKey ? KEY_ZOOM_STEP * 4 : KEY_ZOOM_STEP;
