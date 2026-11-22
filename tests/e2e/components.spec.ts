@@ -352,7 +352,7 @@ test("every floating panel follows the theme at every density: corners and text 
     expect(await themeProblems(p), `density ${density}`).toEqual([]);
   }
   await p.evaluate(() => window.__canvastDebug.runCommand("pins.open", {}, "test"));
-  await expect(p.getByTestId("pins").locator(".pins-canvas").first()).toBeVisible();
+  await expect(p.getByTestId("pins").last().locator(".pins-canvas")).toBeVisible(); // (the second window: the first shows the gallery)
   expect(await themeProblems(p), "a pinned canvas").toEqual([]);
 });
 
