@@ -277,7 +277,10 @@ test("a Pins window over PhotoCraft: a press in it takes the keys back from Phot
   await p.keyboard.press("Control+z");
   await expect.poll(async () => (await objs(app)).length, { message: "Ctrl+Z in Pins over PhotoCraft" }).toBe(1);
   // its picture drawn there, though leaving the canvas let the decoded pictures go: the middle of Pins, fitted to it, is the picture's colour
+  // (nothing selected: the middle of a selection is its turn handle, drawn over the picture)
+  await p.evaluate(() => window.__canvastDebug.runCommand("select.items", { ids: [] }, "test"));
   await p.evaluate(() => window.__canvastDebug.runCommand("view.fitAll", {}, "test"));
   const middle = (): Promise<number[]> => pins.locator("canvas").evaluate((c: HTMLCanvasElement) => [...c.getContext("2d")!.getImageData(c.width >> 1, c.height >> 1, 1, 1).data]);
-  await expect.poll(async () => { const [r0, g, b] = await middle(); return Math.abs(r0! - 90) < 30 && Math.abs(g! - 120) < 30 && Math.abs(b! - 120) < 30; }, { message: "the picture drawn in Pins", timeout: 15_000 }).toBe(true);
+  // (the pixel read is what a failure shows)
+  await expect.poll(async () => { const [r0, g, b] = await middle(); return Math.abs(r0! - 90) < 30 && Math.abs(g! - 120) < 30 && Math.abs(b! - 120) < 30 ? "the picture" : `rgb ${r0} ${g} ${b}`; }, { message: "the picture drawn in Pins", timeout: 15_000 }).toBe("the picture");
 });
