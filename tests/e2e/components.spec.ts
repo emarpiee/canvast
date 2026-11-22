@@ -363,7 +363,8 @@ test("every slider of the panels follows a mouse drag to where it is let go: no 
   const pattern = p.getByTestId("pattern-panel");
   await expect(pattern.locator('input[type="range"]').first()).toBeVisible();
   expect(await sliderDragProblems(p, pattern), "the Pattern panel").toEqual([]);
-  await p.keyboard.press("Shift+R");
+  // (by its command: Shift+R is a key the Pattern panel's field keeps while it has the focus)
+  await p.evaluate(() => window.__canvastDebug.runCommand("reference.open", {}, "test"));
   const win = p.getByTestId("reference-window");
   await expect(win).toHaveCount(1);
   await win.locator("[data-ref-more]").click();

@@ -2950,11 +2950,15 @@ test("reference window (ADR 0207): over the Library and the canvas, a gallery of
   const items = async () => (await boards())[0]!.items as Array<{ h: string; fx?: boolean }>;
   // a picture pasted from another app goes into the library and onto the moodboard
   const pasted = makePng(20, 20, () => [40, 200, 40, 255]).toString("base64");
+  // (Firefox gives a paste made by a script no clipboard data: there, the files go in as a drop from another app does, the same import)
   await w2.evaluate((el, b64) => {
     const bytes = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
     const dt = new DataTransfer();
     dt.items.add(new File([bytes], "green.png", { type: "image/png" }));
-    el.dispatchEvent(new ClipboardEvent("paste", { clipboardData: dt, bubbles: true, cancelable: true }));
+    const paste = new ClipboardEvent("paste", { clipboardData: dt, bubbles: true, cancelable: true });
+    if (paste.clipboardData?.files.length) return void el.dispatchEvent(paste);
+    const board = el.querySelector("[data-ref-board]")!, r = board.getBoundingClientRect();
+    for (const type of ["dragover", "drop"]) board.dispatchEvent(new DragEvent(type, { dataTransfer: dt, bubbles: true, cancelable: true, clientX: r.left + r.width / 2, clientY: r.top + r.height / 2 }));
   }, pasted);
   await expect.poll(async () => (await items()).length, { message: "pasted from another app" }).toBe(2);
   // shown flipped (the file unchanged): its look is the moodboard's
@@ -2963,10 +2967,9 @@ test("reference window (ADR 0207): over the Library and the canvas, a gallery of
   await expect.poll(async () => (await items())[0]!.fx).toBe(true);
   await expect(w2.locator('[data-ref-item="0"] img')).toHaveCSS("transform", /matrix\(-1/);
   // a picture dragged off the canvas onto the moodboard is put on it, and stays on the canvas
-  await p.getByTestId("view-assets").click();
-  await p.locator('[data-testid="asset-card"][title="blue.png"]').click();
-  await p.getByTestId("asset-place").click();
-  await p.getByTestId("view-canvas").click();
+  // (by its command: the window lies over the Library's cards)
+  const blue = (await p.evaluate(() => window.__canvastDebug.catalogEntries())).find((e) => e.name === "blue.png")!.hash;
+  await p.evaluate((h) => window.__canvastDebug.runCommand("reference.toCanvas", { ids: [h] }, "test"), blue);
   await expect.poll(() => p.evaluate(() => window.__canvastDebug.objects().length)).toBe(1);
   await p.keyboard.press("v");
   const pic = await p.evaluate(() => { const d = window.__canvastDebug; return d.objectScreen(d.objects()[0]!.id)!.box; });

@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.61.24 — Tests of the reference window fixed (2026-11-22)
+
+### For developers
+
+- The reference window spec placed a picture by clicking a Library card under the window (it waited until its time ran out): it uses the command. In Firefox a script's paste has no clipboard data, so the files go in as a drop. The slider audit opens the window by its command (Shift+R stays in the Pattern panel's field). The styles registry test lists the comic kind.
+
 ## 0.61.23 — One line for the window's opacity (2026-11-22)
 
 - **Fixed before release:** a reference window's Opacity strip had a heading over its one slider, saying the same thing on a line of its own: the strip is now its sliders alone (a double-click on a name still puts it back). ([The Library](README.md#the-library))
