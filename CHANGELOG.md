@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.61.57 — The menu rows of a Pins window's pictures act (2026-11-22)
+
+- **Fixed before release:** the right-click rows of a Pins window's pictures (favourite, copy, open elsewhere) did nothing: the press on the menu row counted as leaving the window. A press in a menu or dialog no longer changes which Library is in use. ([Pins](README.md#pins))
+
 ## 0.61.56 — A short canvas menu and no Keep it tidy in a Pins window (2026-11-22)
 
 - **Changed:** a Pins window's right-click menu keeps Copy, Copy file, Paste, Duplicate, Bring to front, Send to back, Delete, Select everything and Fit everything in view; its Arrange menu has no Keep it tidy, and arranges there without a sheet. ([Pins](README.md#pins))

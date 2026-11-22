@@ -311,7 +311,8 @@ const COL_W_MAX = 900;
 /** The Libraries embedded in Pins windows, and where the last press was: which Library takes the keys (ADR 0208). */
 const libraryRoots = new Set<HTMLElement>();
 let lastPress: Element | null = null;
-if (typeof window !== "undefined") window.addEventListener("pointerdown", (e) => void (lastPress = e.target as Element | null), { capture: true });
+// (a press in a menu or dialog leaves it: a row of a Pins window's menu acts for that window's Library)
+if (typeof window !== "undefined") window.addEventListener("pointerdown", (e) => { const t = e.target as Element | null; if (!t?.closest?.(".pop-menu, dialog")) lastPress = t; }, { capture: true });
 /** The Library in use: an embedded one the last press was in, else the main one. */
 const libraryInUse = (root: HTMLElement): boolean => (libraryRoots.has(root) ? !!lastPress && root.contains(lastPress) : ![...libraryRoots].some((r) => !!lastPress && r.contains(lastPress)));
 /**
