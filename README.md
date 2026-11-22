@@ -549,7 +549,7 @@ Keep your references in sight while you work: a canvas of studies, or a folder o
 
 A folder of prints beside the canvas you draw on, as the library's own cards.
 
-![A Pins window showing six Hokusai prints of the library as cards beside a canvas with The Great Wave](docs/screenshots/pins-gallery.webp)
+![A Pins window on All pictures: the library's Hokusai prints as its cards, with their count and the search, beside a canvas with The Great Wave](docs/screenshots/pins-gallery.webp)
 
 ## Drawing and vector editing
 
