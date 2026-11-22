@@ -33,7 +33,11 @@ if (!existsSync(join(root, "dist/canvast.html"))) run("scripts/build.mjs");
 // (Electron fetches its binary the first time it is asked for, not at `npm ci`: on a fresh machine it is fetched here)
 if (!existsSync(join(root, "node_modules/electron/dist"))) execFileSync("node", [join(root, "node_modules/electron/install.js")], { cwd: root, stdio: "inherit" });
 run("scripts/build-desktop.mjs");
-const icons = mkdtempSync(join(tmpdir(), "canvast-icons-"));
+// Everything this run makes outside dist-package/ is in one folder, deleted however the run ends (a refused package too): the icons, the
+// checks' workspaces and the AppImage the check unpacks to run (its runtime unpacks into TMPDIR, a few hundred MB a run, and never deletes it).
+const work = mkdtempSync(join(tmpdir(), "canvast-package-"));
+process.on("exit", () => rmSync(work, { recursive: true, force: true }));
+const icons = mkdtempSync(join(work, "icons-"));
 run("scripts/brand/icons.mjs", [icons]);
 // What app stores and catalogs show (AppStream, B32): desktop/canvast.metainfo.xml with this version and its date (its CHANGELOG title's, else today)
 const released = readFileSync(join(root, "CHANGELOG.md"), "utf8").match(new RegExp(`^## ${pkg.version.replace(/\./g, "\\.")} .*\\((\\d{4}-\\d{2}-\\d{2})\\)`, "m"))?.[1] ?? new Date().toISOString().slice(0, 10);
@@ -155,10 +159,10 @@ const refuse = (why) => {
 };
 /** Start a package's app on a fresh workspace folder; it must write the folder (with the bridge, from inside its archive). */
 async function starts(label, executablePath) {
-  const dir = mkdtempSync(join(tmpdir(), "canvast-package-check-"));
+  const dir = mkdtempSync(join(work, "check-"));
   try {
     // (a CI machine's kernel may not allow Chromium's sandbox; there the check runs without it)
-    const app = await electron.launch({ executablePath, args: [`--workspace=${dir}`, `--user-data-dir=${dir}-data`, ...(process.env.CI ? ["--no-sandbox"] : [])], env: { ...process.env, APPIMAGE_EXTRACT_AND_RUN: "1", CANVAST_HIDDEN: "1", CANVAST_HASH: "#debug" } });
+    const app = await electron.launch({ executablePath, args: [`--workspace=${dir}`, `--user-data-dir=${dir}-data`, ...(process.env.CI ? ["--no-sandbox"] : [])], env: { ...process.env, TMPDIR: work, APPIMAGE_EXTRACT_AND_RUN: "1", CANVAST_HIDDEN: "1", CANVAST_HASH: "#debug" } });
     try {
       const page = await app.firstWindow();
       await page.waitForFunction(() => typeof window.__canvastDebug !== "undefined" && typeof window.canvastDesktop === "object", null, { timeout: 60_000 });
@@ -176,7 +180,7 @@ async function starts(label, executablePath) {
 if (wants("appimage")) await starts("AppImage", file);
 // The tarball: unpacked as a person would, its canvast started.
 if (wants("tar")) {
-  const dir = mkdtempSync(join(tmpdir(), "canvast-package-tar-"));
+  const dir = mkdtempSync(join(work, "tar-"));
   execFileSync("tar", ["-xzf", join(out, `${base}.tar.gz`), "-C", dir]);
   const top = readdirSync(dir);
   if (top.length !== 1 || !existsSync(join(dir, top[0], "canvast"))) refuse("the tarball does not unpack to one folder with canvast in it");
@@ -189,7 +193,7 @@ if (wants("tar")) {
   const debOf = () => {
     const debFile = join(out, `${base}.deb`);
     const member = listed("ar", ["t", debFile]).split("\n").find((m) => m.startsWith("data.tar"));
-    const data = join(mkdtempSync(join(tmpdir(), "canvast-package-deb-")), member ?? "data.tar");
+    const data = join(mkdtempSync(join(work, "deb-")), member ?? "data.tar");
     writeFileSync(data, member ? execFileSync("ar", ["p", debFile, member], { maxBuffer: 1 << 30 }) : "");
     const deb = member ? listed("tar", ["-tf", data]).replace(/^\.\//gm, "/") : "";
     rmSync(dirname(data), { recursive: true, force: true });

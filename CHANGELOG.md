@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.61.62 — Packaging cleans up after itself (2026-11-23)
+
+### For developers
+
+- `package-desktop.mjs`: everything a run makes outside `dist-package/` (icons, the checks' workspaces, the AppImage its check unpacks to run, a few hundred MB each) is in one temporary folder, deleted however the run ends; the unpacked AppImages were left in the system's temporary folder after every run.
+
 ## 0.61.61 — Start from scratch leaves nothing behind (2026-11-23)
 
 - **Fixed:** Start from scratch could leave canvast's settings behind: a save timed just before (the panels' places, a setting) was written again between the deletion and the reload. Nothing of canvast is written until the page has reloaded. ([Your workspace and data](README.md#your-workspace-and-data))
