@@ -71,6 +71,7 @@ test("a Pins window shows pictures of the library as the Library's own grid, the
   await cards.first().dblclick();
   await expect(pins.getByTestId("slide-view")).toBeVisible();
   await expect(pins.locator(".film-item")).toHaveCount(2);
+  await expect(p.getByTestId("view-settings"), "the page's tabs and Settings stay while the window's viewer is open").toBeVisible();
   await expect(pins.locator(".assets-side")).toBeHidden();
   // its right-click menu works there, with the Library view hidden (the Library's commands are the window's while it is in use)
   await pins.locator(".viewer-stage").click({ button: "right" });

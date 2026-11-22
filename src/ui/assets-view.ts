@@ -650,6 +650,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   };
   /** With the viewer open the page is only the picture and its own bar: the view tabs, the workspace menu and the Settings button are away (styles.css). */
   const syncViewing = (): void => {
+    if (opts.embedded) return; // (a Pins window's viewer is in its window: the page's tabs and Settings stay)
     document.body.toggleAttribute("data-viewing", visible && !viewer.hidden);
   };
   const listHead = root.querySelector<HTMLElement>(".assets-list-head")!;

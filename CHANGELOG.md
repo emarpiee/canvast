@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.61.55 — The view tabs and Settings stay with a Pins viewer open (2026-11-22)
+
+- **Fixed before release:** opening a picture in a Pins window's viewer hid the view tabs, the workspace menu and the Settings button, as the Library's full viewer does: only the Library view's viewer does that now. ([Pins](README.md#pins))
+
 ## 0.61.54 — Arrange only in a Pins window's Actions bar (2026-11-22)
 
 - **Changed:** a Pins window's Actions bar has its Arrange only (no Adjust). ([Pins](README.md#pins))
