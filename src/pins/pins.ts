@@ -90,6 +90,9 @@ interface Pin {
   close(): void;
 }
 
+/** A Pins window's canvas menu: what a board of references needs (ordering, copying, removing, finding its way); the rest is the main canvas's. */
+export const PINS_MENU_ROWS: ReadonlySet<string> = new Set(["Copy", "Copy file", "Paste", "Duplicate", "Bring to front", "Send to back", "Delete the selection", "Select everything", "Fit everything in view"]);
+
 export function mountPins(deps: PinsDeps): { open(source?: PinSource): void; refresh(): void; dropAt(x: number, y: number, hashes: readonly string[]): boolean; barHost(id: string): HTMLElement | null } {
   const pins = new Map<string, Pin>();
   const keep = (): void => deps.write([...pins.values()].map((p) => ({ c: p.source, ...(p.opacity < 1 ? { o: p.opacity } : {}), ...(p.through ? { t: true } : {}) })));

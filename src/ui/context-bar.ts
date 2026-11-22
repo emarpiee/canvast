@@ -175,7 +175,8 @@ export interface ContextActions {
   laidOutOrder(): string | null;
   /** Arrange in a grid keeps it tidy: the grid made as a sheet with auto layout, its order a rule. */
   keepTidy(): boolean;
-  setKeepTidy(on: boolean): void;
+  /** Absent where Keep it tidy is not offered (a Pins window). */
+  setKeepTidy?(on: boolean): void;
   setFlag(flag: "hidden" | "locked"): void;
   deleteSelection(): void;
   /** Open the command palette, to find an option or action by its name. */
@@ -258,7 +259,7 @@ export function mountContextBar(host: HTMLElement, editor: EditorState, doc: Doc
     ...LAYOUT_MENU.find((g) => g.head.startsWith("Distribute"))!.items.map((i) => cmd(`layout.${i.id}`, `Distribute ${i.label}`, i.hint, i.icon, () => actions.layout({ distribute: i.id.split(":")[1] as "x" | "y" }), () => layoutBlocked() ?? (editor.selection.size < 3 ? "Select three or more." : null))),
     ...LAYOUT_MENU.find((g) => g.head.startsWith("Arrange"))!.items.map((i) => cmd(`layout.${i.id}`, i.label, i.hint, i.icon, () => actions.layout({ grid: i.id.split(":")[1] as SortKey }))),
     ...GAP_ORDER.map((g) => cmd(`layout.gap:${g}`, `Space: ${GAP_LABEL[g].toLowerCase()}`, GAP_HINT[g], `<span class="menu-gap">${GAP_SHORT[g]}</span>`, () => { actions.setGap(g); update(); }, () => (actions.laidOutOrder() !== null ? "Their sheet sets the space." : null))),
-    cmd("layout.keepTidy", "Keep it tidy", "As auto layout: it stays a grid", ICONS.autoLayout, () => { actions.setKeepTidy(!actions.keepTidy()); update(); }, () => (actions.laidOutOrder() !== null ? "Their sheet keeps it." : null)),
+    cmd("layout.keepTidy", "Keep it tidy", "As auto layout: it stays a grid", ICONS.autoLayout, () => { actions.setKeepTidy?.(!actions.keepTidy()); update(); }, () => (!actions.setKeepTidy ? "Only on the main canvas." : actions.laidOutOrder() !== null ? "Their sheet keeps it." : null)),
     cmd("size.reset", "Reset size", "As placed, at this zoom", ICONS.imageUpscale, () => actions.resetSize(), () => sel() ?? (actions.canResetSize() ? null : actions.resetSizeBlock())),
     ...(["w", "h"] as const).flatMap((axis) => (["smallest", "medium", "largest"] as const).map((pick) => {
       const word = axis === "w" ? "Width" : "Height";
@@ -365,7 +366,7 @@ export function mountContextBar(host: HTMLElement, editor: EditorState, doc: Doc
           return commandRows([
             ...orders.map((i) => (actions.keepTidy() ? ([`layout.${i.id}`, { hint: "On a sheet that keeps it" }] as const) : `layout.${i.id}`)),
             ...GAP_ORDER.map((g) => tick(`layout.gap:${g}`, g === actions.gap())),
-            ["layout.keepTidy", { sep: true, checked: actions.keepTidy() }] as const,
+            ...(actions.setKeepTidy ? [["layout.keepTidy", { sep: true, checked: actions.keepTidy() }] as const] : []),
           ]);
         });
         break;

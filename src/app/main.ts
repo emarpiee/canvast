@@ -2,7 +2,7 @@ import { moodboardsToCanvases } from "../pins/migrate";
 import { createCanvasView } from "../canvas/canvas-view";
 import { LIBRARY_DRAG } from "../ui/assets-view";
 import { addCanvasView, docInUse, editorInUse, focusCanvasView, focusedCanvasView, routedActions, routedBarActions, setBarActions, setViewActions } from "../canvas/focus";
-import { mountPins } from "../pins/pins";
+import { PINS_MENU_ROWS, mountPins } from "../pins/pins";
 import type { FrameIndex } from "../scene/frame-index";
 import type { Choice } from "../canvas/canvas-view";
 import { validComicStyle } from "../doc/comic";
@@ -1148,6 +1148,7 @@ async function start(): Promise<void> {
   function wireCanvasView(el: HTMLCanvasElement, now: () => ViewParts | null, main: boolean, own: Partial<ToolHooks> = {}): (p: ViewParts) => () => void {
     el.classList.add("canvas-surface");
     mountContextMenu(el, commands, {
+      ...(main ? {} : { only: PINS_MENU_ROWS }),
       active: () => { const p = now(); return !!p && (!main || appView === "canvas") && !textEditor.isOpen && performance.now() - p.editor.fingerListAt > 1500; },
       pickAt: (x, y) => {
         const p = now();
@@ -1451,7 +1452,7 @@ async function start(): Promise<void> {
       }
     }
     // Kept tidy (ADR 0194): the grid as a sheet with auto layout, unless the things are on one already (then their sheet's order is set).
-    if ("grid" in cmd && settings.get("arrange.keepTidy") && !laidOutSheetOfSelection(doc, editor)) {
+    if ("grid" in cmd && on.view === mainView && settings.get("arrange.keepTidy") && !laidOutSheetOfSelection(doc, editor)) { // (a Pins window arranges plainly)
       lastGrid = null;
       return arrangeAsLayout(doc, editor, cmd.grid, settings.get("arrange.gap"), new Map([...names].map(([h, v]) => [h, v.date])));
     }
@@ -2248,8 +2249,8 @@ async function start(): Promise<void> {
       layout: (cmd) => void runLayout(cmd, { doc, editor, view }),
       gap: () => settings.get("arrange.gap"),
       laidOutOrder: () => { const s = laidOutSheetOfSelection(doc, editor); return s ? (s.container.layout.sort ?? "stack") : null; },
-      keepTidy: () => settings.get("arrange.keepTidy"),
-      setKeepTidy: (on) => settings.set("arrange.keepTidy", on),
+      keepTidy: () => view === mainView && settings.get("arrange.keepTidy"),
+      ...(view === mainView ? { setKeepTidy: (on: boolean) => settings.set("arrange.keepTidy", on) } : {}), // (no Keep it tidy in a Pins window)
       setGap: (gap) => {
         settings.set("arrange.gap", gap);
         // Choosing another space right after arranging the same items lays them out again with it (one more undo step).

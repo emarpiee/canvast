@@ -37,6 +37,11 @@ test("Pins (ADR 0208): Shift+R pins the open canvas in a window above every view
   await expect(bar, "the Actions bar in the Pins window").toBeVisible();
   await expect(bar.locator('.tb-group[aria-label="Objects"]')).toBeHidden();
   await expect(bar.locator('.tb-group[aria-label="Adjust"]')).toBeHidden();
+  // its right-click menu is the canvas's, short: no Group or Export there
+  await p.mouse.click(at.x + 30, at.y + 20, { button: "right" });
+  await expect(p.locator('.pop-menu [data-command="edit.duplicate"]'), "Duplicate in a Pins window's menu").toHaveCount(1);
+  await expect(p.locator(".pop-menu").getByText("Group", { exact: true }), "no Group in a Pins window's menu").toHaveCount(0);
+  await p.keyboard.press("Escape");
   // the canvas's keys act on the view in use: Delete takes what Pins selected; Ctrl+Z brings it back
   await p.keyboard.press("Delete");
   await expect.poll(() => p.evaluate(() => window.__canvastDebug.objects().length), { message: "Delete in Pins" }).toBe(0);

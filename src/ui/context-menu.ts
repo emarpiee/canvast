@@ -59,8 +59,8 @@ export function commandItems(registry: CommandRegistry, titles: readonly string[
 }
 
 /** What the canvas offers on a thing or on empty ground, in groups: the same list for a right click and for a long touch. */
-export function canvasItems(registry: CommandRegistry, onThing: boolean): MenuItem[] {
-  return grouped((onThing ? ON_ITEMS : ON_EMPTY).map((g) => commandItems(registry, g)));
+export function canvasItems(registry: CommandRegistry, onThing: boolean, only?: ReadonlySet<string>): MenuItem[] {
+  return grouped((onThing ? ON_ITEMS : ON_EMPTY).map((g) => commandItems(registry, only ? g.filter((t) => only.has(t)) : g)));
 }
 
 let anchorEl: HTMLElement | null = null;
@@ -149,6 +149,8 @@ export interface ContextMenuHooks {
   active(): boolean;
   /** Pick what is at the point (canvas px) if it is not picked already; whether there is something there. */
   pickAt(x: number, y: number): boolean;
+  /** Only the rows with these titles (a Pins window's short menu). */
+  only?: ReadonlySet<string>;
 }
 
 /**
@@ -162,7 +164,7 @@ export function mountContextMenu(canvas: HTMLElement, registry: CommandRegistry,
     active: hooks.active,
     build: ({ clientX, clientY }) => {
       const r = canvas.getBoundingClientRect();
-      return canvasItems(registry, hooks.pickAt(clientX - r.left, clientY - r.top));
+      return canvasItems(registry, hooks.pickAt(clientX - r.left, clientY - r.top), hooks.only);
     },
   });
 }

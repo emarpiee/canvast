@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.61.56 — A short canvas menu and no Keep it tidy in a Pins window (2026-11-22)
+
+- **Changed:** a Pins window's right-click menu keeps Copy, Copy file, Paste, Duplicate, Bring to front, Send to back, Delete, Select everything and Fit everything in view; its Arrange menu has no Keep it tidy, and arranges there without a sheet. ([Pins](README.md#pins))
+
 ## 0.61.55 — The view tabs and Settings stay with a Pins viewer open (2026-11-22)
 
 - **Fixed before release:** opening a picture in a Pins window's viewer hid the view tabs, the workspace menu and the Settings button, as the Library's full viewer does: only the Library view's viewer does that now. ([Pins](README.md#pins))
