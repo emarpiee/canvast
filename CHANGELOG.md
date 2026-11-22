@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.61.31 — Reference window spec: the picture on top right-clicked (2026-11-22)
+
+### For developers
+
+- The reference window spec right-clicks the picture on top of the moodboard (the larger one dragged in covers the one before it).
+
 ## 0.61.30 — Reference window spec: a picture large enough to drag (2026-11-22)
 
 ### For developers
