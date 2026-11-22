@@ -71,6 +71,12 @@ async function tilesShown(p: Page): Promise<void> {
     .not.toBeNull();
 }
 
+/** Frames until one with nothing to do renders no tile: whatever was scheduled is done. */
+async function settled(p: Page): Promise<void> {
+  await tilesShown(p);
+  await expect.poll(() => renderedDuring(p, async () => undefined), { message: "the view settled" }).toBe(0);
+}
+
 async function renderedDuring(p: Page, action: () => Promise<unknown>): Promise<number> {
   const before = (await stats(p)).renderedTotal;
   await action();
@@ -99,8 +105,12 @@ test("tiles give the same picture as direct rendering: dense scene, after a pan,
 test("panning reuses tiles; a still camera renders none; the zoom changing renders directly", async ({ app }) => {
   const p = app.page;
   await p.evaluate(() => window.__canvastDebug.benchLoad({ kind: "dense", n: 3000 }));
-  await renderedDuring(p, async () => undefined); // let the frames the load scheduled finish
-  const built = await renderedDuring(p, () => p.evaluate(() => window.__canvastDebug.setTileCache(true)));
+  // (settled: the load's frames all done, however many a slower machine needs; a fixed two frames counted part of its build in the next step)
+  await settled(p);
+  const before = (await stats(p)).renderedTotal;
+  await p.evaluate(() => window.__canvastDebug.setTileCache(true));
+  await settled(p); // (a frame builds only what its time allows: the whole set may take several)
+  const built = (await stats(p)).renderedTotal - before;
   const full = (await stats(p)).last!.tiles;
   expect(built).toBe(full); // built from scratch, once
   // Still camera: every tile reused, no visibility query at all.

@@ -16,6 +16,10 @@ Pins keep your references in sight while you work: any canvas, or a folder of th
 
 - The reference windows' moodboards become canvases, once, in a board named **Pins**: every picture where it was, flipped, turned and see-through as it was. The reference windows are replaced by Pins.
 
+### For developers
+
+- `tiles.spec.ts`: the tile counts are taken once the view has settled (a frame with nothing to do renders no tile), not after a fixed two frames, which on a slower machine counted part of the load's own build.
+
 ## 0.61.64 — First modules out of the canvas start-up (2026-11-23)
 
 ### For developers
