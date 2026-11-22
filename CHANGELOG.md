@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.61.38 — A Pins window draws its canvas (2026-11-22)
+
+- **Fixed before release:** a Pins window stayed empty: its view read the document it shows before it had one. ([The Library](README.md#the-library))
+
 ## 0.61.37 — Pins: a canvas in a window above every view (2026-11-22)
 
 - **Added:** **Pins** (Shift+R, or the button by Settings): a window above every view, the Library too, that shows a canvas of the workspace, chosen in it. It is the canvas itself, drawn and edited as in the main view (the same tools, keys, menus and undo); the canvas the main view shows is the same in both. It is a panel you move by its title and size from its corner, and it opens again after a reload. Text editing, the list under the pointer and search work in the main view for now. ([The Library](README.md#the-library))

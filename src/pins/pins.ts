@@ -69,9 +69,7 @@ export function mountPins(deps: PinsDeps): { open(canvasId?: string): void; refr
 
   /** A canvas's document for a pinned view: the main view's when it shows that canvas, else one of its own (read once, saved as the main one is). */
   const own = new Map<string, { doc: DocumentStore; persistence: CanvasPersistence; users: number; placed: boolean }>();
-  /** The document a view is of, before it is known (its frames are read from it). */
-  const docOf = new WeakMap<ViewState, DocumentStore>();
-  const docFor = async (canvasId: string, view: ViewState): Promise<{ doc: DocumentStore; placed: boolean; release(): void } | null> => {
+  const docFor = async (canvasId: string, view: ViewState, use: (doc: DocumentStore) => void): Promise<{ doc: DocumentStore; placed: boolean; release(): void } | null> => {
     if (deps.session.current?.canvasId === canvasId) return { doc: deps.main.doc, placed: false, release: () => undefined };
     const repo = deps.session.repo;
     if (!repo) return null;
@@ -81,8 +79,8 @@ export function mountPins(deps: PinsDeps): { open(canvasId?: string): void; refr
       const loaded = await repo.loadCanvas(canvasId).catch(() => null);
       if (!loaded) return null;
       const doc = new DocumentStore();
-      docOf.set(view, doc);
       doc.load(loaded.objects, loaded.space);
+      use(doc); // (the view's frames are this document's before its camera is placed in them)
       const persistence = new CanvasPersistence(repo, doc, view);
       persistence.attach(canvasId, loaded.canvas.revision, loaded.space, loaded.bookmarks);
       try {
@@ -160,11 +158,13 @@ export function mountPins(deps: PinsDeps): { open(canvasId?: string): void; refr
       pin.canvasId = cid;
       source.innerHTML = `${ICONS.infinity}<span>${esc(canvasName(cid))}</span>${ICONS.chevronDown}`;
       keep();
-      const view = new ViewState(() => (docOf.get(view) ?? deps.main.doc).space);
-      const got = await docFor(cid, view);
+      // (its frames are its document's: read at once by the view, so the document it has until its own is known is the main one's)
+      let shownDoc: DocumentStore = deps.main.doc;
+      const view = new ViewState(() => shownDoc.space);
+      const got = await docFor(cid, view, (d) => void (shownDoc = d));
       if (!got || pin.canvasId !== cid) return got?.release();
       const doc = got.doc;
-      docOf.set(view, doc);
+      shownDoc = doc;
       pin.onMain = doc === deps.main.doc;
       const editor = new EditorState();
       editor.setTool("select");
