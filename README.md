@@ -534,22 +534,22 @@ Tag the studies on a canvas by what they teach, and find them again.
 
 ### Pins
 
-Keep your references in sight while you work: a canvas of studies, or the Library, in a window that floats above every view.
+Keep your references in sight while you work: a canvas of studies, or a folder of the library, in a window that floats above every view.
 
 ![A canvas of Degas's gesture study pinned in a window over a canvas where Delacroix's Study of a Horse is being worked on](docs/screenshots/pins.webp)
 
 | | |
 | --- | --- |
 | Open one | `Shift+R`, or the button by Settings: the canvas you are on, in a window. Open as many as you like |
-| What it shows | The list under its title: any canvas of the workspace, by board, or **The Library** |
+| What it shows | The list under its title: any canvas of the workspace, by board, or **All pictures**, a folder shown lately, or **Choose a folder…** (any folder, found by its name) |
 | A pinned canvas | The canvas itself: its tools (the ones the toolbar sets), keys, wheel and pinch, right-click menu and undo, on the view you pressed last; the Actions bar, along the bottom of the window, has its **Adjust** and **Arrange** (the Adjust panel floats above every view meanwhile). The canvas you are on is the same in both: what you change in one is changed in the other |
-| The Library | The Library itself, without its details panel: its folders, search, cards and viewer (zoom, slideshow) |
+| Pictures of the library | The library's own viewer, in the window: the picture large, its filmstrip, zoom and Fit, the slideshow and Place |
 | Bringing pictures over | Drag a gallery's card, or a Library card, onto a canvas or a pinned one; drag a picture off the canvas onto a pinned canvas (it stays where it was); drop files from another app onto a pinned canvas |
 | The window | Move it by its title, size it from its bottom corner, press its title to fold it. **More** (⋯): **Opacity…** (a slider), **Let clicks through** (to what is under it; its title still takes them) and, in the desktop app, **Float over other apps** |
 
-The Library beside the canvas you draw on.
+A folder of prints beside the canvas you draw on, in the library's own viewer.
 
-![A Pins window on All pictures: the library's Hokusai prints as its cards, with their count and the search, beside a canvas with The Great Wave](docs/screenshots/pins-gallery.webp)
+![A Pins window on All pictures: a Hokusai print large in the library's viewer, the others in its filmstrip, beside a canvas with The Great Wave](docs/screenshots/pins-gallery.webp)
 
 ## Drawing and vector editing
 

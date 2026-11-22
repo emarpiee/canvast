@@ -3325,6 +3325,7 @@ async function start(): Promise<void> {
     actionsFor: canvasActionsFor,
     barActionsFor,
     library: (host) => libraryIn(host, true),
+    hidden: () => assets.revealing,
     dpr: () => dpr,
     read: () => { try { return JSON.parse(settings.get("pins.windows")) as Array<{ c: string; o?: number; t?: boolean }>; } catch { return []; } },
     write: (ws) => void settings.set("pins.windows", JSON.stringify(ws)),

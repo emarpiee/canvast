@@ -131,6 +131,8 @@ export interface AssetsView {
   importFiles(files: File[], here?: boolean): Promise<string[]>;
   /** Draw the notes' cards again (the preview look changed). */
   redrawNotes(): void;
+  /** A Pins window's Library (embedded): its viewer on the pictures of a folder ("folder:<id>") or of all ("all"), from the first. */
+  viewIn(scope: string): Promise<void>;
 }
 
 /**
@@ -617,6 +619,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   reversed = ui.filters.reversed;
   showSort();
   const saveUi = (): void => {
+    if (opts.embedded) return; // (a Pins window's Library keeps its folder and its look to itself: the Library view's stay as they are)
     try {
       localStorage.setItem(UI_KEY, JSON.stringify(ui));
     } catch {
@@ -1967,6 +1970,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   });
   viewer.addEventListener("pointerleave", () => viewer.classList.remove("is-near-top", "is-near-bottom"));
   const closeSlide = (): void => {
+    if (opts.embedded) return; // (a Pins window's Library is its viewer: it has no grid to go back to; the folder changes from the window)
     setGrey(false);
     const was = slideHash;
     stopShow();
@@ -6089,6 +6093,12 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       stopShow();
       root.hidden = true;
       syncViewing();
+    },
+    viewIn: async (to) => {
+      scope = to;
+      await refresh();
+      const first = shown[0]?.hash;
+      if (first) await showSlide(first);
     },
     redrawNotes() {
       redrawCards((listing?.entries ?? []).filter((e) => noteKindOf(e.name)).map((e) => e.hash));

@@ -51,7 +51,7 @@ test("Pins (ADR 0208): Shift+R pins the open canvas in a window above every view
   expect(app.consoleErrors).toEqual([]);
 });
 
-test("a Pins window shows the Library itself (its cards, its folders, its viewer) without its details panel; the main Library is left as it was", async ({ app }) => {
+test("a Pins window shows pictures of the library in the library's own viewer (its filmstrip, zoom and slideshow), for all of them or a folder; the Library view is left as it was", async ({ app }) => {
   const p = app.page;
   await p.getByTestId("view-assets").click();
   await p.getByTestId("assets-import-input").first().setInputFiles([
@@ -60,14 +60,13 @@ test("a Pins window shows the Library itself (its cards, its folders, its viewer
   ]);
   await expect(p.locator("#assets-view").getByTestId("asset-card")).toHaveCount(2);
   await p.getByTestId("view-canvas").click();
-  await p.evaluate(() => window.__canvastDebug.runCommand("pins.open", { source: "library" }, "test"));
+  await p.evaluate(() => window.__canvastDebug.runCommand("pins.open", { source: "all" }, "test"));
   const pins = p.getByTestId("pins");
-  const card = pins.getByTestId("asset-card");
-  await expect(card, "the Library's own cards").toHaveCount(2);
-  await expect(pins.locator(".asset-inspector"), "no details panel").toBeHidden();
-  // a double-click opens its own viewer, in the window (the main view stays the canvas)
-  await card.first().dblclick();
+  // the viewer, in the window, at once: the picture large and the others in its strip
   await expect(pins.getByTestId("slide-view")).toBeVisible();
+  await expect(pins.locator(".film-item")).toHaveCount(2);
+  await expect(pins.locator(".assets-side")).toBeHidden();
+  // the main view is still the canvas, and the Library view kept its own state
   await expect(p.locator("#assets-view")).toBeHidden();
   expect(app.consoleErrors).toEqual([]);
 });

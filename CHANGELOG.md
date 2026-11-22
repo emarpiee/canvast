@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.61.47 — Pins: pictures in the library's own viewer (2026-11-22)
+
+- **Changed:** a Pins window shows pictures of the library (All pictures, a recent folder, or **Choose a folder…**) in **the library's own viewer**: the picture large, its filmstrip, zoom and Fit, the slideshow and Place. The whole Library in the window is gone; the Library view keeps its own folder and look. ([Pins](README.md#pins))
+
+### For developers
+
+- `AssetsView.viewIn(scope)` and `mountAssetsView(…, { embedded })` as a viewer only: it saves no layout, its viewer does not close to a grid, its bar, sidebar, status bar and details are hidden.
+
 ## 0.61.46 — The Actions bar inside the Pins window (2026-11-22)
 
 - **Changed:** while a pinned canvas is the view in use, the Actions bar (its Adjust and Arrange) is along the bottom of its Pins window, and the Adjust panel floats above every view, so both work over the Library, PhotoCraft or any view. ([Pins](README.md#pins))
