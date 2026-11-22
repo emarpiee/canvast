@@ -98,3 +98,16 @@ test("notes-panel", async ({ scene: s }) => {
   await s.shot("notes-panel");
 });
 
+
+test("notes-repair", async ({ scene: s }) => {
+  await s.look({ theme: "dark", hue: 150 });
+  // Settings > Notes: links to pictures that find nothing (a file renamed or moved by another program) written again, once pressed
+  await s.p.getByTestId("view-settings").click();
+  await s.p.getByRole("tab", { name: /Notes/ }).click();
+  const row = s.p.getByTestId("repair-note-links");
+  await expect(row).toBeVisible();
+  await row.click();
+  await expect(s.p.locator("[data-repair-note]")).toBeVisible();
+  await s.settle();
+  await s.shot("notes-repair", await s.around({ els: ['.set-card:has([data-repair-links])'], pad: 12 }));
+});

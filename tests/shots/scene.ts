@@ -19,7 +19,7 @@ export const OUT = resolve(process.env["CANVAST_SHOTS_DIR"] ?? "shots");
 
 export interface Box { minX: number; minY: number; maxX: number; maxY: number }
 export interface Clip { x: number; y: number; width: number; height: number }
-type Obj = { id: string; kind: string; name?: string; container?: boolean; shape?: string };
+type Obj = { id: string; kind: string; name?: string; container?: boolean; shape?: string; parent?: string };
 
 /** The art files whose name starts with one of these (an artist, or artist-title), in that order. */
 export function artFiles(...starts: string[]): string[] {
@@ -59,7 +59,7 @@ export class Scene {
   }
 
   /** A tool, chosen through the debug hook (keys go to whatever has the focus). */
-  async tool(name: "select" | "pen" | "shape" | "balloon" | "text" | "sheet" | "node" | "path"): Promise<void> {
+  async tool(name: "select" | "pen" | "shape" | "balloon" | "text" | "sheet" | "node" | "path" | "panel"): Promise<void> {
     await this.blur();
     await this.p.evaluate((n) => window.__canvastDebug.setTool(n as never), name);
     await this.settle(100);

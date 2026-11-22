@@ -28,6 +28,8 @@ export const SHOTS: Record<string, ShotSpec> = {
   "reveal": { section: "#reveal-and-the-ctrl-list", use: "Find and pick a print buried under others in a pile.", alt: "A pile of Hokusai prints with Ctrl held: the list of what lies under the pointer, one print outlined", pointer: true },
   "media": { section: "#video-audio-and-gifs", use: "Plan a camera move for an animatic: a slow pan across a painting, played on the board.", alt: "A clip of a slow camera pan across Van Gogh's Wheat Field with Cypresses playing on the canvas, its player bar below it", pointer: true },
   "extract-frame": { section: "#video-audio-and-gifs", use: "Keep a key frame of a clip as a still picture, to draw from or to place in a storyboard.", alt: "A camera pan across Van Gogh's Wheat Field with Cypresses as a clip on the canvas, and beside it the frame extracted from it as a picture" },
+  "pins": { section: "#pins", use: "Keep your references in sight while you work: a canvas of studies, or a folder of the library, in a window that floats above every view.", alt: "A canvas of Degas's gesture study pinned in a window over a canvas where Delacroix's Study of a Horse is being worked on" },
+  "pins-gallery": { section: "#pins", use: "A folder of prints beside the canvas you draw on, as the library's own cards.", alt: "A Pins window showing six Hokusai prints of the library as cards beside a canvas with The Great Wave" },
   "canvas-tags": { section: "#tags-on-the-canvas", use: "Tag the studies on a canvas by what they teach, and find them again.", alt: "Studies tagged gesture and anatomy, the Tags panel listing the tags with their counts" },
 
   // Drawing and vector editing
@@ -47,6 +49,7 @@ export const SHOTS: Record<string, ShotSpec> = {
 
   // Comics and storyboards
   "comic": { section: "#a-page-of-panels", use: "Lay out a comic page from four pictures and letter it.", alt: "A comic page of four panels: Hokusai's Seaside Village in Winter with the caption Winter. The village waits for the boats.; Le Prince's Landscape with Peasants Fording a Stream with a balloon saying The ford is high this year.; Verhaecht's Mountainous Landscape with the caption Three days over the pass.; and Hokusai's Great Wave with a burst shouting Hold on! over the boats" },
+  "comic-panels": { section: "#comic-pages", use: "Plan a page by cutting it into panels at any angle, as you would with a knife, and adjust each gutter by hand.", alt: "A comic page drawn with the Panel tool, its panels cut by a slanted gutter, the page selected with the handles of its gutters" },
   "balloon-kinds": { section: "#speech-balloons", use: "Pick the balloon that fits the line: speech, thought, a shout or a caption box.", alt: "Four lettered balloons: a speech balloon, a thought cloud with bubbles, a burst shouting Look out! and a yellow caption box, the Preset in the selected balloon's Balloon chip" },
   "balloons": { section: "#speech-balloons", use: "Point a balloon's tail at the speaker.", alt: "A speech balloon over Le Prince's peasants fording a stream, its tail pointing at them, selected with its handles, its Tail chip's options open" },
   "text": { section: "#text", use: "Set a cover's type: a title and a subtitle in fonts of your own.", alt: "Hokusai's Great Wave with the title THE CROSSING being set in Bangers above it and a subtitle in Cormorant Garamond italic under it, the title's format bar between them" },
@@ -68,6 +71,7 @@ export const SHOTS: Record<string, ShotSpec> = {
   // Notes
   "notes-editor": { section: "#notes", use: "Keep study notes on a reference: its facts as properties, the print embedded, a checklist of what to look at and a copy plan.", alt: "A markdown note, The Great Wave: study notes, open in the notes editor: the print embedded, a checklist of the crest, Mount Fuji and the three boats, and a table of the copy plan" },
   "notes-links": { section: "#links-and-tags", use: "Link notes to each other and see what links to a note.", alt: "The note Seaside Village in Winter selected in the Library, its details listing the study notes of The Great Wave under Linked from" },
+  "notes-repair": { section: "#links-and-tags", use: "Mend the links of notes whose pictures were renamed outside the app, in one press.", alt: "Settings, Notes: the Links in notes card, with Repair links in notes and what it wrote again" },
   "note-properties": { section: "#properties-1", use: "Keep a work's facts (artist, date, medium, series) as properties you can search.", alt: "The details of The Great Wave's study notes: properties artist Katsushika Hokusai, date ca. 1830–32, medium Woodblock print, series and status, and its tags" },
   "notes-panel": { section: "#notes-on-a-canvas", use: "Keep the notes beside the picture they are about, and edit them there.", alt: "The Great Wave on a canvas beside the card of its study notes, the note open in the Note panel" },
 

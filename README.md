@@ -81,7 +81,7 @@ Collect drawings by different masters on one board to compare how each handles t
 
 | Area | What you get |
 | --- | --- |
-| [**Reference boards**](#reference-boards) | Collect pictures, video and files on a canvas; crop, flip and adjust them without touching the files; lay them out on sheets by rules (auto layout); find what lies under what |
+| [**Reference boards**](#reference-boards) | Collect pictures, video and files on a canvas; crop, flip and adjust them without touching the files; lay them out on sheets by rules (auto layout); find what lies under what; keep a canvas or a folder in sight above every view (Pins) |
 | [**Drawing and vector editing**](#drawing-and-vector-editing) | Pressure pens, shapes, Bézier paths and node editing, boolean shapes, masks, gradients and pattern fills, 38 patterns and 55 composition guides, a colour picker for everything and saved styles, layers |
 | [**Comics and storyboards**](#comics-and-storyboards) | Pages and panels as sheets with real ratios, speech balloons with tails and connectors, rich text with your own fonts, pages exported to PDF |
 | [**The Library**](#the-library) | Every file once, in folders and tags, with a search that knows sizes, ratios, colours and dates, a viewer, previews of art files, PDFs, 3D models (lit, or drawn as line art), ZIPs and comic books, similar images and safe deletion |
@@ -265,6 +265,7 @@ Gather what you work from on a canvas: pictures, video, sound, PDFs, 3D models a
 | [Layers](#layers) | Groups, names, order, hiding and locking |
 | [Reveal and the Ctrl list](#reveal-and-the-ctrl-list) | Seeing and picking what lies under other objects |
 | [Tags on the canvas](#tags-on-the-canvas) | Labels for the objects on a canvas |
+| [Pins](#pins) | A canvas, or the library's pictures, in a window above every view |
 
 ### Bringing files in
 
@@ -531,6 +532,25 @@ Tag the studies on a canvas by what they teach, and find them again.
 
 ---
 
+### Pins
+
+Keep your references in sight while you work: a canvas of studies, or a folder of the library, in a window that floats above every view.
+
+![A canvas of Degas's gesture study pinned in a window over a canvas where Delacroix's Study of a Horse is being worked on](docs/screenshots/pins.webp)
+
+| | |
+| --- | --- |
+| Open one | `Shift+R`, or the button by Settings: the canvas you are on, in a window. Open as many as you like |
+| What it shows | The list under its title: any canvas of the workspace, by board, or **All pictures**, a folder shown lately, or **Choose a folder…** (any folder, found by its name) |
+| A pinned canvas | The canvas itself, with the canvas's own tools, keys, right-click menu and undo, on the view you pressed last. The canvas you are on is the same in both: what you change in one is changed in the other |
+| A gallery | The library's own cards, with a search by name. A double-click opens a picture in the library's viewer (its zoom, its slideshow) |
+| Bringing pictures over | Drag a gallery's card, or a Library card, onto a canvas or a pinned one; drag a picture off the canvas onto a pinned canvas (it stays where it was); drop files from another app onto a pinned canvas |
+| The window | Move it by its title, size it from its bottom corner, press its title to fold it. **More** (⋯): **Opacity…** (a slider), **Let clicks through** (to what is under it; its title still takes them) and, in the desktop app, **Float over other apps** |
+
+A folder of prints beside the canvas you draw on, as the library's own cards.
+
+![A Pins window showing six Hokusai prints of the library as cards beside a canvas with The Great Wave](docs/screenshots/pins-gallery.webp)
+
 ## Drawing and vector editing
 
 Everything you draw is vector, so it stays sharp at every magnification.
@@ -770,6 +790,7 @@ Pages and panels are [sheets](#sheets) with real ratios, laid out by [auto layou
 | Section | What is in it |
 | --- | --- |
 | [A page of panels](#a-page-of-panels) | Sheets, ratios and auto layout for pages and storyboards |
+| [Comic pages](#comic-pages) | The Panel tool: a page cut into panels, its gutters and corners as handles |
 | [Speech balloons](#speech-balloons) | Bodies, tails, words and connectors |
 | [Text](#text) | Rich text, fonts, text on a path and in a shape |
 
@@ -786,6 +807,22 @@ Lay out a comic page from four pictures and letter it.
 | Laying them out | Select the panels and press `Shift+A`: a page that holds them in a grid, with a gap and padding (the **Storyboard Frames** guide of the Pattern panel is there too, as a guide to draw over) |
 | Words | Speech balloons and captions over the panels; each panel cuts what goes past its edge |
 | Out | Export the page, or every panel on its own, to PNG, JPEG, WebP, SVG or a multi-page PDF |
+
+### Comic pages
+
+Plan a page by cutting it into panels at any angle, as you would with a knife, and adjust each gutter by hand.
+
+![A comic page drawn with the Panel tool, its panels cut by a slanted gutter, the page selected with the handles of its gutters](docs/screenshots/comic-panels.webp)
+
+| | |
+| --- | --- |
+| A page | The **Panel** tool (`J`, beside the speech balloon): drag on the canvas, in the layout chosen in its options (one panel, or the guides' layouts), inside a margin |
+| Cutting | Drag across the page: every panel the line crosses is cut, at any angle (`Shift`: straight or at 45°); the line and the gutter it leaves show until you let go |
+| Gutters | Each gutter has a handle in its middle (drag to move it, double-click to merge the two panels) and one at each end (drag to turn it, `Shift` by 15°); the one under the pointer shows a grip on each side to change its width |
+| Corners | A selected panel has a handle at each corner; panels stay convex |
+| Width and margin | The **Comic page** options: the gutter of the whole page, or of the gutter you clicked; the margin |
+| Styles | **Save** keeps the page's ratio, panels, gutter and border as a style, for the next page or a selected one |
+| Panels | Each panel is a sheet: what you draw or place in it is cut at its edges |
 
 ### Speech balloons
 
@@ -1411,6 +1448,10 @@ Link notes and files as Obsidian does. Renaming or moving an item updates the li
 
 Link notes to each other and see what links to a note.
 
+Mend the links of notes whose pictures were renamed outside the app, in one press.
+
+![Settings, Notes: the Links in notes card, with Repair links in notes and what it wrote again](docs/screenshots/notes-repair.webp)
+
 ![The note Seaside Village in Winter selected in the Library, its details listing the study notes of The Great Wave under Linked from](docs/screenshots/notes-links.webp)
 
 | Write | What it does |
@@ -1433,6 +1474,7 @@ Link notes to each other and see what links to a note.
 | A markdown note | Keeps them as `[[…]]`; `![[…]]` (an Obsidian embed) is kept as it is written, and shows its picture in the editor when it is one |
 | A rich text note | Writes the path to the item (`../Projects/Plan.md`) |
 | Links to library items | Written as their path from the root of the library (`Pictures/cat.png`, brackets and spaces encoded), whichever folder the note is in |
+| Repairing them | **Settings > Notes > Repair links in notes** writes again the links that find nothing (a file renamed or moved by another program while its links did not follow) to the item they meant |
 | Finding them | By the file a link names on disk (with **Keep file names** off, a picture added as `my cat.png` is `my_cat.png`, on disk and in the library), read from the note's folder, then from the root of the library (`library/Pictures/cat.png` too), then the one item of that name anywhere; so a path relative to the note, written elsewhere, still works, as does `<my cat.png>`, and a copy of an item's file shows that item. The app's own link `canvast:<sha-256>` is read too, and kept as written. The picture dialog shows a picture's link, and a path typed there is found in the library |
 | Other apps' folders | A folder whose name starts with a dot in `library/` (Obsidian's `.obsidian/`, say) is never taken into the library |
 
@@ -2484,7 +2526,8 @@ Change any shortcut, with a warning when two clash.
 | Zoom at centre | `+` / `−` (`Shift` = 4× step) |
 | Pan | Middle-drag · `Space`+drag · Hand tool · two fingers · `Shift`+wheel · arrow keys |
 | Return to origin | `0` · `Home` |
-| Tools | `V` select · `P` pen · `L` lasso · `H` hand · `T` text · `M` note · `U` shape · `K` speech balloon · `B` path · `N` nodes · `C` sheet · `E` eraser |
+| Tools | `V` select · `P` pen · `L` lasso · `H` hand · `T` text · `M` note · `U` shape · `K` speech balloon · `J` comic panels · `B` path · `N` nodes · `C` sheet · `E` eraser |
+| Pins (a canvas or the library's pictures in a window above every view) | `Shift+R` |
 | Undo · redo | `Ctrl/⌘+Z` · `Ctrl/⌘+Shift+Z` or `Ctrl+Y` |
 | Copy · cut · paste · duplicate | `Ctrl/⌘+C` · `X` · `V` · `D` |
 | Select all · clear · cancel a gesture | `Ctrl/⌘+A` · `Esc` |
@@ -2531,6 +2574,9 @@ What canvast does not do today, for both versions, then each. **The limits that 
 | ZIPs | A text inside is shown up to 2 MB (a bigger one is imported to be read); one import takes at most 5,000 files; comic books as `.cbr` or `.cb7` are not read (a card says to open them in a comic reader) |
 | Text | No Indic shaping; other computers can wrap missing characters differently |
 | Partial backups | ⚠️ An Advanced export can only be added, never used to update a workspace. Links in notes to items left out find nothing until those items are there |
+| Pins | A pinned canvas edits text, lists what lies under the pointer and searches only through the main view; the Actions and Properties bars follow the main view |
+| Pins | A paste in a Pins window pastes what was copied in the app (a picture copied in another app: drop it instead); Float over other apps shows a still picture |
+| Comic pages | Panels are convex: an L-shaped panel is two panels |
 | AI agents | In alpha: command options and answers may change between versions; many commands work only on what is selected |
 | AI agents | canvast must be open: an agent cannot use it without a window |
 | AI agents | The canvast tools need Node.js 20 or later; one agent at a time; a command that waits for you times out for the agent after two minutes |
