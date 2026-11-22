@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.61.49 — No full screen or Place in a Pins window (2026-11-22)
+
+- **Changed:** the library's viewer in a Pins window has no Full screen and no Place buttons. ([Pins](README.md#pins))
+
 ## 0.61.48 — The Actions bar floats in the Pins window (2026-11-22)
 
 - **Fixed before release:** the Actions bar in a Pins window took a row of its own under the canvas, so the view moved each time it showed: it floats over the bottom of the canvas, as over the main one. ([Pins](README.md#pins))
