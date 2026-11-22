@@ -1,5 +1,7 @@
 import { mountReferenceWindows } from "../ui/reference-window";
 import { createCanvasView } from "../canvas/canvas-view";
+import { addCanvasView, focusedCanvasView, routedActions } from "../canvas/focus";
+import type { FrameIndex } from "../scene/frame-index";
 import type { Choice } from "../canvas/canvas-view";
 import { validComicStyle } from "../doc/comic";
 import { applyComicStyle, comicStyleOf, chosenGutter, mergeSelectedPanels, pagePer, panelCount, selectedComicPage, setComicOption, splitSelectedPanels } from "./comic";
@@ -1145,6 +1147,7 @@ async function start(): Promise<void> {
     // outlines its thing while touched and picks it when pressed; "Add to the selection" keeps what is picked; on touch the right-click menu follows.
     revealList: (at, pick, opts) => openChoiceList(at, pick, opts),
     // canvas pictures dragged onto a reference window's board go onto it (ADR 0207)
+    active: () => focusedCanvasView() === "main",
     droppedOff: (ids, cx, cy) => {
       const under = document.elementFromPoint(cx, cy);
       const board = under?.closest<HTMLElement>("[data-ref-board]");
@@ -2850,7 +2853,8 @@ async function start(): Promise<void> {
   };
   // The canvas's own commands (src/app/canvas-commands.ts): what each does is reached through these actions, so the commands draw nothing.
   const keysOf = (id: string): string => keymap.bindings(id).map(displayCombo).join(", ");
-  const canvasActions: CanvasActions = {
+  // The canvas's actions for a view of a canvas (its document, editor, camera and focus key): the main view's, and a pinned one's (Pins)
+  const canvasActionsFor = (doc: DocumentStore, editor: EditorState, view: ViewState, index: FrameIndex, focusCycle: ReturnType<typeof createFocusCycle>): CanvasActions => ({
     onCanvas: () => appView === "canvas",
     selectionSize: () => editor.selection.size,
     readOnly: () => session.readOnly,
@@ -3003,8 +3007,9 @@ async function start(): Promise<void> {
     switchWorkspace: canSwitchWorkspace() ? () => void openWorkspaceSwitcher(document.querySelector<HTMLElement>('[data-testid="workspace-chevron"]') ?? document.body) : null,
     checkLibraryFiles: storage?.folderSync ? (quick) => checkLibraryFiles(quick) : null,
     hidden: storage?.hidden ? { isOpen: () => !!storage.hidden?.isOpen(), lock: () => lockHidden(session).then(() => { editor.message = HIDDEN_LOCKED; editor.changed(); }) } : null,
-  };
-  registry.setProvider("app", () => canvasCommands(canvasActions));
+  });
+  addCanvasView("main", canvasActionsFor(doc, editor, view, index, focusCycle));
+  registry.setProvider("app", () => canvasCommands(routedActions()));
   for (const [old, now] of Object.entries(OLD_CANVAS_IDS)) registry.alias(old, now);
   registry.onFail((_c, error) => { editor.message = error; editor.changed(); });
   // An outside caller's risky run asks the person here (ADR 0205); only the person answers. The link to AI agents opens while it is on.

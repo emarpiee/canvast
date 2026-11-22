@@ -366,6 +366,8 @@ export interface ToolHooks {
   setMaker?(make: (tool: "shape" | "sheet", kind: Exclude<ShapeKind, "balloon">, a: ScreenPoint, b: ScreenPoint) => boolean): void;
   /** Objects dragged off the canvas and let go over something that takes them (a reference window's board, ADR 0207): whether it took them (then they do not move). */
   droppedOff?(ids: readonly ObjectId[], clientX: number, clientY: number): boolean;
+  /** This view is the one in use (several views of canvases: the main one, a pinned one): the keys are its own only then. Default: always. */
+  active?(): boolean;
 }
 
 export function attachTools(
@@ -3084,6 +3086,7 @@ export function attachTools(
 
   // ---- keyboard ----------------------------------------------------------
   const onKeyDown = (e: KeyboardEvent): void => {
+    if (hooks.active && !hooks.active()) return;
     if (!canvasShortcutsActive(e)) return;
     if (e.key === "Control" || e.key === "Meta") reveal.key(true);
     const mod = e.ctrlKey || e.metaKey;
@@ -3190,6 +3193,7 @@ export function attachTools(
   };
 
   const onKeyUp = (e: KeyboardEvent): void => {
+    if (hooks.active && !hooks.active()) return;
     if (e.key === "Control" || e.key === "Meta") reveal.key(false);
     if (e.key === " ") releaseSpace();
   };

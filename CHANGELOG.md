@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.61.36 — The canvas's commands follow the view in use (2026-11-22)
+
+### For developers
+
+- The canvas's actions are made for a view of a canvas (`canvasActionsFor(doc, editor, view, index, focus)` in `app/main.ts`) and the commands reach them through `src/canvas/focus.ts` (`addCanvasView`, `focusCanvasView`, `routedActions`): every command, key and menu row acts on the view in use. The tools take keys only while their view is in use (`ToolHooks.active`). With one view, nothing changes.
+
 ## 0.61.35 — Reference window spec: the red picture alone before F (2026-11-22)
 
 ### For developers
