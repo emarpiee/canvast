@@ -15,6 +15,9 @@ test("Pins (ADR 0208): Shift+R pins the open canvas in a window above every view
   // its view of the same canvas: the shape in its middle, picked and moved there; the main view shows it moved (one document)
   const mid = { x: r.x + r.width / 2, y: r.y + r.height / 2 };
   await p.mouse.click(mid.x, mid.y);
+  // F, the canvas's key, on the view in use: the selected shape fills Pins (so a press in its middle is on it, not on a corner's turn zone)
+  await p.keyboard.press("f");
+  await p.waitForTimeout(400);
   const before = await mainBox();
   await p.mouse.move(mid.x, mid.y);
   await p.mouse.down();
