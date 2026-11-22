@@ -29,6 +29,8 @@ import type { FilePanelDeps } from "../ui/file-panel";
 import { viewKindNamed } from "../ui/file-views";
 import type { CardActions } from "../ui/file-views";
 import { ViewState } from "./view-state";
+import { mountAgentPresence } from "./agent-presence";
+import { makeTakeScreenshot } from "./take-screenshot";
 import { newNoteFile } from "../notes/note-file";
 import { cleanFileName } from "../doc/rename-rules";
 import { fileInLibrary } from "./library-filing";
@@ -40,7 +42,7 @@ import type { AssetRecord } from "../assets/asset-library";
 import type { Gradient } from "../doc/paint";
 import type { PathObject } from "../doc/model";
 import type { JoinChoice } from "../doc/stroke-look";
-import { SHOT_FORMATS, encodeShot, nameWords, shotFileName, shotTags, withInterface } from "./screenshot";
+import { nameWords, shotTags } from "./screenshot";
 import { isCard, isFontFile, isPdfFile } from "../assets/file-kind";
 import { FILE_CARD_H, FILE_CARD_W } from "../assets/card";
 import { pdfCardShape } from "../assets/pdf-engine";
@@ -126,9 +128,7 @@ import { mountPropertiesLayout } from "../ui/properties-layout";
 import { setPropsWhere } from "../ui/tool-hint";
 import { installCombobox } from "../ui/combobox";
 import { installMenuKeys } from "../ui/more-menu";
-import { chooseDialog, confirmDialog, listDialog, promptDialog } from "../ui/confirm";
-import { esc } from "../ui/format";
-import type { Touched } from "./agent-link";
+import { chooseDialog, confirmDialog, promptDialog } from "../ui/confirm";
 import { busyProgress, currentBusy, openBusyScreen, openStartScreen } from "../ui/busy-screen";
 import { canSwitchWorkspace, openWorkspaceSwitcher } from "../ui/workspace-switch";
 import type { BusyScreen } from "../ui/busy-screen";
@@ -183,11 +183,11 @@ import { createTextureHooks } from "./texture-actions";
 import type { Adjust } from "../doc/adjust";
 import { downloadSelection, pickedFiles } from "./download";
 import { mountCommandPalette } from "../ui/command-palette";
-import { commands, MAX_BATCH, pressCommand } from "../commands/registry";
+import { commands, pressCommand } from "../commands/registry";
 import { REASON } from "../commands/types";
 import { canvasCommands, ITEMS_MAX, OLD_CANVAS_IDS, type CanvasActions, type ItemRow } from "./canvas-commands";
 import type { ShapeKind } from "../doc/path";
-import { answer, mountAgentLink } from "./agent-link";
+import { answer } from "./agent-link";
 import { Macros } from "../commands/macros";
 import { barCommands } from "../commands/from-bars";
 import { settingCommands } from "../commands/settings-commands";
@@ -1753,94 +1753,8 @@ async function start(): Promise<void> {
       editor.changed();
     }
   };
-  // Screenshot (ADR 0080): what the canvas shows, without the selection outlines, saved to the library with the name, folder and tags of Settings > Screenshot.
-  const takeScreenshot = async (): Promise<void> => {
-    if (appView !== "canvas") return;
-    if (!session.catalog) {
-      editor.message = "Could not save a screenshot: the library is not available in this tab.";
-      editor.changed();
-      return;
-    }
-    const cfg = {
-      format: settings.get("shot.format"),
-      quality: settings.get("shot.quality"),
-      pattern: settings.get("shot.pattern"),
-      transparent: settings.get("shot.transparent"),
-      ui: settings.get("shot.interface"),
-      folder: settings.get("shot.folder").trim(),
-      name: settings.get("shot.name"),
-      style: settings.get("shot.nameStyle"),
-      copy: settings.get("shot.copy"),
-    };
-    try {
-      // A clean frame: the pattern as chosen, no selection outlines, and a background or not.
-      let pic = document.createElement("canvas");
-      padlocked(() => {
-        renderNow({ pattern: cfg.pattern, overlays: false, transparent: cfg.transparent });
-        pic.width = canvas.width;
-        pic.height = canvas.height;
-        pic.getContext("2d")!.drawImage(canvas, 0, 0);
-      });
-      invalidate(); // the screen goes back to normal (selection outlines and all)
-      const vp = view.viewport;
-      const visible = visibleObjects(doc, index, null, view.frameCamera, vp);
-      const picked = editor.selection.size ? visible.filter((po) => editor.selection.has(po.obj.id)) : [];
-      const inShot = picked.length ? picked : visible; // the selection, or the whole view when nothing is picked
-      if (cfg.ui) {
-        try {
-          pic = await withInterface(pic, host, document.getElementById("nav")!, vp.width, vp.height);
-        } catch {
-          editor.message = "The interface could not be included in this browser; the screenshot has the canvas only.";
-          editor.changed();
-        }
-      }
-      if (picked.length) {
-        const x0 = Math.max(0, Math.min(...picked.map((po) => po.box.minX)) - 12);
-        const y0 = Math.max(0, Math.min(...picked.map((po) => po.box.minY)) - 12);
-        const x1 = Math.min(vp.width, Math.max(...picked.map((po) => po.box.maxX)) + 12);
-        const y1 = Math.min(vp.height, Math.max(...picked.map((po) => po.box.maxY)) + 12);
-        if (x1 - x0 >= 2 && y1 - y0 >= 2) {
-          const crop = document.createElement("canvas");
-          crop.width = Math.round((x1 - x0) * dpr);
-          crop.height = Math.round((y1 - y0) * dpr);
-          crop.getContext("2d")!.drawImage(pic, Math.round(x0 * dpr), Math.round(y0 * dpr), crop.width, crop.height, 0, 0, crop.width, crop.height);
-          pic = crop;
-        }
-      }
-      if (cfg.format === "jpeg") {
-        // JPEG has no transparency: fill with white behind the picture.
-        const flat = document.createElement("canvas");
-        flat.width = pic.width;
-        flat.height = pic.height;
-        const fx = flat.getContext("2d")!;
-        fx.fillStyle = "#fff";
-        fx.fillRect(0, 0, flat.width, flat.height);
-        fx.drawImage(pic, 0, 0);
-        pic = flat;
-      }
-      const { blob, format } = await encodeShot(pic, cfg.format, cfg.quality);
-      const words = nameWords(session);
-      const board = words.board;
-      const canvasName = words.canvas;
-      const fileName = `${shotFileName(cfg.name, { ...words, at: new Date() }, cfg.style)}.${SHOT_FORMATS[format].ext}`;
-      const itemTags = [...new Set(inShot.flatMap((po) => po.obj.tags ?? []))];
-      const tags = shotTags({ screenshot: settings.get("shot.tagShot"), board: settings.get("shot.tagBoard"), canvas: settings.get("shot.tagCanvas"), items: settings.get("shot.tagItems"), custom: settings.get("shot.tagsCustom") }, board, canvasName, itemTags);
-      const { record } = await assets.importFileDetailed(new File([blob], fileName, { type: SHOT_FORMATS[format].mime }), false);
-      const where = await fileInLibrary(session, record.hash, cfg.folder, tags);
-      if (cfg.copy) {
-        // (the clipboard may refuse: the screenshot is saved anyway)
-        const png = format === "png" ? blob : await new Promise<Blob | null>((r) => pic.toBlob(r, "image/png"));
-        if (png && (await writeSystemClipboard({ image: png })) === "image") forgetCopiedPicture();
-      }
-      editor.message = `Screenshot saved: “${fileName}” in ${where}.`;
-      editor.messageAction = { label: "View", command: "library.reveal", run: () => void pressCommand("library.reveal", { hashes: [record.hash] }) };
-      editor.changed();
-    } catch (e) {
-      editor.message = `Could not save the screenshot: ${(e as Error).message}`;
-      editor.changed();
-    }
-  };
-
+  // Screenshot (ADR 0080, src/app/take-screenshot.ts)
+  const takeScreenshot = makeTakeScreenshot({ session, settings, assets, doc, editor, view, index, canvas, host, appView: () => appView, dpr: () => dpr, renderNow, invalidate, padlocked });
   // Texture fills (ADR 0154): the chooser's Image and Objects take their source from the canvas or a file.
   setTextureHooks(createTextureHooks({
     editor,
@@ -3065,125 +2979,8 @@ async function start(): Promise<void> {
   registry.setProvider("app", () => canvasCommands(routedActions()));
   for (const [old, now] of Object.entries(OLD_CANVAS_IDS)) registry.alias(old, now);
   registry.onFail((_c, error) => { editor.message = error; editor.changed(); });
-  // An outside caller's risky run asks the person here (ADR 0205); only the person answers. The link to AI agents opens while it is on.
-  registry.setConfirmer((c, options) => confirmDialog({
-    title: `An AI agent wants to: ${c.title}`,
-    lines: [c.hint ?? "", ...(Object.keys(options).length ? [`With: ${JSON.stringify(options).slice(0, 300)}`] : []), "Allow it only if you asked the agent for this."],
-    confirmLabel: "Allow",
-    danger: true,
-  }));
-  // The desktop app pairs by itself: the canvast tools on this computer keep their code where the app can read it (desktop/tools-home.ts).
-  let toolsCode = "";
-  const readToolsCode = (): void => void desktopBridge()?.agentCode?.().then((c) => {
-    if (c && c !== toolsCode) {
-      toolsCode = c;
-      agentLink.sync();
-    }
-  });
-  // What an agent's run did to the items (told in its answer, and where its pointer goes): from the steps the canvas stored meanwhile.
-  const watchItems = (): (() => Touched) => {
-    // (told from the ids there were when it started: a step another part stores in between never makes a new item look changed)
-    const was = new Set([...doc.all()].map((o) => o.id));
-    const touched = new Set<string>();
-    const off = doc.subscribe((source, ids) => void (source !== "load" && ids && ids.forEach((id) => touched.add(id))));
-    return () => {
-      off();
-      const t = [...touched];
-      return { made: t.filter((id) => !was.has(id) && doc.get(id)), changed: t.filter((id) => was.has(id) && doc.get(id)), removed: t.filter((id) => was.has(id) && !doc.get(id)) };
-    };
-  };
-  /** What agents did, newest last (Settings never grows with it: the AI agent button opens it in a list). */
-  const agentLog: Array<{ at: number; title: string; ok: boolean; error?: string; ids: string[] }> = [];
-  let agentLoop = 0;
-  /** Its pointer moves to what it touched, or to the selection; the info bar says what it did. */
-  const agentRan = (method: string, params: unknown, result: unknown): void => {
-    const p = (params ?? {}) as { id?: unknown; steps?: Array<{ id?: unknown }> };
-    const r = (result ?? {}) as { ok?: boolean; error?: string; made?: string[]; changed?: string[]; results?: Array<{ ok: boolean; error?: string; step?: number }> };
-    const title = (id: unknown): string => registry.get(String(id))?.title ?? String(id);
-    const ids = [...(r.made ?? []), ...(r.changed ?? [])];
-    // (a batch's answer lists every step, or by default only those that failed or read something, each by its number)
-    const said = new Map((r.results ?? []).map((x, i) => [x.step ?? i, x]));
-    const stop = (p as { stopOnError?: unknown }).stopOnError === false ? undefined : [...said].find(([, x]) => x.ok === false)?.[0];
-    const done = method === "batch" ? (p.steps ?? []).slice(0, stop === undefined ? MAX_BATCH : stop + 1).map((st, i) => ({ title: title(st.id), res: said.get(i) ?? { ok: true } })) : [];
-    const steps = method === "run" ? [{ title: title(p.id), res: r }] : done.length ? done : [{ title: method === "batch" ? "Several commands" : "Read the list of commands", res: r.ok === false ? r : { ok: true } }];
-    if (method === "list") return;
-    // (one row a call: a batch's steps are counted by kind, so a long batch is one line)
-    const counts = new Map<string, number>();
-    for (const st of steps) counts.set(st.title, (counts.get(st.title) ?? 0) + 1);
-    const failed = steps.find((st) => st.res.ok === false);
-    agentLog.push({ at: Date.now(), title: [...counts].map(([t, n]) => (n > 1 ? `${t} ×${n}` : t)).join(" · "), ok: r.ok !== false && !failed, ...((failed?.res.error ?? r.error) ? { error: failed?.res.error ?? r.error } : {}), ids });
-    if (agentLog.length > 500) agentLog.splice(0, agentLog.length - 500);
-    agentList?.refresh();
-    const last = steps[steps.length - 1];
-    const words = steps.length > 1 ? `${last?.title ?? ""} (${plural(steps.length, "step")})` : (last?.title ?? "");
-    editor.message = r.ok === false ? `AI agent: ${words}: ${r.error ?? last?.res.error ?? "not done"}` : `AI agent: ${words}`;
-    const at = performance.now();
-    const shown = ids.length ? ids : appView === "canvas" ? [...editor.selection] : [];
-    editor.agentMark = { ids: shown, title: words, at, until: at + 4000, from: view.glideMs ? engine.agentPointerAt() : null }; // (reduced motion: it jumps)
-    const loop = ++agentLoop;
-    // (frames only while the pointer glides and fades: one frame between)
-    const frames = (): void => {
-      const m = editor.agentMark;
-      if (loop !== agentLoop || !m) return;
-      const now = performance.now();
-      if (now >= m.until) return void ((editor.agentMark = null), editor.redraw());
-      editor.redraw();
-      if (now < m.at + 350 || now > m.until - 600 || m.off) requestAnimationFrame(frames);
-      else setTimeout(frames, m.until - 600 - now);
-    };
-    frames();
-    editor.changed();
-  };
-  let agentList: { refresh(): void } | null = null;
-  const agentChip = document.querySelector<HTMLButtonElement>('[data-testid="agent-chip"]');
-  const showAgentChip = (connected: boolean): void => {
-    if (!agentChip) return;
-    agentChip.hidden = !settings.get("agents.on");
-    agentChip.dataset["state"] = connected ? "connected" : "waiting";
-    const words = connected ? "AI agent: connected. What it did" : "AI agent: waiting for one. What it did";
-    agentChip.setAttribute("aria-label", words);
-    agentChip.title = words;
-  };
-  agentChip?.addEventListener("click", () => void pressCommand("agents.activity"));
-  registry.setProvider("agents", () => [{
-    id: "agents.activity", group: "AI agents", kind: "settings", title: "What the AI agent did", hint: "Its last actions, newest first", icon: ICONS.tabAgents, risk: "read",
-    why: () => null,
-    exec: () => {
-      agentList = listDialog({
-        title: "What the AI agent did",
-        testid: "agent-activity-dialog",
-        lines: [agentChip?.dataset["state"] === "connected" ? "An AI agent is connected. Turn it off in Settings > AI agents." : "No AI agent is connected now (Settings > AI agents)."], // (as the button shows it)
-        body: () => `<ul class="confirm-list agent-log">${agentLog.map((e, i) => ({ e, i })).reverse().map(({ e, i }) => `<li><time>${new Date(e.at).toLocaleTimeString()}</time><span class="agent-log-what">${e.ok ? "" : "❌ "}${esc(e.title)}${e.error ? `: ${esc(e.error)}` : ""}</span>${e.ids.length && e.ids.some((id) => doc.get(id)) ? `<button type="button" class="set-done" data-agent-go="${i}">Go there</button>` : ""}</li>`).join("") || "<li>Nothing yet.</li>"}</ul>`,
-        onClick: (t, _refresh, close) => {
-          const i = t.closest<HTMLElement>("[data-agent-go]")?.dataset["agentGo"];
-          const e = i === undefined ? undefined : agentLog[Number(i)];
-          if (!e) return;
-          close();
-          setView("canvas");
-          void pressCommand("select.items", { ids: e.ids.filter((id) => doc.get(id)) });
-          void pressCommand("view.fitSelection");
-        },
-      });
-      return { ok: true };
-    },
-  }]);
-  const agentLink = mountAgentLink({
-    registry,
-    on: () => settings.get("agents.on"),
-    code: () => settings.get("agents.code") || toolsCode, // (typed, or the desktop app's: the code the canvast tools made on this computer)
-    readOnly: () => settings.get("agents.readOnly"),
-    say: (text) => { editor.message = text; editor.changed(); },
-    changed: showAgentChip,
-    watch: watchItems,
-    ran: agentRan,
-  });
-  showAgentChip(false);
-  settings.subscribe(() => {
-    if (settings.get("agents.on")) readToolsCode(); // (the tools may have made their code since)
-    agentLink.sync();
-    showAgentChip(agentLink.connected);
-  });
-  if (settings.get("agents.on")) readToolsCode();
+  // The link to AI agents as the person sees it (src/app/agent-presence.ts)
+  const { watchItems, agentRan, showAgentChip } = mountAgentPresence({ registry, settings, doc, editor, view, appView: () => appView, setView, agentPointerAt: () => engine.agentPointerAt() });
   // The context menu (right click, or the menu key): the commands that fit what is under the pointer and what is picked, from the same registry.
   registry.setProvider("panels", () => dock.commands().map((c): Command => ({ ...c, why: () => (appView === "canvas" ? (c.why?.() ?? null) : REASON.notOnCanvas) })));
   registry.setProvider("settings", () => [

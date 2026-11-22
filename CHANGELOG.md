@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.61.64 — First modules out of the canvas start-up (2026-11-23)
+
+### For developers
+
+- The AI agent link as the person sees it (its confirm dialog, chip, pointer and activity list) moved from `app/main.ts` into `app/agent-presence.ts`, and the screenshot into `app/take-screenshot.ts`: moved as they were, nothing changed in what they do. The rest of the split is B34.
+
 ## 0.61.63 — Pins: paste, a live float, a touch menu (2026-11-23)
 
 - **Added:** a picture copied in another app and pasted in a Pins window goes into the library and in the middle of the window, over any view (PhotoCraft's too). ([Pins](README.md#pins))
