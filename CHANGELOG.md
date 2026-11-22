@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.61.39 — The AppImage needs no FUSE library (2026-11-22)
+
+- **Changed:** the Linux AppImage carries the newer static AppImage runtime: it starts on systems without `libfuse2` (B31). ([Installation](README.md#installation))
+
+### For developers
+
+- `scripts/package-desktop.mjs` builds the AppImage with electron-builder's static-runtime toolset (`toolsets.appimage: "1.0.3"`, runtime 20251108); the update address is written into it and checked as before.
+
 ## 0.61.38 — A Pins window draws its canvas (2026-11-22)
 
 - **Fixed before release:** a Pins window stayed empty: its view read the document it shows before it had one. ([The Library](README.md#the-library))

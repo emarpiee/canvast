@@ -101,6 +101,9 @@ await build({
     asarUnpack: ["*.node"], // (a native module cannot load from inside the asar)
     // (the .deb and .rpm name the project's home and say what it is)
     extraMetadata: { homepage: `https://github.com/${repo.replace("|", "/")}`, description: "An offline-first endless canvas for drawing and references", license: pkg.license },
+    // (the AppImage runtime of the static toolset: it needs no FUSE library of the system, libfuse2 or libfuse3; the legacy one needed libfuse2, which
+    // many systems no longer have; B31)
+    toolsets: { appimage: "1.0.3" },
     npmRebuild: false,
     nodeGypRebuild: false,
     artifactName: `${base}.\${ext}`,
