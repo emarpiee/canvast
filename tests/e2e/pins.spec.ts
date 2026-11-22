@@ -32,10 +32,11 @@ test("Pins (ADR 0208): Shift+R pins the open canvas in a window above every view
   }, at);
   await expect.poll(async () => (await mainBox()).minX - before.minX, { message: `moved in Pins, moved on the canvas (${said})` }).toBeGreaterThan(10);
   expect(await p.evaluate(() => window.__canvastDebug.selection().length), "the main view's selection is its own").toBe(0);
-  // the app's Actions bar comes into the window while its canvas is in use, with its Adjust and Arrange only
+  // the app's Actions bar comes into the window while its canvas is in use, with its Arrange only
   const bar = pins.locator(".ctx-bar");
   await expect(bar, "the Actions bar in the Pins window").toBeVisible();
   await expect(bar.locator('.tb-group[aria-label="Objects"]')).toBeHidden();
+  await expect(bar.locator('.tb-group[aria-label="Adjust"]')).toBeHidden();
   // the canvas's keys act on the view in use: Delete takes what Pins selected; Ctrl+Z brings it back
   await p.keyboard.press("Delete");
   await expect.poll(() => p.evaluate(() => window.__canvastDebug.objects().length), { message: "Delete in Pins" }).toBe(0);
