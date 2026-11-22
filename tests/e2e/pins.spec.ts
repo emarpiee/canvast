@@ -51,7 +51,7 @@ test("Pins (ADR 0208): Shift+R pins the open canvas in a window above every view
   expect(app.consoleErrors).toEqual([]);
 });
 
-test("a Pins window shows pictures of the library in the library's own viewer (its filmstrip, zoom and slideshow), for all of them or a folder; the Library view is left as it was", async ({ app }) => {
+test("a Pins window shows pictures of the library as the Library's own grid, then its viewer (its filmstrip, zoom and slideshow), for all of them or a folder; the Library view is left as it was", async ({ app }) => {
   const p = app.page;
   await p.getByTestId("view-assets").click();
   await p.getByTestId("assets-import-input").first().setInputFiles([
@@ -62,7 +62,12 @@ test("a Pins window shows pictures of the library in the library's own viewer (i
   await p.getByTestId("view-canvas").click();
   await p.evaluate(() => window.__canvastDebug.runCommand("pins.open", { source: "all" }, "test"));
   const pins = p.getByTestId("pins");
-  // the viewer, in the window, at once: the picture large and the others in its strip
+  // the Library's own grid of the folder's pictures first (no bar, sidebar or details)
+  const cards = pins.getByTestId("asset-card");
+  await expect(cards).toHaveCount(2);
+  await expect(pins.locator(".assets-side")).toBeHidden();
+  // a double-click opens the Library's viewer in the window, its strip below; back returns to the grid
+  await cards.first().dblclick();
   await expect(pins.getByTestId("slide-view")).toBeVisible();
   await expect(pins.locator(".film-item")).toHaveCount(2);
   await expect(pins.locator(".assets-side")).toBeHidden();
@@ -71,6 +76,9 @@ test("a Pins window shows pictures of the library in the library's own viewer (i
   await expect(p.locator('.pop-menu [data-command="library.place"]'), "no Place in a Pins window").toHaveCount(0);
   await p.locator('.pop-menu [data-command="library.favorite"]').click();
   await expect.poll(async () => (await p.evaluate(() => window.__canvastDebug.catalogEntries())).filter((e) => e.favorite).length, { message: "made a favourite from the Pins window" }).toBe(1);
+  await p.keyboard.press("Escape"); // (the menu)
+  await pins.locator('[data-act="close"]').click();
+  await expect(cards).toHaveCount(2);
   // the main view is still the canvas, and the Library view kept its own state
   await expect(p.locator("#assets-view")).toBeHidden();
   expect(app.consoleErrors).toEqual([]);

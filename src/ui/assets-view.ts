@@ -131,7 +131,7 @@ export interface AssetsView {
   importFiles(files: File[], here?: boolean): Promise<string[]>;
   /** Draw the notes' cards again (the preview look changed). */
   redrawNotes(): void;
-  /** A Pins window's Library (embedded): its viewer on the pictures of a folder ("folder:<id>") or of all ("all"), from the first. */
+  /** A Pins window's Library (embedded): the grid of the pictures of a folder ("folder:<id>") or of all ("all"); a card opens the viewer. */
   viewIn(scope: string): Promise<void>;
 }
 
@@ -618,6 +618,8 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   } catch {
     // unreadable: shown
   }
+  // (a Pins window's Library is a small grid of a folder's pictures: cards, the smallest, no details; whatever the Library view uses)
+  if (opts.embedded) Object.assign(ui, { layout: "grid", details: false, thumb: 96, filters: { ...ui.filters, usage: "all" } });
   // (the kept filters: an option the menus do not have any more is not taken)
   if ([...usageSel.options].some((o) => o.value === ui.filters.usage)) usageSel.value = ui.filters.usage;
   /** The sort menu's properties: those in the library, those shown as columns, and the one sorted by. */
@@ -1990,7 +1992,6 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   });
   viewer.addEventListener("pointerleave", () => viewer.classList.remove("is-near-top", "is-near-bottom"));
   const closeSlide = (): void => {
-    if (opts.embedded) return; // (a Pins window's Library is its viewer: it has no grid to go back to; the folder changes from the window)
     setGrey(false);
     const was = slideHash;
     stopShow();
@@ -5218,6 +5219,8 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   ];
   /** The item rows a Pins window's viewer keeps (ADR 0208): favourite, copy, and open it in another program. */
   const PINNED_ROWS = new Set(["favorite", "copy", "copy-name", "copy-file", "photocraft", "open-app", "open-tab", "show-file"]);
+  /** A Pins window's Library is for looking: of an item's rows it keeps those (what changes the library or places is left to the Library). */
+  const pinnedRows = (items: MenuItem[]): MenuItem[] => (opts.embedded ? items.filter((i) => PINNED_ROWS.has(i.id ?? "")) : items);
   const panelGroups = (): MenuItem[][] =>
     PANEL_GROUPS.map((g) =>
       g.flatMap(([action, hint, icon, label]): MenuItem[] => {
@@ -5321,12 +5324,13 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     active: () => visible && viewer.hidden === true,
     build: async ({ target }) => {
       const card = target.closest<HTMLElement>(".asset-card");
-      if (!card) return emptyItems();
+      if (!card) return opts.embedded ? [] : emptyItems(); // (a Pins window's grid has no menu of its own ground: importing is the Library's)
       const hash = card.dataset["hash"];
       if (hash && !picked.has(hash)) await select(hash); // (a card outside the pick is picked alone; one inside it keeps the whole pick)
       const g = panelGroups();
       // Select several: from now on a tap (or a click) adds a card or takes it away, the way to pick several on a touch screen.
       const several: MenuItem = { id: "select-several", label: "Select several", hint: "Tap to add or remove", icon: ICONS.squareCheckBig, command: "library.selectSeveral", run: () => void pressCommand("library.selectSeveral") };
+      if (opts.embedded) return groupedMenu([pinnedRows(g[0]!), pinnedRows(clipboardGroup(hash ? [hash] : [])), pinnedRows(g[1]!), pinnedRows(g[2]!)]);
       return groupedMenu([[...(severalOn ? [] : [several]), ...g[0]!], clipboardGroup(picked.size ? [...picked] : hash ? [hash] : []), g[1]!, g[2]!]);
     },
   });
@@ -5348,9 +5352,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       if (!hash) return [];
       if (!picked.has(hash) || picked.size > 1) await select(hash); // (the menu is about the item on show)
       const g = panelGroups();
-      // (a Pins window's viewer is for looking: what changes the library, places, or opens it elsewhere in the app is left to the Library)
-      const pinned = (items: MenuItem[]): MenuItem[] => (opts.embedded ? items.filter((i) => PINNED_ROWS.has(i.id ?? "")) : items);
-      return groupedMenu([pinned(g[0]!), pinned(clipboardGroup([hash])), pinned(g[1]!), pinned(g[2]!)]);
+      return groupedMenu([pinnedRows(g[0]!), pinnedRows(clipboardGroup([hash])), pinnedRows(g[1]!), pinnedRows(g[2]!)]);
     },
   });
   // ---- the list's columns: drag a header onto another to move it
@@ -6119,10 +6121,9 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       syncViewing();
     },
     viewIn: async (to) => {
+      if (slideHash) closeSlide();
       scope = to;
       await refresh();
-      const first = shown[0]?.hash;
-      if (first) await showSlide(first);
     },
     redrawNotes() {
       redrawCards((listing?.entries ?? []).filter((e) => noteKindOf(e.name)).map((e) => e.hash));

@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.61.52 — A Pins window's folder as the Library's grid first (2026-11-22)
+
+- **Changed:** a folder (or All pictures) in a Pins window shows first as the Library's own grid of its pictures, smallest cards, no bar, sidebar or details; a double-click opens the viewer, whose back arrow returns to the grid. A card's right-click menu is the short one of the viewer. ([Pins](README.md#pins))
+
 ## 0.61.51 — The menu of a Pins window's viewer works (2026-11-22)
 
 - **Fixed before release:** the right-click menu of a Pins window's viewer (favourite, copy, open elsewhere) refused with "This works in the Library" while the Library view was not shown: each Library (the Library view, and each Pins window's) gives its commands, and those of the one in use (the last pressed) run. ([Pins](README.md#pins))

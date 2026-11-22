@@ -1273,7 +1273,7 @@ body:not([data-view="assets"]):has(.ctx-wrap:not(.is-following) > .ctx-bar:not([
 .library-view[hidden] { display: none; }
 /* (a Library in a Pins window, ADR 0208: the same view, laid out in the window, without its details panels) */
 .library-view.is-embedded { position: relative; inset: auto; z-index: auto; height: 100%; padding: var(--s-4) var(--s-4) 0; box-sizing: border-box; }
-.library-view.is-embedded :is(.asset-inspector, .viewer-details, [data-action="details"], .assets-bar, .assets-side, .assets-statusbar, .viewer-back, [data-act="fullscreen"], [data-act="place"]) { display: none; } /* (in a Pins window: no full screen, no Place) */
+.library-view.is-embedded :is(.asset-inspector, .viewer-details, [data-action="details"], .assets-bar, .assets-side, .assets-statusbar, [data-act="fullscreen"], [data-act="place"]) { display: none; } /* (in a Pins window: its grid and viewer, no full screen, no Place) */
 .library-view.is-embedded { padding: 0; }
 .pins-panel .pins-library { height: 100%; }
 /* A font's thumbnail: its letters in the theme's text colour, the whole picture shown (never cropped). */
