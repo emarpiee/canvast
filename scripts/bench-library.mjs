@@ -238,7 +238,22 @@ async function dragPasses(page) {
   await page.waitForTimeout(1500); // (its thumbnails loaded)
   const canvas = page.locator("#canvas");
   const cb = await canvas.boundingBox();
-  await timedDrag(page, "from a Pins window's pictures onto the canvas", () => card.dragTo(canvas, { targetPosition: { x: Math.round(cb.width * 0.3), y: Math.round(cb.height * 0.5) } }));
+  // (the app's own handling of a drag, by the events a drag gives: its start on the card, its drop on the canvas; the system's part of a
+  // drag, which the test driver cannot do in the desktop app, is left out)
+  const startMs = await card.evaluate((el) => {
+    const t = performance.now();
+    el.dispatchEvent(new DragEvent("dragstart", { bubbles: true, cancelable: true, dataTransfer: (window.__dt = new DataTransfer()) }));
+    return performance.now() - t;
+  });
+  console.log(`drag start on a Pins card: ${startMs.toFixed(0)} ms in its handler`);
+  await timedDrag(page, "from a Pins window's pictures onto the canvas", () => canvas.evaluate((el, at) => {
+    const dt = window.__dt;
+    const r = el.getBoundingClientRect();
+    const o = { bubbles: true, cancelable: true, dataTransfer: dt, clientX: r.left + r.width * at.x, clientY: r.top + r.height * at.y };
+    el.dispatchEvent(new DragEvent("dragover", o));
+    el.dispatchEvent(new DragEvent("drop", o));
+    document.dispatchEvent(new DragEvent("dragend", { bubbles: true, dataTransfer: dt }));
+  }, { x: 0.3, y: 0.5 }));
   await page.evaluate(() => window.__canvastDebug.runCommand("pins.open", {}, "test"));
   const pinned = page.locator(".pins-canvas").first();
   await pinned.waitFor({ timeout: 30_000 });
