@@ -1209,7 +1209,8 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     return groups;
   };
   /** Show a card's picture: at once when it was loaded before, else once it is read or made (if the card is still in the page then). */
-  const loadThumb = (img: HTMLImageElement): void => {
+  /** Show a card's picture: at once when known, else asked for (`urgent`: before the cards outside the view). */
+  const loadThumb = (img: HTMLImageElement, urgent = true): void => {
     const hash = img.dataset["hash"]!;
     const known = thumbUrls.get(hash);
     if (!known) slotState(img, "waiting"); // (a known one shows at once: no shimmer)
@@ -1220,7 +1221,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       if (img.parentElement?.classList.contains("thumb-slot")) slotState(img, "loaded");
       return;
     }
-    thumbFor(hash, () => img.isConnected).then(
+    thumbFor(hash, () => img.isConnected, urgent).then(
       (url) => {
         keepThumbUrl(hash, url);
         img.src = url;
@@ -1669,9 +1670,13 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     syncChildren(grid, els);
     mounted.clear();
     for (const [h, m] of keep) mounted.set(h, m);
-    for (const el of made) {
+    // (the new cards ask for their pictures nearest the middle of the view first, and only those in the view as urgent: the cards kept
+    // beyond it wait behind them, so what is seen fills in first while scrolling)
+    const mid = top + vh / 2;
+    const dist = (el: HTMLElement): number => Math.abs((parseFloat(el.style.getPropertyValue("--y")) || 0) + (parseFloat(el.style.getPropertyValue("--h")) || 0) / 2 - mid);
+    for (const el of made.sort((p, q) => dist(p) - dist(q))) {
       const img = el.querySelector<HTMLImageElement>("img[data-hash]");
-      if (img) loadThumb(img);
+      if (img) loadThumb(img, dist(el) <= vh / 2);
     }
     // A card drawn again (its tags changed, say) keeps the keyboard.
     if (focused?.hash && !focused.el.isConnected) mounted.get(focused.hash)?.el.querySelector<HTMLElement>(".asset-card")?.focus({ preventScroll: true });

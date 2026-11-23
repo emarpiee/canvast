@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.63.4 — The Library fills in what is seen first (2026-11-24)
+
+- **Changed:** while the Library scrolls, the pictures of the cards in view are asked for first, then those just outside it (they were asked for top to bottom, all at once, so cards above the view could keep the visible ones waiting) (B2). ([The Library](README.md#the-library))
+
+### For developers
+
+- `bench-library.mjs --scroll` also times dragging a picture between a Pins window and the canvas, with its long tasks and a script profile.
+
 ## 0.63.3 — Smoother Library scrolling, panel resizing and dragging (2026-11-24)
 
 - **Fixed:** the Library at small thumbnail sizes scrolled at about 25 frames a second, and dragging a panel's edge lagged: the page restyled its thousands of cards at every change. A panel being resized now sets its own width (not a value every card inherited), and the stylesheet no longer asks the whole page questions (`:has()`): the code that changes a state sets a class instead. Dragging items between a Pins window and a canvas no longer restyles the whole app as it starts and ends (B2). ([The Library](README.md#the-library))
