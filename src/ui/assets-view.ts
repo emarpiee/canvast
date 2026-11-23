@@ -3,7 +3,7 @@ import { sectionOrder, sortableSections } from "./sortable-sections";
 import { fileInLibrary } from "../app/library-filing";
 import { beginProgress } from "../app/progress";
 import { searchHelpLineHtml, searchKeysHtml, searchWaysHtml } from "./search-parts";
-import { boardFilterHtml, boardFilterState, wireBoardFilter } from "./board-filter";
+import { boardFilterHtml, boardFilterState, canvasPickHtml, wireBoardFilter } from "./board-filter";
 import { desktopBridge } from "../storage/desktop-bridge";
 import { startStep } from "../app/startup-log";
 import { fileByFolders, filesOfPicker, folderPathOf } from "../app/directory";
@@ -561,6 +561,15 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   markCommands(root, [['[data-action="import"]', "library.import"], ['[data-action="slideshow"]', "library.slideshowShown"], ['.assets-bar [data-action="details"]', "library.details"], ['[data-action="reload-library"]', "library.reload"], ['[data-action="exit-hidden"]', "hidden.exit"], ['[data-action="lock-hidden"]', "hidden.lock"], ['[data-action="hidden-stay"]', "hidden.stay"]]);
   for (const el of root.querySelectorAll<HTMLElement>('[data-action="sort-dir"], [data-action="reset-filters"], [data-action="show-all"], [data-action="to-top"], [data-action="columns"], .assets-controls [data-layout]')) el.dataset["viewState"] = "";
   const side = root.querySelector<HTMLElement>(".assets-side")!;
+  // view-state: (a row the pointer or the keys come to places its Pin and More just before its marks, branch and count: their width,
+  // measured once as it is entered, `--end-w`)
+  const placeRowActions = (e: Event): void => {
+    const row = (e.target as Element | null)?.closest?.<HTMLElement>(".side-row.tree-row.has-more");
+    const end = row?.querySelector(".side-item")?.querySelector(":scope > :is(.side-pinned, .side-kids, .side-n)");
+    if (row) row.style.setProperty("--end-w", `${end ? Math.round(row.getBoundingClientRect().right - end.getBoundingClientRect().left) : 0}px`);
+  };
+  side.addEventListener("pointerover", placeRowActions);
+  side.addEventListener("focusin", placeRowActions);
 
   // What the user chose to hide (the details panel, the viewer's controls) is remembered on this device.
   const UI_KEY = "canvast.assets.ui";
@@ -3633,22 +3642,8 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     placeMenu.innerHTML =
       `<p class="pm-title">Place ${n === 1 ? "it" : `these ${n}`} on</p>` +
       boardFilterHtml(placeFilter, "place-find") +
-      // (the board and canvas switcher's own rows and styles: one look for both lists)
-      tree.boards
-        .map(
-          ({ board, canvases }) => `<section class="nav-board" aria-label="Board ${esc(board.name)}">
-            <div class="nav-board-head"><span class="nav-board-icon">${ICONS.squareStack}</span><span class="nav-board-name">${esc(board.name)}</span><span class="nav-board-n">${canvases.length} ${canvases.length === 1 ? "canvas" : "canvases"}</span></div>
-            <ul class="nav-canvases">${canvases
-              .map((c) => {
-                const active = cur?.canvasId === c.id;
-                return `<li class="nav-canvas-row${active ? " is-current" : ""}"><button type="button" role="menuitem" class="nav-canvas${active ? " is-active" : ""}" data-pm="canvas" data-id="${c.id}"><span class="nav-name">${esc(c.name)}</span><span class="nav-count">${c.objectCount === 0 ? "empty" : `${c.objectCount} object${c.objectCount === 1 ? "" : "s"}`}</span></button></li>`;
-              })
-              .join("")}</ul>
-            <button type="button" role="menuitem" class="nav-add" data-pm="new-canvas" data-id="${board.id}" aria-label="New canvas in ${esc(board.name)}">+ New canvas</button>
-          </section>`,
-        )
-        .join("") +
-      `<button type="button" role="menuitem" class="nav-add nav-add-board" data-pm="new-board">+ New board with a canvas</button>`;
+      // (the board and canvas switcher's own rows and styles: the one list to pick a canvas from)
+      canvasPickHtml(tree, cur?.canvasId ?? null, { attr: "pm", newRows: true });
     wireBoardFilter(placeMenu, { board: ".nav-board", head: ".nav-board-head", row: ".nav-canvas-row", current: (s) => !!s.querySelector(".nav-canvas.is-active") }, placeFilter);
     placeMenu.hidden = false;
     const r = anchor.getBoundingClientRect();

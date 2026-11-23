@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.63.7 — A folder row's Pin and More back, before its marks (2026-11-24)
+
+- **Fixed:** a folder row's Pin button is back under the pointer (0.63.6 had put pinning in More only): Pin and More come just before the row's marks, branch and count, over the end of its name, which is cut shorter for them; the marks and count stay, in their order, with no gaps. ([Folders and tags](README.md#folders-and-tags))
+
+### For developers
+
+- `canvasPickHtml` (`ui/board-filter.ts`): the one list to pick a canvas from, by board (Place on…, next a Pins window).
+
 ## 0.63.6 — Folder rows without gaps (2026-11-24)
 
 - **Changed:** a folder row's marks, branch and count sit together at its end again, with no space kept between them; under the pointer only its ⋯ takes the count's place, and pinning a folder is in that ⋯ (Pin to top), as on a touch screen, not a second button on the row. ([Folders and tags](README.md#folders-and-tags))

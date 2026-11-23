@@ -104,6 +104,9 @@ test("a folder folds, stays folded after a reload, and Organize moves to a folde
   await artRow.hover();
   await expect(artRow.locator(".side-more").last()).toBeVisible();
   expect(await branchX(), "the branch mark does not move under the pointer").toBe(restX);
+  // (Pin and More come before the marks and branch, over the end of the name: the branch is still where it was, not under them)
+  const more = await artRow.locator(".side-more").last().boundingBox();
+  expect(more!.x + more!.width, "More ends before the branch mark").toBeLessThanOrEqual(restX + 1);
   await tree.getByRole("button", { name: /^Art/ }).click(); // (a folder with subfolders closes on its own row)
   await expect(tree.getByText("Ink")).toHaveCount(0);
   await p.reload();
@@ -239,9 +242,9 @@ test("a folder folds, stays folded after a reload, and Organize moves to a folde
     await p.getByRole("button", { name: `More actions for folder ${folder}`, exact: true }).click();
     await p.getByRole("menuitem", { name: `${word} folder ${folder}`, exact: true }).click();
   };
-  await pinFolder("Pin", "Art"); // (in the row's More: under the pointer only More takes the count's place)
+  await tree.getByRole("button", { name: "Pin folder Art", exact: true }).click(); // (the row's own button)
   await expect(folderOrder).toHaveText(["Art", "Bee", "Plain"]);
-  await expect(tree.locator(".is-pinned")).toHaveCount(1);
+  await expect(tree.getByRole("button", { name: "Unpin folder Art", exact: true })).toHaveAttribute("aria-pressed", "true");
   await tree.getByRole("button", { name: /^Art/ }).click(); // (and opens on it)
   await expect(folderOrder).toHaveText(["Art", "Ink", "Bee", "Plain"]);
   await pinFolder("Pin", "Ink");

@@ -1,4 +1,6 @@
+import type { WorkspaceTree } from "../app/session";
 import { esc } from "./format";
+import { ICONS } from "./icons";
 
 /**
  * A list of boards and their canvases that may be long (the board and canvas switcher, Place on…), made short: a search field over it
@@ -73,4 +75,29 @@ export function wireBoardFilter(menu: HTMLElement, list: BoardList, state: Board
     });
   });
   apply();
+}
+
+/**
+ * A list to pick a canvas from, by board (Place on…, a Pins window's choice): the board and canvas switcher's own rows and look, its
+ * canvases as rows `data-<attr>="canvas"` with their id, the current one marked; with `newRows`, + New canvas and + New board with a
+ * canvas as well. Put the search field (`boardFilterHtml`) over it and wire it with `wireBoardFilter`, as every such list.
+ */
+export function canvasPickHtml(tree: WorkspaceTree, current: string | null, o: { attr: string; newRows?: boolean }): string {
+  const a = o.attr;
+  return (
+    tree.boards
+      .map(
+        ({ board, canvases }) => `<section class="nav-board" aria-label="Board ${esc(board.name)}">
+            <div class="nav-board-head"><span class="nav-board-icon">${ICONS.squareStack}</span><span class="nav-board-name">${esc(board.name)}</span><span class="nav-board-n">${canvases.length} ${canvases.length === 1 ? "canvas" : "canvases"}</span></div>
+            <ul class="nav-canvases">${canvases
+              .map((c) => {
+                const active = current === c.id;
+                return `<li class="nav-canvas-row${active ? " is-current" : ""}"><button type="button" role="menuitem" class="nav-canvas${active ? " is-active" : ""}" data-${a}="canvas" data-id="${c.id}"><span class="nav-name">${esc(c.name)}</span><span class="nav-count">${c.objectCount === 0 ? "empty" : `${c.objectCount} object${c.objectCount === 1 ? "" : "s"}`}</span></button></li>`;
+              })
+              .join("")}</ul>
+            ${o.newRows ? `<button type="button" role="menuitem" class="nav-add" data-${a}="new-canvas" data-id="${board.id}" aria-label="New canvas in ${esc(board.name)}">+ New canvas</button>` : ""}
+          </section>`,
+      )
+      .join("") + (o.newRows ? `<button type="button" role="menuitem" class="nav-add nav-add-board" data-${a}="new-board">+ New board with a canvas</button>` : "")
+  );
 }
