@@ -648,6 +648,7 @@ test("tags, favourites, folders, notes and fields travel in archives and merge o
   }
   await q.getByTestId("view-assets").click();
   await expect(q.getByTestId("folder-tree").getByRole("button", { name: /^Refs/ })).toHaveCount(1);
+  await q.getByTestId("folder-tree").getByRole("button", { name: /^Refs/ }).click(); // (folders start folded: Refs opened to show Hands)
   await expect(q.getByTestId("folder-tree").getByRole("button", { name: /^Hands/ })).toHaveCount(1);
   await q.locator(`[data-testid="asset-card"][data-hash="${HASH}"]`).click();
   await expect(q.getByTestId("asset-favorite")).toHaveAttribute("aria-pressed", "true");
