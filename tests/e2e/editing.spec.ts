@@ -628,10 +628,11 @@ test("W A S D, nearest in view: an item that is in the window is a neighbour how
 
 test("resize with side handles: corners and sides follow the pointer; Shift keeps the proportions, Alt resizes about the middle, Ctrl turns snapping off; edges snap to other items (ADR 0063)", async ({ app }) => {
   const p = app.page;
-  const img = await importImage(app);
-  await p.evaluate(() => window.__canvastDebug.jump(5)); // the picture is about 8 px wide at first; make it big enough to work with
-  await app.frame();
+  // (a shape: it stretches; a picture keeps its proportions)
+  await key(app, "u");
+  await app.drag({ x: 450, y: 300 }, { x: 560, y: 380 });
   await key(app, "v");
+  const img = (await objects(app)).at(-1)!;
   const boxOf = async (id: string) => (await screenOfObject(app, id))!.box;
   const frame = async () => (await p.evaluate(() => window.__canvastDebug.selectionFrame()))!.corners;
   const select = async (id: string) => {
@@ -859,7 +860,15 @@ test("Reset rotation and Reset proportions in the selection bar put a turned or 
   await expect(unrotate).toBeHidden();
   await expect(unstretch).toBeHidden();
   const frame = async () => (await p.evaluate(() => window.__canvastDebug.selectionFrame()))!.corners;
-  // Stretch with the right side handle.
+  // Stretched by its sheet (its own handles keep its proportions): on a sheet of its own, pinned to scale, the sheet's right side dragged out.
+  const pick = (id: string) => p.evaluate((i) => window.__canvastDebug.select([i]), id);
+  await sheetWith(p, "puton");
+  await expect.poll(async () => (await objects(app)).filter((o) => o["container"]).length).toBe(1);
+  const sheetId = (await objects(app)).find((o) => o["container"])!.id;
+  await pick(img.id);
+  expect((await p.evaluate(() => window.__canvastDebug.runCommand("item.setPin", { h: "scale", v: "scale" }))).ok).toBe(true);
+  await pick(sheetId);
+  await app.frame();
   let c = await frame();
   const mid: [number, number] = [c[1]![0], (c[1]![1] + c[2]![1]) / 2];
   await p.mouse.move(mid[0], mid[1]);
@@ -867,6 +876,7 @@ test("Reset rotation and Reset proportions in the selection bar put a turned or 
   await p.mouse.move(mid[0] + 40, mid[1], { steps: 3 });
   await p.mouse.move(mid[0] + 120, mid[1], { steps: 4 });
   await p.mouse.up();
+  await pick(img.id);
   await app.frame();
   const b1 = await box();
   expect((b1.maxX - b1.minX) / (b1.maxY - b1.minY)).toBeGreaterThan(((b0.maxX - b0.minX) / (b0.maxY - b0.minY)) * 1.3);
@@ -883,6 +893,7 @@ test("Reset rotation and Reset proportions in the selection bar put a turned or 
   const b3 = await box();
   expect(Math.abs(b3.maxX - b1.maxX)).toBeLessThan(1); // one undo step puts the stretch back
   await key(app, "Control+z");
+  await pick(img.id);
   // Reset size: zoomed in since it was placed, it is one pixel of the file for one of the screen again, about its middle; one undo step.
   await chooseInMenu(p, "sizemenu", "size:reset");
   await app.frame();
@@ -1464,10 +1475,25 @@ test("every kind of object snaps when resized by a handle: to another object's e
     await p.mouse.click((b.minX + b.maxX) / 2, (b.minY + b.maxY) / 2);
     await expect.poll(() => p.evaluate(() => window.__canvastDebug.selection())).toEqual([id]);
   };
+  const bigPng = makePng(300, 400, (x, y) => [x % 256, y % 256, 120, 255]);
+  /** A large picture placed from the library, as one usually is. */
+  const libraryPicture = async () => {
+    const n = await count();
+    await p.getByTestId("view-assets").click();
+    await p.getByTestId("assets-import-input").setInputFiles({ name: "big.png", mimeType: "image/png", buffer: bigPng });
+    await p.locator('[data-testid="asset-card"][title="big.png"]').click();
+    await p.getByTestId("asset-place").click();
+    await p.getByTestId("view-canvas").click();
+    await expect.poll(count).toBe(n + 1);
+    await key(app, "v");
+    const id = (await objects(app)).find((o) => o.kind === "image")!.id;
+    await p.evaluate((i) => window.__canvastDebug.select([i]), id);
+  };
   // Each kind made left of the middle and left selected (with the Select tool on).
   const kinds: Array<[string, () => Promise<void>]> = [
     ["shape", async () => { await key(app, "u"); await app.drag({ x: 450, y: 300 }, { x: 560, y: 380 }); await key(app, "v"); }],
     ["picture", picture],
+    ["picture from the library", libraryPicture],
     ["picture on its own sheet", async () => { await picture(); await sheetWith(p, "puton"); await expect.poll(async () => (await objects(app)).filter((o) => o["container"]).length).toBe(1); }],
     ["pen stroke", async () => { await key(app, "p"); await app.drag({ x: 450, y: 320 }, { x: 560, y: 360 }); await key(app, "v"); await p.mouse.click(505, 340); }],
     ["speech balloon", async () => { await key(app, "k"); await app.drag({ x: 450, y: 300 }, { x: 560, y: 380 }); await key(app, "v"); }],
@@ -1487,13 +1513,14 @@ test("every kind of object snaps when resized by a handle: to another object's e
     const right = await resizeRightTo(797); // (3 px short, as for the grid: a pen stroke's box has its pen's width round it)
     // (a kind that keeps its proportions snaps by the nearer of its two moving edges: its bottom may be what lands on the rectangle's line)
     const bottom = (await frame())[2]![1];
-    const byBottom = name === "pen stroke" && [250, 350, 450].some((y) => Math.abs(bottom - y) <= 0.5);
+    const byBottom = ["pen stroke", "picture", "picture from the library"].includes(name) && [250, 350, 450].some((y) => Math.abs(bottom - y) <= 0.5);
     if (Math.abs(right - 800) > reach && !byBottom) missed.push(`${name} to an object: its side at ${right.toFixed(2)}, not 800`);
-    // Level with it, from the corner, both axes free (a shape, a picture: it stretches): its bottom 3 px short of the rectangle's bottom,
-    // its right side far from every line. The bottom snaps as the side did.
-    if (["shape", "picture", "picture on its own sheet", "sheet"].includes(name)) {
+    // Level with it, from the corner: its bottom 3 px short of the rectangle's bottom (along its diagonal for a picture, which keeps its
+    // proportions; a shape stretches, its right side far from every line). The bottom snaps as the side did.
+    if (["shape", "picture", "picture from the library", "picture on its own sheet", "sheet"].includes(name)) {
       const c = await frame();
-      await app.drag({ x: c[2]![0], y: c[2]![1] }, { x: 680, y: 447 }, 6);
+      const k = (447 - c[0]![1]) / (c[2]![1] - c[0]![1]);
+      await app.drag({ x: c[2]![0], y: c[2]![1] }, { x: name.startsWith("picture") ? c[0]![0] + k * (c[2]![0] - c[0]![0]) : 680, y: 447 }, 6);
       await app.frame();
       const bottomNow = (await frame())[2]![1];
       if (Math.abs(bottomNow - 450) > reach) missed.push(`${name} level with an object: its bottom at ${bottomNow.toFixed(2)}, not 450`);

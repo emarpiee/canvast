@@ -1595,7 +1595,7 @@ export function attachTools(
           g = { kind: "textpad", pointerId: e.pointerId, start: s, edge: h.edge, pads: { padX, padY, padR: padR ?? padX, padB: padB ?? padY }, emPx: words.size * wordsPo.proj.ppu, moved: false };
           return;
         }
-        // Free (one-axis, or both axes apart) for upright pictures and for paths, turned or not, whose turn is the box's: strokes and text keep their shape.
+        // Free (one-axis, or both axes apart) for paths, turned or not, whose turn is the box's, and upright note cards: everything else keeps its shape.
         const turnOf = (rot: number | undefined): number => ((radiansFromAngle(rot ?? 0) % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
         const boxTurn = ((sel.frame.angle % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
         const same = (rot: number | undefined): boolean => Math.abs(turnOf(rot) - boxTurn) < 1e-6 || Math.abs(Math.abs(turnOf(rot) - boxTurn) - 2 * Math.PI) < 1e-6;
@@ -1606,8 +1606,8 @@ export function attachTools(
           const o = doc.get(id)!;
           // (a text: its left and right handles change the width of its box, the words wrap again; a text on a path or in a shape takes its width from that)
           if (o.kind === "text") return (h.edge === "e" || h.edge === "w") && !o.rot && sel.frame.angle === 0 && !o.onPath && !o.inShape;
-          // (a path and a picture alike: stretched along its own sides, when they are the box's)
-          return (o.kind === "path" || o.kind === "image") && same(o.rot);
+          // (shapes and sheets stretch; a picture, a video or any other file keeps its proportions; a note's card, upright, is laid out again to its new shape)
+          return o.kind === "path" ? same(o.rot) : o.kind === "image" && !!o.page && !o.rot && sel.frame.angle === 0;
         });
         g = {
           kind: "scale",

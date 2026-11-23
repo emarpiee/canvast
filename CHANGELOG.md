@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.63.13 — Pictures keep their proportions when resized (2026-11-24)
+
+- **Changed:** a picture, a video or any other file keeps its proportions when resized by its handles, a corner or a side; shapes and sheets stretch as before, and a note's card is laid out again to its new shape as before. A picture is still stretched with its sheet when pinned to scale. ([Keyboard and pointer reference](README.md#keyboard-and-pointer-reference))
+- **Fixed before release:** 0.63.11's turned picture stretching along its own sides is taken back (pictures keep their proportions).
+
 ## 0.63.12 — One scrollbar in a Pins window (2026-11-24)
 
 - **Fixed before release:** a Pins window showing the library had a second, large scrollbar of its own beside the library's: the window itself no longer scrolls, only what it shows. ([Pins](README.md#pins))
