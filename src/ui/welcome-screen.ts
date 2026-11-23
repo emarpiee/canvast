@@ -1,5 +1,5 @@
 import { makeModal, showModal } from "./modal";
-import { logoSvg } from "./brand";
+import { TAGLINE, logoSvg } from "./brand";
 import { esc } from "./format";
 import { ICONS } from "./icons";
 import { commands, pressCommand } from "../commands/registry";
@@ -29,7 +29,7 @@ export async function openWelcomeScreen(bridge: WelcomeBridge): Promise<void> {
     locked: true,
     titleId: "welcome-title",
     html: `
-    <div class="lock-brand"><span class="lock-logo">${logoSvg()}</span><span class="lock-name">canvast</span></div>
+    <div class="lock-brand"><span class="lock-logo">${logoSvg()}</span><span class="lock-name">canvast</span><span class="lock-tagline">${TAGLINE}</span></div>
     <h2 id="welcome-title">${gone ? `The workspace folder “${esc(gone)}” is not there any more` : "Choose a workspace"}</h2>
     <p class="lock-text">${gone ? `It was at ${esc(missing!)}. It may have been moved or deleted (a deleted folder may still be in the system trash).` : "A workspace is a folder: your boards, canvases and library are files in it."}</p>
     <div class="lock-other is-first"><button type="button" class="assets-btn is-primary" data-go="new" data-testid="welcome-new">${ICONS.folderPlus}<span>New workspace…</span></button><button type="button" class="assets-btn" data-go="open" data-testid="welcome-open">${ICONS.folderOpen}<span>Open a folder…</span></button></div>
