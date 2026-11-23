@@ -7,6 +7,7 @@
 ### For developers
 
 - `bench-library.mjs --scroll` also times dragging a picture between a Pins window and the canvas, with its long tasks and a script profile.
+- `tiles.spec.ts`: the dense-zoom preview tests wait for the load's tile set to be built (the same race as before: two fixed frames were too few on a slower machine).
 
 ## 0.63.3 — Smoother Library scrolling, panel resizing and dragging (2026-11-24)
 

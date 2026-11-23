@@ -317,7 +317,7 @@ test("dense scenes: zoom frames show a scaled preview, then refine to the exact 
 test("dense scenes: zooming more than one level from the tile set renders exactly", async ({ app }) => {
   const p = app.page;
   await p.evaluate(() => window.__canvastDebug.benchLoad({ kind: "dense", n: 10000 }));
-  await renderedDuring(p, async () => undefined);
+  await settled(p); // (the load's whole tile set built, however many frames a slower machine needs, before a zoom can preview it)
   expect((await zoomBy(p, 0.75)).last?.preview).toBe(true);
   const rebuilt = await renderedDuring(p, () => zoomBy(p, 0.5)); // 1.25 levels from the set
   expect(rebuilt).toBeGreaterThan(0);
@@ -350,7 +350,7 @@ test("sparse scenes and deep zoom never use the preview: every zoom frame is exa
 test("an edit during a zoom preview is never hidden behind a stale preview", async ({ app }) => {
   const p = app.page;
   await p.evaluate(() => window.__canvastDebug.benchLoad({ kind: "dense", n: 10000 }));
-  await renderedDuring(p, async () => undefined);
+  await settled(p); // (the load's whole tile set built, however many frames a slower machine needs, before a zoom can preview it)
   expect((await zoomBy(p, 0.25)).last?.preview).toBe(true);
   // Change one object and zoom in the same page call, so no frame can render the edit into the tiles
   // first (when one does, a preview of that set is legitimate: it includes the edit). The first frame
