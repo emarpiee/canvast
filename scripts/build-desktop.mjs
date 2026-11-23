@@ -38,9 +38,10 @@ const nativeAddon = {
     });
   },
 };
-const common = { bundle: true, platform: "node", format: "cjs", target: "node22", loader: { ".css": "text", ".svg": "text" } /* (the welcome page: the app's stylesheet and icons) */, external: ["electron", "pdfjs-dist", "pdfjs-dist/*", "three", "three/*", "virtual:model-worker"] /* (what the page draws with: never run here) */, alias: { "better-sqlite3": sqlite }, plugins: [nativeAddon], logLevel: "warning" };
+const common = { bundle: true, platform: "node", format: "cjs", target: "node22", external: ["electron", "pdfjs-dist", "pdfjs-dist/*", "three", "three/*", "virtual:model-worker"] /* (what the page draws with: never run here) */, alias: { "better-sqlite3": sqlite }, plugins: [nativeAddon], logLevel: "warning" };
 await build({ ...common, entryPoints: [resolve(root, "desktop/main.ts")], outfile: resolve(out, "main.cjs") });
 await build({ ...common, entryPoints: [resolve(root, "desktop/preload.ts")], outfile: resolve(out, "preload.cjs") });
+await build({ ...common, entryPoints: [resolve(root, "desktop/welcome-preload.ts")], outfile: resolve(out, "welcome-preload.cjs") });
 await copyFile(html, resolve(out, "canvast.html"));
 await writeFile(resolve(out, "package.json"), JSON.stringify({ name: "canvast", productName: "canvast", desktopName: "canvast.desktop", version: pkg.version, main: "main.cjs", private: true }, null, 2));
 console.log(`${out.replace(root + "/", "")}/ (main.cjs, preload.cjs, canvast.html from ${html.replace(root + "/", "")})`);

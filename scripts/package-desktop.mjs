@@ -104,7 +104,7 @@ await build({
     electronVersion: pkg.devDependencies.electron,
     electronDist: join(root, "node_modules/electron/dist"), // (the tested binary, not another download)
     directories: { output: out, buildResources: icons },
-    files: ["main.cjs", "preload.cjs", "canvast.html", "package.json", "*.node"],
+    files: ["main.cjs", "preload.cjs", "welcome-preload.cjs", "canvast.html", "package.json", "*.node"],
     asar: true,
     // (in the AppImage at usr/share/metainfo/, where catalogs and software centres read it)
     extraFiles: [{ from: metainfo, to: "usr/share/metainfo/app.canvast.desktop.metainfo.xml" }],

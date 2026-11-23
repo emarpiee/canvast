@@ -2,12 +2,13 @@
 
 ## 0.62.1 — A welcome page in the desktop app (2026-11-23)
 
-- **Changed:** the desktop app's first start (and a start whose last workspace folder is gone) shows a welcome page in canvast's own look, its logo and a card with **New workspace…**, **Open a folder…**, the recent workspaces and **Quit**, instead of a system message box. ([Switching workspaces](README.md#switching-workspaces))
+- **Changed:** the desktop app's first start (and a start whose last workspace folder is gone) shows the app itself, on an empty canvas kept in memory only, with a welcome card over it (its logo, **New workspace…**, **Open a folder…**, the recent workspaces and **Quit**), instead of a system message box. ([Switching workspaces](README.md#switching-workspaces))
 
 ### For developers
 
 - `tiles.spec.ts`: the sub-pixel pan and edit tests count tiles once the load has settled too (the same race as 0.62.0's fix: a slower machine still building the load's tiles counted them as the pan's).
-- `desktop/welcome.ts`: the page, made of the app's stylesheet, logo, icons and the lock screen's look, with no script (each choice is a link the main process reads); the desktop build loads `.css` and `.svg` as text. A desktop test starts with no workspace and quits from the page.
+- The welcome window loads the app in a session kept in memory (no partition on the disk), with its own bridge (`desktop/welcome-preload.ts`: the choices, and the one taken); the card is `src/ui/welcome-screen.ts`, the lock screen's look. A desktop test starts with no workspace, sees the app behind the card, and quits from it.
+- Backlog: B35 (the Library opens without expanding every folder), B36 (a pin icon for Pins), both asked by the owner.
 
 ## 0.62.0 — Pins, comic pages, and an AppImage that runs anywhere (2026-11-23)
 

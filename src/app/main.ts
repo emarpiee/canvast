@@ -30,6 +30,7 @@ import { viewKindNamed } from "../ui/file-views";
 import type { CardActions } from "../ui/file-views";
 import { ViewState } from "./view-state";
 import { mountAgentPresence } from "./agent-presence";
+import { openWelcomeScreen, welcomeBridge } from "../ui/welcome-screen";
 import { makeTakeScreenshot } from "./take-screenshot";
 import { newNoteFile } from "../notes/note-file";
 import { cleanFileName } from "../doc/rename-rules";
@@ -869,6 +870,9 @@ async function start(): Promise<void> {
   stopSteps();
   opening?.close();
   opening = null;
+  // The desktop app with no workspace to open: this page is its welcome window, the app on an empty canvas with the welcome over it
+  const welcome = welcomeBridge();
+  if (welcome) void openWelcomeScreen(welcome);
   const persistence = session.persistence;
   // Startup marks (docs/testing/phase-8.md): the canvas is loaded, the index is complete (the first frame is marked where it is drawn).
   mark("loaded");

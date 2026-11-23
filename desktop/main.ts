@@ -8,11 +8,10 @@
  */
 import { COPY_MARK, clipboardEntries, type ClipboardAlso } from "./clipboard-entries";
 import { app, BrowserWindow, dialog, ipcMain, Menu, nativeImage, nativeTheme, net, protocol, session, shell, clipboard, ClipboardItem } from "electron";
-import { welcomeChoiceOf, welcomeHtml, type WelcomeChoice } from "./welcome";
 import { execFile } from "node:child_process";
 import { createHash, randomBytes, randomUUID, scrypt } from "node:crypto";
 import { createReadStream, existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, statSync, watch, writeFileSync } from "node:fs";
-import { lstat, mkdir, mkdtemp, open, type FileHandle, readFile, readdir, realpath, rename, rm, rmdir, stat, unlink, utimes, writeFile } from "node:fs/promises";
+import { lstat, mkdir, open, type FileHandle, readFile, readdir, realpath, rename, rm, rmdir, stat, unlink, utimes, writeFile } from "node:fs/promises";
 import { basename, dirname, join, resolve, sep } from "node:path";
 import { cleanWholeName } from "../src/doc/file-names";
 import { agentsFile } from "./tools-home";
@@ -119,55 +118,49 @@ async function newWorkspaceFolder(near: string | null): Promise<string | null> {
 let starting = false;
 
 /**
- * The welcome page, when there is no workspace to open (welcome.ts): the recent ones that are still there, open a folder, a new
- * workspace, quit. `missing`: the last workspace, whose folder is not there any more (moved or deleted). The folder chosen, or null to quit.
+ * The welcome, when there is no workspace to open: the app itself in a window of its own, on an empty canvas kept in memory only (a
+ * session of no partition on the disk: nothing of it is written anywhere), with the welcome card over it (src/ui/welcome-screen.ts):
+ * the recent workspaces that are still there, open a folder, a new workspace, quit. `missing`: the last workspace, whose folder is not
+ * there any more (moved or deleted). The folder chosen, or null to quit.
  */
 async function startDialog(missing: string | null): Promise<string | null> {
-  const dir = await mkdtemp(join(app.getPath("temp"), "canvast-welcome-"));
-  const file = join(dir, "welcome.html");
+  const ses = session.fromPartition("welcome"); // (no "persist:": in memory, gone with the window)
+  ses.setPermissionRequestHandler((_wc, _permission, done) => done(false));
+  ses.webRequest.onBeforeRequest((details, done) => done({ cancel: !/^(file|data|blob|devtools):/.test(details.url) })); // (offline, as the app)
   const win = new BrowserWindow({
-    width: 560,
-    height: 640,
-    title: "canvast",
+    width: 1400,
+    height: 900,
+    title: `canvast ${app.getVersion()}`,
     show: process.env["CANVAST_HIDDEN"] !== "1",
-    autoHideMenuBar: true,
     backgroundColor: nativeTheme.shouldUseDarkColors ? "#171615" : "#f1f0ee", // (as the app's window: Electron takes no oklch())
-    webPreferences: { sandbox: true, contextIsolation: true, nodeIntegration: false, javascript: false },
+    webPreferences: { partition: "welcome", preload: join(__dirname, "welcome-preload.cjs"), sandbox: true, contextIsolation: true, nodeIntegration: false, webSecurity: true },
   });
   win.setMenuBarVisibility(false);
   win.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
-  win.webContents.on("will-navigate", (e) => e.preventDefault()); // (its links move only within the page)
+  win.webContents.on("will-navigate", (e) => e.preventDefault());
   starting = true;
+  const recent = (): Array<{ path: string }> => readRecent().workspaces.filter((w) => isFolder(w.path)).slice(0, 3);
   try {
-    for (;;) {
-      const others = readRecent().workspaces.filter((w) => isFolder(w.path)).slice(0, 3);
-      await writeFile(file, welcomeHtml({ recent: others.map((w) => ({ name: basename(w.path), path: w.path })), missing }), { mode: 0o600 });
-      await win.loadFile(file); // (again after a choice that came to nothing: the page as it was, its links ready again)
-      const choice = await new Promise<WelcomeChoice | null>((done) => {
-        const onLink = (_e: unknown, url: string): void => {
-          const c = welcomeChoiceOf(new URL(url).hash);
-          if (c) off(), done(c);
-        };
-        const onClosed = (): void => (off(), done(null));
-        const off = (): void => {
-          win.webContents.off("did-navigate-in-page", onLink);
-          win.off("closed", onClosed);
-        };
-        win.webContents.on("did-navigate-in-page", onLink);
-        win.on("closed", onClosed);
+    return await new Promise<string | null>((done) => {
+      // (only this window's own page is answered)
+      ipcMain.handle("canvast:welcomeChoices", (e) => (e.sender === win.webContents ? { recent: recent().map((w) => ({ name: basename(w.path), path: w.path })), missing } : null));
+      ipcMain.handle("canvast:welcomeChoose", async (e, choice: unknown) => {
+        if (e.sender !== win.webContents || typeof choice !== "string") return false;
+        if (choice === "quit") return done(null), true;
+        const r = /^recent-(\d)$/.exec(choice);
+        const p = r ? recent()[Number(r[1])]?.path ?? null : choice === "open" ? await pickFolder() : choice === "new" ? await newWorkspaceFolder(missing) : null;
+        if (!p) return false;
+        done(p);
+        return true;
       });
-      if (!choice || choice.kind === "quit") return null;
-      if (choice.kind === "recent") {
-        const w = others[choice.index];
-        if (w && isFolder(w.path)) return w.path;
-        continue;
-      }
-      const p = choice.kind === "open" ? await pickFolder() : await newWorkspaceFolder(missing);
-      if (p) return p;
-    }
+      win.on("closed", () => done(null));
+      void win.loadFile(HTML).catch(() => done(null));
+    });
   } finally {
+    ipcMain.removeHandler("canvast:welcomeChoices");
+    ipcMain.removeHandler("canvast:welcomeChoose");
     if (!win.isDestroyed()) win.destroy();
-    void rm(dir, { recursive: true, force: true }).catch(() => undefined);
+    void ses.clearStorageData().catch(() => undefined);
   }
 }
 

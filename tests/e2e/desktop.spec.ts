@@ -69,19 +69,23 @@ async function exportBackup(app: ElectronApplication, page: Page, to: string, as
   return readFileSync(to);
 }
 
-test("a first start, with no workspace to open, shows the welcome page in the app's own look: new, open a folder, quit (no system message box)", async () => {
+test("a first start, with no workspace to open, shows the app itself with the welcome over it: new, open a folder, quit (no system message box)", async () => {
   const data = tempDir("canvast-welcome-");
   const app = await electron.launch({ args: [join(buildDir(), "desktop"), `--user-data-dir=${data}`], env: { ...process.env, CANVAST_HIDDEN: "1" } });
   const closed = new Promise<void>((done) => app.process().once("exit", () => done()));
   const page = await app.firstWindow();
   const card = page.getByTestId("welcome");
-  await expect(card).toBeVisible();
+  await expect(card).toBeVisible({ timeout: 30_000 });
   await expect(card.getByRole("heading")).toHaveText("Choose a workspace");
   await expect(card.locator(".lock-logo svg")).toHaveCount(1); // (the app's logo)
   await expect(page.getByTestId("welcome-new")).toBeVisible();
   await expect(page.getByTestId("welcome-open")).toBeVisible();
-  // (the app's own stylesheet: its card and its primary button's colours, not the browser's)
-  expect(await page.getByTestId("welcome-new").evaluate((a) => getComputedStyle(a).backgroundColor)).not.toBe("rgba(0, 0, 0, 0)");
+  // (the app behind it: its canvas and its bars, an empty canvas of this window only)
+  await expect(page.locator("#canvas")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Settings" })).toBeAttached();
+  // (it cannot be closed: Escape leaves it)
+  await page.keyboard.press("Escape");
+  await expect(card).toBeVisible();
   await page.getByTestId("welcome-quit").click();
   await closed; // (Quit ends the app: no window of a workspace opens)
 });
