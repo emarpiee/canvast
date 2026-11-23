@@ -80,8 +80,12 @@ test("a first start, with no workspace to open, shows the app itself with the we
   await expect(card.locator(".lock-logo svg")).toHaveCount(1); // (the app's logo)
   await expect(page.getByTestId("welcome-new")).toBeVisible();
   await expect(page.getByTestId("welcome-open")).toBeVisible();
-  // (the app behind it: its canvas and its bars, an empty canvas of this window only)
+  // (the app behind it, seen through the dimming: its canvas and its bars, an empty canvas of this window only)
   await expect(page.locator("#canvas")).toBeVisible();
+  expect(await card.evaluate((d) => getComputedStyle(d, "::backdrop").backgroundColor), "the app shows through").toMatch(/\/ 0\.\d+\)|, 0\.\d+\)$/);
+  // (one column of choices, each as wide as the others)
+  const widths = await Promise.all(["welcome-new", "welcome-open", "welcome-quit"].map(async (t) => Math.round((await page.getByTestId(t).boundingBox())!.width)));
+  expect(new Set(widths).size, `the choices are one column (${widths.join(", ")})`).toBe(1);
   await expect(page.getByRole("button", { name: "Settings" })).toBeAttached();
   // (it cannot be closed: Escape leaves it)
   await page.keyboard.press("Escape");

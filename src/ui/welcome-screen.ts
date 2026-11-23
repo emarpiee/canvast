@@ -24,7 +24,7 @@ export async function openWelcomeScreen(bridge: WelcomeBridge): Promise<void> {
   const { recent, missing } = await bridge.choices();
   const gone = missing ? (missing.split(/[\\/]/).filter(Boolean).pop() ?? missing) : null;
   const dlg = makeModal({
-    className: "confirm lock-screen",
+    className: "confirm lock-screen is-welcome",
     testid: "welcome",
     locked: true,
     titleId: "welcome-title",
@@ -32,7 +32,7 @@ export async function openWelcomeScreen(bridge: WelcomeBridge): Promise<void> {
     <div class="lock-brand"><span class="lock-logo">${logoSvg()}</span><span class="lock-name">canvast</span></div>
     <h2 id="welcome-title">${gone ? `The workspace folder “${esc(gone)}” is not there any more` : "Choose a workspace"}</h2>
     <p class="lock-text">${gone ? `It was at ${esc(missing!)}. It may have been moved or deleted (a deleted folder may still be in the system trash).` : "A workspace is a folder: your boards, canvases and library are files in it."}</p>
-    <div class="confirm-actions"><button type="button" class="is-primary" data-go="new" data-testid="welcome-new">New workspace…</button><button type="button" data-go="open" data-testid="welcome-open">Open a folder…</button></div>
+    <div class="lock-other is-first"><button type="button" class="assets-btn is-primary" data-go="new" data-testid="welcome-new">${ICONS.folderPlus}<span>New workspace…</span></button><button type="button" class="assets-btn" data-go="open" data-testid="welcome-open">${ICONS.folderOpen}<span>Open a folder…</span></button></div>
     ${recent.length ? `<div class="lock-other" aria-label="Recent workspaces">${recent.map((w, i) => `<button type="button" class="assets-btn" data-go="recent-${i}" data-testid="welcome-recent" title="${esc(w.path)}">${ICONS.folderOpen}<span>${esc(w.name)}</span></button>`).join("")}</div>` : ""}
     <div class="lock-other"><button type="button" class="assets-btn" data-go="quit" data-testid="welcome-quit">${ICONS.x}<span>Quit</span></button></div>`,
   });
@@ -51,7 +51,7 @@ export async function openWelcomeScreen(bridge: WelcomeBridge): Promise<void> {
   const INDEX: OptionSpec = { name: "index", type: "number", doc: "which recent workspace, from 0", required: true };
   commands.setProvider("welcome", () => [
     { id: "welcome.new", group: "Welcome", kind: "settings", title: "New workspace…", hint: "An empty folder you name", risk: "refused", why: () => null, exec: () => choose("new") },
-    { id: "welcome.open", group: "Welcome", kind: "settings", title: "Open a folder…", hint: "An existing workspace, or a folder to start one in", risk: "refused", why: () => null, exec: () => choose("open") },
+    { id: "welcome.open", group: "Welcome", kind: "settings", title: "Open a folder…", hint: "An existing workspace, or a new one in it", risk: "refused", why: () => null, exec: () => choose("open") },
     { id: "welcome.recent", group: "Welcome", kind: "settings", title: "Open a recent workspace", hint: "One of the last ones", risk: "refused", options: [INDEX], why: () => (recent.length ? null : "No recent workspace."), exec: (o) => choose(`recent-${Number(o["index"])}`) },
     { id: "welcome.quit", group: "Welcome", kind: "settings", title: "Quit", hint: "No workspace is opened", risk: "refused", why: () => null, exec: () => choose("quit") },
   ]);
