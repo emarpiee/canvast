@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.63.2 — The Library's viewer in a module of its own (2026-11-24)
+
+### For developers
+
+- The Library's viewer (an item large, a note in its place, zoom, the filmstrip, the slideshow: about 940 lines) moved from `ui/assets-view.ts` into `ui/library-viewer.ts` as `mountLibraryViewer(ctx)`: what it reads of the Library is a typed `ViewerCtx` (getters on the Library's own variables, setters where it writes them), what the Library reads of it is what it returns. Moved by the TypeScript checker's references, not by text; nothing changed in what it does (B34, in part).
+
 ## 0.63.1 — The masks and gaps actions in modules of their own (2026-11-24)
 
 ### For developers
