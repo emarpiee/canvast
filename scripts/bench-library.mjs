@@ -154,10 +154,50 @@ async function scrollPass(page, mode, size, pass) {
   scrollRows.push([`${mode === "grid" ? "Thumbnails" : "List"}, size ${size}`, pass, `${r.fps.toFixed(0)}`, `${r.p95.toFixed(0)} ms`, `${r.worst.toFixed(0)} ms`, String(r.long), `${Math.round(r.top / secs).toLocaleString()} px/s`, `${atStop}`, filled]);
   console.log(`scroll ${mode} ${size} ${pass}: ${JSON.stringify(r)} cards waiting ${atStop}, all shown ${filled}`);
 }
+// ---- dragging a panel's edge over the grid (--scroll): frames and where their time goes, as for scrolling, to compare the two
+const resizeRows = [];
+async function resizePass(page, grip, size) {
+  await page.locator(`.assets-view [data-layout="grid"], [data-layout="grid"]`).first().click();
+  await page.locator(".assets-size input").evaluate((el, v) => { el.value = String(v); el.dispatchEvent(new Event("input", { bubbles: true })); }, size);
+  await page.waitForTimeout(2000);
+  const g = page.locator(`.col-grip[data-grip="${grip}"]`);
+  if (!(await g.count()) || !(await g.isVisible())) return console.log(`resize ${grip} ${size}: no grip shown`);
+  const b = await g.boundingBox();
+  const x = b.x + b.width / 2, y = b.y + b.height / 2;
+  await page.mouse.move(x, y);
+  await page.evaluate(() => {
+    const w = window; w.__frames = []; w.__on = true; let last = performance.now();
+    const tick = (t) => { w.__frames.push(t - last); last = t; if (w.__on) requestAnimationFrame(tick); };
+    requestAnimationFrame(tick);
+  });
+  const cdp = await page.context().newCDPSession(page);
+  await cdp.send("Performance.enable");
+  const before = Object.fromEntries((await cdp.send("Performance.getMetrics")).metrics.map((m) => [m.name, m.value]));
+  const t0 = performance.now();
+  // (pressed, then moved 4 px a step, 120 px one way and back, twice, a move every 16 ms; let go where it began)
+  await page.mouse.down();
+  const dir = grip === "side" ? 1 : -1;
+  for (let lap = 0; lap < 2; lap++) for (const sign of [1, -1]) for (let i = 1; i <= 30; i++) { await page.mouse.move(x + dir * sign * (sign > 0 ? i : 30 - i) * 4, y); await page.waitForTimeout(16); }
+  await page.mouse.up();
+  await page.waitForTimeout(500); // (the grid takes its place once, when the edge is let go)
+  const secs = (performance.now() - t0) / 1000;
+  const r = await page.evaluate(() => {
+    const w = window; w.__on = false;
+    const f = w.__frames.slice(1).sort((a, b) => a - b), sum = f.reduce((a, b) => a + b, 0);
+    return { fps: f.length / (sum / 1000), p95: f[Math.floor(f.length * 0.95)] ?? 0, worst: f[f.length - 1] ?? 0, long: f.filter((v) => v > 50).length };
+  });
+  const after = Object.fromEntries((await cdp.send("Performance.getMetrics")).metrics.map((m) => [m.name, m.value]));
+  await cdp.detach();
+  const d = (k) => ((after[k] ?? 0) - (before[k] ?? 0)) * 1000;
+  const task = d("TaskDuration"), script = d("ScriptDuration"), style = d("RecalcStyleDuration"), lay = d("LayoutDuration");
+  console.log(`resize ${grip} ${size}: ${JSON.stringify(r)}; in ${secs.toFixed(1)} s: tasks ${task.toFixed(0)} ms = script ${script.toFixed(0)}, style ${style.toFixed(0)} (${after.RecalcStyleCount - before.RecalcStyleCount}x), layout ${lay.toFixed(0)} (${after.LayoutCount - before.LayoutCount}x), the rest (paint, decoding, other) ${(task - script - style - lay).toFixed(0)}`);
+  resizeRows.push([`${grip === "side" ? "Library panel" : "Details panel"}, size ${size}`, `${r.fps.toFixed(0)}`, `${r.p95.toFixed(0)} ms`, `${r.worst.toFixed(0)} ms`, String(r.long), task.toFixed(0), script.toFixed(0), style.toFixed(0), lay.toFixed(0), (task - script - style - lay).toFixed(0)]);
+}
 if (SCROLL) {
   for (const pass of ["first time", "again"])
     for (const mode of ["grid", "list"])
       for (const size of [96, 240]) await scrollPass(s.page, mode, size, pass);
+  for (const grip of ["side", "insp"]) for (const size of [96, 240]) await resizePass(s.page, grip, size);
   note("after scrolling: page heap", await heap(s.page));
 }
 await s.page.evaluate(() => window.__canvastDebug.flushStorage());
@@ -182,4 +222,5 @@ await s.app.close();
 console.log(`\n| ${N.toLocaleString()} items | time |\n| --- | --- |\n${results.map(([a, b]) => `| ${a} | ${b} |`).join("\n")}`);
 if (timeRows.length) console.log(`\n| Where the time went (ms) | Pass | Tasks | Script | Style | Layout | Paint, decoding, other |\n| --- | --- | --- | --- | --- | --- | --- |\n${timeRows.map((r) => `| ${r.join(" | ")} |`).join("\n")}`);
 if (scrollRows.length) console.log(`\n| Scrolling ${N.toLocaleString()} items | Pass | FPS | Slowest 5 % | Slowest | Frames over 50 ms | Speed | Cards waiting at stop | Until all shown |\n| --- | --- | --- | --- | --- | --- | --- | --- | --- |\n${scrollRows.map((r) => `| ${r.join(" | ")} |`).join("\n")}`);
+if (resizeRows.length) console.log(`\n| Dragging a panel edge over ${N.toLocaleString()} items | FPS | Slowest 5 % | Slowest | Frames over 50 ms | Tasks (ms) | Script | Style | Layout | Paint, decoding, other |\n| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |\n${resizeRows.map((r) => `| ${r.join(" | ")} |`).join("\n")}`);
 if (!args.includes("--keep")) for (const d of [dir, `${dir}-device-a`]) rmSync(d, { recursive: true, force: true });
