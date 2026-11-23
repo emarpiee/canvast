@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.63.11 — A turned picture resizes as a shape does (2026-11-24)
+
+- **Fixed:** a picture with any turn, even one too small to be seen, kept its proportions when resized by a corner and did not snap, while a shape in the same state did: a picture now stretches along its own sides as a shape does (one rule for both), and a box turned less than half a pixel over its size snaps to other objects again. ([Keyboard and pointer reference](README.md#keyboard-and-pointer-reference))
+
+### For developers
+
+- `stretchTurned` (`doc/edit-ops.ts`) takes the object already stretched in its own coordinates, so paths and pictures share it; the resize decides "may stretch" by one rule for both (the box's turn is the object's own).
+
 ## 0.63.10 — Pins title and list spacing (2026-11-24)
 
 - **Fixed before release:** a Pins window's title is its filled pin, then what it shows, with room between them; the boards in its list (and in Place on…) stand apart instead of touching. ([Pins](README.md#pins))

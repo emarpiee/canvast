@@ -64,12 +64,13 @@ function renamed(o: PathObject, s: number): Partial<PathObject> {
 }
 
 /**
- * A turned path stretched along its own axes (kx along its width, ky along its height) with a world point fixed. The geometry is scaled in
+ * A turned path or picture stretched along its own axes (kx along its width, ky along its height) with a world point fixed: `grown` is it
+ * stretched in its own coordinates, its anchor not moved yet. The geometry is scaled in
  * its own, unturned, coordinates; the turn is about the middle of the geometry's box, which moves with the stretch, so the anchor is chosen to
  * leave the fixed point where it is: the fixed point as the unturned geometry sees it (`f`) goes to `f` scaled, and is then turned about the
  * new middle.
  */
-function stretchTurned(o: PathObject, fixed: WorldPoint, kx: number, ky: number, keepWidth: boolean, keepRadius: boolean): PathObject {
+function stretchTurned<T extends CanvasObject>(o: T, fixed: WorldPoint, kx: number, ky: number, grown: T): T {
   const { c, s } = cosSin(o.rot!);
   const p = pivotOf(o);
   const rel = {
@@ -79,14 +80,13 @@ function stretchTurned(o: PathObject, fixed: WorldPoint, kx: number, ky: number,
   // the fixed point in the geometry's own unturned coordinates: undo the turn about the pivot
   const vx = rel.x - p.x, vy = rel.y - p.y;
   const f = { x: c * vx + s * vy + p.x, y: -s * vx + c * vy + p.y };
-  const grown: PathObject = { ...o, ...stretched(o, kx, ky, keepRadius), width: keepWidth ? o.width : o.width * Math.sqrt(kx * ky) };
   const q = pivotOf(grown);
   const wx = kx * f.x - q.x, wy = ky * f.y - q.y;
   const at = { x: c * wx - s * wy + q.x, y: s * wx + c * wy + q.y }; // where that point is now, turned about the new middle
   return normalizeUnit({
     ...grown,
     anchor: { x: D.sub(fixed.x, D.shift(D.fromNumber(at.x), o.unit)), y: D.sub(fixed.y, D.shift(D.fromNumber(at.y), o.unit)) },
-  }) as PathObject;
+  }) as T;
 }
 
 /**
@@ -117,7 +117,7 @@ function pageLimited(o: { pixelW: number; pixelH: number }, kx: number, ky: numb
 
 export function scaleAbout(o: CanvasObject, fixed: WorldPoint, kx: number, ky: number, keepWidth = false, keepRadius = false): CanvasObject {
   if (!(kx > 0 && ky > 0 && Number.isFinite(kx) && Number.isFinite(ky))) throw new RangeError(`bad scale ${kx},${ky}`);
-  if (o.kind === "path" && o.rot && kx !== ky) return stretchTurned(o, fixed, kx, ky, keepWidth, keepRadius);
+  if (o.kind === "path" && o.rot && kx !== ky) return stretchTurned(o, fixed, kx, ky, { ...o, ...stretched(o, kx, ky, keepRadius), width: keepWidth ? o.width : o.width * Math.sqrt(kx * ky) });
   if (o.kind === "image" && o.page) [kx, ky] = pageLimited(o, kx, ky);
   if (o.kind === "text" && kx !== ky) [kx, ky] = [Math.max(kx, o.size / o.w), 1]; // (a side handle: at least a letter wide)
   const anchor = {
@@ -141,7 +141,10 @@ export function scaleAbout(o: CanvasObject, fixed: WorldPoint, kx: number, ky: n
     return normalizeUnit({ ...o, anchor, ...stretched(o, kx, ky, keepRadius), width: keepWidth ? o.width : o.width * Math.sqrt(kx * ky) });
   }
   const k = Math.sqrt(kx * ky); // (a picture's corners and outline scale as the whole does)
-  return normalizeUnit({ ...o, anchor, w: o.w * kx, h: o.h * ky, ...(o.kind === "image" && o.page ? pageScaled(o, kx, ky) : {}), ...(o.kind === "image" && o.radius !== undefined ? { radius: scaleRadius(o.radius, k) } : {}), ...(o.kind === "image" && o.width !== undefined ? { width: keepWidth ? o.width : o.width * k } : {}) });
+  const sized = { ...o, w: o.w * kx, h: o.h * ky, ...(o.kind === "image" && o.page ? pageScaled(o, kx, ky) : {}), ...(o.kind === "image" && o.radius !== undefined ? { radius: scaleRadius(o.radius, k) } : {}), ...(o.kind === "image" && o.width !== undefined ? { width: keepWidth ? o.width : o.width * k } : {}) };
+  // (a turned picture stretches along its own sides, as a turned shape does)
+  if (o.rot && kx !== ky) return stretchTurned(o, fixed, kx, ky, sized);
+  return normalizeUnit({ ...sized, anchor });
 }
 
 /**

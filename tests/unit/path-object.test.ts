@@ -77,6 +77,13 @@ describe("path objects: editing", () => {
     expect(geometryBounds(wide.sub).maxY * 2 ** wide.unit).toBeCloseTo(10, 9);
     expect(() => scaleAbout(o, ORIGIN, 2, 2)).not.toThrow();
   });
+  it("a turned picture stretches along its own sides too, its middle held where it was", () => {
+    const pic = { id: newObjectId(), kind: "image", anchor: { x: D.ZERO, y: D.ZERO }, unit: 0, z: 0, opacity: 1, attachmentTargetId: null, assetId: "a".repeat(64), w: 10, h: 20, pixelW: 10, pixelH: 20, rot: TURN / 4 } as CanvasObject;
+    const wide = scaleAbout(pic, { x: D.fromNumber(5), y: D.fromNumber(10) }, 2, 1) as typeof pic & { w: number; h: number };
+    expect([wide.w, wide.h, wide.rot]).toEqual([20, 20, TURN / 4]);
+    // (its middle is its anchor, the top-left of its own box, plus half its size: the turn is about it)
+    expect([D.toNumber(wide.anchor.x) + 10, D.toNumber(wide.anchor.y) + 10].map((v) => Math.round(v * 1e9) / 1e9)).toEqual([5, 10]);
+  });
   it("a path far outside the comfortable size is re-expressed in another unit, exactly", () => {
     const o = path(rectSubs(0, 0, 2 ** 30, 2 ** 30), { stroke: "#000000", width: 2 ** 20 });
     const n = normalizeUnit(o) as PathObject;

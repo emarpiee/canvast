@@ -1606,7 +1606,8 @@ export function attachTools(
           const o = doc.get(id)!;
           // (a text: its left and right handles change the width of its box, the words wrap again; a text on a path or in a shape takes its width from that)
           if (o.kind === "text") return (h.edge === "e" || h.edge === "w") && !o.rot && sel.frame.angle === 0 && !o.onPath && !o.inShape;
-          return o.kind === "path" ? same(o.rot) : o.kind === "image" && !o.rot && sel.frame.angle === 0;
+          // (a path and a picture alike: stretched along its own sides, when they are the box's)
+          return (o.kind === "path" || o.kind === "image") && same(o.rot);
         });
         g = {
           kind: "scale",
@@ -1979,7 +1980,8 @@ export function attachTools(
     const px = s.x - gs.grab.x;
     const py = s.y - gs.grab.y;
     editor.guides = null;
-    const sn = gs.snap && !mods.noSnap && as === 0 && ac === 1 ? gs.snap : null; // (the edges to line up with are on the screen's axes)
+    // (the edges to line up with are on the screen's axes: an upright box, or one turned too little to be seen, under half a pixel over its size)
+    const sn = gs.snap && !mods.noSnap && ac > 0 && Math.abs(as) * Math.max(gs.size0.w, gs.size0.h, 1) < 0.5 ? gs.snap : null;
     const pt = boxOf(px, py);
     let kx = sx !== 0 ? pt.u / sx : 1;
     let ky = sy !== 0 ? pt.v / sy : 1;
