@@ -91,7 +91,8 @@ test("library-list", async ({ scene: s }) => {
 test("sidebar", async ({ scene: s }) => {
   await s.look({ theme: "dark", hue: 30 });
   await collection(s);
-  await s.p.getByRole("button", { name: "Pin folder Japanese prints", exact: true }).click();
+  await s.p.getByRole("button", { name: "More actions for folder Japanese prints", exact: true }).click();
+  await s.p.getByRole("menuitem", { name: "Pin folder Japanese prints", exact: true }).click();
   for (const q of ["#drawing #animal/horse", "kind:picture orientation:portrait"]) {
     await s.p.getByTestId("assets-search").fill(q);
     await s.p.getByRole("button", { name: "Save this search" }).filter({ visible: true }).click();

@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.63.6 — Folder rows without gaps (2026-11-24)
+
+- **Changed:** a folder row's marks, branch and count sit together at its end again, with no space kept between them; under the pointer only its ⋯ takes the count's place, and pinning a folder is in that ⋯ (Pin to top), as on a touch screen, not a second button on the row. ([Folders and tags](README.md#folders-and-tags))
+
 ## 0.63.5 — A folder row keeps its place under the pointer (2026-11-24)
 
 - **Fixed:** under the pointer a folder row's marks (concealed, pinned) disappeared and its name and branch mark moved aside for the Pin and More buttons: the row's end is now kept for its count, which Pin and More take over under the pointer, in the same place; nothing else on the row moves, and a long name is cut with …. ([Folders and tags](README.md#folders-and-tags))
