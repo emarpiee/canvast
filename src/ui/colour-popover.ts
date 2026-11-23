@@ -1085,10 +1085,10 @@ function buildAdjustLayer(host: HTMLElement, o: AdjustOptions, layerAt: number, 
   };
   /** The cells of pixelate: squares or round dots (ADR 0190). */
   const pixelShapeRow = (): string =>
-    `<div class="adj-row"><label class="adj-label" for="adj-pixel-shape">Shape</label><select id="adj-pixel-shape" data-adj-pixel-shape aria-label="Pixelate shape"><option value=""${cur.pixelShape ? "" : " selected"}>Squares</option><option value="dots"${cur.pixelShape === "dots" ? " selected" : ""}>Dots</option></select></div>`;
+    `<div class="adj-row has-select"><label class="adj-label" for="adj-pixel-shape">Shape</label><select id="adj-pixel-shape" data-adj-pixel-shape aria-label="Pixelate shape"><option value=""${cur.pixelShape ? "" : " selected"}>Squares</option><option value="dots"${cur.pixelShape === "dots" ? " selected" : ""}>Dots</option></select></div>`;
   /** How a blur spreads (ADR 0189): soft, along a line, out from the middle, round it; the angle row only for a line. */
   const blurTypeRow = (): string =>
-    `<div class="adj-row"><label class="adj-label" for="adj-blur-type">Type</label><select id="adj-blur-type" data-adj-blur-type aria-label="Blur type">${BLUR_TYPES.map(([v, l]) => `<option value="${v}"${(cur.blurType ?? "") === v ? " selected" : ""}>${l}</option>`).join("")}</select></div>`;
+    `<div class="adj-row has-select"><label class="adj-label" for="adj-blur-type">Type</label><select id="adj-blur-type" data-adj-blur-type aria-label="Blur type">${BLUR_TYPES.map(([v, l]) => `<option value="${v}"${(cur.blurType ?? "") === v ? " selected" : ""}>${l}</option>`).join("")}</select></div>`;
   /** Which advanced rows a blur of this type shows (ADR 0190). */
   const advShown = (k: AdjustKey): boolean =>
     k === "blurAngle" || k === "blurOffset" ? cur.blurType === "motion" : k === "blurCenterX" || k === "blurCenterY" ? cur.blurType === "zoom" || cur.blurType === "spin" : k === "blurQuality" ? !!cur.blurType : true;

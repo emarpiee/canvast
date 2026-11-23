@@ -81,6 +81,7 @@ const closeChild = (refocus = false): void => {
   child = null;
   menu.remove();
   from.setAttribute("aria-expanded", "false");
+  from.parentElement?.classList.remove("has-open-menu");
   if (refocus && from.isConnected) from.focus();
 };
 
@@ -95,6 +96,7 @@ export function closeMoreMenu(refocus = false): void {
   menu.remove();
   onClose?.();
   anchor.setAttribute("aria-expanded", "false");
+  anchor.parentElement?.classList.remove("has-open-menu");
   if (refocus && anchor.isConnected) anchor.focus();
 }
 
@@ -204,6 +206,7 @@ export function openMoreMenu(anchor: HTMLElement, items: readonly MenuItem[], la
   popHost().appendChild(menu);
   placeMenu(menu, anchor);
   anchor.setAttribute("aria-expanded", "true");
+  anchor.parentElement?.classList.add("has-open-menu"); // (what holds the button shows it open: a class for its look)
   open = { menu, anchor, onClose: opts.onClose };
   if (opts.onActive) {
     const at = (e: Event): number | null => { const b = (e.target as HTMLElement).closest<HTMLElement>("[data-i]"); return b ? Number(b.dataset["i"]) : null; };

@@ -33,6 +33,7 @@ import type { ImageObject } from "../doc/model";
 import type { SettingsStore } from "../settings/settings";
 import { DETAIL_LINKS_SHOWN, SIDE_SORTS, syncChildren, TYPING } from "./assets-view";
 import type { AssetsView, ColumnId, SideSort } from "./assets-view";
+import { classWhen } from "./class-when";
 
 const FILM_OVERSCAN = 12;
 
@@ -93,6 +94,7 @@ export function mountLibraryViewer(ctx: ViewerCtx) {
   const slideImg = ctx.viewer.querySelector<HTMLImageElement>("img")!;
   const slideMedia = ctx.viewer.querySelector<HTMLVideoElement>("video")!;
   const slideCaption = ctx.viewer.querySelector<HTMLElement>("figcaption")!;
+  classWhen(ctx.viewer, "has-note-caption", () => slideCaption.classList.contains("is-note"), [slideCaption], ["class"]); // (room under it for the words)
   const slideTile = document.createElement("div");
   slideTile.className = "viewer-tile";
   slideTile.hidden = true;

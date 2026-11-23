@@ -1,4 +1,5 @@
 import { ICONS } from "./icons";
+import { classWhen } from "./class-when";
 
 export type AppView = "canvas" | "assets" | "settings" | "photocraft";
 
@@ -23,6 +24,11 @@ export function mountViewSwitch(root: HTMLElement, onSelect: (v: AppView) => voi
       if (t) onSelect("photocraft");
     });
   }
+  // (classes for the stylesheet: the PhotoCraft tab joins its × while it shows; the top right makes room for the AI agent's button while it shows)
+  const pcSwitch = pc?.querySelector<HTMLElement>(".pc-switch"), pcClose = pc?.querySelector<HTMLElement>(".view-close");
+  if (pcSwitch && pcClose) classWhen(pcSwitch, "has-close", () => !pcClose.hidden, [pcClose], ["hidden"]);
+  const agentChip = root.querySelector<HTMLElement>(".agent-chip");
+  if (agentChip) classWhen(document.documentElement, "has-agent-chip", () => !agentChip.hidden, [agentChip], ["hidden"]);
   const tabs = [...root.querySelectorAll<HTMLButtonElement>('[role="tab"]'), ...(pc ? [...pc.querySelectorAll<HTMLButtonElement>('[role="tab"]')] : [])];
   const set = (v: AppView): void => {
     // The Settings button is a button of its own at the top right in every view (not one of the buttons of a bar).

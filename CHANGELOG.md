@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.63.3 — Smoother Library scrolling, panel resizing and dragging (2026-11-24)
+
+- **Fixed:** the Library at small thumbnail sizes scrolled at about 25 frames a second, and dragging a panel's edge lagged: the page restyled its thousands of cards at every change. A panel being resized now sets its own width (not a value every card inherited), and the stylesheet no longer asks the whole page questions (`:has()`): the code that changes a state sets a class instead. Dragging items between a Pins window and a canvas no longer restyles the whole app as it starts and ends (B2). ([The Library](README.md#the-library))
+
+### For developers
+
+- `ui/class-when.ts` (`classWhen`: a class on one element kept true about a few watched ones), `slotState` for thumbnails, `markOffParts` for form rows; 38 of the 39 `:has()` rules replaced by classes. `check:tokens` fails on a new `:has()` unless its line says why (`/* has-ok: … */`); the one left is inside an open note only.
+- `bench-library.mjs --scroll` also drags each panel's edge and says where the time goes.
+
 ## 0.63.2 — The Library's viewer in a module of its own (2026-11-24)
 
 ### For developers

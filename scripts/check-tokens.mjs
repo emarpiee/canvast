@@ -71,5 +71,14 @@ for (const k of Object.keys(counts)) {
     console.error(`FAIL tokens: ${counts[k]} literal ${k} value(s), the baseline allows ${allowed}. Use a token from :root in src/styles.css (add one there if none fits). Run with --list to see them.`);
   } else if (counts[k] < allowed) console.log(`note: ${k} literals went down to ${counts[k]} (baseline ${allowed}); run with --update to lock it in`);
 }
+// No :has() in the stylesheet: the browser checks it again across the page on each change of the page (the Library's grid of thousands of
+// cards was restyled at every scroll, drag and panel resize). A class set by the code that changes the state does the same work once
+// (ui/class-when.ts). A rule that cannot do without one says why on its line, in a comment starting "has-ok:".
+const raw = (await readFile(resolve(root, "src/styles.css"), "utf8")).split("\n");
+const hasRules = css.split("\n").flatMap((l, i) => (l.includes(":has(") && !raw[i].includes("has-ok:") ? [`styles.css:${i + 1}: ${l.trim().slice(0, 120)}`] : []));
+if (hasRules.length) {
+  bad = true;
+  console.error(`FAIL tokens: ${hasRules.length} :has() rule(s); set a class from the code instead (ui/class-when.ts), or say why on the line with /* has-ok: … */\n  ${hasRules.join("\n  ")}`);
+}
 if (!bad) console.log(`PASS tokens: ${Object.entries(counts).map(([k, v]) => `${k} ${v}`).join(", ")}`);
 process.exit(bad ? 1 : 0);

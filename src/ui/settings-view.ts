@@ -535,6 +535,8 @@ export function mountSettingsView(root: HTMLElement, settings: SettingsStore, ke
   const searchEl = root.querySelector<HTMLInputElement>(".set-search")!;
   const clearEl = root.querySelector<HTMLButtonElement>("[data-search-clear]")!;
   const panelsEl = root.querySelector<HTMLElement>(".set-panels")!;
+  // (a page of cards only, `is-cards`, is laid out in columns: marked once, as its parts are fixed)
+  for (const sec of panelsEl.querySelectorAll<HTMLElement>(":scope > section")) sec.classList.toggle("is-cards", [...sec.children].every((c) => c.matches("h2, .set-card")));
   const noneEl = root.querySelector<HTMLElement>(".set-none")!;
   const panels = [...root.querySelectorAll<HTMLElement>('[role="tabpanel"]')];
   let current = "drawing";

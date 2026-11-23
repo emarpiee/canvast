@@ -17,6 +17,7 @@ import type { Command } from "../commands/types";
 import { mediaBarTop } from "./media-player";
 import type { MenuItem } from "./more-menu";
 import type { BoolOp } from "../doc/boolean";
+import { classWhen } from "./class-when";
 
 /**
  * The Actions bar (ADR 0051, 0128): what you can DO to the selection, in one row at a fixed place (bottom centre, above the readout), never
@@ -236,6 +237,9 @@ export function mountContextBar(host: HTMLElement, editor: EditorState, doc: Doc
   wrap.className = "ctx-wrap";
   wrap.append(bar);
   host.appendChild(wrap);
+  // (classes for the stylesheet, kept with the bar: the wrapper is empty while the bar is hidden; the page has a bar showing that does not follow the selection)
+  classWhen(wrap, "is-empty", () => !!bar.hidden, [bar], ["hidden"]);
+  classWhen(document.body, "has-ctx-bar", () => !bar.hidden && !wrap.classList.contains("is-following"), [bar, wrap]);
   // With a hover choice (Settings > Appearance > Actions bar group names) the names float over or under the bar while the pointer is on it: a
   // layer of their own in the wrapper, so neither the bar nor the options bar beside it changes size or moves (ADR 0197).
   const placeNames = hoverNames(bar, wrap).place;

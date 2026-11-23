@@ -86,6 +86,7 @@ import { deleteEverywhere } from "./delete-everywhere";
 import { freeFolderName, mergeFolderInto } from "../app/folder-merge";
 import type { SettingsStore } from "../settings/settings";
 import { mountLibraryViewer } from "./library-viewer";
+import { classWhen } from "./class-when";
 
 /**
  * Assets view: the full-window library of the workspace's shared originals
@@ -144,11 +145,22 @@ export function libraryCardHtml(o: { hash: string; label: string; title: string;
  */
 export function thumbSlots(root: HTMLElement): void {
   root.addEventListener("load", (e) => {
-    if (e.target instanceof HTMLImageElement && e.target.parentElement?.classList.contains("thumb-slot")) e.target.classList.add("is-loaded");
+    if (e.target instanceof HTMLImageElement && e.target.parentElement?.classList.contains("thumb-slot")) slotState(e.target, "loaded");
   }, true);
   root.addEventListener("error", (e) => {
-    if (e.target instanceof HTMLImageElement && e.target.parentElement?.classList.contains("thumb-slot")) e.target.classList.add("is-broken");
+    if (e.target instanceof HTMLImageElement && e.target.parentElement?.classList.contains("thumb-slot")) slotState(e.target, "broken");
   }, true);
+}
+
+/**
+ * A thumbnail's picture: waiting (its slot shimmers), loaded or broken. The slot carries `is-waiting` itself, so the shimmer is a plain
+ * class (a selector asking each slot whether its picture had loaded was checked again on every card each time the grid changed).
+ */
+export function slotState(img: HTMLImageElement, state: "waiting" | "loaded" | "broken"): void {
+  img.classList.toggle("is-loaded", state === "loaded");
+  img.classList.toggle("is-broken", state === "broken");
+  const slot = img.parentElement;
+  if (slot?.classList.contains("thumb-slot")) slot.classList.toggle("is-waiting", state === "waiting");
 }
 
 /** What a dragged library item carries: its hashes, as JSON (the canvas, a Pins canvas and a sidebar row take it). */
@@ -457,6 +469,15 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     tile: (name) => fileTile({ name, type: "" }),
   });
   const inspector = root.querySelector<HTMLElement>(".asset-inspector")!;
+  // view-state: (the body says whether the details panel shows, `has-inspector`, for its rules: a class, kept with the panel's own
+  // hidden attribute whatever shows or hides it, where a selector asking the body about the panel restyled the whole grid at each change)
+  const markInspector = (): void => void body.classList.toggle("has-inspector", !inspector.hidden);
+  new MutationObserver(markInspector).observe(inspector, { attributes: true, attributeFilter: ["hidden"] });
+  markInspector();
+  // view-state: (a details section whose parts are all hidden, or that has none, is marked `is-empty` and leaves no gap: the details panel is
+  // a small tree, watched for what is shown or hidden in it, as its parts arrive one by one)
+  const markSections = (): void => { for (const sec of inspector.querySelectorAll<HTMLElement>(".asset-dsec")) sec.classList.toggle("is-empty", ![...sec.children].some((c) => !(c as HTMLElement).hidden)); };
+  new MutationObserver(markSections).observe(inspector, { subtree: true, childList: true, attributes: true, attributeFilter: ["hidden"] });
   // The Details fold stays open (or closed) as you left it when you go to another item; only you close it.
   let detailsOpen = false;
   // Read from the fold itself just before the panel is drawn again (its `toggle` event comes a task later, after a quick pick of another item has already replaced it).
@@ -864,8 +885,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       if (job) void job.p.then((u) => u !== url && revokeUnused(u), () => undefined);
       // (a card on the screen keeps its picture until asked again: its markup is the same)
       for (const img of root.querySelectorAll<HTMLImageElement>(`.asset-thumb img[data-hash="${h}"], .film-item img[data-hash="${h}"]`)) {
-        img.classList.remove("is-loaded", "is-broken");
-        loadThumb(img);
+        loadThumb(img); // (waiting again: its slot shimmers until the new one is here)
       }
     }
     assets.retryAll();
@@ -1192,11 +1212,12 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   const loadThumb = (img: HTMLImageElement): void => {
     const hash = img.dataset["hash"]!;
     const known = thumbUrls.get(hash);
+    if (!known) slotState(img, "waiting"); // (a known one shows at once: no shimmer)
     if (known) {
       // Loaded before: decoded before the card is painted, so it shows at once (no blank card, no shimmer, while it decodes).
       img.decoding = "sync";
       img.src = known;
-      if (img.parentElement?.classList.contains("thumb-slot")) img.classList.add("is-loaded");
+      if (img.parentElement?.classList.contains("thumb-slot")) slotState(img, "loaded");
       return;
     }
     thumbFor(hash, () => img.isConnected).then(
@@ -1205,7 +1226,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
         img.src = url;
       },
       (e) => {
-        if (!(e instanceof ThumbSkipped)) img.classList.add("is-broken");
+        if (!(e instanceof ThumbSkipped)) slotState(img, "broken");
       },
     );
   };
@@ -1219,7 +1240,6 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       // A card kept on the screen with no picture asks again.
       const img = job.failed ? mounted.get(hash)?.el.querySelector<HTMLImageElement>("img.is-broken") : null;
       if (img) {
-        img.classList.remove("is-broken");
         loadThumb(img);
       }
     }
@@ -1930,7 +1950,9 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     const picked = pickedKeys(scope);
     const item = (key: string, label: string, n: number | null, opts: { depth?: number; icon?: string; /** Before the count (a pinned folder's pin). */ mark?: string; extra?: string; cls?: string; before?: string; title?: string; /** What the row does, in place of choosing a scope. */ attrs?: string; /** A row with rows under it: open or not (a click opens or closes it). */ expanded?: boolean; /** It can be dragged (a folder, into another). */ drag?: boolean } = {}): string => {
       const current = TRASH_WORD.test(search.value) ? key === "trash" : scope === key || picked.has(key);
-      return `<li class="side-row ${opts.cls ?? ""}${current ? " is-current" : ""}" style="--depth:${opts.depth ?? 0}">${opts.before ?? ""}<button type="button" class="side-item${current ? " is-active" : ""}" ${opts.attrs ?? `data-scope="${esc(key)}" aria-current="${scope === key || picked.has(key)}"`}${opts.drag ? ' draggable="true"' : ""}${opts.expanded === undefined ? "" : ` aria-expanded="${opts.expanded}"`} title="${opts.title ?? label.replace(/<[^>]*>/g, "")}${/^(ext|tag):/.test(key) ? " (Ctrl+click: add to the filter)" : key.startsWith("folder:") ? " (Ctrl+click: show it too; Shift+click: the folders between)" : ""}">
+      // (what the row holds, for its look: a More button, a pin)
+      const holds = `${opts.extra?.includes("side-more") ? " has-more" : ""}${opts.extra?.includes("side-pin") ? " has-pin" : ""}`;
+      return `<li class="side-row ${opts.cls ?? ""}${holds}${current ? " is-current" : ""}" style="--depth:${opts.depth ?? 0}">${opts.before ?? ""}<button type="button" class="side-item${current ? " is-active" : ""}" ${opts.attrs ?? `data-scope="${esc(key)}" aria-current="${scope === key || picked.has(key)}"`}${opts.drag ? ' draggable="true"' : ""}${opts.expanded === undefined ? "" : ` aria-expanded="${opts.expanded}"`} title="${opts.title ?? label.replace(/<[^>]*>/g, "")}${/^(ext|tag):/.test(key) ? " (Ctrl+click: add to the filter)" : key.startsWith("folder:") ? " (Ctrl+click: show it too; Shift+click: the folders between)" : ""}">
         ${opts.icon ?? ""}<span class="side-label">${label}</span>${opts.mark ?? ""}${opts.expanded === undefined ? "" : `<span class="side-kids" aria-hidden="true"></span>`}${n === null ? "" : `<span class="side-n${opts.before !== undefined ? " layer-count" : ""}">${n}</span>`}</button>${opts.extra ?? ""}</li>`;
     };
     const nameInput = (value: string, label: string): string =>
@@ -3547,14 +3569,18 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       let want = startW;
       let frame = 0;
       const drag = isSide ? "is-resizing-side" : "is-resizing-insp";
-      body.style.setProperty("--slot-w", `${startW}px`);
-      body.style.setProperty("--drag-w", `${startW}px`);
+      // (the panel's own width and margin, set on it: a value set on the Library's body would be inherited by every card, each restyled every frame)
+      const place = (w: number): void => {
+        panel.style.flex = `0 0 ${w}px`;
+        panel.style.setProperty(isSide ? "margin-right" : "margin-left", `${startW - w}px`);
+      };
+      place(startW);
       body.classList.add(drag);
       const move = (ev: PointerEvent): void => {
         want = Math.max(range.min, Math.min(range.max, Math.round(startW + (isSide ? ev.clientX - startX : startX - ev.clientX))));
         frame ||= requestAnimationFrame(() => {
           frame = 0;
-          body.style.setProperty("--drag-w", `${want}px`);
+          place(want);
           g.style.transform = `translateX(${(want - startW) * (isSide ? 1 : -1)}px)`;
         });
       };
@@ -3566,6 +3592,8 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
         cancelAnimationFrame(frame);
         resizing = false;
         body.classList.remove(drag);
+        panel.style.removeProperty("flex");
+        panel.style.removeProperty(isSide ? "margin-right" : "margin-left");
         g.style.transform = "";
         set(want, true);
         relayout();
@@ -3608,7 +3636,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
             <ul class="nav-canvases">${canvases
               .map((c) => {
                 const active = cur?.canvasId === c.id;
-                return `<li class="nav-canvas-row"><button type="button" role="menuitem" class="nav-canvas${active ? " is-active" : ""}" data-pm="canvas" data-id="${c.id}"><span class="nav-name">${esc(c.name)}</span><span class="nav-count">${c.objectCount === 0 ? "empty" : `${c.objectCount} object${c.objectCount === 1 ? "" : "s"}`}</span></button></li>`;
+                return `<li class="nav-canvas-row${active ? " is-current" : ""}"><button type="button" role="menuitem" class="nav-canvas${active ? " is-active" : ""}" data-pm="canvas" data-id="${c.id}"><span class="nav-name">${esc(c.name)}</span><span class="nav-count">${c.objectCount === 0 ? "empty" : `${c.objectCount} object${c.objectCount === 1 ? "" : "s"}`}</span></button></li>`;
               })
               .join("")}</ul>
             <button type="button" role="menuitem" class="nav-add" data-pm="new-canvas" data-id="${board.id}" aria-label="New canvas in ${esc(board.name)}">+ New canvas</button>
@@ -3709,7 +3737,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     // The strip at the top: drop them there to place them on the open canvas (the library stays open).
     if (!session.readOnly && hashes.some((h) => entryOf(h)?.present === true)) {
       placeZone.querySelector("span")!.textContent = `Drop here to place ${hashes.length === 1 ? "it" : `these ${hashes.length}`} on ${session.current && session.tree ? crumbOf(session.current.canvasId) : "the open canvas"}`;
-      placeZone.hidden = false;
+      showPlaceZone(true);
     }
     // Every place they can be dropped shows it, as the strip does.
     for (const t of side.querySelectorAll<HTMLElement>("[data-scope]")) if (takesDrop(t)) t.classList.add("drop-zone");
@@ -3717,13 +3745,18 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   // (on the document: the card dragged may be gone from the grid by then, which is drawn as it scrolls, and its end would not reach the grid)
   const dragOver = (): void => {
     dragCell = null;
-    placeZone.hidden = true;
+    showPlaceZone(false);
     for (const t of root.querySelectorAll<HTMLElement>(".drop-zone")) t.classList.remove("is-drop-target");
     for (const t of side.querySelectorAll<HTMLElement>(".drop-zone")) t.classList.remove("drop-zone");
   };
   document.addEventListener("dragend", dragOver, true);
   document.addEventListener("drop", () => queueMicrotask(dragOver), true);
   const placeZone = root.querySelector<HTMLElement>(".assets-place-zone")!;
+  /** The strip shown while items are dragged; the page's top bars step aside for it (`body.is-placing`, a class: a selector asking the whole page whether the strip showed restyled all of it at every drag). */
+  function showPlaceZone(on: boolean): void {
+    placeZone.hidden = !on;
+    document.body.classList.toggle("is-placing", on);
+  }
   placeZone.addEventListener("dragover", (e) => {
     if (!e.dataTransfer?.types.includes(DRAG_TYPE)) return;
     e.preventDefault();
@@ -3733,7 +3766,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   placeZone.addEventListener("dragleave", () => placeZone.classList.remove("is-drop-target"));
   placeZone.addEventListener("drop", (e) => {
     e.preventDefault();
-    placeZone.hidden = true;
+    showPlaceZone(false);
     placeZone.classList.remove("is-drop-target");
     const hashes = (JSON.parse(e.dataTransfer?.getData(DRAG_TYPE) || "[]") as string[]).filter((h) => entryOf(h)?.present === true);
     if (!hashes.length) return;
@@ -4786,6 +4819,8 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   // ---- hidden mode: the same view over the hidden items. It begins with the word and the password, and ends with Exit, the word
   // deleted, locking, or leaving the library; the view is then as it was before, and no hidden item's picture is kept.
   const hiddenBar = root.querySelector<HTMLElement>(".assets-hidden-bar")!;
+  const hiddenReadout = hiddenBar.closest(".hud-readout");
+  if (hiddenReadout) classWhen(hiddenReadout, "has-hidden-bar", () => !hiddenBar.hidden, [hiddenBar], ["hidden"]);
   const stayBtn = hiddenBar.querySelector<HTMLButtonElement>('[data-action="hidden-stay"]')!;
   const paintHiddenMode = (): void => {
     hiddenBar.hidden = !hiddenMode;

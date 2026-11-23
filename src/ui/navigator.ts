@@ -95,7 +95,7 @@ export function mountNavigator(root: HTMLElement, session: Session, openCanvasVi
           const items = canvases
             .map((c) => {
               const active = cur?.canvasId === c.id;
-              return `<li class="nav-canvas-row">${label(
+              return `<li class="nav-canvas-row${active ? " is-current" : ""}">${label(
                 "canvas",
                 c.id,
                 c.name,

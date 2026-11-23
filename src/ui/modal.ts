@@ -22,7 +22,13 @@ export function makeModal(o: ModalOptions): HTMLDialogElement {
     dlg.addEventListener("cancel", (e) => e.preventDefault());
   }
   document.body.appendChild(dlg);
+  markIconButtons(dlg);
   return dlg;
+}
+
+/** A dialog's action buttons that hold an icon line it up with their words (`has-icon`): marked once, as the dialog is made or shown. */
+function markIconButtons(dlg: HTMLElement): void {
+  for (const b of dlg.querySelectorAll<HTMLElement>(".confirm-actions button")) b.classList.toggle("has-icon", !!b.querySelector("svg"));
 }
 
 /**
@@ -38,6 +44,7 @@ const modalChanged = (): void => watchers.forEach((fn) => fn());
 
 /** Show it; `closed` runs once it has closed and left the page. */
 export function showModal(dlg: HTMLDialogElement, closed?: () => void): void {
+  markIconButtons(dlg);
   dlg.addEventListener("close", () => {
     dlg.remove();
     modalChanged();

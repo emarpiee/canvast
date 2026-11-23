@@ -30,6 +30,7 @@ import { viewKindNamed } from "../ui/file-views";
 import type { CardActions } from "../ui/file-views";
 import { ViewState } from "./view-state";
 import { mountAgentPresence } from "./agent-presence";
+import { classWhen } from "../ui/class-when";
 import { mountDesktopSession } from "./desktop-session";
 import { openWelcomeScreen, welcomeBridge } from "../ui/welcome-screen";
 import { makeTakeScreenshot } from "./take-screenshot";
@@ -954,6 +955,7 @@ async function start(): Promise<void> {
   noteWindowEl.hidden = true;
   noteWindow.append(noteWindowEl);
   document.body.append(noteWindow);
+  classWhen(noteWindow, "is-empty", () => !!noteWindowEl.hidden, [noteWindowEl], ["hidden"]); // (no scrim while its panel is closed)
   noteWindow.addEventListener("pointerdown", (e) => void (e.target === noteWindow && notePanel.close()));
   const notePanelReady = (d: FilePanelDeps): void => void (notePanel = mountFilePanel({ panel: notePanelEl, window: noteWindowEl }, d, () => settings.get("notes.panelMode")));
   let newNoteAt: (at: ScreenPoint, widthPx?: number) => Promise<void> = async () => undefined;

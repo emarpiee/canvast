@@ -13,6 +13,7 @@ import { hexOfCss } from "../ui/text-editor";
 import { commands, pressCommand, runCommand } from "../commands/registry";
 import { markCommands } from "../commands/from-bars";
 import type { Command } from "../commands/types";
+import { classWhen } from "../ui/class-when";
 
 /** Simple: zoom and whether it is saved, in plain words. More: adds position, objects and how smoothly it runs. Technical: the numbers. Hidden: nothing. */
 export type InfoMode = "simple" | "more" | "technical" | "hidden";
@@ -222,6 +223,9 @@ export function mountHud(root: HTMLElement, view: ViewState, stats: FrameStats, 
   const diagEl = root.querySelector<HTMLElement>(".hud-diag")!;
   const objEl = root.querySelector<HTMLElement>(".hud-objects")!;
   const readout = root.querySelector<HTMLElement>(".hud-readout")!;
+  // (classes for the stylesheet: a saving problem keeps the readout seen in Zen mode; with the readout hidden the controls take its place by the edge)
+  classWhen(readout, "has-save-problem", () => ["error", "unavailable", "conflict", "readonly"].includes(saveEl.dataset["state"] ?? ""), [saveEl], ["data-state"]);
+  classWhen(root.querySelector(".hud-bottom")!, "no-readout", () => !!readout.hidden, [readout], ["hidden"]);
   const infoButton = root.querySelector<HTMLElement>('[data-action="info"]')!;
   const meter = new FpsMeter();
   let fpsRaf = 0;

@@ -107,6 +107,17 @@ const nameOf = (el: Element): string => (el as HTMLElement).dataset?.["name"] ??
  * group. In the bar the names are hidden; the controls are not moved. Words that stand loose in a part ("On sheet", "Span") become its
  * little headings. Done once: the bar's markup does not change afterwards (groups re-filled by code, as the kinds of a mixed pick, are named by their group).
  */
+const watchedForms = new WeakSet<HTMLElement>();
+/**
+ * A form's parts that are all off (`is-off`): a row of choices whose choices are all hidden or switched off, a field's row whose field is.
+ * A class the stylesheet hides by, where a selector asking each part about its children was checked again on each change of the page.
+ */
+export function markOffParts(root: HTMLElement): void {
+  const off = (k: Element): boolean => (k as HTMLElement).hidden === true || k.hasAttribute("data-off");
+  for (const c of root.querySelectorAll<HTMLElement>(".pf-choices")) c.classList.toggle("is-off", [...c.children].every(off));
+  for (const r of root.querySelectorAll<HTMLElement>(".pf-row")) r.classList.toggle("is-off", [...r.children].some((k) => k.matches("input, select") && off(k)));
+}
+
 export function nameControls(row: HTMLElement): void {
   const named = (el: Element): boolean => [...el.childNodes].some((n) => (n.nodeType === Node.TEXT_NODE && n.textContent!.trim()) || (n instanceof HTMLElement && (n.matches(".swatch-name, .pf-name, .pf-short") || (n.tagName === "SPAN" && !n.querySelector("svg") && n.textContent!.trim() && !n.matches("[data-paint-chip], [data-colour-chip]")))));
   const nameEl = (text: string): HTMLElement => {
@@ -210,6 +221,12 @@ export function nameControls(row: HTMLElement): void {
       n.replaceWith(cap);
     }
   }
+  // (its parts that are all off, marked for the stylesheet: watched in this row, as the bar switches its controls on and off)
+  if (!watchedForms.has(row)) {
+    watchedForms.add(row);
+    new MutationObserver(() => markOffParts(row)).observe(row, { subtree: true, childList: true, attributes: true, attributeFilter: ["hidden", "data-off"] });
+  }
+  markOffParts(row);
 }
 
 /** The kinds of rows of the form, in their order (ADR 0198). */

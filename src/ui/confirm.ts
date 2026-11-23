@@ -157,7 +157,7 @@ export function chooseDialog(opts: ChooseOptions): Promise<string | null> {
     ${opts.lines.map((l) => `<p>${esc(l)}</p>`).join("")}
     ${summaryHtml(opts)}
     <div class="choose-list" role="radiogroup" aria-labelledby="choose-title">
-      ${opts.choices.map((c, i) => `<label class="choose-item"><input type="radio" name="choose" value="${esc(c.value)}"${i === 0 ? " checked" : ""}><span><strong>${esc(c.label)}</strong><small>${esc(c.help)}</small></span></label>`).join("")}
+      ${opts.choices.map((c, i) => `<label class="choose-item${i === 0 ? " is-checked" : ""}"><input type="radio" name="choose" value="${esc(c.value)}"${i === 0 ? " checked" : ""}><span><strong>${esc(c.label)}</strong><small>${esc(c.help)}</small></span></label>`).join("")}
     </div>
     ${opts.remember ? `<label class="choose-remember"><input type="checkbox" data-testid="choose-remember"> ${esc(opts.remember.label)}</label>` : ""}
     <div class="confirm-actions">
@@ -165,6 +165,8 @@ export function chooseDialog(opts: ChooseOptions): Promise<string | null> {
       <button type="button" class="is-primary" data-testid="choose-ok" value="ok">${esc(opts.confirmLabel)}</button>
     </div>`,
   });
+  // view-state: (the chosen row is marked, `is-checked`, for its look)
+  dlg.addEventListener("change", () => { for (const r of dlg.querySelectorAll<HTMLElement>(".choose-item")) r.classList.toggle("is-checked", !!r.querySelector<HTMLInputElement>("input:checked")); });
   return new Promise((resolve) => {
     let answer: string | null = null;
     // view-state: (a dialog's or chooser's own control: what it gives goes to the command that opened it)

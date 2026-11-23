@@ -119,7 +119,7 @@ export function createTextureEditor(o: TextureEditorOptions): { el: HTMLElement;
   const number = (f: Field, extra = ""): string =>
     shows(f) ? `<div class="adj-row" data-tex-row="${f.key}"${f.tiled ? " data-tiled" : ""}><label class="adj-label" title="Double-click to reset" for="tex-${f.key}">${f.label}</label>${extra || "<span></span>"}<input type="number" class="adj-num" id="tex-${f.key}" data-tex-num="${f.key}" min="${f.min}" max="${f.max}" step="${f.step}" aria-label="${f.label}"></div>` : "";
   const select = (c: Choice): string =>
-    shows(c) ? `<div class="adj-row" data-tex-row="${c.key}"${c.tiled ? " data-tiled" : ""}><label class="adj-label" title="Double-click to reset" for="tex-${c.key}">${c.label}</label><select id="tex-${c.key}" data-tex-sel="${c.key}" aria-label="${c.label}">${c.items.map(([v, l]) => `<option value="${v}">${esc(l)}</option>`).join("")}</select><span></span></div>` : "";
+    shows(c) ? `<div class="adj-row has-select" data-tex-row="${c.key}"${c.tiled ? " data-tiled" : ""}><label class="adj-label" title="Double-click to reset" for="tex-${c.key}">${c.label}</label><select id="tex-${c.key}" data-tex-sel="${c.key}" aria-label="${c.label}">${c.items.map(([v, l]) => `<option value="${v}">${esc(l)}</option>`).join("")}</select><span></span></div>` : "";
   const vary = [VARY_CHOICES[0]!, ...VARY_FIELDS.slice(0, -1)].map((f) => ("items" in f ? select(f) : number(f))).join("") + select(VARY_CHOICES[1]!) + select(VARY_CHOICES[2]!)
     + number(VARY_FIELDS.at(-1)!, `<button type="button" class="tex-newseed" data-tex-newseed aria-label="New seed" title="New seed: the same settings, other copies">${ICONS.shuffle}</button>`);
   el.innerHTML = `

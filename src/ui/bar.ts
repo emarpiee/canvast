@@ -38,6 +38,9 @@ export function hoverNames(bar: HTMLElement, layerHost: HTMLElement): { place():
     }));
   };
   for (const ev of ["pointerenter", "focusin", "scroll"]) bar.addEventListener(ev, place);
+  // view-state: (the host says while the bar is pointed at or holds the focus, `is-naming`: the names show by that class)
+  const naming = (): void => void queueMicrotask(() => layerHost.classList.toggle("is-naming", bar.matches(":hover") || bar.contains(document.activeElement)));
+  for (const ev of ["pointerenter", "pointerleave", "focusin", "focusout"]) bar.addEventListener(ev, naming);
   return { place };
 }
 

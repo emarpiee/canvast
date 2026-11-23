@@ -13,6 +13,7 @@ import type { MenuItem } from "./more-menu";
 import { commands, pressCommand } from "../commands/registry";
 import { REASON } from "../commands/types";
 import type { Options, OptionSpec } from "../commands/types";
+import { slotState } from "./assets-view";
 
 export interface TrashDeps {
   box: HTMLElement;
@@ -79,6 +80,7 @@ export function mountTrashView(deps: TrashDeps): TrashView {
         img.addEventListener("load", () => slot.closest<HTMLElement>(".asset-cell")?.style.setProperty("--ar", String(img.naturalWidth / Math.max(1, img.naturalHeight) || 1)), { once: true });
         img.src = url;
         slot.replaceChildren(img);
+        if (!img.complete) slotState(img, "waiting"); // (its slot shimmers until it is here)
       });
     }
   }, { root: box, rootMargin: "400px" });

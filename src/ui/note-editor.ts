@@ -673,6 +673,8 @@ export async function mountNoteEditor(el: HTMLElement, opts: { kind: NoteKind; t
     elementWhitelist: "input|mark|kbd",
     attributeWhitelist: { input: "type|checked|disabled" },
   };
+  /** What holds the note while it is full screen: lifted above the rest (`holds-full-note`), and let down again. */
+  let lifted: HTMLElement[] = [];
   const editor = suneditor.create(holder, {
     ...presetOptions(opts.style),
     ...content,
@@ -714,7 +716,14 @@ export async function mountNoteEditor(el: HTMLElement, opts: { kind: NoteKind; t
       onToggleMarkdownView: viewToggled("markdown"),
       onToggleCodeView: viewToggled("code"),
       // (full screen is fixed to the window, but stays in the stacking of what holds it: what holds it rises with it)
-      onToggleFullScreen: ({ is }: { is: boolean }) => void el.classList.toggle("has-full-note", is),
+      // (the note full screen: it and every element it is in are lifted above the rest, marked here rather than found by a selector that
+      // asked every element of the page whether it held one, again on each change of the page)
+      onToggleFullScreen: ({ is }: { is: boolean }) => {
+        el.classList.toggle("has-full-note", is);
+        for (const up of lifted) up.classList.remove("holds-full-note");
+        lifted = [];
+        if (is) for (let up = el.parentElement; up && up !== document.body; up = up.parentElement) lifted.push(up), up.classList.add("holds-full-note");
+      },
       onChange: () => void (dirty = true),
       onInput: () => void (dirty = true),
       onSave: async () => (await host.save()) || false,
@@ -1180,6 +1189,9 @@ export async function mountNoteEditor(el: HTMLElement, opts: { kind: NoteKind; t
       el.removeEventListener("mouseover", peekOver);
       el.removeEventListener("mouseout", unpeek);
       unpeek();
+      // (closed full screen: what held it comes down again, wherever it is now)
+      for (const up of lifted) up.classList.remove("holds-full-note");
+      lifted = [];
       editor.destroy();
       twin?.destroy();
       for (const url of links.keys()) URL.revokeObjectURL(url);
