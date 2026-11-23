@@ -2993,6 +2993,14 @@ input[data-scrub-input]:focus { cursor: text; }
 .pins-canvas:focus { outline: none; }
 .pins-gallery { height: 100%; overflow: auto; padding: var(--s-4); box-sizing: border-box; }
 .pins-gallery .assets-grid { --thumb: var(--pins-thumb); }
+/* A Pins window's title: "Pins:" and what it shows, a button that opens the list to choose (cut short with … when long). */
+.pins-panel .panel-head h2 { display: flex; align-items: center; gap: var(--s-2); min-width: 0; }
+.pins-source { display: inline-flex; align-items: center; gap: var(--s-2); min-width: 0; height: var(--row-btn); padding: 0 var(--s-2); font: inherit; color: inherit; background: transparent; border: 0; border-radius: var(--ctl-r); cursor: pointer; }
+.pins-source:hover, .pins-source[aria-expanded="true"] { background: var(--hud-hover); }
+.pins-source > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pins-source svg { flex: none; width: var(--icon-sm); height: var(--icon-sm); }
+/* (its list is a menu of the window: above the Pins windows, as every menu) */
+.place-menu.pins-pick { z-index: var(--z-pop); }
 .dock-zone { position: absolute; top: 0; bottom: 0; width: calc(var(--sp-15) * 1.6); background: color-mix(in oklch, var(--hud-accent) 16%, transparent); border: 2px dashed var(--hud-accent); pointer-events: none; }
 .dock-zone[hidden] { display: none; }
 .dock-zone.is-left { left: 0; }

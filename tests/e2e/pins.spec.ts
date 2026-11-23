@@ -83,6 +83,16 @@ test("a Pins window shows pictures of the library as the Library's own grid, the
   // the Library's own grid of the folder's pictures first (no bar, sidebar or details)
   const cards = pins.getByTestId("asset-card");
   await expect(cards).toHaveCount(2);
+  // what it shows is chosen from its title: the app's own list of canvases (a search over the boards), then the pictures
+  await expect(pins.locator(".panel-head h2")).toContainText("Pins:");
+  await pins.getByTestId("pins-source").click();
+  const pick = p.getByTestId("pins-pick");
+  await expect(pick.locator('[data-pins="all"]')).toHaveClass(/is-active/);
+  await expect(pick.locator('[data-pins="canvas"]')).toHaveCount(1);
+  await p.getByTestId("pins-find").fill("zzz");
+  await expect(pick.locator('[data-pins="canvas"]:visible')).toHaveCount(0);
+  await p.keyboard.press("Escape");
+  await expect(pick).toHaveCount(0);
   await expect(pins.locator(".assets-side")).toBeHidden();
   // a double-click opens the Library's viewer in the window, its strip below; back returns to the grid
   await cards.first().dblclick();

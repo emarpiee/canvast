@@ -13,7 +13,7 @@ import { addCanvasView, dropBarActions, focusCanvasView, focusedCanvasView, setB
 import type { PanelDock } from "../ui/panel-dock";
 import { panelHtml } from "../ui/panel";
 import { openMoreMenu } from "../ui/more-menu";
-import type { MenuItem } from "../ui/more-menu";
+import { boardFilterHtml, boardFilterState, canvasPickHtml, openPickList, pickActionHtml, pickRowHtml, wireBoardFilter } from "../ui/board-filter";
 import { ICONS } from "../ui/icons";
 import { esc } from "../ui/format";
 import { newObjectId } from "../doc/model";
@@ -112,16 +112,26 @@ export function mountPins(deps: PinsDeps): { open(source?: PinSource): void; ref
   };
   // (the folders a gallery showed lately, newest first, for the chooser; kept on this device)
   const RECENT_KEY = "canvast.pins.recentFolders";
+  /** How many folders shown lately the list keeps. */
+  const RECENT_SHOWN = 5;
   let recent: string[] = (() => {
     try {
       const v = JSON.parse(localStorage.getItem(RECENT_KEY) ?? "[]") as unknown;
-      return Array.isArray(v) ? v.filter((x): x is string => typeof x === "string").slice(0, 8) : [];
+      return Array.isArray(v) ? v.filter((x): x is string => typeof x === "string").slice(0, RECENT_SHOWN) : [];
     } catch {
       return [];
     }
   })();
+  const clearRecent = (): void => {
+    recent = [];
+    try {
+      localStorage.removeItem(RECENT_KEY);
+    } catch {
+      /* (no storage: nothing kept) */
+    }
+  };
   const remember = (fid: string): void => {
-    recent = [fid, ...recent.filter((x) => x !== fid)].slice(0, 8);
+    recent = [fid, ...recent.filter((x) => x !== fid)].slice(0, RECENT_SHOWN);
     try {
       localStorage.setItem(RECENT_KEY, JSON.stringify(recent));
     } catch {
@@ -200,19 +210,46 @@ export function mountPins(deps: PinsDeps): { open(source?: PinSource): void; ref
     };
   };
 
-  const chooserRows = (pin: Pin): MenuItem[] => [
-    ...(deps.session.tree?.boards ?? []).map(({ board, canvases }) => ({
-      label: board.name,
-      icon: ICONS.squareStack,
-      hint: canvases.length === 1 ? "1 canvas" : `${canvases.length} canvases`,
-      command: "pins.show",
-      run: () => undefined, // (its canvases are in its own list)
-      more: canvases.map((c) => ({ label: c.name, icon: ICONS.infinity, hint: c.id === deps.session.current?.canvasId ? "Open in the main view" : "A canvas of this board", command: "pins.show", checked: pin.source === `canvas:${c.id}`, run: () => void pressCommand("pins.show", { window: pin.id, source: `canvas:${c.id}` }) })),
-    })),
-    { label: "All pictures", icon: ICONS.images, hint: "The library's viewer, on every picture", command: "pins.show", checked: pin.source === "all", sep: true, run: () => void pressCommand("pins.show", { window: pin.id, source: "all" }) },
-    ...recent.filter((fid) => folders.some((f) => f.id === fid)).map((fid) => ({ label: folderPath(folders as never, fid).join(" › "), icon: ICONS.folder, hint: "A folder shown lately", command: "pins.show", checked: pin.source === `folder:${fid}`, run: () => void pressCommand("pins.show", { window: pin.id, source: `folder:${fid}` }) })),
-    { label: "Choose a folder…", icon: ICONS.folderTree, hint: "Find any folder by its name", command: "pins.show", run: () => void chooseFolder(pin) },
-  ];
+  // ---- what a window shows, chosen from its title: the app's own list to pick a canvas (boards folded, a search over them: as Place on…),
+  // then the library's pictures (all of them, the folders shown lately, any folder by its name)
+  const pickFilter = boardFilterState();
+  let picking: (() => void) | null = null;
+  const openPick = async (pin: Pin, anchor: HTMLElement): Promise<void> => {
+    picking?.();
+    await loadFolders();
+    const tree = deps.session.tree;
+    const kept = recent.filter((fid) => folders.some((f) => f.id === fid));
+    const nameOfFolder = (fid: string): string => folders.find((f) => f.id === fid)?.name ?? "";
+    // (a folder's path only when two shown share a name)
+    const label = (fid: string): string => (kept.filter((k) => nameOfFolder(k) === nameOfFolder(fid)).length > 1 ? folderPath(folders as never, fid).join(" › ") : nameOfFolder(fid));
+    const row = (what: string, text: string, on: boolean, id = ""): string => pickRowHtml("pins", what, text, on, id);
+    const close = openPickList(anchor, {
+      label: "What it shows",
+      testid: "pins-pick",
+      className: "pins-pick",
+      html:
+        boardFilterHtml(pickFilter, "pins-find") +
+        (tree ? canvasPickHtml(tree, canvasOf(pin.source) ?? null, { attr: "pins" }) : "") +
+        `<section class="nav-board pins-pick-pics" aria-label="Pictures of the library"><div class="nav-board-head"><span class="nav-board-icon">${ICONS.images}</span><span class="nav-board-name">Pictures</span></div>
+          <ul class="nav-canvases">${row("all", "All pictures", pin.source === "all")}${kept.map((fid) => row("folder", label(fid), pin.source === `folder:${fid}`, fid)).join("")}${row("choose", "Choose a folder…", false)}</ul>
+          ${kept.length ? pickActionHtml("pins", "clear-recent", "Clear the recent folders", "pins-clear-recent") : ""}
+        </section>`,
+      wire: (menu) => wireBoardFilter(menu, { board: ".nav-board:not(.pins-pick-pics)", head: ".nav-board-head", row: ".nav-canvas-row", current: (sec) => !!sec.querySelector(".nav-canvas.is-active") }, pickFilter),
+      // commands: pins.show, pins.clearRecent
+      pick: (b) => {
+        const what = b.dataset["pins"], id = b.dataset["id"] ?? "";
+        if (what === "canvas") void pressCommand("pins.show", { window: pin.id, source: `canvas:${id}` });
+        else if (what === "all") void pressCommand("pins.show", { window: pin.id, source: "all" });
+        else if (what === "folder") void pressCommand("pins.show", { window: pin.id, source: `folder:${id}` });
+        else if (what === "choose") void chooseFolder(pin);
+        else if (what === "clear-recent") void pressCommand("pins.clearRecent");
+      },
+    }, "pins");
+    picking = () => {
+      picking = null;
+      close();
+    };
+  };
 
   const open = (source: PinSource = deps.session.current ? `canvas:${deps.session.current.canvasId}` : "all", prefs: Omit<WindowPrefs, "c"> = {}): void => {
     const id = newObjectId();
@@ -221,9 +258,9 @@ export function mountPins(deps: PinsDeps): { open(source?: PinSource): void; ref
     el.dataset["testid"] = "pins";
     el.setAttribute("aria-label", "Pins");
     el.innerHTML = panelHtml({
-      title: "Pins",
+      title: `Pins: <button type="button" class="pins-source" data-pins-source data-testid="pins-source" aria-haspopup="menu" aria-expanded="false" aria-label="What it shows" title="What it shows: a canvas, or pictures of the library"></button>`,
       tools: `<button type="button" class="layer-btn" data-pins-more aria-haspopup="menu" aria-label="More" title="More: opacity, clicks through, float over other apps">${ICONS.ellipsis}</button>`,
-      sub: `<div class="styles-kinds"><button type="button" class="pick-current" data-pins-source aria-haspopup="menu" aria-label="What it shows" title="What it shows: a canvas, or pictures of the library"></button></div><div class="pins-look" data-pins-look hidden></div>`,
+      sub: `<div class="pins-look" data-pins-look hidden></div>`,
       body: `<div class="pins-view" data-pins-view><canvas class="pins-canvas" tabindex="0" aria-label="A pinned canvas: the canvas's tools, keys and menus"></canvas></div><div class="pins-library" data-pins-library hidden></div><div class="pins-bar" data-pins-bar></div>`,
     });
     const host = el.querySelector<HTMLElement>("[data-pins-view]")!;
@@ -347,7 +384,7 @@ export function mountPins(deps: PinsDeps): { open(source?: PinSource): void; ref
       if (!el.contains(e.target as Node)) here = false;
     }, true);
     // commands: pins.show
-    picker.addEventListener("click", () => void loadFolders().then(() => openMoreMenu(picker, chooserRows(pin), "What it shows")));
+    picker.addEventListener("click", () => void (picking ? picking() : openPick(pin, picker))); // view-state: (opens the list; what is chosen in it runs pins.show)
     // commands: pins.close
     el.querySelector("[data-close]")!.addEventListener("click", () => void pressCommand("pins.close", { window: id }));
     // ---- the window's own options: its opacity (the shared settings rows), clicks through it, and floated above other apps
@@ -439,6 +476,10 @@ export function mountPins(deps: PinsDeps): { open(source?: PinSource): void; ref
           p.unfloat = null;
         };
       });
+      return { ok: true };
+    }),
+    pc("pins.clearRecent", "Clear the recent folders of Pins", "The folders shown lately leave the list", [], () => {
+      clearRecent();
       return { ok: true };
     }),
     pc("pins.close", "Close a Pins window", "What it shows stays as it is", [WINDOW], (o) => {

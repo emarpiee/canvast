@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.63.8 — A Pins window chooses from its title (2026-11-24)
+
+- **Changed:** what a Pins window shows is chosen from its title (*Pins: Board 1 › Canvas 1*), not a row of its own under it, so its canvas has that room: the list is the app's own list of canvases (a search over them, the boards folded, as Place on…), then All pictures, the five folders shown lately (with **Clear the recent folders**) and Choose a folder…; no repeated words under each row. ([Pins](README.md#pins))
+
+### For developers
+
+- `openPickList`, `pickRowHtml`, `pickActionHtml` (`ui/board-filter.ts`): the one chooser of canvases with a filter, opened as a menu; Place on… and Pins share it. Command `pins.clearRecent`.
+
 ## 0.63.7 — A folder row's Pin and More back, before its marks (2026-11-24)
 
 - **Fixed:** a folder row's Pin button is back under the pointer (0.63.6 had put pinning in More only): Pin and More come just before the row's marks, branch and count, over the end of its name, which is cut shorter for them; the marks and count stay, in their order, with no gaps. ([Folders and tags](README.md#folders-and-tags))

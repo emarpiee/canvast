@@ -1,6 +1,8 @@
 import type { WorkspaceTree } from "../app/session";
 import { esc } from "./format";
 import { ICONS } from "./icons";
+import { popHost } from "./modal";
+import { placeMenu } from "./more-menu";
 
 /**
  * A list of boards and their canvases that may be long (the board and canvas switcher, Place on…), made short: a search field over it
@@ -100,4 +102,57 @@ export function canvasPickHtml(tree: WorkspaceTree, current: string | null, o: {
       )
       .join("") + (o.newRows ? `<button type="button" role="menuitem" class="nav-add nav-add-board" data-${a}="new-board">+ New board with a canvas</button>` : "")
   );
+}
+
+/** Another row of such a list (a choice besides the canvases: pictures, a folder): the canvases' look, `data-<attr>` saying what it is. */
+export const pickRowHtml = (attr: string, what: string, text: string, on: boolean, id = ""): string =>
+  `<li class="nav-canvas-row${on ? " is-current" : ""}"><button type="button" role="menuitem" class="nav-canvas${on ? " is-active" : ""}" data-${attr}="${what}"${id ? ` data-id="${esc(id)}"` : ""}><span class="nav-name">${esc(text)}</span></button></li>`;
+
+/** An action at the foot of such a list (+ New canvas, Clear the recent folders): its look, `data-<attr>` saying what it is. */
+export const pickActionHtml = (attr: string, what: string, text: string, testid = ""): string =>
+  `<button type="button" role="menuitem" class="nav-add" data-${attr}="${what}"${testid ? ` data-testid="${testid}"` : ""}>${esc(text)}</button>`;
+
+/**
+ * Such a list opened from a button, as a menu: placed by it (`placeMenu`), above the windows, its search focused; a row chosen gives its
+ * button to `pick` and closes it, as a press outside it or Escape does. Returns what closes it.
+ */
+export function openPickList(anchor: HTMLElement, o: { html: string; label: string; testid: string; className?: string; wire?(menu: HTMLElement): void; pick(row: HTMLElement): void }, attr: string): () => void {
+  const menu = document.createElement("div");
+  menu.className = `place-menu${o.className ? ` ${o.className}` : ""}`;
+  menu.dataset["testid"] = o.testid;
+  menu.setAttribute("role", "menu");
+  menu.setAttribute("aria-label", o.label);
+  menu.innerHTML = o.html;
+  o.wire?.(menu);
+  let closed = false;
+  const close = (): void => {
+    if (closed) return;
+    closed = true;
+    menu.remove();
+    anchor.setAttribute("aria-expanded", "false");
+    document.removeEventListener("pointerdown", outside, true);
+    document.removeEventListener("keydown", keys, true);
+  };
+  // view-state: (the list closes on a press outside it or on Escape; what is chosen in it is the caller's command)
+  const outside = (e: PointerEvent): void => void (!menu.contains(e.target as Node) && !anchor.contains(e.target as Node) && close());
+  const keys = (e: KeyboardEvent): void => {
+    if (e.key !== "Escape") return;
+    e.stopPropagation();
+    close();
+    anchor.focus();
+  };
+  // commands: (each row runs its caller's command, through `pick`)
+  menu.addEventListener("click", (e) => {
+    const b = (e.target as HTMLElement).closest<HTMLElement>(`[data-${attr}]`);
+    if (!b) return;
+    close();
+    o.pick(b);
+  });
+  document.addEventListener("pointerdown", outside, true);
+  document.addEventListener("keydown", keys, true);
+  popHost().appendChild(menu);
+  placeMenu(menu, anchor);
+  anchor.setAttribute("aria-expanded", "true");
+  menu.querySelector<HTMLInputElement>(".board-filter-input")?.focus();
+  return close;
 }
