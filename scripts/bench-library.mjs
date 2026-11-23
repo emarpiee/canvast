@@ -161,9 +161,10 @@ async function resizePass(page, grip, size) {
   await page.locator(".assets-size input").evaluate((el, v) => { el.value = String(v); el.dispatchEvent(new Event("input", { bubbles: true })); }, size);
   await page.waitForTimeout(2000);
   const g = page.locator(`.col-grip[data-grip="${grip}"]`);
-  if (!(await g.count()) || !(await g.isVisible())) return console.log(`resize ${grip} ${size}: no grip shown`);
-  const b = await g.boundingBox();
-  const x = b.x + b.width / 2, y = b.y + b.height / 2;
+  const b = (await g.count()) ? await g.boundingBox() : null;
+  if (!b || !b.height) return console.log(`resize ${grip} ${size}: no grip shown`);
+  // (the grip is a line of no width: what is pressed is its grab area, a strip just before it)
+  const x = b.x - 2, y = b.y + b.height / 2;
   await page.mouse.move(x, y);
   await page.evaluate(() => {
     const w = window; w.__frames = []; w.__on = true; let last = performance.now();
