@@ -4,7 +4,7 @@ The work on canvast that is not done yet, and what became of each item. **Priori
 
 | ID | Item | Priority | Status | Notes |
 | --- | --- | --- | --- | --- |
-| B2 | The library scrolls smoothly at small thumbnail sizes (size 96: about 40 frames a second since 0.60.13, was under 30; 60 at size 240 and in the list) | high | open | `--scroll` in the *Bench library* workflow; what is left is mostly painting the pictures |
+| B2 | The library scrolls smoothly at small thumbnail sizes (Thumbnails at size 96: about 26 frames a second the first time, 33 again, 5,000 items, 0.63.0; 60 at size 240 and in the list) | high | open | Measured 2026-11-24 with `--scroll` in the *Bench library* workflow (5,000 items); the slow part is drawing the small cards (long frames of up to 0.5 s the first time) |
 | B24 | A setting changed just before a reload sometimes comes back as it was (the canvas pattern, the canvas background colour) | high | open | 0.62.2: a save writes only the settings it changed, so another tab's newer ones are kept (one cause, found); left to watch: a reload right after a change may read the browser's storage before it has the change (likely, not confirmed); seen in `frames.spec.ts` (info readout, background, pattern, pens: `:1850`), `editing.spec.ts:569` and `assets.spec.ts:1497` (the Library's own list columns, another store: the last change before the reload lost) |
 | B3 | Faster test runs: each change runs only the tests whose code it touches, found from recorded coverage | medium | open | Approved, not started |
 | B4 | A vector network can have a fill for each closed region, not one fill for the whole network | medium | open | A limit listed in the README |
