@@ -1489,6 +1489,15 @@ test("every kind of object snaps when resized by a handle: to another object's e
     const bottom = (await frame())[2]![1];
     const byBottom = name === "pen stroke" && [250, 350, 450].some((y) => Math.abs(bottom - y) <= 0.5);
     if (Math.abs(right - 800) > reach && !byBottom) missed.push(`${name} to an object: its side at ${right.toFixed(2)}, not 800`);
+    // Level with it, from the corner, both axes free (a shape, a picture: it stretches): its bottom 3 px short of the rectangle's bottom,
+    // its right side far from every line. The bottom snaps as the side did.
+    if (["shape", "picture", "picture on its own sheet", "sheet"].includes(name)) {
+      const c = await frame();
+      await app.drag({ x: c[2]![0], y: c[2]![1] }, { x: 680, y: 447 }, 6);
+      await app.frame();
+      const bottomNow = (await frame())[2]![1];
+      if (Math.abs(bottomNow - 450) > reach) missed.push(`${name} level with an object: its bottom at ${bottomNow.toFixed(2)}, not 450`);
+    }
     await clear();
     // To the grid: alone, with Snap to the grid on, the side dragged to 3 px short of a grid line.
     await p.evaluate(() => window.__canvastDebug.setSetting("snap.grid", true));
