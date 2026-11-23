@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.63.0 — A welcome in the desktop app, a lighter Library (2026-11-24)
+
+The desktop app now opens on itself: a first start shows canvast with a welcome card over it, instead of a system message box. The Library's folders start folded so a big library opens quickly, Pins gets its pin, and settings are no longer undone by another tab.
+
+### Highlights
+
+- **A welcome in the app itself:** a first start (or a missing workspace folder) shows canvast, dimmed, with its logo, tagline and the choices: new workspace, open a folder, recent ones. ([Switching workspaces](README.md#switching-workspaces))
+- **Folders start folded:** a library of many folders opens quickly, the folders you open stay open, and the path to the folder in view always shows. ([Folders and tags](README.md#folders-and-tags))
+- **Pins has a pin:** its button and commands show a pin. ([Pins](README.md#pins))
+- **Settings kept across tabs:** a setting changed in one tab is no longer undone by another.
+
+### Before you update
+
+- The Library's folder tree starts folded once: open the folders you use, and they stay open.
+
 ## 0.62.4 — More modules out of the big files (2026-11-23)
 
 ### For developers
