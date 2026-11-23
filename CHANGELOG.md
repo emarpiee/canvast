@@ -1,8 +1,12 @@
 # Changelog
 
+## 0.63.9 — Pins title on one row (2026-11-24)
+
+- **Fixed before release:** a Pins window's title is one row again (its button no longer spilled into the Hide button's name), and its list takes the app's type and spacing. ([Pins](README.md#pins))
+
 ## 0.63.8 — A Pins window chooses from its title (2026-11-24)
 
-- **Changed:** what a Pins window shows is chosen from its title (*Pins: Board 1 › Canvas 1*), not a row of its own under it, so its canvas has that room: the list is the app's own list of canvases (a search over them, the boards folded, as Place on…), then All pictures, the five folders shown lately (with **Clear the recent folders**) and Choose a folder…; no repeated words under each row. ([Pins](README.md#pins))
+- **Changed:** what a Pins window shows is chosen from its title (*Pins: Board 1 › Canvas 1*), not a row of its own under it, so its canvas has that room: the list is the app's own list of canvases (a search over them, the boards folded, as Place on…), then the library (Whole library, the five folders shown lately (with **Clear the recent folders**) and Choose a folder…), in the app's own type and spacing; no repeated words under each row. ([Pins](README.md#pins))
 
 ### For developers
 

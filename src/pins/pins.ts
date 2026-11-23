@@ -142,7 +142,7 @@ export function mountPins(deps: PinsDeps): { open(source?: PinSource): void; ref
   const loadFolders = async (): Promise<void> => void (folders = (await deps.session.catalog?.list().catch(() => null))?.folders ?? folders);
   const nameOf = (src: PinSource): string => {
     if (canvasOf(src)) return canvasName(canvasOf(src)!);
-    if (src === "all") return "All pictures";
+    if (src === "all") return "Whole library";
     const f = folders.find((x) => x.id === src.slice(7));
     return f ? folderPath(folders as never, f.id).join(" › ") : "A folder";
   };
@@ -159,7 +159,7 @@ export function mountPins(deps: PinsDeps): { open(source?: PinSource): void; ref
       tabs: [{
         id: "folder", title: "Folder", icon: ICONS.folder, openIcon: ICONS.folderOpen, one: true, noun: "folders",
         nodes: [
-          { id: "", name: "All pictures", parent: null, icon: ICONS.images, hint: "Every picture of the library", state: pin.source === "all" ? "on" : "off" },
+          { id: "", name: "Whole library", parent: null, icon: ICONS.images, hint: "Every file of the library", state: pin.source === "all" ? "on" : "off" },
           ...folders.filter((f) => deps.hidden() || !f.hidden).map((f): ChoiceNode => ({ id: f.id, name: f.name, parent: f.parentId, state: f.id === cur ? "on" : "off" })),
         ],
       }],
@@ -230,8 +230,8 @@ export function mountPins(deps: PinsDeps): { open(source?: PinSource): void; ref
       html:
         boardFilterHtml(pickFilter, "pins-find") +
         (tree ? canvasPickHtml(tree, canvasOf(pin.source) ?? null, { attr: "pins" }) : "") +
-        `<section class="nav-board pins-pick-pics" aria-label="Pictures of the library"><div class="nav-board-head"><span class="nav-board-icon">${ICONS.images}</span><span class="nav-board-name">Pictures</span></div>
-          <ul class="nav-canvases">${row("all", "All pictures", pin.source === "all")}${kept.map((fid) => row("folder", label(fid), pin.source === `folder:${fid}`, fid)).join("")}${row("choose", "Choose a folder…", false)}</ul>
+        `<section class="nav-board pins-pick-pics" aria-label="The library"><div class="nav-board-head"><span class="nav-board-icon">${ICONS.library}</span><span class="nav-board-name">Library</span></div>
+          <ul class="nav-canvases">${row("all", "Whole library", pin.source === "all")}${kept.map((fid) => row("folder", label(fid), pin.source === `folder:${fid}`, fid)).join("")}${row("choose", "Choose a folder…", false)}</ul>
           ${kept.length ? pickActionHtml("pins", "clear-recent", "Clear the recent folders", "pins-clear-recent") : ""}
         </section>`,
       wire: (menu) => wireBoardFilter(menu, { board: ".nav-board:not(.pins-pick-pics)", head: ".nav-board-head", row: ".nav-canvas-row", current: (sec) => !!sec.querySelector(".nav-canvas.is-active") }, pickFilter),
@@ -258,7 +258,8 @@ export function mountPins(deps: PinsDeps): { open(source?: PinSource): void; ref
     el.dataset["testid"] = "pins";
     el.setAttribute("aria-label", "Pins");
     el.innerHTML = panelHtml({
-      title: `Pins: <button type="button" class="pins-source" data-pins-source data-testid="pins-source" aria-haspopup="menu" aria-expanded="false" aria-label="What it shows" title="What it shows: a canvas, or pictures of the library"></button>`,
+      title: "Pins",
+      heading: `Pins: <button type="button" class="pins-source" data-pins-source data-testid="pins-source" aria-haspopup="menu" aria-expanded="false" aria-label="What it shows" title="What it shows: a canvas, or pictures of the library"></button>`,
       tools: `<button type="button" class="layer-btn" data-pins-more aria-haspopup="menu" aria-label="More" title="More: opacity, clicks through, float over other apps">${ICONS.ellipsis}</button>`,
       sub: `<div class="pins-look" data-pins-look hidden></div>`,
       body: `<div class="pins-view" data-pins-view><canvas class="pins-canvas" tabindex="0" aria-label="A pinned canvas: the canvas's tools, keys and menus"></canvas></div><div class="pins-library" data-pins-library hidden></div><div class="pins-bar" data-pins-bar></div>`,

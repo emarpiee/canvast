@@ -1938,7 +1938,7 @@ body[data-viewing] #nav, body[data-viewing] .view-settings { display: none; }
 .split { display: inline-flex; flex: 1; min-width: 0; }
 .split > .assets-btn:first-child { flex: 1; border-top-right-radius: 0; border-bottom-right-radius: 0; }
 .split > .assets-btn.is-icon { border-top-left-radius: 0; border-bottom-left-radius: 0; margin-left: 1px; width: 32px; }
-.place-menu { position: fixed; z-index: 40; width: 320px; max-height: min(70vh, 460px); overflow: auto; display: grid; gap: var(--s-1); padding: var(--s-4); background: var(--hud-bg); border: 1px solid var(--hud-border); border-radius: var(--r-lg); box-shadow: var(--hud-lift); backdrop-filter: blur(12px); }
+.place-menu { position: fixed; z-index: 40; width: 320px; font: var(--text-md) var(--font-ui); max-height: min(70vh, 460px); overflow: auto; display: grid; gap: var(--s-1); padding: var(--s-4); background: var(--hud-bg); border: 1px solid var(--hud-border); border-radius: var(--r-lg); box-shadow: var(--hud-lift); backdrop-filter: blur(12px); }
 .place-menu[hidden] { display: none; }
 .pm-title { margin: var(--s-1) var(--s-4) var(--s-2); font-size: var(--text-sm); color: var(--hud-muted); }
 .place-menu > button:not(.nav-add) { display: flex; align-items: center; gap: var(--s-4); min-height: var(--list-h); padding: 0 var(--s-4); font: inherit; color: inherit; text-align: left; background: transparent; border: 0; border-radius: var(--r-sm); cursor: pointer; }
@@ -2994,7 +2994,7 @@ input[data-scrub-input]:focus { cursor: text; }
 .pins-gallery { height: 100%; overflow: auto; padding: var(--s-4); box-sizing: border-box; }
 .pins-gallery .assets-grid { --thumb: var(--pins-thumb); }
 /* A Pins window's title: "Pins:" and what it shows, a button that opens the list to choose (cut short with … when long). */
-.pins-panel .panel-head h2 { display: flex; align-items: center; gap: var(--s-2); min-width: 0; }
+.pins-panel .panel-head h2 { display: flex; align-items: center; gap: var(--s-2); min-width: 0; white-space: nowrap; }
 .pins-source { display: inline-flex; align-items: center; gap: var(--s-2); min-width: 0; height: var(--row-btn); padding: 0 var(--s-2); font: inherit; color: inherit; background: transparent; border: 0; border-radius: var(--ctl-r); cursor: pointer; }
 .pins-source:hover, .pins-source[aria-expanded="true"] { background: var(--hud-hover); }
 .pins-source > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

@@ -31,7 +31,7 @@ export const SHOTS: Record<string, ShotSpec> = {
   "media": { section: "#video-audio-and-gifs", use: "Plan a camera move for an animatic: a slow pan across a painting, played on the board.", alt: "A clip of a slow camera pan across Van Gogh's Wheat Field with Cypresses playing on the canvas, its player bar below it", pointer: true },
   "extract-frame": { section: "#video-audio-and-gifs", use: "Keep a key frame of a clip as a still picture, to draw from or to place in a storyboard.", alt: "A camera pan across Van Gogh's Wheat Field with Cypresses as a clip on the canvas, and beside it the frame extracted from it as a picture" },
   "pins": { section: "#pins", use: "Keep your references in sight while you work: a canvas of studies, or a folder of the library, in a window that floats above every view.", alt: "A canvas of Degas's gesture study pinned in a window over a canvas where Delacroix's Study of a Horse is being worked on" },
-  "pins-gallery": { section: "#pins", use: "A folder of prints beside the canvas you draw on, as the library's own grid and viewer.", alt: "A Pins window on All pictures: the library's Hokusai prints as its grid of cards, beside a canvas with The Great Wave" },
+  "pins-gallery": { section: "#pins", use: "A folder of prints beside the canvas you draw on, as the library's own grid and viewer.", alt: "A Pins window on the whole library: the library's Hokusai prints as its grid of cards, beside a canvas with The Great Wave" },
   "canvas-tags": { section: "#tags-on-the-canvas", use: "Tag the studies on a canvas by what they teach, and find them again.", alt: "Studies tagged gesture and anatomy, the Tags panel listing the tags with their counts" },
 
   // Drawing and vector editing

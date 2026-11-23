@@ -8,6 +8,8 @@ import { ICONS } from "./icons";
 export interface PanelParts {
   /** The header: omit it for a panel that is all content. */
   title?: string;
+  /** Markup in the header in place of the title (a button in it); `title` still names the panel to its buttons. */
+  heading?: string;
   count?: number;
   /** Buttons in the header, before the one that hides the panel. */
   tools?: string;
@@ -20,7 +22,7 @@ export interface PanelParts {
 
 export function panelHtml(p: PanelParts): string {
   const head = p.title
-    ? `<header class="panel-head"><h2>${p.title}${p.count === undefined ? "" : ` <span class="layers-count">${p.count}</span>`}</h2><span class="layers-tools">${p.tools ?? ""}<button type="button" class="layer-btn" data-close aria-label="Hide the ${p.title} panel" title="Hide the ${p.title} panel">${ICONS.x}</button></span></header>`
+    ? `<header class="panel-head"><h2>${p.heading ?? p.title}${p.count === undefined ? "" : ` <span class="layers-count">${p.count}</span>`}</h2><span class="layers-tools">${p.tools ?? ""}<button type="button" class="layer-btn" data-close aria-label="Hide the ${p.title} panel" title="Hide the ${p.title} panel">${ICONS.x}</button></span></header>`
     : "";
   return `${head}${p.sub ? `<div class="panel-sub">${p.sub}</div>` : ""}<div class="panel-body">${p.body}</div>${p.foot ? `<footer class="panel-foot">${p.foot}</footer>` : ""}`;
 }

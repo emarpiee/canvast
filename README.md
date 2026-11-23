@@ -541,7 +541,7 @@ Keep your references in sight while you work: a canvas of studies, or a folder o
 | | |
 | --- | --- |
 | Open one | `Shift+R`, or the button by Settings: the canvas you are on, in a window. Open as many as you like |
-| What it shows | The button in its title (*Pins: Board 1 › Canvas 1*) opens the list to choose: every canvas of the workspace, by board, with a search over them and the boards folded (as **Place on…**), then **All pictures**, the five folders shown lately (**Clear the recent folders** empties that list), or **Choose a folder…** (any folder, found by its name) |
+| What it shows | The button in its title (*Pins: Board 1 › Canvas 1*) opens the list to choose: every canvas of the workspace, by board, with a search over them and the boards folded (as **Place on…**), then the library: **Whole library**, the five folders shown lately (**Clear the recent folders** empties that list), or **Choose a folder…** (any folder, found by its name) |
 | A pinned canvas | The canvas itself: its tools (the ones the toolbar sets), keys, wheel and pinch, right-click menu and undo, over any view, on the view you pressed last; the Actions bar, floating over the bottom of the window, has its **Arrange** (without Keep it tidy); the right-click menu, and a finger held still on a touch screen, give a short one (copy, paste, duplicate, order, delete, select all, fit). The canvas you are on is the same in both: what you change in one is changed in the other |
 | Pictures of the library | The library's own grid of the folder's pictures (no bar, sidebar or details); a double-click opens its viewer in the window (the picture large, its filmstrip, zoom and Fit, the slideshow), and its back arrow returns to the grid |
 | Bringing pictures over | Drag a gallery's card, or a Library card, onto a canvas or a pinned one; drag a picture off the canvas onto a pinned canvas (it stays where it was); drop files from another app onto a pinned canvas, or paste a picture copied there (it goes into the library and in the middle of the window) |
@@ -549,7 +549,7 @@ Keep your references in sight while you work: a canvas of studies, or a folder o
 
 A folder of prints beside the canvas you draw on, as the library's own grid and viewer.
 
-![A Pins window on All pictures: the library's Hokusai prints as its grid of cards, beside a canvas with The Great Wave](docs/screenshots/pins-gallery.webp)
+![A Pins window on the whole library: the library's Hokusai prints as its grid of cards, beside a canvas with The Great Wave](docs/screenshots/pins-gallery.webp)
 
 ## Drawing and vector editing
 
