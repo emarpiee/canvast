@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.62.4 — More modules out of the big files (2026-11-23)
+
+### For developers
+
+- The desktop session (sharing, hidden media, closing, long writes) moved from `app/main.ts` into `app/desktop-session.ts`, and the tools' geometry (rotate zones, corners, snapping, resize handles) from `interaction/tools.ts` into `interaction/tool-geometry.ts`: moved as they were (B34, in part).
+
 ## 0.62.3 — Folders start folded; a pin for Pins (2026-11-23)
 
 - **Changed:** the Library's folders start folded, so a library of many folders opens quickly; the folders you open stay open (remembered on this device), and the folders that lead to the one in view always open (B35). ([Folders and tags](README.md#folders-and-tags))
