@@ -30,21 +30,16 @@ import type { BoolOp } from "../doc/boolean";
 import { boolGroupsOf, isBoolMember, isResult, operandOf, resultOf } from "../doc/boolean-group";
 import { ancestorsOf, descendantsOf, isContainer, isMaskSheet, rootsOf } from "../doc/containers";
 import { planLayerMove, type LayerPlace } from "../doc/layer-move";
-import { DEFAULT_CONSTRAINT, constraintOf } from "../doc/constraints";
 import { cleanAdjust, cropOf, isNeutral, reachFraction } from "../doc/adjust";
 import type { Adjust } from "../doc/adjust";
-import { cropEdges, uncrop } from "../doc/crop";
+import { uncrop } from "../doc/crop";
 import { renderedPicture, setAdjustPreviewing } from "../render/adjust-image";
 import { DEFAULT_INK, newInk } from "../render/ink";
-import type { Constraint } from "../doc/constraints";
 import { MITER_LIMIT, NODE, type Arrow, drawnParams, drawnSubs, geometryBounds, type SubPath } from "../doc/path";
 import { fitPolyline, simplifySub } from "../doc/fit-curve";
 import { alignedOutlineOf, outlineOf } from "../doc/outline-stroke";
-import { divideShapes, pathLookOf, uniteRegions } from "../doc/divide";
-import { gapsOf } from "../doc/gaps";
+import { divideShapes, pathLookOf } from "../doc/divide";
 import { remadePatterns } from "./pattern";
-import { cameraIn } from "../scene/frame-index";
-import { projectionFor } from "../render/projection";
 import { buildNetwork, regionFillAt, withRegionFill } from "../doc/network";
 import { regionIn } from "../doc/boolean-group";
 import type { WidthProfile } from "../doc/stroker";
@@ -76,6 +71,10 @@ import type { AssetLibrary, AssetRecord } from "../assets/asset-library";
 import { duplicateNotice } from "../assets/asset-library";
 import type { EditorState } from "./editor-state";
 import type { ViewState } from "./view-state";
+import { dividable, selected } from "./actions/shared";
+// (groups of actions in modules of their own, B34: what they export is the app's as before)
+export * from "./actions/masks";
+export * from "./actions/gaps";
 
 /** User-level commands shared by keyboard shortcuts, toolbar and tests. */
 
@@ -106,20 +105,6 @@ export function deleteSelection(doc: DocumentStore, editor: EditorState): void {
   doc.commit(doc.transaction(ids.length === 1 ? "Delete object" : `Delete ${ids.length} objects`, [], ids));
   editor.select([]);
 }
-
-/** The selected objects that exist (in paint order). */
-/** The selected objects, back to front. Asked many times for one change (every bar and check), so kept until the document or the selection
- * changes: a large selection in a large canvas was a filter of every object each time. (A copy each time: a caller may sort it.) */
-let selectedMemo: { ordered: readonly CanvasObject[]; ids: Set<ObjectId>; out: CanvasObject[] } | null = null;
-const selected = (doc: DocumentStore, editor: EditorState): CanvasObject[] => {
-  const ordered = doc.ordered();
-  const sel = editor.selection;
-  const m = selectedMemo;
-  if (m && m.ordered === ordered && m.ids.size === sel.size && [...sel].every((id) => m.ids.has(id))) return [...m.out];
-  const out = ordered.filter((o) => sel.has(o.id));
-  selectedMemo = { ordered, ids: new Set(sel), out };
-  return [...out];
-};
 
 /** Group the selection (at least two units) into one group at the level the user is working at. */
 export function groupSelection(doc: DocumentStore, editor: EditorState): void {
@@ -2423,7 +2408,6 @@ export function releaseNetwork(doc: DocumentStore, editor: EditorState): void {
 
 // ---- Divide and the Shape builder (ADR 0145) -------------------------------------------------------------------------------
 
-const dividable = (doc: DocumentStore, editor: EditorState): PathObject[] => selected(doc, editor).filter((o): o is PathObject => o.kind === "path" && !o.container && !o.result && !o.locked && o.sub.some((s) => s.closed));
 export const canDivide = (doc: DocumentStore, editor: EditorState): boolean => dividable(doc, editor).length >= 2;
 
 /** Cut the picked shapes into the regions they overlap in: each region a shape of its own with the look of the one on top. One undo step. */
@@ -2442,392 +2426,6 @@ export function divide(doc: DocumentStore, editor: EditorState): void {
   editor.select(placed.map((o) => o.id));
   editor.changed();
 }
-
-// ---- Gaps (ADR 0172) ---------------------------------------------------------------------------------------------------------
-
-/** The gaps the picked shapes close in, as shapes with the Shape tool's fill and no outline, placed in the units of the back one; or why none. */
-function gapShapes(doc: DocumentStore, editor: EditorState, view: ViewState, closePx: number): { back: PathObject; gaps: PathObject[] } | string {
-  const shapes = dividable(doc, editor);
-  // the closing distance on the screen, in the units of the back shape (the one the gaps are found in)
-  const back0 = [...shapes].sort((a, b) => a.z - b.z)[0];
-  const cam = back0 && cameraIn(view.frameCamera, back0.frame ?? doc.space.world);
-  const ppu = cam && back0 ? projectionFor(cam, view.viewport, back0.anchor, back0.unit).ppu : 0;
-  const found = gapsOf(shapes, doc.space, ppu > 0 && ppu < Infinity ? closePx / ppu : 0);
-  if (typeof found === "string") return found;
-  const { back } = found;
-  if (!found.gaps.length) return "The selected shapes close in no gap: an empty place must be closed in on every side to be filled.";
-  const gaps = found.gaps.map((g): PathObject => homeObject(normalizeUnit({
-    id: newObjectId(), kind: "path", ...(back.frame ? { frame: back.frame } : {}), anchor: back.anchor, unit: back.unit, z: back.z, opacity: 1,
-    attachmentTargetId: null, ...(back.parent ? { parent: back.parent } : {}), sub: g.subs, evenodd: true,
-    fill: editor.shapeFill ?? "#2563eb", stroke: null, width: back.width, name: "Gap",
-  }), doc.space) as PathObject);
-  return { back, gaps };
-}
-
-/** Put new fills just under `back` (they fill what lies between it and its neighbours, which stay on top). */
-function placeUnder(doc: DocumentStore, objs: PathObject[], back: PathObject): CanvasObject[] {
-  const all = doc.ordered();
-  const at = all.findIndex((o) => o.id === back.id);
-  return at > 0 ? placeAbove(all, objs, all[at - 1]!) : objs.map((o, i) => ({ ...o, z: back.z - objs.length + i }));
-}
-
-export const canFillGaps = (doc: DocumentStore, editor: EditorState): boolean => dividable(doc, editor).length >= 1;
-
-/** Fill every gap the picked shapes close in: one undo step; the fills are picked. */
-export function fillAllGaps(doc: DocumentStore, editor: EditorState, view: ViewState, closePx: number): void {
-  if (editor.blockEdit()) return;
-  const found = gapShapes(doc, editor, view, closePx);
-  if (typeof found === "string") {
-    editor.message = found;
-    return editor.changed();
-  }
-  const placed = placeUnder(doc, found.gaps, found.back);
-  doc.commit(doc.transaction(`Fill ${found.gaps.length} ${found.gaps.length === 1 ? "gap" : "gaps"}`, placed));
-  editor.select(placed.map((o) => o.id));
-  editor.changed();
-}
-
-/** Turn on Fill a gap: the gaps of the picked shapes show, a click fills the one under it (one undo step each), Enter or Esc ends it. */
-export function startGapFill(doc: DocumentStore, editor: EditorState, view: ViewState, closePx: number): void {
-  if (editor.blockEdit() || editor.builder || editor.gapFill) return;
-  const found = gapShapes(doc, editor, view, closePx);
-  if (typeof found === "string") {
-    editor.message = found;
-    return editor.changed();
-  }
-  editor.gapFill = { gaps: found.gaps, world: doc.space.world, hover: null };
-  editor.message = `Fill a gap: click a gap to fill it (${found.gaps.length} found); Enter or Esc when done.`;
-  editor.changed();
-}
-
-/** Fill gap `i` of Fill a gap, under the shape at the back of the ones around it. */
-export function fillGapAt(doc: DocumentStore, editor: EditorState, i: number): void {
-  const f = editor.gapFill;
-  const gap = f?.gaps[i];
-  if (!f || !gap || editor.blockEdit()) return;
-  const backs = dividable(doc, editor);
-  const back = [...backs].sort((a, b) => a.z - b.z)[0];
-  const placed = back ? placeUnder(doc, [gap], back) : [gap];
-  doc.commit(doc.transaction("Fill a gap", placed));
-  f.gaps = f.gaps.filter((_, k) => k !== i);
-  f.hover = null;
-  if (!f.gaps.length) editor.gapFill = null;
-  editor.changed();
-}
-
-export function finishGapFill(editor: EditorState): void {
-  editor.gapFill = null;
-  editor.changed();
-}
-
-/** Open the Shape builder on the picked shapes: their regions are drawn instead of them; drag across regions to merge them, Alt-drag to delete them, Enter to finish. */
-export function startShapeBuilder(doc: DocumentStore, editor: EditorState): void {
-  if (editor.blockEdit() || editor.builder) return;
-  const shapes = dividable(doc, editor);
-  const made = divideShapes(shapes, doc.space);
-  if (typeof made === "string") {
-    editor.message = made;
-    editor.changed();
-    return;
-  }
-  editor.builder = { faces: made, srcIds: shapes.map((o) => o.id), world: doc.space.world, merged: [], deleted: new Set(), hover: null, touched: [], removing: false };
-  editor.preview = { kind: "edit", ids: shapes.map((o) => o.id) };
-  editor.message = "Shape builder: drag across regions to merge them, Alt-drag to delete them, Enter to finish, Esc to cancel.";
-  editor.changed();
-}
-
-/** Close the Shape builder: with `apply`, the shapes are replaced by the regions as they were left (merged ones united, deleted ones gone). */
-export function finishShapeBuilder(doc: DocumentStore, editor: EditorState, apply: boolean): void {
-  const b = editor.builder;
-  if (!b) return;
-  editor.builder = null;
-  editor.preview = { kind: "none" };
-  if (!apply) return editor.changed();
-  const grouped = new Set(b.merged.flat());
-  const parts: PathObject[] = [];
-  for (const group of b.merged) {
-    const united = uniteRegions(group.filter((i) => !b.deleted.has(i)).map((i) => b.faces[i]!.obj));
-    if (!united) {
-      editor.message = "Those regions could not be merged: their outlines graze each other.";
-      editor.changed();
-      return;
-    }
-    parts.push(united);
-  }
-  b.faces.forEach((f, i) => {
-    if (!grouped.has(i) && !b.deleted.has(i)) parts.push(f.obj);
-  });
-  const sources = b.srcIds.map((id) => doc.get(id)).filter((o): o is PathObject => o?.kind === "path");
-  if (!sources.length) return editor.changed();
-  const top = [...sources].sort((a, c) => c.z - a.z)[0]!;
-  const placed = parts.length ? placeAbove(doc.ordered(), parts.map((o) => homeObject(normalizeUnit(o), doc.space)), top) : [];
-  doc.commit(doc.transaction("Shape builder", placed, sources.map((o) => o.id)));
-  editor.select(placed.map((o) => o.id));
-  editor.changed();
-}
-
-// ---- Masks (ADR 0144) ---------------------------------------------------------------------------------------------------------
-
-/** The units (a group at the working level, or a single object) among the picked objects, with the objects of each. */
-function pickedUnits(doc: DocumentStore, editor: EditorState): Map<string, CanvasObject[]> {
-  const level = editor.entered.length;
-  const units = new Map<string, CanvasObject[]>();
-  for (const o of selected(doc, editor)) if (!o.locked) (units.get(o.groups?.[level] ?? o.id) ?? units.set(o.groups?.[level] ?? o.id, []).get(o.groups?.[level] ?? o.id)!).push(o);
-  return units;
-}
-const topZ = (os: readonly CanvasObject[]): number => Math.max(...os.map((o) => o.z));
-
-/** Whether two or more things are picked, none of them part of a mask already: the top one can become the mask of the others. */
-export function canMakeMask(doc: DocumentStore, editor: EditorState): boolean {
-  const units = pickedUnits(doc, editor);
-  return units.size >= 2 && [...units.values()].every((u) => u.every((o) => !o.isMask && !o.mask));
-}
-
-/**
- * Cut the picked things by the top one (ADR 0144): it becomes a mask that keeps of the others what its opacity (`alpha`) or brightness
- * (`luminance`) lets through. The mask is a group of its own (so a brush mask can add to it), inside a group of the mask and what it cuts.
- */
-export function makeMask(doc: DocumentStore, editor: EditorState, mode: "alpha" | "luminance"): void {
-  if (editor.blockEdit()) return;
-  if (!canMakeMask(doc, editor)) {
-    editor.message = "Select two or more objects that are not masks already: the top one becomes the mask of the others.";
-    editor.changed();
-    return;
-  }
-  const units = [...pickedUnits(doc, editor).values()].sort((a, b) => topZ(b) - topZ(a));
-  const [maskObjs, ...rest] = units as [CanvasObject[], ...CanvasObject[][]];
-  const masked = rest.flat();
-  const level = editor.entered.length;
-  const MG = newObjectId();
-  const G = newObjectId();
-  const names = { [G]: "Masked", [MG]: "Mask" };
-  const place = (o: CanvasObject): CanvasObject => {
-    const path = [...(o.groups ?? [])];
-    path.splice(level, 0, G);
-    return { ...o, groups: path, groupNames: { ...(o.groupNames ?? {}), ...names } };
-  };
-  if ([...maskObjs, ...masked].some((o) => (o.groups?.length ?? 0) >= 14)) {
-    editor.message = "Those groups nest too deeply to add a mask.";
-    editor.changed();
-    return;
-  }
-  const out = [
-    ...maskObjs.map((o) => place({ ...o, groups: [...(o.groups ?? []), MG], isMask: true as const })),
-    ...masked.map((o) => place({ ...o, mask: { by: MG, mode } })),
-  ];
-  doc.commit(doc.transaction(mode === "alpha" ? "Mask by opacity" : "Mask by brightness", out));
-  editor.select(out.map((o) => o.id));
-  editor.changed();
-}
-
-/** The masks (group ids) of the picked objects: those that are cut by one, and those that are one. */
-function pickedMasks(doc: DocumentStore, editor: EditorState): Set<string> {
-  const bys = new Set<string>();
-  for (const o of selected(doc, editor)) {
-    if (o.mask) bys.add(o.mask.by);
-    if (o.isMask) for (const g of o.groups ?? []) bys.add(g);
-  }
-  const real = new Set<string>();
-  for (const o of doc.all()) if (o.mask && bys.has(o.mask.by)) real.add(o.mask.by);
-  return real;
-}
-
-export const canReleaseMask = (doc: DocumentStore, editor: EditorState): boolean => pickedMasks(doc, editor).size > 0 || selected(doc, editor).some((o) => isMaskSheet(o));
-
-/** What the picked masks are now: how they cut and whether they are inverted (the first one); null when none is picked. */
-export function selectedMask(doc: DocumentStore, editor: EditorState): { mode: "alpha" | "luminance"; invert: boolean } | null {
-  const bys = pickedMasks(doc, editor);
-  for (const o of doc.all()) if (o.mask && bys.has(o.mask.by)) return { mode: o.mask.mode, invert: o.mask.invert === true };
-  return null;
-}
-
-/** Change what the picked masks do (how they cut, whether inverted) or take them away (what they cut is whole again, and their objects are drawn on their own). One undo step. */
-export function changeMask(doc: DocumentStore, editor: EditorState, change: { mode?: "alpha" | "luminance"; invert?: boolean; release?: true }): void {
-  if (editor.blockEdit()) return;
-  const bys = pickedMasks(doc, editor);
-  if (!bys.size) {
-    if (change.release && selected(doc, editor).some((o) => isMaskSheet(o))) releaseSheets(doc, editor); // a clipping mask: its shape stays
-    return;
-  }
-  const out: CanvasObject[] = [];
-  for (const o of doc.all()) {
-    if (o.mask && bys.has(o.mask.by)) {
-      if (change.release) {
-        const { mask: _m, ...rest } = o;
-        out.push(rest as CanvasObject);
-      } else {
-        const invert = change.invert ?? o.mask.invert === true;
-        out.push({ ...o, mask: { by: o.mask.by, mode: change.mode ?? o.mask.mode, ...(invert ? { invert: true as const } : {}) } });
-      }
-    } else if (change.release && o.isMask && o.groups?.some((g) => bys.has(g))) {
-      const { isMask: _i, ...rest } = o;
-      out.push(rest as CanvasObject);
-    }
-  }
-  if (!out.length) return;
-  doc.commit(doc.transaction(change.release ? "Release the mask" : change.invert !== undefined ? "Invert the mask" : "Mask mode", out));
-  editor.changed();
-}
-
-/** Pick the objects of the mask that cuts the picked objects, so it can be moved or edited (it is shown, see-through, while picked). */
-export function selectTheMask(doc: DocumentStore, editor: EditorState): void {
-  const bys = pickedMasks(doc, editor);
-  const members = [...doc.all()].filter((o) => o.isMask && o.groups?.some((g) => bys.has(g)));
-  if (!members.length) return;
-  editor.entered = [];
-  editor.select(members.map((o) => o.id));
-  editor.changed();
-}
-
-/**
- * A mask to paint (ADR 0144): the picked things get a mask by brightness that starts as a white rectangle (all shown, black strokes hide)
- * or a black one (all hidden, white strokes show); the Pen then paints into it until it is finished. Returns whether it started.
- */
-export function startBrushMask(doc: DocumentStore, editor: EditorState, revealed: boolean): void {
-  if (editor.blockEdit()) return;
-  const roots = rootsOf(selected(doc, editor).filter((o) => !o.locked));
-  const level = editor.entered.length;
-  if (!roots.length || roots.some((o) => o.isMask || o.mask)) {
-    editor.message = "Select the objects to paint a mask for (not masks already).";
-    editor.changed();
-    return;
-  }
-  const f0 = roots[0]!.frame ?? doc.space.world;
-  const b = unionBounds(roots.map((o) => expressObjectIn(o, f0)))!;
-  const unit = roots[0]!.unit;
-  const w = D.toNumber(D.shift(D.sub(b.max.x, b.min.x), -unit));
-  const h = D.toNumber(D.shift(D.sub(b.max.y, b.min.y), -unit));
-  if (!(w > 0 && h > 0 && Number.isFinite(w + h))) {
-    editor.message = "Those objects have no common size to paint a mask on.";
-    editor.changed();
-    return;
-  }
-  const members = selected(doc, editor).filter((o) => !o.locked);
-  if (members.some((o) => (o.groups?.length ?? 0) >= 14)) return;
-  const MG = newObjectId();
-  const G = newObjectId();
-  const names = { [G]: "Masked", [MG]: "Mask" };
-  const backdrop: PathObject = {
-    id: newObjectId(),
-    kind: "path",
-    ...(f0 === doc.space.world ? {} : { frame: f0 }),
-    anchor: b.min,
-    unit,
-    z: doc.topZ() + 1,
-    opacity: 1,
-    attachmentTargetId: null,
-    sub: drawnSubs("rect", 0, 0, w, h, 6, 5),
-    fill: revealed ? "#ffffff" : "#000000",
-    stroke: null,
-    width: Math.max(Math.min(w, h) / 100, Number.MIN_VALUE),
-    shape: "rect",
-    isMask: true,
-    groups: [MG],
-  };
-  const place = (o: CanvasObject): CanvasObject => {
-    const path = [...(o.groups ?? [])];
-    path.splice(level, 0, G);
-    return { ...o, groups: path, groupNames: { ...(o.groupNames ?? {}), ...names } };
-  };
-  const out = [place(homeObject(normalizeUnit(backdrop), doc.space)), ...members.map((o) => place({ ...o, mask: { by: MG, mode: "luminance" } }))];
-  doc.commit(doc.transaction("Painted mask", out));
-  editor.entered = [];
-  editor.select(out.map((o) => o.id));
-  editor.maskEdit = { groups: [G, MG], ink: revealed ? "#000000" : "#ffffff" };
-  editor.setTool("pen");
-  editor.message = revealed ? "Painting the mask: the Pen hides (black); the buttons switch to showing (white)." : "Painting the mask: the Pen shows (white); the buttons switch to hiding (black).";
-  editor.changed();
-}
-
-/** Paint the mask in white (shows) or black (hides), or stop painting it. */
-export function paintMask(editor: EditorState, ink: "show" | "hide" | "done"): void {
-  if (!editor.maskEdit) return;
-  if (ink === "done") editor.maskEdit = null;
-  else editor.maskEdit = { ...editor.maskEdit, ink: ink === "show" ? "#ffffff" : "#000000" };
-  editor.changed();
-}
-
-/** The topmost picked shape cuts what else is picked, clipping it to the shape's outline (a sheet of any shape, ADR 0108, 0144). */
-export function makeClippingMask(doc: DocumentStore, editor: EditorState): void {
-  if (editor.blockEdit()) return;
-  const picked = selected(doc, editor).filter((o) => !o.locked);
-  const roots = rootsOf(picked);
-  const shapes = roots.filter((o): o is PathObject => o.kind === "path" && !o.container && !o.result && !o.groups?.length && o.sub.some((s) => s.closed));
-  const maskShape = shapes.sort((a, b) => b.z - a.z)[0];
-  if (!maskShape || roots.length < 2) {
-    editor.message = "Select a closed shape and what it should cut: the top shape becomes the clipping mask.";
-    editor.changed();
-    return;
-  }
-  const content = roots.filter((o) => o !== maskShape);
-  const all = doc.ordered();
-  const lowest = Math.min(...content.map((o) => o.z));
-  const below = [...all].filter((o) => o.z < lowest && o.id !== maskShape.id).pop();
-  const parents = new Set(content.map((o) => o.parent));
-  const parent = parents.size === 1 ? [...parents][0] : undefined;
-  let n = 0;
-  for (const o of all) n = Math.max(n, Number(/^Mask (\d+)$/.exec(o.name ?? "")?.[1] ?? 0));
-  const { parent: _p, ...bare } = maskShape;
-  const body: PathObject = { ...bare, fill: null, stroke: null, container: { clip: true, mask: true, was: { fill: maskShape.fill, stroke: maskShape.stroke } }, name: `Mask ${n + 1}`, ...(parent !== undefined ? { parent } : {}) };
-  const placed = below ? (placeAbove(all, [body], below)[0] ?? body) : { ...body, z: lowest - 1 };
-  const inside = content.map((o) => ({ ...o, parent: body.id }) as CanvasObject);
-  doc.commit(doc.transaction("Clipping mask", [placed, ...inside]));
-  editor.select([body.id, ...picked.map((o) => o.id)]);
-  editor.changed();
-}
-
-/** Release the picked sheets (ADR 0108): what is on them stays where it is, on the sheet around them (or on the canvas); the sheets go. */
-export function releaseSheets(doc: DocumentStore, editor: EditorState): void {
-  if (editor.blockEdit()) return;
-  const frames = selected(doc, editor).filter(isContainer);
-  if (!frames.length) return;
-  const gone = new Map(frames.map((f) => [f.id, f]));
-  const next: CanvasObject[] = [];
-  // A clipping mask goes back to being the shape it was made from (with the fill and outline it had); only plain sheets go.
-  const shapes = frames.filter((f) => isMaskSheet(f)).map((f): CanvasObject => {
-    const { container, name: _n, ...rest } = f;
-    const was = container.was;
-    const fill = was ? was.fill : f.fill;
-    const stroke = was ? was.stroke : f.stroke === null && f.fill === null ? "#1f2329" : f.stroke; // (an old mask that kept nothing: given an outline, or it would be invisible)
-    return { ...rest, fill, stroke } as CanvasObject;
-  });
-  for (const o of doc.all()) {
-    if (gone.has(o.id) || o.parent === undefined || !gone.has(o.parent)) continue;
-    let up = gone.get(o.parent)!.parent;
-    while (up !== undefined && gone.has(up)) up = gone.get(up)!.parent; // (a released sheet inside a released sheet)
-    const { parent: _p, ...rest } = o;
-    next.push((up !== undefined ? { ...rest, parent: up } : rest) as CanvasObject);
-  }
-  const kept = new Set(shapes.map((s) => s.id));
-  doc.commit(doc.transaction(frames.length === 1 ? "Release sheet" : `Release ${frames.length} sheets`, [...next, ...shapes], [...gone.keys()].filter((id) => !kept.has(id))));
-  editor.select([...next, ...shapes].map((o) => o.id));
-  editor.changed();
-}
-
-/** The constraint of the first picked object that is directly on a sheet (null: none is). */
-export function selectedPin(doc: DocumentStore, editor: EditorState): Constraint | null {
-  if (selected(doc, editor).some(isContainer)) return null; // (a sheet picked with what is on it: the pins are the objects', not shown)
-  const on = selected(doc, editor).find((o) => o.parent !== undefined && isContainer(doc.get(o.parent)));
-  return on ? constraintOf(on) : null;
-}
-
-/** Change how the picked objects that are on a sheet follow it when it is resized (ADR 0108): one undo step. */
-export function setPin(doc: DocumentStore, editor: EditorState, patch: { h?: Constraint["h"]; v?: Constraint["v"] }): void {
-  const on = selected(doc, editor).filter((o) => o.parent !== undefined && isContainer(doc.get(o.parent)) && !o.locked);
-  if (!on.length || editor.blockEdit()) return;
-  const next = on.map((o): CanvasObject => {
-    const c = constraintOf(o);
-    const h = patch.h ?? c.h, v = patch.v ?? c.v;
-    const { constraint: _c, ...rest } = o;
-    return (h === DEFAULT_CONSTRAINT.h && v === DEFAULT_CONSTRAINT.v ? rest : { ...rest, constraint: { h, v } }) as CanvasObject;
-  });
-  doc.commit(doc.transaction(on.length === 1 ? "Change pin" : `Change pin of ${on.length} objects`, next));
-  editor.changed();
-}
-
-/** Whether a sheet that has things on it is picked (Fit to contents applies; a sheet with auto layout sizes itself: hug). */
-export const canFitSheet = (doc: DocumentStore, editor: EditorState): boolean =>
-  selected(doc, editor).some((o) => isContainer(o) && !o.rot && o.radius === undefined && !isLaidOut(o) && [...doc.all()].some((k) => k.parent === o.id));
 
 // ---- Auto layout (ADR 0186) ----------------------------------------------------------------------
 

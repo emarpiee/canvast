@@ -54,6 +54,8 @@ export const RULES = [
   [/^src\/(ui\/(assets-view|library-[a-z-]+|batch-rename|hidden-access|note-editor|file-views|file-panel|pdf-view|model-view|archive-view|view-state|setting-rows)\.ts|notes\/.+\.ts)$/, ["library"]],
   [/^src\/ui\/(archive-ui|library-folder-card|reset-dialog)\.ts$/, ["storage", "library"]],
   [/^src\/pins\//, ["library", "drawing"]], // (Pins: a canvas in a window above every view)
+  // (the canvas actions, moved into groups of their own, B34: every part of the canvas uses them)
+  [/^src\/app\/actions\/[a-z-]+\.ts$/, ALL],
   [/^src\/app\/(library-filing|asset-names)\.ts$/, ["library"]],
   // pictures, files and export
   [/^src\/(ui\/(export-dialog|file-actions|media-[a-z-]+|adjust-panel)|app\/(export-[a-z-]+|screenshot|svg-export|pdf-vector|download|font-loader))\.ts$/, ["pictures", "drawing"]],

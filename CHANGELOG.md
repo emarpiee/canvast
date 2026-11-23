@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.63.1 — The masks and gaps actions in modules of their own (2026-11-24)
+
+### For developers
+
+- The canvas actions' Masks and Gaps groups moved from `app/actions.ts` into `app/actions/masks.ts` and `app/actions/gaps.ts`, with the selection helpers they share in `app/actions/shared.ts`; moved as they were, `actions.ts` exports them as before (B34, in part). The change map runs every group for `app/actions/`.
+
 ## 0.63.0 — A welcome in the desktop app, a lighter Library (2026-11-24)
 
 The desktop app now opens on itself: a first start shows canvast with a welcome card over it, instead of a system message box. The Library's folders start folded so a big library opens quickly, Pins gets its pin, and settings are no longer undone by another tab.
