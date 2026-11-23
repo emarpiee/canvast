@@ -67,6 +67,32 @@ note("first open, new device: page ready", s.ready);
 note("first open, new device: the Library view shows every item", s.listed);
 note("first open: page heap", await heap(s.page));
 
+// The busiest functions of a script profile (self time), with the code around them: where a slow pass spends its script.
+const sourceLines = new Map();
+function printProfile(profile, title) {
+  const dt = new Map();
+  const deltas = profile.timeDeltas ?? [];
+  for (let i = 0; i < (profile.samples ?? []).length; i++) dt.set(profile.samples[i], (dt.get(profile.samples[i]) ?? 0) + (deltas[i] ?? 0) / 1000);
+  const self = new Map();
+  for (const n of profile.nodes) {
+    const f = n.callFrame;
+    const key = `${f.functionName || "(anonymous)"} @${f.lineNumber}:${f.columnNumber}|${f.url}`;
+    self.set(key, (self.get(key) ?? 0) + (dt.get(n.id) ?? 0));
+  }
+  const near = (url, line, col) => {
+    if (!url.startsWith("file://")) return "";
+    if (!sourceLines.has(url)) { try { sourceLines.set(url, readFileSync(decodeURIComponent(new URL(url).pathname), "utf8").split("\n")); } catch { sourceLines.set(url, []); } }
+    const text = sourceLines.get(url)[line] ?? "";
+    return text.slice(Math.max(0, col - 60), col + 100).replace(/\s+/g, " ");
+  };
+  console.log(`  profile, ${title} (self time, ms):`);
+  for (const [key, ms] of [...self].sort((a, b) => b[1] - a[1]).slice(0, 18)) {
+    const [name, url] = key.split("|");
+    const [, line, col] = name.match(/@(\d+):(\d+)$/) ?? [];
+    console.log(`    ${ms.toFixed(0).padStart(6)}  ${name.padEnd(36)} ${url ? near(url, Number(line), Number(col)) : ""}`);
+  }
+}
+
 // ---- scrolling the Library view (--scroll) ----
 const scrollRows = [];
 const timeRows = [];
@@ -110,28 +136,7 @@ async function scrollPass(page, mode, size, pass) {
   timeRows.push([`${mode === "grid" ? "Thumbnails" : "List"}, size ${size}`, pass, task.toFixed(0), script.toFixed(0), style.toFixed(0), lay.toFixed(0), (task - script - style - lay).toFixed(0)]);
   if (profiling) {
     const { profile } = await cdp.send("Profiler.stop");
-    const dt = new Map();
-    const deltas = profile.timeDeltas ?? [];
-    for (let i = 0; i < (profile.samples ?? []).length; i++) dt.set(profile.samples[i], (dt.get(profile.samples[i]) ?? 0) + (deltas[i] ?? 0) / 1000);
-    const self = new Map();
-    for (const n of profile.nodes) {
-      const f = n.callFrame;
-      const key = `${f.functionName || "(anonymous)"} @${f.lineNumber}:${f.columnNumber}|${f.url}`;
-      self.set(key, (self.get(key) ?? 0) + (dt.get(n.id) ?? 0));
-    }
-    const sources = new Map();
-    const near = (url, line, col) => {
-      if (!url.startsWith("file://")) return "";
-      if (!sources.has(url)) { try { sources.set(url, readFileSync(decodeURIComponent(new URL(url).pathname), "utf8").split("\n")); } catch { sources.set(url, []); } }
-      const text = sources.get(url)[line] ?? "";
-      return text.slice(Math.max(0, col - 60), col + 100).replace(/\s+/g, " ");
-    };
-    console.log(`  profile, ${pass} (self time, ms):`);
-    for (const [key, ms] of [...self].sort((a, b) => b[1] - a[1]).slice(0, 18)) {
-      const [name, url] = key.split("|");
-      const [, line, col] = name.match(/@(\d+):(\d+)$/) ?? [];
-      console.log(`    ${ms.toFixed(0).padStart(6)}  ${name.padEnd(36)} ${url ? near(url, Number(line), Number(col)) : ""}`);
-    }
+    printProfile(profile, pass);
   }
   await cdp.detach();
   // the cards in view once the wheel stops: how long until each shows its picture
@@ -194,11 +199,71 @@ async function resizePass(page, grip, size) {
   console.log(`resize ${grip} ${size}: ${JSON.stringify(r)}; in ${secs.toFixed(1)} s: tasks ${task.toFixed(0)} ms = script ${script.toFixed(0)}, style ${style.toFixed(0)} (${after.RecalcStyleCount - before.RecalcStyleCount}x), layout ${lay.toFixed(0)} (${after.LayoutCount - before.LayoutCount}x), the rest (paint, decoding, other) ${(task - script - style - lay).toFixed(0)}`);
   resizeRows.push([`${grip === "side" ? "Library panel" : "Details panel"}, size ${size}`, `${r.fps.toFixed(0)}`, `${r.p95.toFixed(0)} ms`, `${r.worst.toFixed(0)} ms`, String(r.long), task.toFixed(0), script.toFixed(0), style.toFixed(0), lay.toFixed(0), (task - script - style - lay).toFixed(0)]);
 }
+// ---- dragging pictures between a Pins window and the canvas (--scroll): how long each takes, and where the main thread spends it
+const dragRows = [];
+async function timedDrag(page, label, drag, placed) {
+  await page.evaluate(() => {
+    const w = window; w.__long = [];
+    w.__longObs?.disconnect();
+    w.__longObs = new PerformanceObserver((l) => { for (const e of l.getEntries()) w.__long.push(e.duration); });
+    w.__longObs.observe({ entryTypes: ["longtask"] });
+  });
+  const cdp = await page.context().newCDPSession(page);
+  await cdp.send("Profiler.enable");
+  await cdp.send("Profiler.setSamplingInterval", { interval: 200 });
+  await cdp.send("Profiler.start");
+  const before = await page.evaluate(() => window.__canvastDebug.objects().length);
+  const t0 = performance.now();
+  await drag();
+  const released = performance.now() - t0;
+  await page.waitForFunction((n) => window.__canvastDebug.objects().length > n, before, { timeout: 60_000, polling: 20 });
+  const total = performance.now() - t0;
+  await page.evaluate(() => window.__canvastDebug.nextFrame());
+  const drawn = performance.now() - t0;
+  const { profile } = await cdp.send("Profiler.stop");
+  await cdp.detach();
+  const long = await page.evaluate(() => { window.__longObs.disconnect(); return window.__long; });
+  console.log(`drag ${label}: released after ${released.toFixed(0)} ms, placed after ${total.toFixed(0)} ms, drawn after ${drawn.toFixed(0)} ms; long tasks ${long.length}, longest ${Math.max(0, ...long).toFixed(0)} ms, together ${long.reduce((a, b) => a + b, 0).toFixed(0)} ms`);
+  printProfile(profile, `drag ${label}`);
+  dragRows.push([label, released.toFixed(0), total.toFixed(0), drawn.toFixed(0), String(long.length), Math.max(0, ...long).toFixed(0)]);
+  return placed;
+}
+async function dragPasses(page) {
+  await page.evaluate(() => window.__canvastDebug.setView("canvas"));
+  // a Pins window on all the pictures, and one on the canvas
+  await page.evaluate(() => window.__canvastDebug.runCommand("pins.open", { source: "all" }, "test"));
+  const lib = page.locator('[data-testid="pins"]').first();
+  const card = lib.locator('[data-testid="asset-card"]').first();
+  await card.waitFor({ timeout: 60_000 });
+  await page.waitForTimeout(1500); // (its thumbnails loaded)
+  const canvas = page.locator("#canvas");
+  const cb = await canvas.boundingBox();
+  await timedDrag(page, "from a Pins window's pictures onto the canvas", () => card.dragTo(canvas, { targetPosition: { x: Math.round(cb.width * 0.3), y: Math.round(cb.height * 0.5) } }));
+  await page.evaluate(() => window.__canvastDebug.runCommand("pins.open", {}, "test"));
+  const pinned = page.locator(".pins-canvas").first();
+  await pinned.waitFor({ timeout: 30_000 });
+  await page.waitForTimeout(1500);
+  // the picture just placed, dragged off the canvas onto the pinned canvas (pressed off its middle: the middle of a selection turns it)
+  const id = await page.evaluate(() => window.__canvastDebug.objects().at(-1).id);
+  await page.evaluate((i) => window.__canvastDebug.select([i]), id);
+  await page.evaluate(() => window.__canvastDebug.nextFrame());
+  const box = await page.evaluate((i) => window.__canvastDebug.objectScreen(i).box, id);
+  const from = { x: cb.x + (box.minX + box.maxX) / 2 - (box.maxX - box.minX) / 4, y: cb.y + (box.minY + box.maxY) / 2 + (box.maxY - box.minY) / 4 };
+  const pb = await pinned.boundingBox();
+  const to = { x: pb.x + pb.width / 2, y: pb.y + pb.height / 2 };
+  await timedDrag(page, "from the canvas onto a pinned canvas", async () => {
+    await page.mouse.move(from.x, from.y);
+    await page.mouse.down();
+    for (let i = 1; i <= 20; i++) { await page.mouse.move(from.x + ((to.x - from.x) * i) / 20, from.y + ((to.y - from.y) * i) / 20); await page.waitForTimeout(16); }
+    await page.mouse.up();
+  });
+}
 if (SCROLL) {
   for (const pass of ["first time", "again"])
     for (const mode of ["grid", "list"])
       for (const size of [96, 240]) await scrollPass(s.page, mode, size, pass);
   for (const grip of ["side", "insp"]) for (const size of [96, 240]) await resizePass(s.page, grip, size);
+  await dragPasses(s.page).catch((e) => console.log(`drag passes stopped: ${e.message.split("\n")[0]}`));
   note("after scrolling: page heap", await heap(s.page));
 }
 await s.page.evaluate(() => window.__canvastDebug.flushStorage());
@@ -224,4 +289,5 @@ console.log(`\n| ${N.toLocaleString()} items | time |\n| --- | --- |\n${results.
 if (timeRows.length) console.log(`\n| Where the time went (ms) | Pass | Tasks | Script | Style | Layout | Paint, decoding, other |\n| --- | --- | --- | --- | --- | --- | --- |\n${timeRows.map((r) => `| ${r.join(" | ")} |`).join("\n")}`);
 if (scrollRows.length) console.log(`\n| Scrolling ${N.toLocaleString()} items | Pass | FPS | Slowest 5 % | Slowest | Frames over 50 ms | Speed | Cards waiting at stop | Until all shown |\n| --- | --- | --- | --- | --- | --- | --- | --- | --- |\n${scrollRows.map((r) => `| ${r.join(" | ")} |`).join("\n")}`);
 if (resizeRows.length) console.log(`\n| Dragging a panel edge over ${N.toLocaleString()} items | FPS | Slowest 5 % | Slowest | Frames over 50 ms | Tasks (ms) | Script | Style | Layout | Paint, decoding, other |\n| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |\n${resizeRows.map((r) => `| ${r.join(" | ")} |`).join("\n")}`);
+if (dragRows.length) console.log(`\n| Dragging a picture (${N.toLocaleString()} items in the library) | Let go after (ms) | Placed after | Drawn after | Long tasks | Longest (ms) |\n| --- | --- | --- | --- | --- | --- |\n${dragRows.map((r) => `| ${r.join(" | ")} |`).join("\n")}`);
 if (!args.includes("--keep")) for (const d of [dir, `${dir}-device-a`]) rmSync(d, { recursive: true, force: true });
