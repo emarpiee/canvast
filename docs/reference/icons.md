@@ -7,7 +7,6 @@ One icon per function: two buttons that do different things never share an icon,
 | `book-image` | The Panel tool, a comic page and its panels: the tool, its options' section, the Actions bar's Comic page menu |
 | `rows-2`, `columns-2` | Cut a comic panel in two: across, or down (the Sheets menu of the Actions bar) |
 | `ghost`, `mouse-pointer-2-off`, `monitor-up` | A Pins window: its opacity, let clicks through, float over other apps |
-| `app-window` | Pins: its button and its commands |
 | `save` | Save: Save as a style, Save to library (the export dialog, the Actions bar, the context menu), Save from the text, Save the adjustments (nothing else carries it) |
 | `arrow-down-to-line` | Import: every import button and menu row, the Import tool of the rail, Import styles (nothing else carries it) |
 | `refresh-cw` | Update: Update from the picked picture, from the Pattern panel, to the current view, the bookmark pictures, the initial state, a saved search to the look shown now (nothing else carries it) |
@@ -311,7 +310,7 @@ One icon per function: two buttons that do different things never share an icon,
 | `minus` (also Zoom out) | Minimize the window (desktop app, window frame off): the common window icon, the owner's choice over a unique one |
 | `square` | Maximize or restore the window (desktop app, window frame off): the common window icon, the owner's choice |
 | `log-out` | Exit hidden mode (hidden mode chip, status bar) |
-| `pin` | Pin: a folder to the top of the library sidebar; hidden mode, so it stays on when leaving the library (filled when pinned) |
+| `pin` | Pin: a folder to the top of the library sidebar; hidden mode, so it stays on when leaving the library (filled when pinned); Pins (its button and its commands) |
 | `folder-up` | The mark of a pinned folder in the library sidebar |
 | `pin-off` | Unpin a folder (library sidebar) |
 | `file-image` | Custom thumbnail of a library item (details panel, bulk bar) |

@@ -17,13 +17,13 @@ The work on canvast that is not done yet, and what became of each item. **Priori
 | B28 | AI agents work with fewer, clearer commands: change any item by its id (fill, outline, text colour, position, size) without selecting it, a text's colour on `item.create`, a batch answer that counts what it made instead of listing every id, and every command saying when it did nothing | medium | open | Found while an agent drew pixel art (0.60.19–0.60.23) |
 | B30 | Panning and zooming stay smooth with adjustments on the canvas (blur, pixelate and the other adjustment shapes): today they make the view lag | medium | open | Reported by the owner 2026-11-17: investigate first (which adjustments, how many, at what zoom), then fix |
 | B34 | The app's largest files (the canvas start-up, the Library, the tools) split into modules of their own, so a change in one part cannot break another unseen | medium | open | Started in 0.61.64 (the AI agent link and the screenshot moved out); the rest share the state of one big function (the Library's viewer and slideshow, the canvas actions, paste and drop), so they need a shared state object designed first, then one move per commit with the tests green between |
-| B35 | The Library opens without expanding every folder (a library of many subfolders opened slowly), and still remembers which folders you expanded or collapsed | medium | open | Asked by the owner |
 | B9 | Hiding and showing big hidden items faster (about 30 to 60 MB/s today) | low | open | Waits for a decision: encrypting in the desktop app's main process means the key leaves the page |
 | B10 | Speed and memory measured on real devices (an older laptop, a phone), not only on the test machine | low | open | The benchmarks and the qualification matrix exist and were run on the test machine |
 | B11 | The Retroma theme | low | open | Parked on the `retroma-v4` branch until the owner resumes it |
 | B12 | Math in notes (formulas) | low | open | On hold |
 | B26 | The Layers panel's row buttons show which state they are in: today some icons (such as the clipping and the frame toggles) look the same whether on or off | low | open | Icon audit of every Layers panel toggle first |
-| B36 | The Pins button and Pins rows show a pin icon | low | open | Asked by the owner |
+| B35 | The Library opens without expanding every folder (a library of many subfolders opened slowly), and still remembers which folders you expanded or collapsed | medium | closed | 0.62.3 |
+| B36 | The Pins button and Pins rows show a pin icon | low | closed | 0.62.3 |
 | B1 | README pictures for the newest features: the ZIP and comic book viewer, maybe the rename and move progress notice | high | closed | 0.60.16: the ZIP and comic book view's section and picture (a progress notice is too brief to picture) |
 | B13 | Builds for Windows and macOS open for contribution, with terms for them | medium | closed | 0.60.12: [Builds for other systems](CONTRIBUTING.md#builds-for-other-systems) |
 | B23 | Better-formatted release notes on GitHub: a summary first, then a part for users and one for developers | high | closed | 0.60.13 |

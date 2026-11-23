@@ -560,7 +560,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
 
   // What the user chose to hide (the details panel, the viewer's controls) is remembered on this device.
   const UI_KEY = "canvast.assets.ui";
-  const ui: { details: boolean; bar: boolean; layout: "grid" | "list"; order: ColumnId[]; hidden: ColumnId[]; closed: string[]; folded: string[]; chooser: ChooserView; tagsInline: boolean; sideSort: Record<keyof typeof SIDE_SORTS, SideSort>; pinned: string[]; expanded: string[]; sections: string[]; detailSections: string[]; views: Record<string, SavedLook>; filters: { usage: string; sort: string; reversed: boolean; scope: string }; colW: Partial<Record<ColumnId, number>>; thumb: number | null; listThumb: number; fontSample: number; fontTry: string; sheetH: number | null; sideW: number | null; inspW: number | null } = { details: true, bar: true, layout: "grid", order: [...DEFAULT_COLUMN_ORDER], hidden: [...DEFAULT_HIDDEN], closed: [], folded: [], chooser: "tree", tagsInline: false, sideSort: { folders: "az", tag: "az", ctag: "az", types: "many", saved: "own" }, pinned: [], expanded: [], sections: [...SIDE_SECTIONS], detailSections: [...DETAIL_SECTIONS], views: {}, filters: { ...NO_FILTERS }, colW: {}, thumb: null, listThumb: 96, fontSample: 0, fontTry: "", sheetH: null, sideW: null, inspW: null };
+  const ui: { details: boolean; bar: boolean; layout: "grid" | "list"; order: ColumnId[]; hidden: ColumnId[]; closed: string[]; folded: string[]; opened: string[]; chooser: ChooserView; tagsInline: boolean; sideSort: Record<keyof typeof SIDE_SORTS, SideSort>; pinned: string[]; expanded: string[]; sections: string[]; detailSections: string[]; views: Record<string, SavedLook>; filters: { usage: string; sort: string; reversed: boolean; scope: string }; colW: Partial<Record<ColumnId, number>>; thumb: number | null; listThumb: number; fontSample: number; fontTry: string; sheetH: number | null; sideW: number | null; inspW: number | null } = { details: true, bar: true, layout: "grid", order: [...DEFAULT_COLUMN_ORDER], hidden: [...DEFAULT_HIDDEN], closed: [], folded: [], opened: [], chooser: "tree", tagsInline: false, sideSort: { folders: "az", tag: "az", ctag: "az", types: "many", saved: "own" }, pinned: [], expanded: [], sections: [...SIDE_SECTIONS], detailSections: [...DETAIL_SECTIONS], views: {}, filters: { ...NO_FILTERS }, colW: {}, thumb: null, listThumb: 96, fontSample: 0, fontTry: "", sheetH: null, sideW: null, inspW: null };
   try {
     const saved = JSON.parse(localStorage.getItem(UI_KEY) ?? "{}") as Partial<typeof ui>;
     if (typeof saved.details === "boolean") ui.details = saved.details;
@@ -585,6 +585,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     if (typeof saved.sheetH === "number" && saved.sheetH >= 120 && saved.sheetH <= 2000) ui.sheetH = saved.sheetH;
     if (Array.isArray(saved.closed)) ui.closed = saved.closed.filter((c) => typeof c === "string").slice(0, 8);
     if (Array.isArray(saved.folded)) ui.folded = saved.folded.filter((c) => typeof c === "string").slice(0, 20000);
+    if (Array.isArray(saved.opened)) ui.opened = saved.opened.filter((c) => typeof c === "string").slice(0, 20000);
     if (saved.chooser === "inline") ui.chooser = "inline";
     if (saved.tagsInline === true) ui.tagsInline = true;
     if (Array.isArray(saved.pinned)) ui.pinned = saved.pinned.filter((c) => typeof c === "string").slice(0, 2000); // (where pins were kept before 0.54.47: taken once, below)
@@ -621,6 +622,16 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   }
   // (a Pins window's Library is a small grid of a folder's pictures: cards, the smallest, no details; whatever the Library view uses)
   if (opts.embedded) Object.assign(ui, { layout: "grid", details: false, thumb: 96, filters: { ...ui.filters, usage: "all" } });
+  /**
+   * Whether a tree's row is open. Folders start folded and open as you open them, remembered (`ui.opened`, B35: a library of many
+   * subfolders opened slowly with all of them open); a tag tree's rows start open and fold as you fold them (`ui.folded`).
+   */
+  const isTagKey = (k: string): boolean => /^c?tag:/.test(k);
+  const isOpen = (k: string): boolean => (isTagKey(k) ? !ui.folded.includes(k) : ui.opened.includes(k));
+  const setOpen = (k: string, open: boolean): void => {
+    if (isTagKey(k)) ui.folded = open ? ui.folded.filter((x) => x !== k) : [...ui.folded.filter((x) => x !== k), k];
+    else ui.opened = open ? [...ui.opened.filter((x) => x !== k), k] : ui.opened.filter((x) => x !== k);
+  };
   // (the kept filters: an option the menus do not have any more is not taken)
   if ([...usageSel.options].some((o) => o.value === ui.filters.usage)) usageSel.value = ui.filters.usage;
   /** The sort menu's properties: those in the library, those shown as columns, and the one sorted by. */
@@ -2866,11 +2877,16 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     const findingFolders = sideFind.folders.trim() !== "";
     // Pinned folders lead the list, a subfolder too (a search shows every folder in its place, with what leads to it).
     const pinnedNow = new Set(findingFolders ? [] : ui.pinned);
+    // (the folder in view is never hidden in a folded one: the folders that lead to it open, as a file manager shows the path)
+    if (scope.startsWith("folder:")) {
+      let at = listing.folders.find((f) => f.id === scope.slice(7))?.parentId ?? null;
+      for (let n = 0; at && n < 64; n++, at = listing.folders.find((f) => f.id === at)?.parentId ?? null) if (!isOpen(at)) setOpen(at, true);
+    }
     const foldersKept = findingFolders ? treeSearch(listing.folders, (f) => f.parentId, (f) => folderPath(listing!.folders, f.id).join("/"), sideFind.folders).keep : null;
     const folderKids = (id: string): AssetFolder[] => folderSorted(listing!.folders.filter((f) => f.parentId === id && !pinnedNow.has(f.id) && (!foldersKept || foldersKept.has(f.id))));
     /** A folder's row, then its subfolders' rows, in the app's one tree. */
     const treeOf = (root: AssetFolder): string =>
-      walkTree([root], (f) => folderKids(f.id), (f) => findingFolders || !ui.folded.includes(f.id), (f, at) =>
+      walkTree([root], (f) => folderKids(f.id), (f) => findingFolders || isOpen(f.id), (f, at) =>
         (naming?.kind === "rename" && naming.id === f.id
           ? nameInput(f.name, `New name for folder ${f.name}`)
           : item(`folder:${f.id}`, esc(f.name), subtreeCount(f.id), {
@@ -2920,7 +2936,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     /** A header's button that folds or opens all of a tree. */
     const foldAllBtn = (attr: string, what: string, keys: readonly string[]): string => {
       if (!keys.length) return "";
-      const open = keys.some((k) => !ui.folded.includes(k));
+      const open = keys.some((k) => isOpen(k));
       const word = `${open ? "Collapse" : "Expand"} all ${what}`;
       return `<button type="button" class="side-add" ${attr} aria-label="${word}" title="${word}">${open ? ICONS.chevronsDownUp : ICONS.chevronsUpDown}</button>`;
     };
@@ -2944,7 +2960,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
         return item(`${o.scope}:${t.id}`, `#${esc(label)}`, o.n(t.id), { ...opts, ...(title || opts.before !== undefined ? { title: title ?? `#${esc(full(t.id))}` } : {}), extra: o.menu(t.id, t.value !== null, kids.has(t.id), full(t.id)) });
       };
       const tree = (root: (typeof nodes)[number]): string =>
-        walkTree([root], (t) => (kids.get(t.id) ?? []).filter((k) => found.keep.has(k.id)), (t) => finding || !ui.folded.includes(`${o.scope}:${t.id}`), (t, at) =>
+        walkTree([root], (t) => (kids.get(t.id) ?? []).filter((k) => found.keep.has(k.id)), (t) => finding || isOpen(`${o.scope}:${t.id}`), (t, at) =>
           row(t, t.name, { depth: at.depth, cls: "tree-row", before: treeGuides(at.depth, at.last, at.conts) + treeSlot(at, `data-tag-twist="${o.scope}:${esc(t.id)}"`) }),
         );
       const rows = ui.tagsInline
@@ -4819,7 +4835,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     }
     if (b.dataset["tagTwist"] !== undefined) {
       const id = b.dataset["tagTwist"];
-      ui.folded = ui.folded.includes(id) ? ui.folded.filter((x) => x !== id) : [...ui.folded, id];
+      setOpen(id, !isOpen(id));
       saveUi();
       renderSide();
       return;
@@ -4828,8 +4844,8 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       // (each tree folds on its own: what another has folded stays)
       const tree = b.dataset["tagsFold"];
       const parents = tree ? (sideTagParents.get(tree) ?? []) : (listing?.folders ?? []).filter((f) => listing!.folders.some((k) => k.parentId === f.id)).map((f) => f.id);
-      const others = ui.folded.filter((k) => (tree ? !k.startsWith(`${tree}:`) : /^c?tag:/.test(k)));
-      ui.folded = parents.some((id) => !ui.folded.includes(id)) ? [...others, ...parents] : others;
+      const open = parents.some((id) => isOpen(id)); // (any open: all fold; none: all open)
+      for (const id of parents) setOpen(id, !open);
       saveUi();
       renderSide();
       return;
@@ -4925,7 +4941,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       // A folder with subfolders opens on a click and closes on the next, and is the one chosen either way (folders as in a file manager).
       if (next.startsWith("folder:") && b.hasAttribute("aria-expanded")) {
         const id = next.slice(7);
-        ui.folded = b.getAttribute("aria-expanded") === "true" ? [...ui.folded.filter((x) => x !== id), id] : ui.folded.filter((x) => x !== id);
+        setOpen(id, b.getAttribute("aria-expanded") !== "true");
         saveUi();
         scope = next;
         render();
@@ -4959,7 +4975,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
         break;
       case "new":
         naming = { kind: "new", parent: id || null };
-        ui.folded = ui.folded.filter((x) => x !== id); // (where the new one will show)
+        if (id) setOpen(id, true); // (where the new one will show)
         renderSide();
         break;
       case "rename":

@@ -384,7 +384,7 @@ export function mountPins(deps: PinsDeps): { open(source?: PinSource): void; ref
   }, true);
 
   // ---- commands (ADR 0205): every action of the windows, for the buttons, menus, keys and outside callers alike
-  const pc = (id: string, title: string, hint: string, options: readonly OptionSpec[], exec: NonNullable<Command["exec"]>): Command => ({ id, group: "Pins", kind: "pins", title, hint, icon: ICONS.referenceWindow, risk: "read", options, why: () => null, exec });
+  const pc = (id: string, title: string, hint: string, options: readonly OptionSpec[], exec: NonNullable<Command["exec"]>): Command => ({ id, group: "Pins", kind: "pins", title, hint, icon: ICONS.pin, risk: "read", options, why: () => null, exec });
   const WINDOW: OptionSpec = { name: "window", type: "text", doc: "the window", required: true };
   const known = (c: unknown): boolean => typeof c === "string" && (deps.session.tree?.boards ?? []).some((b) => b.canvases.some((x) => x.id === c));
   /** A source a window can show: a canvas of the workspace (as `canvas`, an id alone), all pictures, or a folder (`library` from before is all). */

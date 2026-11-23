@@ -103,6 +103,13 @@ test("a folder folds, stays folded after a reload, and Organize moves to a folde
   await p.getByTestId("view-assets").click();
   await expect(tree.getByText("Art")).toBeVisible();
   await expect(tree.getByText("Ink")).toHaveCount(0);
+  // (folders start folded and open as they are opened, remembered: B35)
+  await tree.getByRole("button", { name: /^Art/ }).click();
+  await expect(tree.getByText("Ink")).toBeVisible();
+  await p.reload();
+  await p.waitForFunction(() => typeof window.__canvastDebug !== "undefined");
+  await p.getByTestId("view-assets").click();
+  await expect(tree.getByText("Ink"), "an opened folder stays open").toBeVisible();
   // Every row's name starts in one line, whether it has an arrow or not, and the count ends at the row's edge.
   await p.getByTestId("folder-new").click();
   await name("Plain");

@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.62.3 — Folders start folded; a pin for Pins (2026-11-23)
+
+- **Changed:** the Library's folders start folded, so a library of many folders opens quickly; the folders you open stay open (remembered on this device), and the folders that lead to the one in view always open (B35). ([Folders and tags](README.md#folders-and-tags))
+- **Changed:** Pins shows a pin, its button and its commands (B36). ([Pins](README.md#pins))
+
+### Before you update
+
+- The Library's folder tree starts folded once: open the folders you use, and they stay open.
+
 ## 0.62.2 — Settings kept when two tabs change them (2026-11-23)
 
 - **Fixed:** a setting changed in one canvast tab could be undone by another tab saving its own older copy of every setting: a save now writes only the settings it changed (B24, in part). ([Your workspace and data](README.md#your-workspace-and-data))

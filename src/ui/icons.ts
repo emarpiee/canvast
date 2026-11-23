@@ -29,7 +29,6 @@ import speechBalloonSvg from "lucide-static/icons/message-circle.svg";
 import comicPanelSvg from "lucide-static/icons/book-image.svg";
 import cutAcrossSvg from "lucide-static/icons/rows-2.svg";
 import cutDownSvg from "lucide-static/icons/columns-2.svg";
-import referenceWindowSvg from "lucide-static/icons/app-window.svg";
 import windowOpacitySvg from "lucide-static/icons/ghost.svg";
 import clickThroughSvg from "lucide-static/icons/mouse-pointer-2-off.svg";
 import floatOnTopSvg from "lucide-static/icons/monitor-up.svg";
@@ -724,7 +723,6 @@ export const ICONS = {
   cutAcross: clean(cutAcrossSvg),
   cutDown: clean(cutDownSvg),
   /** The reference window (ADR 0207). */
-  referenceWindow: clean(referenceWindowSvg),
   /** A reference board's picture turned a quarter, shown in grey (a value study), the window folded to its title, made see-through, let clicks through, floated over other apps (ADR 0207). */
   windowOpacity: clean(windowOpacitySvg),
   clickThrough: clean(clickThroughSvg),
