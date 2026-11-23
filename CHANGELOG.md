@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.63.14 — A folder's count readable under the pointer (2026-11-24)
+
+- **Fixed before release:** a folder row's count, which now stays under the pointer, takes the row's text colour there, so it reads on the hovered and the selected row in both themes. ([Folders and tags](README.md#folders-and-tags))
+- **Docs:** the two Pins pictures show the title's pin and the list's button. ([Pins](README.md#pins))
+
 ## 0.63.13 — Pictures keep their proportions when resized (2026-11-24)
 
 - **Changed:** a picture, a video or any other file keeps its proportions when resized by its handles, a corner or a side; shapes and sheets stretch as before, and a note's card is laid out again to its new shape as before. A picture is still stretched with its sheet when pinned to scale. ([Keyboard and pointer reference](README.md#keyboard-and-pointer-reference))
