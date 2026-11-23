@@ -1,6 +1,16 @@
 import { expect, test } from "./harness";
 import { makePng } from "./png";
 
+import type { Locator } from "@playwright/test";
+/** What in a Pins window scrolls although it should not (the window itself, its parts): only the Library's grid may, and it has no more to show here. */
+const overflowing = (pins: Locator): Promise<string[]> =>
+  pins.evaluate((el) => {
+    const win = el.closest(".dock-item") ?? el;
+    return [win, ...win.querySelectorAll("*")]
+      .filter((e) => /auto|scroll/.test(getComputedStyle(e).overflowY) && e.scrollHeight > e.clientHeight + 1)
+      .map((e) => `${e.tagName.toLowerCase()}.${[...e.classList].join(".")} ${e.scrollHeight}/${e.clientHeight}`);
+  });
+
 test("Pins (ADR 0208): Shift+R pins the open canvas in a window above every view, drawn by the canvas's own engine; what is done in it is done to the canvas (its own selection, the canvas's keys and undo), and it opens again after a reload", async ({ app }) => {
   const p = app.page;
   await p.evaluate(() => window.__canvastDebug.runCommand("item.create", { kind: "rect" }, "test"));
@@ -11,6 +21,7 @@ test("Pins (ADR 0208): Shift+R pins the open canvas in a window above every view
   await p.keyboard.press("Shift+R");
   const pins = p.getByTestId("pins");
   await expect(pins).toBeVisible();
+  expect(await overflowing(pins), "nothing in the window scrolls: no scrollbar of its own").toEqual([]);
   const view = pins.locator("canvas");
   const r = (await view.boundingBox())!;
   // its view of the same canvas: the shape in its middle, picked and moved there; the main view shows it moved (one document)
@@ -83,6 +94,7 @@ test("a Pins window shows pictures of the library as the Library's own grid, the
   // the Library's own grid of the folder's pictures first (no bar, sidebar or details)
   const cards = pins.getByTestId("asset-card");
   await expect(cards).toHaveCount(2);
+  expect(await overflowing(pins), "nothing in the window scrolls: no scrollbar of its own").toEqual([]);
   // what it shows is chosen from its title: the app's own list of canvases (a search over the boards), then the pictures
   await expect(pins.locator(".panel-head .pins-mark")).toHaveAttribute("aria-label", "Pins");
   // (one row: the title's button is not in the Hide button's name, and the header is one line high)
