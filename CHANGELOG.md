@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.63.12 — One scrollbar in a Pins window (2026-11-24)
+
+- **Fixed before release:** a Pins window showing the library had a second, large scrollbar of its own beside the library's: the window itself no longer scrolls, only what it shows. ([Pins](README.md#pins))
+
 ## 0.63.11 — A turned picture resizes as a shape does (2026-11-24)
 
 - **Fixed:** a picture with any turn, even one too small to be seen, kept its proportions when resized by a corner and did not snap, while a shape in the same state did: a picture now stretches along its own sides as a shape does (one rule for both), and a box turned less than half a pixel over its size snaps to other objects again. ([Keyboard and pointer reference](README.md#keyboard-and-pointer-reference))
