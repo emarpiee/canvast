@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import * as D from "../../src/core/dyadic";
 import { LIMITS, boolWith, chooseInMenu, distance, expect, maskWith, pathWith, recordMetric, reps, setPenColour, sheetWith, test, saveSettings } from "./harness";
 import { encodeGif } from "./gif";
@@ -1489,11 +1490,26 @@ test("every kind of object snaps when resized by a handle: to another object's e
     const id = (await objects(app)).find((o) => o.kind === "image")!.id;
     await p.evaluate((i) => window.__canvastDebug.select([i]), id);
   };
+  const NOTE = `# A note\n\n${"Words of a note on its card. ".repeat(12)}\n`;
+  /** A note's card placed from the library: it is laid out again to its new shape as it is resized. */
+  const noteCard = async () => {
+    const n = await count();
+    await p.getByTestId("view-assets").click();
+    await p.getByTestId("assets-import-input").setInputFiles({ name: "a-note.md", mimeType: "text/markdown", buffer: Buffer.from(NOTE) });
+    await p.locator(`[data-testid="asset-card"][data-hash="${createHash("sha256").update(NOTE).digest("hex")}"]`).click();
+    await p.getByTestId("asset-place").click();
+    await p.getByTestId("view-canvas").click();
+    await expect.poll(count).toBe(n + 1);
+    await key(app, "v");
+    const id = (await objects(app)).find((o) => o.kind === "image")!.id;
+    await p.evaluate((i) => window.__canvastDebug.select([i]), id);
+  };
   // Each kind made left of the middle and left selected (with the Select tool on).
   const kinds: Array<[string, () => Promise<void>]> = [
     ["shape", async () => { await key(app, "u"); await app.drag({ x: 450, y: 300 }, { x: 560, y: 380 }); await key(app, "v"); }],
     ["picture", picture],
     ["picture from the library", libraryPicture],
+    ["note card", noteCard],
     ["picture on its own sheet", async () => { await picture(); await sheetWith(p, "puton"); await expect.poll(async () => (await objects(app)).filter((o) => o["container"]).length).toBe(1); }],
     ["pen stroke", async () => { await key(app, "p"); await app.drag({ x: 450, y: 320 }, { x: 560, y: 360 }); await key(app, "v"); await p.mouse.click(505, 340); }],
     ["speech balloon", async () => { await key(app, "k"); await app.drag({ x: 450, y: 300 }, { x: 560, y: 380 }); await key(app, "v"); }],
