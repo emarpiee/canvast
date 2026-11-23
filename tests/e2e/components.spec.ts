@@ -96,6 +96,14 @@ test("a folder folds, stays folded after a reload, and Organize moves to a folde
   await name("Ink");
   const tree = p.getByTestId("folder-tree");
   await expect(tree.getByText("Ink")).toBeVisible();
+  // Under the pointer only the count's place changes (to Pin and More): the branch mark stays where it was
+  const artRow = tree.locator(".side-row", { has: p.getByRole("button", { name: /^Art/ }) });
+  const branchX = () => artRow.locator(".side-kids").evaluate((e) => Math.round(e.getBoundingClientRect().left));
+  await p.mouse.move(5, 5);
+  const restX = await branchX();
+  await artRow.hover();
+  await expect(artRow.locator(".side-more").last()).toBeVisible();
+  expect(await branchX(), "the branch mark does not move under the pointer").toBe(restX);
   await tree.getByRole("button", { name: /^Art/ }).click(); // (a folder with subfolders closes on its own row)
   await expect(tree.getByText("Ink")).toHaveCount(0);
   await p.reload();

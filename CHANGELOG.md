@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.63.5 — A folder row keeps its place under the pointer (2026-11-24)
+
+- **Fixed:** under the pointer a folder row's marks (concealed, pinned) disappeared and its name and branch mark moved aside for the Pin and More buttons: the row's end is now kept for its count, which Pin and More take over under the pointer, in the same place; nothing else on the row moves, and a long name is cut with …. ([Folders and tags](README.md#folders-and-tags))
+
 ## 0.63.4 — The Library fills in what is seen first (2026-11-24)
 
 - **Changed:** while the Library scrolls, the pictures of the cards in view are asked for first, then those just outside it (they were asked for top to bottom, all at once, so cards above the view could keep the visible ones waiting) (B2). ([The Library](README.md#the-library))
