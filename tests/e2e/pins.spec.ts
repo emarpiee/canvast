@@ -84,7 +84,7 @@ test("a Pins window shows pictures of the library as the Library's own grid, the
   const cards = pins.getByTestId("asset-card");
   await expect(cards).toHaveCount(2);
   // what it shows is chosen from its title: the app's own list of canvases (a search over the boards), then the pictures
-  await expect(pins.locator(".panel-head h2")).toContainText("Pins:");
+  await expect(pins.locator(".panel-head .pins-mark")).toHaveAttribute("aria-label", "Pins");
   // (one row: the title's button is not in the Hide button's name, and the header is one line high)
   await expect(pins.locator("[data-close]")).toHaveAttribute("aria-label", "Hide the Pins panel");
   await pins.getByTestId("pins-source").click();

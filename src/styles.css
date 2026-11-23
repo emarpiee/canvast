@@ -1948,6 +1948,8 @@ body[data-viewing] #nav, body[data-viewing] .view-settings { display: none; }
 .nav-menu { width: 340px; display: grid; gap: var(--s-4); padding: var(--s-4); max-height: min(80vh, 640px); overflow: auto; }
 .nav-menu > .nav-board, .place-menu > .nav-board { padding: var(--s-2) var(--s-2) var(--s-4); background: color-mix(in oklch, var(--hud-fg) 5%, transparent); border: 1px solid var(--hud-border); border-radius: var(--r-lg); }
 .nav-menu > .nav-board + .nav-board, .place-menu > .nav-board + .nav-board { margin-top: 0; border-top: 1px solid var(--hud-border); padding-top: var(--s-2); }
+/* (in a list to choose from, the boards stand apart with room between them, as the workspace menu's do) */
+.place-menu > .nav-board + .nav-board, .place-menu > .board-filter + .nav-board { margin-top: var(--s-4); }
 .nav-menu .nav-board-head, .place-menu .nav-board-head { min-height: calc(var(--ctl) - 2px); padding: 0 var(--s-1) 0 var(--s-4); }
 .nav-menu .nav-board-name, .place-menu .nav-board-name { font-weight: 650; }
 .nav-menu .nav-board-n, .place-menu .nav-board-n { flex: none; font-size: var(--text-xs); color: var(--hud-muted); }
@@ -2994,7 +2996,9 @@ input[data-scrub-input]:focus { cursor: text; }
 .pins-gallery { height: 100%; overflow: auto; padding: var(--s-4); box-sizing: border-box; }
 .pins-gallery .assets-grid { --thumb: var(--pins-thumb); }
 /* A Pins window's title: "Pins:" and what it shows, a button that opens the list to choose (cut short with … when long). */
-.pins-panel .panel-head h2 { display: flex; align-items: center; gap: var(--s-2); min-width: 0; white-space: nowrap; }
+.pins-mark { display: inline-flex; flex: none; }
+.pins-mark svg { width: var(--icon-md); height: var(--icon-md); fill: currentColor; }
+.pins-panel .panel-head h2 { display: flex; align-items: center; gap: var(--s-4); min-width: 0; white-space: nowrap; }
 .pins-source { display: inline-flex; align-items: center; gap: var(--s-2); min-width: 0; height: var(--row-btn); padding: 0 var(--s-2); font: inherit; color: inherit; background: transparent; border: 0; border-radius: var(--ctl-r); cursor: pointer; }
 .pins-source:hover, .pins-source[aria-expanded="true"] { background: var(--hud-hover); }
 .pins-source > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

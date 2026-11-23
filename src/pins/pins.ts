@@ -259,7 +259,7 @@ export function mountPins(deps: PinsDeps): { open(source?: PinSource): void; ref
     el.setAttribute("aria-label", "Pins");
     el.innerHTML = panelHtml({
       title: "Pins",
-      heading: `Pins: <button type="button" class="pins-source" data-pins-source data-testid="pins-source" aria-haspopup="menu" aria-expanded="false" aria-label="What it shows" title="What it shows: a canvas, or pictures of the library"></button>`,
+      heading: `<span class="pins-mark" role="img" aria-label="Pins" title="Pins">${ICONS.pin}</span><button type="button" class="pins-source" data-pins-source data-testid="pins-source" aria-haspopup="menu" aria-expanded="false" aria-label="What it shows" title="What it shows: a canvas, or pictures of the library"></button>`,
       tools: `<button type="button" class="layer-btn" data-pins-more aria-haspopup="menu" aria-label="More" title="More: opacity, clicks through, float over other apps">${ICONS.ellipsis}</button>`,
       sub: `<div class="pins-look" data-pins-look hidden></div>`,
       body: `<div class="pins-view" data-pins-view><canvas class="pins-canvas" tabindex="0" aria-label="A pinned canvas: the canvas's tools, keys and menus"></canvas></div><div class="pins-library" data-pins-library hidden></div><div class="pins-bar" data-pins-bar></div>`,

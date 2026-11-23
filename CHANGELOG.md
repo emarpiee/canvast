@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.63.10 — Pins title and list spacing (2026-11-24)
+
+- **Fixed before release:** a Pins window's title is its filled pin, then what it shows, with room between them; the boards in its list (and in Place on…) stand apart instead of touching. ([Pins](README.md#pins))
+
 ## 0.63.9 — Pins title on one row (2026-11-24)
 
 - **Fixed before release:** a Pins window's title is one row again (its button no longer spilled into the Hide button's name), and its list takes the app's type and spacing. ([Pins](README.md#pins))
