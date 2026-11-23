@@ -403,16 +403,18 @@ export class SettingsStore {
   restore(from: unknown): number {
     if (!from || typeof from !== "object" || Array.isArray(from)) return 0;
     let n = 0;
+    const taken: SettingKey[] = [];
     for (const key of Object.keys(SETTINGS) as SettingKey[]) {
       if (this.values.has(key) || !(key in from)) continue;
       const v = (SETTINGS[key] as Def<unknown>).validate((from as Record<string, unknown>)[key]);
       if (v === undefined || v === (SETTINGS[key] as Def<unknown>).default) continue;
       this.values.set(key, v);
       this.touched(key);
+      taken.push(key);
       n++;
     }
     if (n) {
-      this.save();
+      this.save(taken);
       for (const key of Object.keys(SETTINGS) as SettingKey[]) for (const fn of this.listeners) fn(key);
     }
     return n;
@@ -442,7 +444,7 @@ export class SettingsStore {
     if (this.get(key) === v) return true;
     this.values.set(key, v);
     this.touched(key);
-    this.save();
+    this.save([key]);
     for (const fn of this.listeners) fn(key);
     return true;
   }
@@ -451,7 +453,7 @@ export class SettingsStore {
   reset(key: SettingKey): void {
     if (!this.values.delete(key)) return;
     this.touched(key);
-    this.save();
+    this.save([key]);
     for (const fn of this.listeners) fn(key);
   }
 
@@ -482,7 +484,7 @@ export class SettingsStore {
       changed.push(key);
     }
     if (!changed.length) return changed;
-    this.save();
+    this.save(changed);
     this.adopting = true;
     try {
       for (const key of changed) for (const fn of this.listeners) fn(key);
@@ -497,10 +499,26 @@ export class SettingsStore {
     return () => this.listeners.delete(fn);
   }
 
-  private save(): void {
+  /**
+   * Write `keys` (the ones changed here) into what is stored, and nothing else: a value another tab of canvast (or anything else) stored
+   * meanwhile is kept, never covered by this tab's older copy of it (B24). A key stored nowhere yet is written too.
+   */
+  private save(keys: readonly SettingKey[]): void {
     try {
+      let stored: Record<string, unknown> = {};
+      try {
+        const parsed: unknown = JSON.parse(this.storage?.getItem(DEVICE_KEY) || "{}");
+        if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) stored = parsed as Record<string, unknown>;
+      } catch {
+        // unreadable: written whole again
+      }
+      for (const [k, v] of this.values) if (!(k in stored)) stored[k] = v;
+      for (const k of keys) {
+        if (this.values.has(k)) stored[k] = this.values.get(k);
+        else delete stored[k];
+      }
       // (a fresh start's first save says its bars were never elsewhere: nothing to move at the next start)
-      this.storage?.setItem(DEVICE_KEY, JSON.stringify({ ...(this.fresh ? { "ui.barPlaces": 1 } : {}), ...Object.fromEntries(this.values) }));
+      this.storage?.setItem(DEVICE_KEY, JSON.stringify({ ...(this.fresh ? { "ui.barPlaces": 1 } : {}), ...stored }));
       this.storage?.removeItem(LEGACY_VIEW_KEY);
     } catch {
       // storage full or blocked: the value stays for this session

@@ -20,6 +20,18 @@ describe("settings (device scope)", () => {
     expect(new SettingsStore(st).get("pen.widthPx")).toBe(3);
   });
 
+  it("a save writes only what changed here: a value another tab stored meanwhile is kept (B24)", () => {
+    const st = memory();
+    const a = new SettingsStore(st);
+    const b = new SettingsStore(st); // (another tab, opened at the same time)
+    a.set("ui.info", "hidden");
+    b.set("pen.widthPx", 8); // (b's own copy still has ui.info at its default)
+    const now = new SettingsStore(st);
+    expect([now.get("ui.info"), now.get("pen.widthPx")]).toEqual(["hidden", 8]);
+    b.reset("pen.widthPx");
+    expect(new SettingsStore(st).get("ui.info"), "a reset elsewhere keeps it too").toBe("hidden");
+  });
+
   it("falls back to the default for damaged or hand-edited stored values", () => {
     expect(new SettingsStore(memory({ "canvast.settings": "{not json" })).get("ui.view")).toBe("canvas");
     const s = new SettingsStore(memory({ "canvast.settings": JSON.stringify({ "ui.view": "mars", "pen.widthPx": "wide", "pen.color": "#2563eb" }) }));

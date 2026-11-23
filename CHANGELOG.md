@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.62.2 — Settings kept when two tabs change them (2026-11-23)
+
+- **Fixed:** a setting changed in one canvast tab could be undone by another tab saving its own older copy of every setting: a save now writes only the settings it changed (B24, in part). ([Your workspace and data](README.md#your-workspace-and-data))
+
+### For developers
+
+- `SettingsStore.save(keys)` merges the keys changed into what is stored. Unit test: two stores on one storage keep each other's changes.
+
 ## 0.62.1 — A welcome page in the desktop app (2026-11-23)
 
 - **Changed:** the desktop app's first start (and a start whose last workspace folder is gone) shows the app itself, on an empty canvas kept in memory only, with a welcome card over it (its logo, **New workspace…**, **Open a folder…**, the recent workspaces and **Quit**), instead of a system message box. ([Switching workspaces](README.md#switching-workspaces))
