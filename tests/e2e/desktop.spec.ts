@@ -71,7 +71,8 @@ async function exportBackup(app: ElectronApplication, page: Page, to: string, as
 
 test("a first start, with no workspace to open, shows the app itself with the welcome over it: new, open a folder, quit (no system message box)", async () => {
   const data = tempDir("canvast-welcome-");
-  const app = await electron.launch({ args: [join(buildDir(), "desktop"), `--user-data-dir=${data}`], env: { ...process.env, CANVAST_HIDDEN: "1" } });
+  // (a start of its own: no recent workspace, whatever this machine has; its user data, recent list included, under XDG_CONFIG_HOME)
+  const app = await electron.launch({ args: [join(buildDir(), "desktop"), `--user-data-dir=${data}`], env: { ...process.env, CANVAST_HIDDEN: "1", XDG_CONFIG_HOME: data } });
   const closed = new Promise<void>((done) => app.process().once("exit", () => done()));
   const page = await app.firstWindow();
   const card = page.getByTestId("welcome");
