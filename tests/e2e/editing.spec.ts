@@ -1455,8 +1455,11 @@ test("every kind of object snaps when resized by a handle: to another object's e
     const k = (x - c[0]![0]) / (c[2]![0] - c[0]![0]);
     await app.drag(at, { x, y: c[0]![1] + k * (c[2]![1] - c[0]![1]) }, 6);
     await app.frame();
-    return (await frame())[1]![0];
+    const after = await p.evaluate(() => window.__canvastDebug.selectionFrame());
+    if (!after) throw new Error(`${current}: the selection went with the drag from (${at.x.toFixed(1)}, ${at.y.toFixed(1)}): it ended "${await p.locator("canvas").first().getAttribute("data-last-gesture")}", selected ${JSON.stringify(await p.evaluate(() => window.__canvastDebug.selection()))}, ${(await objects(app)).length} objects`);
+    return after.corners[1]![0];
   };
+  let current = "";
   const count = async () => (await objects(app)).length;
   const clear = async () => {
     await key(app, "v");
@@ -1537,6 +1540,7 @@ test("every kind of object snaps when resized by a handle: to another object's e
   await p.evaluate(() => window.__canvastDebug.setSetting("snap.grid", false)); // (the object alone: a grid line nearer would take the side)
   const missed: string[] = [];
   for (const [name, make] of kinds) {
+    current = name;
     // (a balloon's outline grows with it while the snap is worked out at the size it had: its box can land a pixel or so off, a known gap)
     const reach = name === "speech balloon" ? 2 : 0.5;
     // To another object: a rectangle whose left side is at x 800, the side dragged to 4 px short of it.
