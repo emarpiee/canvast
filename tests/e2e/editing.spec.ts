@@ -1544,13 +1544,18 @@ test("every kind of object snaps when resized by a handle: to another object's e
     await app.drag({ x: 800, y: 250 }, { x: 900, y: 450 });
     await make();
     expect((await p.evaluate(() => window.__canvastDebug.selection())).length, `${name}: selected`).toBeGreaterThan(0);
+    if (!(await p.evaluate(() => window.__canvastDebug.selectionFrame()))) {
+      missed.push(`${name}: selected, but no selection box to resize`);
+      await clear();
+      continue;
+    }
     const right = await resizeRightTo(797); // (3 px short, as for the grid: a pen stroke's box has its pen's width round it)
     // (a kind that keeps its proportions snaps by the nearer of its two moving edges: its bottom may be what lands on the rectangle's line)
     const bottom = (await frame())[2]![1];
     // (what keeps its proportions at a corner snaps by the nearer of its two moving edges)
     const keeps = ["pen stroke", "picture", "picture from the library", "text", "GIF"].includes(name);
     const byBottom = keeps && [250, 350, 450].some((y) => Math.abs(bottom - y) <= 0.5);
-    if (Math.abs(right - 800) > reach && !byBottom) missed.push(`${name} to an object: its side at ${right.toFixed(2)}, not 800`);
+    if (Math.abs(right - 800) > reach && !byBottom) missed.push(`${name} to an object: its side at ${right.toFixed(2)}, not 800 (the drag ended "${await p.locator("canvas").first().getAttribute("data-last-gesture")}")`);
     // Level with it, from the corner: its bottom 3 px short of the rectangle's bottom (along its diagonal for a picture, which keeps its
     // proportions; a shape stretches, its right side far from every line). The bottom snaps as the side did.
     if (["shape", "picture", "picture from the library", "picture on its own sheet", "sheet", "note card", "text", "GIF"].includes(name)) {

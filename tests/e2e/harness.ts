@@ -412,7 +412,8 @@ export async function themeProblems(page: Page): Promise<string[]> {
         const words = el.tagName !== "BUTTON" || (el.textContent ?? "").trim().length > 0;
         if (words && !sizes.has(cs.fontSize)) out.push(`${name}: ${say(el)} has text of ${cs.fontSize}, not a size of the theme`);
       }
-      for (const b of panel.querySelectorAll(".panel-head button")) if (shown(b) && !b.classList.contains("layer-btn")) out.push(`${name}: header button ${say(b)} is not the panel's .layer-btn`);
+      // (the title's own chooser, what a Pins window shows, is part of the title, not one of its tools)
+      for (const b of panel.querySelectorAll(".panel-head button")) if (shown(b) && !b.classList.contains("layer-btn") && !b.matches("h2 > [aria-haspopup]")) out.push(`${name}: header button ${say(b)} is not the panel's .layer-btn`);
       for (const b of panel.querySelectorAll(".panel-sub button[aria-haspopup]")) if (shown(b) && !b.classList.contains("pick-current")) out.push(`${name}: ${say(b)} opens a list but is not the shared chooser (.pick-current)`);
       for (const i of panel.querySelectorAll('.panel-sub input[type="search"]')) if (shown(i) && !i.closest(".layers-filter")) out.push(`${name}: a search field outside .layers-filter`);
     }

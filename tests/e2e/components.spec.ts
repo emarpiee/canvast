@@ -107,7 +107,7 @@ test("a folder folds, stays folded after a reload, and Organize moves to a folde
   // (Pin and More come before the marks and branch, over the end of the name: the branch is still where it was, not under them)
   const more = await artRow.locator(".side-more").last().boundingBox();
   expect(more!.x + more!.width, "More ends before the branch mark").toBeLessThanOrEqual(restX + 1);
-  await tree.getByRole("button", { name: /^Art/ }).click(); // (a folder with subfolders closes on its own row)
+  await tree.getByRole("button", { name: /^Art/ }).click({ position: { x: 24, y: 8 } }); // (on its name: under the pointer, Pin and More sit over the name's end) // (a folder with subfolders closes on its own row)
   await expect(tree.getByText("Ink")).toHaveCount(0);
   await p.reload();
   await p.waitForFunction(() => typeof window.__canvastDebug !== "undefined");
@@ -115,13 +115,13 @@ test("a folder folds, stays folded after a reload, and Organize moves to a folde
   await expect(tree.getByText("Art")).toBeVisible();
   await expect(tree.getByText("Ink")).toHaveCount(0);
   // (folders start folded and open as they are opened, remembered: B35)
-  await tree.getByRole("button", { name: /^Art/ }).click();
+  await tree.getByRole("button", { name: /^Art/ }).click({ position: { x: 24, y: 8 } }); // (on its name: under the pointer, Pin and More sit over the name's end)
   await expect(tree.getByText("Ink")).toBeVisible();
   await p.reload();
   await p.waitForFunction(() => typeof window.__canvastDebug !== "undefined");
   await p.getByTestId("view-assets").click();
   await expect(tree.getByText("Ink"), "an opened folder stays open").toBeVisible();
-  await tree.getByRole("button", { name: /^Art/ }).click(); // (folded again, as what follows expects)
+  await tree.getByRole("button", { name: /^Art/ }).click({ position: { x: 24, y: 8 } }); // (on its name: under the pointer, Pin and More sit over the name's end) // (folded again, as what follows expects)
   await expect(tree.getByText("Ink")).toHaveCount(0);
   // Every row's name starts in one line, whether it has an arrow or not, and the count ends at the row's edge.
   await p.getByTestId("folder-new").click();
@@ -245,7 +245,7 @@ test("a folder folds, stays folded after a reload, and Organize moves to a folde
   await tree.getByRole("button", { name: "Pin folder Art", exact: true }).click(); // (the row's own button)
   await expect(folderOrder).toHaveText(["Art", "Bee", "Plain"]);
   await expect(tree.getByRole("button", { name: "Unpin folder Art", exact: true })).toHaveAttribute("aria-pressed", "true");
-  await tree.getByRole("button", { name: /^Art/ }).click(); // (and opens on it)
+  await tree.getByRole("button", { name: /^Art/ }).click({ position: { x: 24, y: 8 } }); // (on its name: under the pointer, Pin and More sit over the name's end) // (and opens on it)
   await expect(folderOrder).toHaveText(["Art", "Ink", "Bee", "Plain"]);
   await pinFolder("Pin", "Ink");
   await expect(folderOrder).toHaveText(["Ink", "Art", "Bee", "Plain"]);

@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.63.16 — A selected folder's count readable under the pointer (2026-11-27)
+
+- **Fixed before release:** a selected folder's count under the pointer drops its pill, which made its number too faint in the light theme. ([Folders and tags](README.md#folders-and-tags))
+
+### For developers
+
+- Tests: the folder test clicks a row on its name (Pin and More sit over the name's end under the pointer); the panel parts check takes the chooser in a title (a Pins window's) as part of it; the every-kind snap test says how a drag ended and which kind had no box.
+
 ## 0.63.15 — One resize rule for every kind (2026-11-27)
 
 - **Changed:** what may stretch on a resize is one rule for every kind of object: shapes, sheets and note cards stretch, turned or not (along their own sides), and pictures, videos, other files and pen strokes keep their proportions. ([Keyboard and pointer reference](README.md#keyboard-and-pointer-reference))
