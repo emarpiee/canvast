@@ -1448,7 +1448,18 @@ test("every kind of object snaps when resized by a handle: to another object's e
   const p = app.page;
   const frame = async () => (await p.evaluate(() => window.__canvastDebug.selectionFrame()))!.corners;
   /** The selection's bottom-right corner handle, dragged across to `x`: where its right side ends up. (A corner, which every kind has: a side handle needs room, and a pen stroke keeps its shape.) */
+  /** Until the selection's box stays as it is (a note's card is laid out again a moment after it is placed or resized: its height changes). */
+  const still = async (): Promise<void> => {
+    let last = "";
+    await expect.poll(async () => {
+      const f = JSON.stringify(await p.evaluate(() => window.__canvastDebug.selectionFrame()));
+      const same = f === last;
+      last = f;
+      return same;
+    }, { intervals: [150] }).toBe(true);
+  };
   const resizeRightTo = async (x: number): Promise<number> => {
+    await still();
     const c = await frame();
     const at = { x: c[2]![0], y: c[2]![1] };
     // (along the box's diagonal, so a kind that keeps its proportions, a pen stroke, has its side where the pointer goes too)
@@ -1562,7 +1573,9 @@ test("every kind of object snaps when resized by a handle: to another object's e
     if (Math.abs(right - 800) > reach && !byBottom) missed.push(`${name} to an object: its side at ${right.toFixed(2)}, not 800 (the drag ended "${await p.locator("canvas").first().getAttribute("data-last-gesture")}")`);
     // Level with it, from the corner: its bottom 3 px short of the rectangle's bottom (along its diagonal for a picture, which keeps its
     // proportions; a shape stretches, its right side far from every line). The bottom snaps as the side did.
-    if (["shape", "picture", "picture from the library", "picture on its own sheet", "sheet", "note card", "text", "GIF"].includes(name)) {
+    // (not a note's card: as a whole note its height follows its words once it is laid out again; its width snaps, above)
+    if (["shape", "picture", "picture from the library", "picture on its own sheet", "sheet", "text", "GIF"].includes(name)) {
+      await still();
       const c = await frame();
       const k = (447 - c[0]![1]) / (c[2]![1] - c[0]![1]);
       await app.drag({ x: c[2]![0], y: c[2]![1] }, { x: keeps ? c[0]![0] + k * (c[2]![0] - c[0]![0]) : 680, y: 447 }, 6);
