@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.63.17 — A small box resizes from its corners (2026-11-27)
+
+- **Fixed:** a press on a corner handle of a small box (a text a line high, anything under about 36 px on the screen) turned it instead of resizing it, for every kind of object: a resize handle now always resizes, and a press past the corner still turns. ([Keyboard and pointer reference](README.md#keyboard-and-pointer-reference))
+
 ## 0.63.16 — A selected folder's count readable under the pointer (2026-11-27)
 
 - **Fixed before release:** a selected folder's count under the pointer drops its pill, which made its number too faint in the light theme. ([Folders and tags](README.md#folders-and-tags))

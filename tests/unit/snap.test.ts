@@ -42,3 +42,14 @@ describe("snapping to the shapes themselves (ADR 0171)", () => {
     expect(bestFlushSnap([[120, 103, 180, 103]], snapTargets([], [[100, 100, 200, 100]]))).toBeNull(); // (a curve's piece cannot lie flush)
   });
 });
+
+describe("the rotate zone and the resize handles", () => {
+  it("a press on a small box's corner handle resizes; past the corner it turns", async () => {
+    const { inRotateZone } = await import("../../src/interaction/tool-geometry");
+    // a text a line high: its bottom-right handle is within the rotate zone's reach of the top-right corner, on the box's edge
+    const frame = { angle: 0, corners: [[460, 320], [535, 320], [535, 344], [460, 344]] as const, centre: [497.5, 332] as const };
+    const handle: [number, number] = [497.5, 294];
+    expect(inRotateZone({ x: 535, y: 344 }, frame as never, handle)).toBe(false);
+    expect(inRotateZone({ x: 555, y: 364 }, frame as never, handle)).toBe(true);
+  });
+});

@@ -24,6 +24,9 @@ export const ROTATE_ZONE_PX = 36;
 /** Whether a press at `s` turns the selection: on the rotate handle, or just outside a corner of the box (beyond its resize handle). */
 export function inRotateZone(s: ScreenPoint, frame: SelectionFrame, handle: readonly [number, number]): boolean {
   if (Math.hypot(s.x - handle[0], s.y - handle[1]) <= HANDLE_SIZE_PX) return true;
+  // A press on a resize handle resizes, whatever the box's size: on a small one a corner's handle is within reach of the next corner and on
+  // the box's edge, not inside it (a text a line high turned instead). The reach is the resize's own (a side handle is only its square).
+  if (resizeHandles(frame).some((h) => { const r = h.edge ? HANDLE_SIZE_PX / 2 + 1 : HANDLE_SIZE_PX; return Math.abs(s.x - h.at[0]) <= r && Math.abs(s.y - h.at[1]) <= r; })) return false;
   const near = frame.corners.some((p) => {
     const d = Math.hypot(s.x - p[0], s.y - p[1]);
     return d > HANDLE_SIZE_PX && d <= ROTATE_ZONE_PX;
