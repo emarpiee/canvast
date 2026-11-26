@@ -64,7 +64,7 @@ function renamed(o: PathObject, s: number): Partial<PathObject> {
 }
 
 /**
- * A turned path stretched along its own axes (kx along its width, ky along its height) with a world point fixed: `grown` is it
+ * A turned path or card stretched along its own axes (kx along its width, ky along its height) with a world point fixed: `grown` is it
  * stretched in its own coordinates, its anchor not moved yet. The geometry is scaled in
  * its own, unturned, coordinates; the turn is about the middle of the geometry's box, which moves with the stretch, so the anchor is chosen to
  * leave the fixed point where it is: the fixed point as the unturned geometry sees it (`f`) goes to `f` scaled, and is then turned about the
@@ -142,6 +142,8 @@ export function scaleAbout(o: CanvasObject, fixed: WorldPoint, kx: number, ky: n
   }
   const k = Math.sqrt(kx * ky); // (a picture's corners and outline scale as the whole does)
   const sized = { ...o, w: o.w * kx, h: o.h * ky, ...(o.kind === "image" && o.page ? pageScaled(o, kx, ky) : {}), ...(o.kind === "image" && o.radius !== undefined ? { radius: scaleRadius(o.radius, k) } : {}), ...(o.kind === "image" && o.width !== undefined ? { width: keepWidth ? o.width : o.width * k } : {}) };
+  // (a turned card stretches along its own sides, as a turned shape does)
+  if (o.rot && kx !== ky) return stretchTurned(o, fixed, kx, ky, sized);
   return normalizeUnit({ ...sized, anchor });
 }
 

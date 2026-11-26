@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.63.15 — One resize rule for every kind (2026-11-27)
+
+- **Changed:** what may stretch on a resize is one rule for every kind of object: shapes, sheets and note cards stretch, turned or not (along their own sides), and pictures, videos, other files and pen strokes keep their proportions. ([Keyboard and pointer reference](README.md#keyboard-and-pointer-reference))
+- **Fixed:** a turned picture, text or player now snaps by its corners as a shape does (its own corners, turned with it); before, only shapes and upright boxes had them. ([Keyboard and pointer reference](README.md#keyboard-and-pointer-reference))
+- **Fixed before release:** a panel's resize edge lights up as a thin line on the edge under the pointer, not a bar inside it that looked like a scrollbar (in a Pins window too). ([Pins](README.md#pins))
+
+### For developers
+
+- `stretchable(o)` (`doc/model.ts`): the one rule of what a resize may stretch. `shapeOnScreen` gives every kind but a pen stroke its corners from `itemCorners`, and `cornerIn` turns them exactly; `stretchTurned` serves turned cards too.
+- The every-kind snap test covers a picture from the library, a note card, a text and a GIF.
+
 ## 0.63.14 — A folder's count readable under the pointer (2026-11-24)
 
 - **Fixed before release:** a folder row's count, which now stays under the pointer, takes the row's text colour there, so it reads on the hovered and the selected row in both themes. ([Folders and tags](README.md#folders-and-tags))

@@ -1515,8 +1515,9 @@ test("every kind of object snaps when resized by a handle: to another object's e
       await p.mouse.click(460, 330);
       await p.keyboard.type("Snap to it");
       await key(app, "Escape");
+      await expect(p.getByTestId("text-editor")).toBeHidden();
       await expect.poll(async () => (await objects(app)).filter((o) => o.kind === "text").length).toBe(1);
-      await key(app, "v");
+      await p.evaluate(() => window.__canvastDebug.setTool("select")); // (the key would go to the text's format bar, which keeps the focus)
       await p.evaluate((i) => window.__canvastDebug.select([i]), (await objects(app)).find((o) => o.kind === "text")!.id);
     }],
     ["GIF", async () => {

@@ -14,7 +14,7 @@ import type { ViewState } from "../app/view-state";
 import type { EditorState, Tool } from "../app/editor-state";
 import type { DocumentStore } from "../doc/document-store";
 import type { CanvasObject, ImageObject, ObjectId, PathObject, SheetLayout, StrokeObject, TextObject } from "../doc/model";
-import { editSubs, homeObject, newObjectId, strokePoints } from "../doc/model";
+import { editSubs, homeObject, newObjectId, strokePoints, stretchable } from "../doc/model";
 import type { Paint } from "../doc/paint";
 import type { ShapeKind, SubPath } from "../doc/path";
 import { holesOf } from "../doc/path-pieces";
@@ -142,7 +142,7 @@ type Gesture =
       /** The box's middle (Alt resizes about it) and, for a side handle, which side. */
       centre: ScreenPoint;
       edge: Edge | null;
-      /** The selection may be stretched on one axis (only upright pictures); anything else keeps its proportions. */
+      /** The selection may be stretched, its sides apart (`stretchable`); anything else keeps its proportions. */
       free: boolean;
       /** The box's own axes on screen (its turn): the factors of a resize are along them. */
       axes: { c: number; s: number };
@@ -1595,7 +1595,7 @@ export function attachTools(
           g = { kind: "textpad", pointerId: e.pointerId, start: s, edge: h.edge, pads: { padX, padY, padR: padR ?? padX, padB: padB ?? padY }, emPx: words.size * wordsPo.proj.ppu, moved: false };
           return;
         }
-        // Free (one-axis, or both axes apart) for paths, turned or not, whose turn is the box's, and upright note cards: everything else keeps its shape.
+        // Free (one-axis, or both axes apart) for what may stretch, turned or not, when its turn is the box's: everything else keeps its shape.
         const turnOf = (rot: number | undefined): number => ((radiansFromAngle(rot ?? 0) % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
         const boxTurn = ((sel.frame.angle % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
         const same = (rot: number | undefined): boolean => Math.abs(turnOf(rot) - boxTurn) < 1e-6 || Math.abs(Math.abs(turnOf(rot) - boxTurn) - 2 * Math.PI) < 1e-6;
@@ -1606,8 +1606,8 @@ export function attachTools(
           const o = doc.get(id)!;
           // (a text: its left and right handles change the width of its box, the words wrap again; a text on a path or in a shape takes its width from that)
           if (o.kind === "text") return (h.edge === "e" || h.edge === "w") && !o.rot && sel.frame.angle === 0 && !o.onPath && !o.inShape;
-          // (shapes and sheets stretch; a picture, a video or any other file keeps its proportions; a note's card, upright, is laid out again to its new shape)
-          return o.kind === "path" ? same(o.rot) : o.kind === "image" && !!o.page && !o.rot && sel.frame.angle === 0;
+          // (the one rule, `stretchable`; what stretches does so along its own sides, turned or not)
+          return stretchable(o) && same(o.rot);
         });
         g = {
           kind: "scale",
@@ -1962,7 +1962,7 @@ export function attachTools(
   /**
    * The factors of a resize drag, side-handle: a corner or a side follows the pointer; Shift keeps the proportions; Alt resizes about the
    * middle of the box; Ctrl (or Cmd) turns snapping off. The dragged edge snaps to the edges and middles of other objects.
-   * Anything but an upright picture keeps its proportions whatever is held (it cannot be stretched).
+   * What may not stretch (`stretchable`) keeps its proportions whatever is held.
    */
   const scaleFactors = (gs: Extract<Gesture, { kind: "scale" }>, s: ScreenPoint, mods: { shift: boolean; alt: boolean; noSnap: boolean }): { kx: number; ky: number; fixed: ScreenPoint } => {
     const fixed = mods.alt ? gs.centre : gs.fixed;

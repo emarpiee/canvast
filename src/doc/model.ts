@@ -572,6 +572,13 @@ export function unrotatedBounds(o: CanvasObject): LocalBounds {
 }
 
 /** The rotation pivot: the centre of the unrotated bounds, in local units. */
+/**
+ * What a resize may stretch, its sides apart (ADR 0063): a shape or a sheet, and a note's card (laid out again to its new shape). A
+ * picture, a video, any other file and a pen stroke keep their proportions. (A text's side handles set its box's width: the words wrap again.)
+ * The one rule for every gesture and command that resizes.
+ */
+export const stretchable = (o: CanvasObject): boolean => o.kind === "path" || (o.kind === "image" && !!o.page);
+
 export function pivotOf(o: CanvasObject): { x: number; y: number } {
   const b = unrotatedBounds(o);
   return { x: (b.minX + b.maxX) / 2, y: (b.minY + b.maxY) / 2 };

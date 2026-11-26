@@ -1,17 +1,18 @@
 import type { EditorState } from "../app/editor-state";
-import { TURN } from "../core/angle";
+import { TURN, cosSin } from "../core/angle";
 import type { ScreenPoint, WorldPoint } from "../core/camera";
 import * as D from "../core/dyadic";
 import { expressExactIn } from "../core/frames";
 import type { Frame } from "../core/frames";
 import { worldBounds } from "../doc/edit-ops";
-import { pathSubs } from "../doc/model";
+import { pathSubs, pivotOf, unrotatedBounds } from "../doc/model";
 import type { CanvasObject, PathObject } from "../doc/model";
 import { NODE } from "../doc/path";
 import { pointInPolygon } from "../render/geometry2d";
 import { exactX, exactY } from "../render/projection";
 import type { ProjectedObject, ScreenBox } from "../render/projection";
 import { HANDLE_SIZE_PX } from "../render/scene-renderer";
+import { itemCorners } from "../render/selection-frame";
 import type { SelectionFrame } from "../render/selection-frame";
 import { bestEdgeSnap, bestFlushSnap, bestPointSnap } from "./snap-points";
 import type { Seg, SnapTargets } from "./snap-points";
@@ -58,8 +59,16 @@ export type CornerRef = { o: CanvasObject; s: number; k: number; mid?: true } | 
 export function cornerIn(r: CornerRef, f: Frame): WorldPoint {
   const o = r.o;
   if ("c" in r) {
-    const b = boundsIn(o, f);
-    return { x: r.c === 0 || r.c === 3 ? b.min.x : b.max.x, y: r.c < 2 ? b.min.y : b.max.y };
+    if (!o.rot || o.kind === "stroke") {
+      const b = boundsIn(o, f);
+      return { x: r.c === 0 || r.c === 3 ? b.min.x : b.max.x, y: r.c < 2 ? b.min.y : b.max.y };
+    }
+    // a turned picture, text or player: the corner of its own box, turned with it about its middle (as it is drawn)
+    const b = unrotatedBounds(o), m = pivotOf(o), { c, s } = cosSin(o.rot);
+    const vx = (r.c === 0 || r.c === 3 ? b.minX : b.maxX) - m.x, vy = (r.c < 2 ? b.minY : b.maxY) - m.y;
+    const at = { x: D.add(o.anchor.x, D.shift(D.fromNumber(m.x + c * vx - s * vy), o.unit)), y: D.add(o.anchor.y, D.shift(D.fromNumber(m.y + s * vx + c * vy), o.unit)) };
+    const of = o.frame ?? f.space.world;
+    return of === f ? at : expressExactIn(f.space, of, at, f);
   }
   const n = pathSubs(o as PathObject)[r.s]!.n;
   const at = (k: number): WorldPoint => ({ x: D.add(o.anchor.x, D.shift(D.fromNumber(n[k * NODE]!), o.unit)), y: D.add(o.anchor.y, D.shift(D.fromNumber(n[k * NODE + 1]!), o.unit)) });
@@ -100,12 +109,15 @@ export function shapeOnScreen(po: ProjectedObject): { pts: number[]; refs: Corne
       const m = p.length / 2;
       for (let i = 0; i + 1 < m + (fp.closed ? 1 : 0); i++) out.curved.push([p[2 * i]!, p[2 * i + 1]!, p[(2 * (i + 1)) % p.length]!, p[(2 * (i + 1) + 1) % p.length]!]);
     }
-  } else if (!o.rot && o.kind !== "stroke") {
-    // A picture, text or player: its box is its shape.
-    const { minX: l, minY: t, maxX: r, maxY: b } = po.box;
-    out.pts.push(l, t, r, t, r, b, l, b);
-    out.refs.push({ o, c: 0 }, { o, c: 1 }, { o, c: 2 }, { o, c: 3 });
-    out.straight.push([l, t, r, t], [r, t, r, b], [r, b, l, b], [l, b, l, t]);
+  } else if (o.kind !== "stroke") {
+    // A picture, text or player, turned or not: its own box is its shape (the corners its selection shows, `cornerIn` gives them exactly).
+    const c = itemCorners(po);
+    c.forEach(([x, y], i) => {
+      out.pts.push(x, y);
+      out.refs.push({ o, c: i as 0 | 1 | 2 | 3 });
+      const [x2, y2] = c[(i + 1) % 4]!;
+      out.straight.push([x, y, x2, y2]);
+    });
   }
   return out;
 }

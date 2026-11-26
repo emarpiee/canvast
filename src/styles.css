@@ -2971,7 +2971,11 @@ input[data-scrub-input]:focus { cursor: text; }
 .dock-item:not([data-side="right"]) > .dock-grip { right: 0; }
 .dock-item:not([data-side="right"]) { --dock-grip-room: var(--sp-3); }
 .dock-item:not([data-side="right"]) .panel-body { margin-right: var(--dock-grip-room); } /* (the panel's scrollbar is on this edge: it stops short of the grip) */
-.dock-grip:hover, .dock-item.is-resizing > .dock-grip { background: color-mix(in oklch, var(--hud-accent) 45%, transparent); border-radius: var(--r-pill); }
+/* (under the pointer, a thin line on the very edge it resizes: a pill inside the edge read as a scrollbar) */
+.dock-grip::after { content: ""; position: absolute; top: 0; bottom: 0; width: var(--sp-1); }
+.dock-item[data-side="right"] > .dock-grip::after { left: 0; }
+.dock-item:not([data-side="right"]) > .dock-grip::after { right: 0; }
+.dock-grip:hover::after, .dock-item.is-resizing > .dock-grip::after { background: var(--hud-accent); }
 .dock-item[data-folded] > .dock-grip { display: none; }
 #dock-float { position: fixed; inset: 0; pointer-events: none; z-index: var(--z-edge); }
 #dock-float > .dock-item { position: absolute; }
