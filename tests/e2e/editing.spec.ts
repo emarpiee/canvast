@@ -1570,6 +1570,12 @@ test("every kind of object snaps when resized by a handle: to another object's e
     // To the grid: alone, with Snap to the grid on, the side dragged to 3 px short of a grid line.
     await p.evaluate(() => window.__canvastDebug.setSetting("snap.grid", true));
     await make();
+    if (!(await p.evaluate(() => window.__canvastDebug.selectionFrame()))) {
+      missed.push(`${name} (grid): selected, but no selection box to resize`);
+      await p.evaluate(() => window.__canvastDebug.setSetting("snap.grid", false));
+      await clear();
+      continue;
+    }
     const step = await p.evaluate(() => window.__canvastDebug.gridStep());
     if (step === null) missed.push(`${name}: no grid step`);
     else {

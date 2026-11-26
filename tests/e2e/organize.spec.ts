@@ -19,6 +19,8 @@ const GREEN_HASH = createHash("sha256").update(GREEN).digest("hex");
 const card = (p: Page, hash: string) => p.locator(`[data-testid="asset-card"][data-hash="${hash}"]`);
 const cards = (p: Page) => p.getByTestId("asset-card");
 const side = (p: Page, label: RegExp) => p.getByTestId("assets-side").getByRole("button", { name: label });
+/** Where a row is pressed: on its name (under the pointer, Pin and More sit over the name's end). */
+const onName = { position: { x: 24, y: 8 } };
 
 async function libraryWithTwo(p: Page): Promise<void> {
   await p.getByTestId("view-assets").click();
@@ -90,16 +92,16 @@ test("tags and favourites: edit in the inspector, filter by sidebar and search, 
 
   // Sidebar scopes.
   await expect(side(p, /Favourites/)).toContainText("1");
-  await side(p, /Favourites/).click();
+  await side(p, /Favourites/).click(onName);
   await expect(cards(p)).toHaveCount(1);
-  await side(p, /#ref/).click();
+  await side(p, /#ref/).click(onName);
   await expect(cards(p)).toHaveCount(1);
   await expect(card(p, HASH)).toBeVisible();
   // Choosing the chosen tag again lets go of it.
-  await side(p, /#ref/).click();
+  await side(p, /#ref/).click(onName);
   await expect(cards(p)).toHaveCount(2);
   await expect(side(p, /All items/)).toHaveAttribute("aria-current", "true");
-  await side(p, /All items/).click();
+  await side(p, /All items/).click(onName);
   await expect(cards(p)).toHaveCount(2);
 
   // Search: words match name, type or tags; #tag is exact.
@@ -301,7 +303,7 @@ test("hiding: a hidden item is in no list until the word is typed (and the passw
   await p.getByTestId("view-assets").click();
   // A filter left on outside hidden mode is kept for its end, and the reset button inside says only hidden mode's own (it showed and did nothing).
   const reset = p.getByTestId("assets-reset-filters");
-  await side(p, /^Favourites/).click();
+  await side(p, /^Favourites/).click(onName);
   await expect(reset).toBeVisible();
   await search.fill("hidden:");
   await p.getByTestId("prompt-input").fill("nope");
@@ -334,7 +336,7 @@ test("hiding: a hidden item is in no list until the word is typed (and the passw
   for (const h of [HASH, GREEN_HASH]) await p.evaluate(([h, f]) => window.__canvastDebug.libraryOp("file", h, f), [h, vault] as const);
   await expect(side(p, /^All hidden items/)).toContainText("2");
   await expect(side(p, /^Vault/)).toContainText("2");
-  await side(p, /^Vault/).click();
+  await side(p, /^Vault/).click(onName);
   await expect(reset).toBeVisible(); // (a hidden folder filters too)
   await reset.click();
   await expect(side(p, /^All hidden items/)).toHaveAttribute("aria-current", "true");
@@ -471,7 +473,7 @@ test("a long sidebar list shows its first rows and a button for the rest; the op
   await expect(more).toHaveText("Show 3 more");
   await more.click();
   await expect(tags).toHaveCount(15);
-  await side(p, /^#t15/).click(); // the list of a tag past the first twelve
+  await side(p, /^#t15/).click(onName); // the list of a tag past the first twelve
   await p.getByTestId("tag-list").getByTestId("side-show-all").click(); // Show fewer
   await expect(tags).toHaveCount(13); // (the open one stays)
   await expect(side(p, /^#t15/)).toHaveAttribute("aria-current", "true");
@@ -500,28 +502,28 @@ test("folders nest, an asset is in one folder at a time, and deleting a folder n
   await expect(p.getByTestId("asset-folder-now")).toHaveText("Refs");
   await fileInto(p, "Hands");
 
-  await side(p, /^Hands/).click();
+  await side(p, /^Hands/).click(onName);
   await expect(cards(p)).toHaveCount(1);
-  await side(p, /^Refs/).click(); // (a folder with subfolders closes on its own row as it is chosen)
+  await side(p, /^Refs/).click(onName); // (a folder with subfolders closes on its own row as it is chosen)
   await expect(cards(p)).toHaveCount(2); // a folder shows its subfolders too
-  await side(p, /^Unfiled/).click();
+  await side(p, /^Unfiled/).click(onName);
   await expect(cards(p)).toHaveCount(0);
   expect(await p.evaluate(() => window.__canvastDebug.storedAssetHashes())).toEqual([HASH, GREEN_HASH].sort());
 
   // Conceal Refs: a view filter only. Its items, and its subfolder's, are listed only when it or a folder in it is opened; nothing of them changes.
   await sideAct(p, "folder", "Refs", "Conceal folder Refs: its items are listed only when it is opened");
-  await side(p, /^All items/).click();
+  await side(p, /^All items/).click(onName);
   await expect(cards(p)).toHaveCount(0);
   await expect(side(p, /^All items/)).toContainText("0");
-  await side(p, /^Refs/).click();
+  await side(p, /^Refs/).click(onName);
   await expect(cards(p)).toHaveCount(2);
   await expect(p.getByTestId("assets-filtered")).toContainText("concealed: listed only here");
-  await side(p, /^Hands/).click();
+  await side(p, /^Hands/).click(onName);
   await expect(cards(p)).toHaveCount(1);
   await pick(p, HASH);
   await expect(p.getByTestId("asset-folder-now")).toHaveText("Refs › Hands"); // (still filed where it was)
   await sideAct(p, "folder", "Refs", "Reveal folder Refs: its items are listed everywhere again");
-  await side(p, /^All items/).click();
+  await side(p, /^All items/).click(onName);
   await expect(cards(p)).toHaveCount(2);
 
   // Export folder: its files and its subfolders', as a ZIP that keeps its folders (from the folder itself) or puts them all together.
@@ -559,7 +561,7 @@ test("folders nest, an asset is in one folder at a time, and deleting a folder n
   await expect(p.getByTestId("assets-status")).toHaveText("Moved “Palms” to Top level.");
   await pick(p, HASH);
   await expect(p.getByTestId("asset-folder-now")).toHaveText("Palms"); // (its item with it)
-  await side(p, /^Palms/).dragTo(side(p, /^Refs/));
+  await side(p, /^Palms/).dragTo(side(p, /^Refs/), { sourcePosition: onName.position, targetPosition: onName.position });
   await expect(p.getByTestId("assets-status")).toHaveText("Moved “Palms” to Refs.");
   await expect(p.getByTestId("asset-folder-now")).toHaveText("Refs › Palms");
 
@@ -569,7 +571,7 @@ test("folders nest, an asset is in one folder at a time, and deleting a folder n
   await p.getByTestId("confirm-ok").click();
   await expect(side(p, /^Palms/)).toHaveCount(0);
   await expect(side(p, /^All items/)).toContainText("1");
-  await side(p, /^All items/).click();
+  await side(p, /^All items/).click(onName);
   await pick(p, GREEN_HASH);
   await p.getByTestId("asset-organize").click();
   await expect(p.getByTestId("tree-chooser").getByRole("radio", { name: "Palms" })).toHaveCount(0); // (not offered to file into)
@@ -778,7 +780,7 @@ test("the library's filters are kept over a reload, are said over the grid, and 
   await p.getByTestId("assets-usage").selectOption("unused");
   await p.getByTestId("assets-sort").selectOption("name");
   await p.getByTestId("assets-sort-dir").click();
-  await side(p, /^Favourites/).click();
+  await side(p, /^Favourites/).click(onName);
   await expect(reset).toBeVisible();
   await p.reload();
   await p.waitForFunction(() => typeof window.__canvastDebug !== "undefined");
@@ -824,7 +826,7 @@ test("sidebar: one More menu per row (Escape closes only it, one click elsewhere
   await expect(card(p, HASH), "Escape closed the menu only").toHaveAttribute("aria-pressed", "true");
   // With a menu open, one click on another row both closes it and does that row's action.
   await more.click();
-  await side(p, /^Favourites/).click();
+  await side(p, /^Favourites/).click(onName);
   await expect(p.getByRole("menu")).toHaveCount(0);
   await expect(side(p, /^Favourites/)).toHaveAttribute("aria-current", "true");
   // A section folds away and stays folded over a reload.
@@ -855,7 +857,7 @@ test("sidebar: one More menu per row (Escape closes only it, one click elsewhere
   await expect(p.locator(".side-body")).toBeHidden();
   await strip.click();
   await expect(p.locator(".side-body")).toBeVisible();
-  await side(p, /^Unfiled/).click();
+  await side(p, /^Unfiled/).click(onName);
   await expect(p.locator(".side-body")).toBeHidden();
   await expect(strip).toContainText("Library: Unfiled");
   expect(app.consoleErrors).toEqual([]);
