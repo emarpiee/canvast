@@ -1476,7 +1476,7 @@ test("every kind of object snaps when resized by a handle: to another object's e
     await p.mouse.click((b.minX + b.maxX) / 2, (b.minY + b.maxY) / 2);
     await expect.poll(() => p.evaluate(() => window.__canvastDebug.selection())).toEqual([id]);
   };
-  const bigPng = makePng(300, 400, (x, y) => [x % 256, y % 256, 120, 255]);
+  const bigPng = makePng(160, 120, (x, y) => [x % 256, y % 256, 120, 255]); // (placed in the middle of the view, clear of the notices at the bottom)
   /** A large picture placed from the library, as one usually is. */
   const libraryPicture = async () => {
     const n = await count();
@@ -1510,6 +1510,23 @@ test("every kind of object snaps when resized by a handle: to another object's e
     ["picture", picture],
     ["picture from the library", libraryPicture],
     ["note card", noteCard],
+    ["text", async () => {
+      await key(app, "t");
+      await p.mouse.click(460, 330);
+      await p.keyboard.type("Snap to it");
+      await key(app, "Escape");
+      await expect.poll(async () => (await objects(app)).filter((o) => o.kind === "text").length).toBe(1);
+      await key(app, "v");
+      await p.evaluate((i) => window.__canvastDebug.select([i]), (await objects(app)).find((o) => o.kind === "text")!.id);
+    }],
+    ["GIF", async () => {
+      const n = await count();
+      const gif = Buffer.from(encodeGif(64, 48, [[255, 0, 0], [0, 255, 0]], [0, 1].map((c) => ({ w: 64, h: 48, pixels: Array(64 * 48).fill(c) }))));
+      await p.getByTestId("import-input").setInputFiles({ name: "a.gif", mimeType: "image/gif", buffer: gif });
+      await expect.poll(count).toBe(n + 1);
+      await key(app, "v");
+      await p.evaluate((i) => window.__canvastDebug.select([i]), (await objects(app)).find((o) => o.kind === "image")!.id);
+    }],
     ["picture on its own sheet", async () => { await picture(); await sheetWith(p, "puton"); await expect.poll(async () => (await objects(app)).filter((o) => o["container"]).length).toBe(1); }],
     ["pen stroke", async () => { await key(app, "p"); await app.drag({ x: 450, y: 320 }, { x: 560, y: 360 }); await key(app, "v"); await p.mouse.click(505, 340); }],
     ["speech balloon", async () => { await key(app, "k"); await app.drag({ x: 450, y: 300 }, { x: 560, y: 380 }); await key(app, "v"); }],
@@ -1529,14 +1546,16 @@ test("every kind of object snaps when resized by a handle: to another object's e
     const right = await resizeRightTo(797); // (3 px short, as for the grid: a pen stroke's box has its pen's width round it)
     // (a kind that keeps its proportions snaps by the nearer of its two moving edges: its bottom may be what lands on the rectangle's line)
     const bottom = (await frame())[2]![1];
-    const byBottom = ["pen stroke", "picture", "picture from the library"].includes(name) && [250, 350, 450].some((y) => Math.abs(bottom - y) <= 0.5);
+    // (what keeps its proportions at a corner snaps by the nearer of its two moving edges)
+    const keeps = ["pen stroke", "picture", "picture from the library", "text", "GIF"].includes(name);
+    const byBottom = keeps && [250, 350, 450].some((y) => Math.abs(bottom - y) <= 0.5);
     if (Math.abs(right - 800) > reach && !byBottom) missed.push(`${name} to an object: its side at ${right.toFixed(2)}, not 800`);
     // Level with it, from the corner: its bottom 3 px short of the rectangle's bottom (along its diagonal for a picture, which keeps its
     // proportions; a shape stretches, its right side far from every line). The bottom snaps as the side did.
-    if (["shape", "picture", "picture from the library", "picture on its own sheet", "sheet"].includes(name)) {
+    if (["shape", "picture", "picture from the library", "picture on its own sheet", "sheet", "note card", "text", "GIF"].includes(name)) {
       const c = await frame();
       const k = (447 - c[0]![1]) / (c[2]![1] - c[0]![1]);
-      await app.drag({ x: c[2]![0], y: c[2]![1] }, { x: name.startsWith("picture") ? c[0]![0] + k * (c[2]![0] - c[0]![0]) : 680, y: 447 }, 6);
+      await app.drag({ x: c[2]![0], y: c[2]![1] }, { x: keeps ? c[0]![0] + k * (c[2]![0] - c[0]![0]) : 680, y: 447 }, 6);
       await app.frame();
       const bottomNow = (await frame())[2]![1];
       if (Math.abs(bottomNow - 450) > reach) missed.push(`${name} level with an object: its bottom at ${bottomNow.toFixed(2)}, not 450`);
