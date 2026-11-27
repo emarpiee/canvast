@@ -30,16 +30,28 @@ export interface LiveContext {
   renderMath?: (tex: string, display: boolean) => string;
   /** A diagram (a ```mermaid block) as SVG; absent, it stays code. */
   renderDiagram?: (code: string) => Promise<string>;
+  /** A small editor for a table's cell (its Markdown on one line): Tab, Enter and Escape `move` on, undo with nothing left in it is the
+   *  note's. `close` gives its words and removes it. */
+  cellEditor?: (parent: HTMLElement, text: string, on: CellEvents, at?: { x: number; y: number }) => { close(): string };
+  /** The note's own undo and redo (a cell with nothing left to undo hands Ctrl+Z on). */
+  undo?: () => boolean;
+  redo?: () => boolean;
   /** A pair's sign typed over selected words goes round them (Settings). */
   wrapSelection?: boolean;
-  /** The format bar over words selected in a table's cell (it calls `pick` with a format's name); returns what closes it. */
-  formatBar?: (at: DOMRect, pick: (name: string) => void) => () => void;
   /** Whether a wiki link's target reaches anything (undefined: not known). */
   exists?: (target: string) => boolean | undefined;
   /** Words for a picture's resize handle and the "no language" choice. */
   resizeLabel: string;
   plainLabel: string;
   detectedLabel: string;
+}
+
+/** What a table cell's editor reports. */
+export interface CellEvents {
+  move(to: "next" | "prev" | "down" | "out"): void;
+  blur(): void;
+  undo(): boolean;
+  redo(): boolean;
 }
 
 /** The words of a table's actions. */

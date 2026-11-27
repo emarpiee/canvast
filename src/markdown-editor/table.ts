@@ -9,7 +9,6 @@ import { mediaElement } from "./live";
 import { renderMarkdown } from "./render";
 import { cleanHtml } from "./clean";
 import { openPopover, type PopItem } from "./popover";
-import { WRAP_PAIRS } from "./behaviors/wrap-selection";
 
 type Align = "left" | "center" | "right" | "";
 interface Model {
@@ -82,16 +81,164 @@ class TableWidget extends WidgetType {
     const commit = (next?: { row: number; col: number }): void => {
       const text = writeTable(model);
       if (next) focusNext.set(view, { at: this.from, ...next });
-      if (text === this.source) return void (next && cellAt(next.row, next.col)?.focus());
+      if (text === this.source) return void (next && edit(next.row, next.col));
       view.dispatch({ changes: { from: this.from, to: this.from + this.source.length, insert: text }, userEvent: "input.table" });
     };
-    const read = (cell: HTMLElement): string => (cell.dataset["editing"] ? (cell.textContent ?? "").replace(/\|/g, "\\|") : cell.dataset["md"] ?? "");
     const drawCell = (cell: HTMLElement, md: string): void => {
       cell.dataset["md"] = md;
       cell.innerHTML = md ? cleanHtml(renderMarkdown(md, { html: true })).replace(/^<p>|<\/p>$/g, "") : "";
       for (const img of cell.querySelectorAll("img")) img.replaceWith(mediaElement(this.ctx, img.getAttribute("data-embed") ?? img.getAttribute("src") ?? "", img.alt, img.hasAttribute("data-embed")));
     };
     const rowCount = model.rows.length + 1;
+    const cols = model.head.length;
+    const mdAt = (row: number, col: number): string => (row === 0 ? model.head[col] : model.rows[row - 1]?.[col]) ?? "";
+
+    // ---- One cell edited at a time, in a small editor of its own on the cell's Markdown (the note's keys, formats and undo there too) ----
+    let editing: { row: number; col: number; close(): string } | null = null;
+    /** Stop editing: the cell's words into the table (written back when they changed, or when `next` asks for another cell). */
+    const finish = (next?: { row: number; col: number }): void => {
+      if (!editing) return next ? void commit(next) : undefined;
+      const { row, col } = editing;
+      const md = editing.close();
+      editing = null;
+      set(row, col, md);
+      drawCell(cellAt(row, col)!, md);
+      commit(next);
+    };
+    /** Edit the cell at `row`, `col` (the cursor where `at` points in it, else at its end). */
+    const edit = (row: number, col: number, at?: { x: number; y: number }): void => {
+      clearCells();
+      if (editing?.row === row && editing.col === col) return;
+      if (editing) {
+        const md = editing.close(), was = editing;
+        editing = null;
+        set(was.row, was.col, md);
+        drawCell(cellAt(was.row, was.col)!, md);
+      }
+      const cell = cellAt(row, col);
+      if (!cell || !this.ctx.cellEditor) return;
+      // (the note's own selection goes to the table, so one selection shows: the cell's)
+      if (view.state.selection.main.from !== this.from) view.dispatch({ selection: { anchor: this.from } });
+      cell.textContent = "";
+      cell.classList.add("is-editing");
+      cell.parentElement!.classList.add("is-editing");
+      const ed = this.ctx.cellEditor(cell, mdAt(row, col).replace(/\\\|/g, "|"), {
+        move: (to) => {
+          const i = row * cols + col;
+          if (to === "out") {
+            finish();
+            const end = this.from + writeTable(model).length;
+            view.dispatch({ selection: { anchor: Math.min(end + 1, view.state.doc.length) } });
+            view.focus();
+            return;
+          }
+          let r = row, c = col;
+          if (to === "next" || to === "prev") {
+            const k = i + (to === "next" ? 1 : -1);
+            if (k < 0) return;
+            if (k >= (model.rows.length + 1) * cols) model.rows.push(Array<string>(cols).fill(""));
+            (r = Math.floor(k / cols)), (c = k % cols);
+          } else {
+            if (row + 1 >= model.rows.length + 1) model.rows.push(Array<string>(cols).fill(""));
+            r = row + 1;
+          }
+          finish({ row: r, col: c });
+        },
+        blur: () => finish(),
+        // (nothing left to undo in the cell: the note's own history, a sort or a moved row too)
+        undo: () => (finish(), this.ctx.undo?.() ?? false),
+        redo: () => (finish(), this.ctx.redo?.() ?? false),
+      }, at);
+      editing = { row, col, close: () => (cell.classList.remove("is-editing"), cell.parentElement!.classList.remove("is-editing"), ed.close().replace(/\|/g, "\\|").replace(/\n/g, "<br>")) };
+    };
+
+    // ---- Cells selected together: dragged across, or Shift+clicked (cleared, copied, cut or formatted at once) ----
+    let range: { r0: number; c0: number; r1: number; c1: number } | null = null;
+    const inRange = (r: number, c: number): boolean => !!range && r >= Math.min(range.r0, range.r1) && r <= Math.max(range.r0, range.r1) && c >= Math.min(range.c0, range.c1) && c <= Math.max(range.c0, range.c1);
+    const paintRange = (): void => {
+      for (const cell of table.querySelectorAll<HTMLElement>(".me-cell")) cell.parentElement!.classList.toggle("me-cell-selected", inRange(Number(cell.dataset["r"]), Number(cell.dataset["c"])));
+    };
+    const clearCells = (): void => {
+      range = null;
+      paintRange();
+    };
+    const eachSelected = (f: (r: number, c: number) => void): void => {
+      if (!range) return;
+      for (let r = Math.min(range.r0, range.r1); r <= Math.max(range.r0, range.r1); r++) for (let c = Math.min(range.c0, range.c1); c <= Math.max(range.c0, range.c1); c++) f(r, c);
+    };
+    const selectedTable = (): string => {
+      const rows: string[][] = [];
+      eachSelected((r, c) => {
+        const i = r - Math.min(range!.r0, range!.r1);
+        (rows[i] ??= []).push(mdAt(r, c));
+      });
+      const head = rows[0] ?? [];
+      return [`| ${head.join(" | ")} |`, `| ${head.map(() => "---").join(" | ")} |`, ...rows.slice(1).map((r) => `| ${r.join(" | ")} |`)].join("\n");
+    };
+    const FORMAT_KEYS: Record<string, [string, string]> = { b: ["**", "**"], i: ["*", "*"], e: ["`", "`"], S: ["~~", "~~"], H: ["==", "=="] };
+    wrap.tabIndex = -1;
+    // typing: (keys on cells selected together write the table: clear, cut, a format on each)
+    wrap.addEventListener("keydown", (e) => {
+      if (!range || editing) return;
+      const mod = e.ctrlKey || e.metaKey;
+      const key = e.shiftKey && mod ? e.key.toUpperCase() : e.key.toLowerCase();
+      if (e.key === "Escape") return void (clearCells(), view.focus(), e.preventDefault());
+      if (e.key === "Delete" || e.key === "Backspace" || (mod && key === "x")) {
+        if (mod) void navigator.clipboard?.writeText(selectedTable()).catch(() => undefined);
+        eachSelected((r, c) => set(r, c, ""));
+      } else if (mod && key === "c") return void (navigator.clipboard?.writeText(selectedTable()).catch(() => undefined), e.preventDefault());
+      else if (mod && FORMAT_KEYS[key]) {
+        const [a, b] = FORMAT_KEYS[key]!;
+        let all = true;
+        eachSelected((r, c) => void (all &&= mdAt(r, c).startsWith(a) && mdAt(r, c).endsWith(b) && mdAt(r, c).length >= a.length + b.length));
+        eachSelected((r, c) => {
+          const md = mdAt(r, c);
+          if (md) set(r, c, all ? md.slice(a.length, md.length - b.length) : `${a}${md}${b}`);
+        });
+      } else return;
+      e.preventDefault();
+      e.stopPropagation();
+      const keep = range;
+      commit();
+      range = keep;
+    });
+    const cellOf = (t: EventTarget | null): HTMLElement | null => (t instanceof Element ? t.closest<HTMLElement>(".me-cell") : null);
+    // view-state: (a press on a cell edits it; dragged on to other cells, or with Shift, it selects cells instead)
+    table.addEventListener("pointerdown", (e) => {
+      const cell = cellOf(e.target);
+      if (!cell || e.button !== 0 || (e.target as HTMLElement).closest(".me-col-resize, .cm-editor")) return;
+      const r = Number(cell.dataset["r"]), c = Number(cell.dataset["c"]);
+      if (e.shiftKey && (editing || range)) {
+        e.preventDefault();
+        const from = range ? { r: range.r0, c: range.c0 } : { r: editing!.row, c: editing!.col };
+        if (editing) finish();
+        range = { r0: from.r, c0: from.c, r1: r, c1: c };
+        paintRange();
+        wrap.focus({ preventScroll: true });
+        return;
+      }
+      e.preventDefault();
+      const start = { x: e.clientX, y: e.clientY };
+      let dragged = false;
+      const move = (ev: PointerEvent): void => {
+        const over = cellOf(document.elementFromPoint(ev.clientX, ev.clientY));
+        if (!over || (!dragged && over === cell)) return;
+        if (!dragged) {
+          dragged = true;
+          if (editing) finish();
+        }
+        range = { r0: r, c0: c, r1: Number(over.dataset["r"]), c1: Number(over.dataset["c"]) };
+        paintRange();
+      };
+      const up = (): void => {
+        document.removeEventListener("pointermove", move);
+        if (dragged) return void wrap.focus({ preventScroll: true });
+        edit(r, c, start);
+      };
+      document.addEventListener("pointermove", move);
+      document.addEventListener("pointerup", up, { once: true });
+    });
+
     const make = (tag: "th" | "td", md: string, row: number, col: number): HTMLElement => {
       // (the cell holds its words in an element of their own, beside a heading cell's grips)
       const box = document.createElement(tag);
@@ -100,101 +247,13 @@ class TableWidget extends WidgetType {
       box.append(cell);
       cell.dataset["r"] = String(row);
       cell.dataset["c"] = String(col);
-      cell.contentEditable = "true";
-      cell.spellcheck = true;
       if (model.aligns[col]) box.style.textAlign = model.aligns[col]!;
       drawCell(cell, md);
-      // typing: (a cell shows its Markdown while it is edited, and writes it back when left)
-      // Words selected in the cell: the format bar over them, its marks written round them in the cell's Markdown.
-      let closeBar: (() => void) | null = null;
-      const onSelection = (): void => {
-        closeBar?.();
-        closeBar = null;
-        const sel = getSelection();
-        if (!sel?.rangeCount || sel.isCollapsed || !cell.contains(sel.anchorNode) || !cell.contains(sel.focusNode) || !this.ctx.formatBar) return;
-        const range = sel.getRangeAt(0);
-        closeBar = this.ctx.formatBar(range.getBoundingClientRect(), (name) => {
-          const marks: Record<string, [string, string]> = { bold: ["**", "**"], italic: ["*", "*"], strike: ["~~", "~~"], highlight: ["==", "=="], code: ["`", "`"], link: ["[", "]()"] };
-          const [a, b] = marks[name] ?? ["", ""];
-          wrapIn(a, b, true);
-        });
-      };
-      /** The selected words of the cell put between `a` and `b` (or taken out of them, when `toggle` and they are there), still selected. */
-      const wrapIn = (a: string, b: string, toggle: boolean): boolean => {
-        const sel = getSelection();
-        if (!sel?.rangeCount || sel.isCollapsed || !cell.contains(sel.anchorNode) || !cell.contains(sel.focusNode)) return false;
-        const range = sel.getRangeAt(0);
-        const before = document.createRange();
-        before.setStart(cell, 0);
-        before.setEnd(range.startContainer, range.startOffset);
-        const from = before.toString().length, words = range.toString(), all = cell.textContent ?? "";
-        const off = toggle && all.slice(from - a.length, from) === a && all.slice(from + words.length, from + words.length + b.length) === b;
-        cell.textContent = off ? all.slice(0, from - a.length) + words + all.slice(from + words.length + b.length) : all.slice(0, from) + a + words + b + all.slice(from + words.length);
-        const start = off ? from - a.length : from + a.length;
-        const text = cell.firstChild;
-        if (text) {
-          const r = document.createRange();
-          r.setStart(text, start);
-          r.setEnd(text, start + words.length);
-          sel.removeAllRanges();
-          sel.addRange(r);
-        }
-        return true;
-      };
-      // A pair's sign typed over selected words goes round them, as in the note's text (a second `*` makes them bold).
-      cell.addEventListener("beforeinput", (e) => {
-        const close = e.inputType === "insertText" && e.data ? WRAP_PAIRS[e.data] : undefined;
-        if (close && this.ctx.wrapSelection !== false && wrapIn(e.data!, close, false)) e.preventDefault();
-      });
-      cell.addEventListener("focus", () => {
-        cell.dataset["editing"] = "1";
-        cell.textContent = (cell.dataset["md"] ?? "").replace(/\\\|/g, "|");
-        document.addEventListener("selectionchange", onSelection);
-      });
-      cell.addEventListener("blur", () => {
-        document.removeEventListener("selectionchange", onSelection);
-        closeBar?.();
-        closeBar = null;
-        const md = read(cell);
-        delete cell.dataset["editing"];
-        set(row, col, md);
-        drawCell(cell, md);
-        if (!focusNext.has(view)) commit();
-      });
       // view-state: (opens the table's list of actions; each writes the table through `commit`)
       cell.addEventListener("contextmenu", (e) => {
         e.preventDefault();
-        set(row, col, read(cell));
+        if (editing) finish();
         openPopover(new DOMRect(e.clientX, e.clientY, 0, 0), actions(row, col), this.ctx.tableLabel);
-      });
-      cell.addEventListener("keydown", (e) => {
-        const cols = model.head.length;
-        const go = (r: number, c: number): void => {
-          set(row, col, read(cell));
-          delete cell.dataset["editing"];
-          commit({ row: r, col: c });
-        };
-        if (e.key === "Tab") {
-          e.preventDefault();
-          const i = row * cols + col + (e.shiftKey ? -1 : 1);
-          if (i < 0) return;
-          if (i >= rowCount * cols) model.rows.push(Array<string>(cols).fill(""));
-          go(Math.floor(i / cols), i % cols);
-        } else if (e.key === "Enter" && !e.shiftKey) {
-          e.preventDefault();
-          if (row + 1 >= rowCount) model.rows.push(Array<string>(cols).fill(""));
-          go(row + 1, col);
-        } else if (e.key === "Escape") {
-          e.preventDefault();
-          set(row, col, read(cell));
-          delete cell.dataset["editing"];
-          focusNext.delete(view);
-          commit();
-          const end = this.from + writeTable(model).length;
-          view.dispatch({ selection: { anchor: Math.min(end + 1, view.state.doc.length) } });
-          view.focus();
-        }
-        e.stopPropagation();
       });
       return box;
     };
@@ -408,7 +467,7 @@ class TableWidget extends WidgetType {
     const want = focusNext.get(view);
     if (want && want.at === this.from) {
       focusNext.delete(view);
-      queueMicrotask(() => cellAt(want.row, want.col)?.focus()); // (once the editor has put the new table in, before the next key)
+      queueMicrotask(() => edit(want.row, want.col)); // (once the editor has put the new table in, before the next key)
     }
     return wrap;
   }

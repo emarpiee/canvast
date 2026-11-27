@@ -7,6 +7,8 @@ import { COMMANDS, type FormatName } from "./commands";
 export interface SelectionBarOptions {
   icons: Readonly<Record<string, string>>;
   labels: Readonly<Record<string, string>>;
+  /** Offer Turn into (not in a table's cell, which holds words only). Default true. */
+  turnInto?: boolean;
 }
 
 const INLINE: FormatName[] = ["bold", "italic", "strike", "highlight", "code", "link"];
@@ -42,7 +44,7 @@ function bar(opts: SelectionBarOptions): (view: EditorView) => { dom: HTMLElemen
       item.className = "me-selbar-item";
       menu.append(item);
     }
-    dom.append(turn, ...INLINE.map((n) => btn(n, opts.icons[n] ?? n, opts.labels[n] ?? n)), menu);
+    dom.append(...(opts.turnInto === false ? [] : [turn]), ...INLINE.map((n) => btn(n, opts.icons[n] ?? n, opts.labels[n] ?? n)), menu);
     // view-state: (a press on the bar keeps the selection in the text)
     dom.addEventListener("mousedown", (e) => e.preventDefault());
     // typing: (the bar's buttons write the note's Markdown; Turn into only opens its list)
@@ -85,36 +87,3 @@ export function selectionBar(opts: SelectionBarOptions): Extension {
   );
   return [field, focusClass];
 }
-
-/**
- * The same bar, floating over words selected outside the editor's text (a table's cell): the inline formats, each calling `pick` with its
- * name. Returns what closes it.
- */
-export function floatingBar(opts: SelectionBarOptions, at: DOMRect, pick: (name: FormatName) => void, parent: HTMLElement = document.body): () => void {
-  const dom = document.createElement("div");
-  dom.className = "me-selbar me-selbar-floating";
-  dom.setAttribute("role", "toolbar");
-  dom.setAttribute("aria-label", opts.labels["format"] ?? "Format");
-  for (const n of INLINE) {
-    const b = document.createElement("button");
-    b.type = "button";
-    b.className = "me-btn";
-    b.dataset["me"] = n;
-    b.title = opts.labels[n] ?? n;
-    b.setAttribute("aria-label", opts.labels[n] ?? n);
-    b.innerHTML = opts.icons[n] ?? n;
-    dom.append(b);
-  }
-  // view-state: (a press on the bar keeps the selection in the cell)
-  dom.addEventListener("mousedown", (e) => e.preventDefault());
-  // typing: (the bar's buttons write the cell's Markdown)
-  dom.addEventListener("click", (e) => {
-    const b = (e.target as HTMLElement).closest<HTMLElement>("[data-me]");
-    if (b) pick(b.dataset["me"] as FormatName);
-  });
-  parent.append(dom);
-  dom.style.left = `${Math.max(4, Math.min(at.left, innerWidth - dom.offsetWidth - 4))}px`;
-  dom.style.top = `${Math.max(4, at.top - dom.offsetHeight - 6)}px`;
-  return () => dom.remove();
-}
-

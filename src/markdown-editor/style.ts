@@ -83,7 +83,6 @@ export const EDITOR_CSS = `
 :where(.me-table) tr > :first-child { border-left: 0; } :where(.me-table) tr > :last-child { border-right: 0; }
 :where(.me-table, .me-preview) th { background: var(--me-code-bg); font-weight: 600; }
 :where(.me-table) :is(th, td) { outline: none; cursor: text; }
-:where(.me-table) :is(th, td):focus { box-shadow: inset 0 0 0 2px color-mix(in oklch, var(--me-accent) 60%, transparent); }
 :where(.me-table-add) { display: grid; place-items: center; padding: 0; border: 0; border-radius: 4px; background: var(--me-code-bg); color: var(--me-faint); font: inherit; font-size: 11px; line-height: 1; cursor: pointer; opacity: 0; transition: opacity 0.12s; }
 :where(.me-table:hover) .me-table-add, :where(.me-table:focus-within) .me-table-add { opacity: 1; }
 :where(.me-table-add):hover { color: var(--me-fg); background: var(--me-line); }
@@ -127,6 +126,10 @@ export const EDITOR_CSS = `
 :where(.me-pop-sep) { height: 1px; margin: 4px 2px; background: var(--me-line); }
 /* table cells and columns */
 :where(.me-table) .me-cell { outline: none; min-height: 1.4em; cursor: text; }
+:where(.me-table) .me-cell.is-editing .cm-editor { background: transparent; }
+:where(.me-table) :is(th, td).is-editing { box-shadow: inset 0 0 0 2px color-mix(in oklch, var(--me-accent) 60%, transparent); }
+:where(.me-table) .me-cell-selected { background: color-mix(in oklch, var(--me-accent) 18%, transparent); }
+:where(.me-table:focus) { outline: none; }
 :where(.me-table) th { position: relative; }
 :where(.me-col-resize) { position: absolute; top: 0; right: -3px; bottom: 0; width: 6px; cursor: col-resize; z-index: 1; }
 :where(.me-col-resize):hover { background: color-mix(in oklch, var(--me-accent) 40%, transparent); }
@@ -156,7 +159,6 @@ export const EDITOR_CSS = `
 :where(.me-date) input { font: inherit; color: var(--me-fg); background: var(--me-code-bg); border: 1px solid var(--me-line); border-radius: 4px; padding: 2px 6px; }
 /* the bar over selected words */
 :where(.me-blurred) .me-selbar { display: none; }
-:where(.me-selbar-floating) { position: fixed; z-index: 1000; background: var(--me-bg); border: 1px solid var(--me-line); border-radius: var(--me-radius); box-shadow: 0 6px 20px color-mix(in oklch, var(--me-fg) 18%, transparent); }
 :where(.me-selbar) { position: relative; display: flex; align-items: center; gap: 2px; padding: 3px; }
 :where(.me-selbar-turn) { padding: 0 8px; font-size: 0.85em; color: var(--me-fg); }
 :where(.me-selbar-menu) { position: absolute; top: 100%; left: 0; margin-top: 4px; display: flex; flex-direction: column; min-width: 12em; padding: 4px; background: var(--me-bg); border: 1px solid var(--me-line); border-radius: var(--me-radius); box-shadow: 0 6px 20px color-mix(in oklch, var(--me-fg) 18%, transparent); }

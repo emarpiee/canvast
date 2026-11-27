@@ -1,7 +1,7 @@
 // The Markdown editor: one CodeMirror view for live and source mode, a rendered page for preview mode, a toolbar, and the hooks a host fills in
 // (pictures, links, tags, files, saving). It knows nothing of the app it is in.
 import { autocompletion, type Completion, type CompletionContext, type CompletionResult } from "@codemirror/autocomplete";
-import { defaultKeymap, history, historyKeymap, indentWithTab, redo, undo } from "@codemirror/commands";
+import { defaultKeymap, history, historyKeymap, indentWithTab, redo, redoDepth, undo, undoDepth } from "@codemirror/commands";
 import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
 import { syntaxTree } from "@codemirror/language";
 import { openSearchPanel, search, searchKeymap } from "@codemirror/search";
@@ -17,8 +17,8 @@ import { closePopover, setMenuHost, type MenuHost } from "./popover";
 import { vim } from "@replit/codemirror-vim";
 import { DEFAULT_ICONS, type IconName } from "./icons";
 import { markdownLook } from "./highlight";
-import { livePreview, refresh } from "./live";
-import { floatingBar, selectionBar } from "./selection-bar";
+import { livePreview, refresh, type CellEvents } from "./live";
+import { selectionBar } from "./selection-bar";
 import { renderMarkdown } from "./render";
 import { cleanHtml } from "./clean";
 export { cleanHtml };
@@ -250,7 +250,9 @@ export function createMarkdownEditor(opts: EditorOptions): MarkdownEditor {
           ...(host.wikiExists ? { exists: host.wikiExists.bind(host) } : {}),
           ...(host.renderMath ? { renderMath: host.renderMath.bind(host) } : {}),
           wrapSelection: opts.wrapSelection !== false,
-          formatBar: (at: DOMRect, pick: (name: string) => void) => floatingBar({ icons, labels: labels as unknown as Record<string, string> }, at, pick as never, el),
+          cellEditor: (parent: HTMLElement, text: string, events: CellEvents, at?: { x: number; y: number }) => cellEditor(parent, text, events, at),
+          undo: () => undo(view),
+          redo: () => redo(view),
           ...(host.renderDiagram ? { renderDiagram: host.renderDiagram.bind(host) } : {}),
           taskLabel: labels.task, copyLabel: labels.copyCode, copiedLabel: labels.copied, languageLabel: labels.codeLanguage, addRowLabel: labels.addRow, addColumnLabel: labels.addColumn,
           tableLabel: labels.tableActions, languages: host.languages ?? LANGUAGES, resizeLabel: labels.resize, plainLabel: labels.plainText, detectedLabel: labels.detected,
@@ -414,6 +416,56 @@ export function createMarkdownEditor(opts: EditorOptions): MarkdownEditor {
     if (host.codeSpans) extensions.push(codeColours(host.codeSpans));
   }
 
+  /**
+   * A table cell's editor: the cell's Markdown on one line in a small editor with the note's reading, look, keys and behaviours (Ctrl+B,
+   * wrapping, brackets, the format bar), so a cell is edited as the note is. Tab and Shift+Tab go to the next or previous cell, Enter down a
+   * row, Escape out of the table; Shift+Enter is a line break (`<br>`); Ctrl+Z with nothing left in the cell undoes the note's last step.
+   */
+  const cellEditor = (parent: HTMLElement, text: string, events: CellEvents, at?: { x: number; y: number }): { close(): string } => {
+    let closed = false;
+    const cellView: EditorView = new EditorView({
+      parent,
+      state: EditorState.create({
+        doc: text.replace(/<br\s*\/?>/gi, "\n"),
+        extensions: [
+          history(),
+          drawSelection(),
+          EditorView.lineWrapping,
+          EditorView.theme(CM_THEME),
+          EditorView.theme({ ".cm-content": { padding: "0", maxWidth: "none" }, ".cm-scroller": { padding: "0" } }),
+          markdown({ base: markdownLanguage, extensions: EXTENSIONS, addKeymap: false }),
+          markdownLook,
+          ...behaviorExtensions((id) => on(id) && id !== "list-enter" && id !== "renumber-lists" && id !== "move-lines", false),
+          selectionBar({ icons, labels: labels as unknown as Record<string, string>, turnInto: false }),
+          Prec.high(keymap.of([
+            { key: "Tab", run: () => (events.move("next"), true) },
+            { key: "Shift-Tab", run: () => (events.move("prev"), true) },
+            { key: "Enter", run: () => (events.move("down"), true) },
+            { key: "Shift-Enter", run: (v) => (v.dispatch(v.state.replaceSelection("\n")), true) },
+            { key: "Escape", run: () => (events.move("out"), true) },
+            { key: "Mod-z", run: (v) => (undoDepth(v.state) ? undo(v) : events.undo()) },
+            { key: "Mod-y", run: (v) => (redoDepth(v.state) ? redo(v) : events.redo()) },
+            { key: "Mod-Shift-z", run: (v) => (redoDepth(v.state) ? redo(v) : events.redo()) },
+            { key: "Mod-s", preventDefault: true, run: () => (events.blur(), host.save?.(), true) },
+          ])),
+          keymap.of([...formatKeys.filter((k) => !/^Mod-Alt|^Alt-q|^Shift-Mod-k|F10|ContextMenu/.test(k.key)), ...historyKeymap, ...defaultKeymap]),
+          EditorView.domEventHandlers({ blur: () => void setTimeout(() => !closed && !cellView.hasFocus && events.blur()) }),
+          EditorView.contentAttributes.of({ spellcheck: "true" }),
+        ],
+      }),
+    });
+    cellView.focus();
+    const pos = at ? cellView.posAtCoords(at) : null;
+    cellView.dispatch({ selection: { anchor: pos ?? cellView.state.doc.length } });
+    return {
+      close() {
+        closed = true;
+        const value = cellView.state.doc.toString();
+        cellView.destroy();
+        return value;
+      },
+    };
+  };
   // (a file's own line ends are kept: one written with CR LF throughout is saved so)
   const lineEnds = (text: string): Extension => (/\r\n/.test(text) && !/(^|[^\r])\n/.test(text) ? EditorState.lineSeparator.of("\r\n") : []);
   const stateOf = (text: string): EditorState => EditorState.create({ doc: text, extensions: [extensions, lineEnds(text)] });
