@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.63.35 — The quick switcher (2026-11-27)
+
+- **Added:** the quick switcher, `Ctrl/⌘+P` (a key of its own in Settings › Shortcuts): the palette's box over the canvases, the Library's notes, PDFs and 3D models and this canvas's bookmarks; Enter opens one in the active tab (B39). ([The command palette](README.md#the-command-palette))
+
 ## 0.63.34 — Settings over the workspace, its layout switches (2026-11-27)
 
 - **Changed:** Settings opens as a box over the workspace, which stays in sight behind it (B39). ([Settings](README.md#settings))

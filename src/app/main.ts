@@ -192,7 +192,7 @@ import { createTextureHooks } from "./texture-actions";
 import type { Adjust } from "../doc/adjust";
 import { downloadSelection, pickedFiles } from "./download";
 import { mountCommandPalette } from "../ui/command-palette";
-import { commands, pressCommand } from "../commands/registry";
+import { CommandRegistry, commands, pressCommand } from "../commands/registry";
 import { REASON } from "../commands/types";
 import type { OptionSpec, Options } from "../commands/types";
 import { canvasCommands, ITEMS_MAX, OLD_CANVAS_IDS, type CanvasActions, type ItemRow } from "./canvas-commands";
@@ -3236,6 +3236,34 @@ async function start(): Promise<void> {
     if ((e.target as HTMLElement | null)?.closest?.("dialog")) return;
     e.preventDefault();
     pressCommand("find.palette", {}, "key");
+  }, true);
+
+  // The quick switcher (B39, Ctrl+P): the palette's look and keys over the places to go to: canvases, files (notes, PDFs, 3D models) and this
+  // canvas's bookmarks (@canvas, @note, @pdf, @model, @bookmark narrow it). Enter opens one in the active tab.
+  const places = new CommandRegistry();
+  places.setProvider("places", () => {
+    const row = (id: string, kind: string, title: string, hint: string, run: () => void): Command => ({ id, group: "Go to", kind, title, hint, risk: "read", why: () => null, exec: () => (run(), { ok: true }) });
+    const out: Command[] = [];
+    for (const { board, canvases } of session.tree?.boards ?? []) {
+      for (const c of canvases) out.push(row(`go.canvas.${c.id}`, "canvas", c.name, board.name, () => (void pressCommand("canvas.openId", { id: c.id }), void pressCommand("go.canvas"))));
+    }
+    for (const [hash, name] of assetNames.map) {
+      const k = viewKindNamed(name);
+      if (k && k.id !== "archive") out.push(row(`go.file.${hash}`, k.id, name, `A ${k.noun} of the Library`, () => void notePanel.open(hash)));
+    }
+    for (const b of bookmarkList.items) out.push(row(`go.bookmark.${b.id}`, "bookmark", b.name, "A bookmark of this canvas", () => void pressCommand("bookmark.go", { bookmark: b.id })));
+    return out;
+  });
+  const switcher = mountCommandPalette(places, { id: "quick-switcher", label: "Go to", placeholder: "Go to a canvas, a file or a bookmark; @ narrows it (@canvas, @note, @bookmark…)" });
+  commands.setProvider("switcher", () => [
+    { id: "find.switcher", group: "Find", kind: "find", title: "Quick switcher", hint: "Go to a canvas, a file or a bookmark", risk: "read", words: "go open switch jump", why: () => null, exec: () => (switcher.open(), { ok: true }) },
+  ]);
+  // commands: find.switcher (Ctrl+P, or the key chosen for it)
+  window.addEventListener("keydown", (e) => {
+    if (!(e.ctrlKey || e.metaKey) || e.altKey || e.shiftKey || e.key.toLowerCase() !== "p") return;
+    if ((e.target as HTMLElement | null)?.closest?.("dialog")) return;
+    e.preventDefault(); // (not the browser's print)
+    pressCommand("find.switcher", {}, "key");
   }, true);
 
   // "/" opens the command palette (not while typing).

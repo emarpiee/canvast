@@ -18,16 +18,20 @@ const MAX_SHOWN = 60;
 /** One row of the palette: a command, or (while a kind is being typed after `@`) a kind to choose. */
 type Row = { kind: "command"; command: Command } | { kind: "filter"; word: string; count: number };
 
-export function mountCommandPalette(registry: CommandRegistry): { open(): void; close(): void } {
+export function mountCommandPalette(
+  registry: CommandRegistry,
+  /** Another palette over another list (the quick switcher): its own ids, name and prompt. */
+  o: { id: string; label: string; placeholder: string } = { id: "palette", label: "Commands", placeholder: "Type a command (select, zoom, export…); @ narrows it to a kind (@settings, @toolbar, @tool…)" },
+): { open(): void; close(): void } {
   const root = document.createElement("div");
   root.className = "palette";
-  root.dataset["testid"] = "command-palette";
+  root.dataset["testid"] = o.id === "palette" ? "command-palette" : o.id;
   root.setAttribute("role", "dialog");
   root.setAttribute("aria-modal", "true");
-  root.setAttribute("aria-label", "Commands");
+  root.setAttribute("aria-label", o.label);
   root.hidden = true;
-  root.innerHTML = `<input class="palette-input" type="text" role="combobox" aria-expanded="true" aria-controls="palette-list" aria-autocomplete="list" placeholder="Type a command (select, zoom, export…); @ narrows it to a kind (@settings, @toolbar, @tool…)" autocomplete="off" spellcheck="false" aria-label="Command">
-    <ul class="palette-list" id="palette-list" role="listbox" aria-label="Commands"></ul>`;
+  root.innerHTML = `<input class="palette-input" type="text" role="combobox" aria-expanded="true" aria-controls="${o.id}-list" aria-autocomplete="list" placeholder="${o.placeholder}" autocomplete="off" spellcheck="false" aria-label="Command">
+    <ul class="palette-list" id="${o.id}-list" role="listbox" aria-label="${o.label}"></ul>`;
   document.body.appendChild(root);
   const input = root.querySelector<HTMLInputElement>(".palette-input")!;
   const list = root.querySelector<HTMLUListElement>(".palette-list")!;
@@ -65,14 +69,14 @@ export function mountCommandPalette(registry: CommandRegistry): { open(): void; 
     list.innerHTML = shown.length
       ? shown
           .map((r, i) => {
-            const open = `<li role="option" id="palette-${i}" data-i="${i}" aria-selected="${i === active}" class="${i === active ? "is-active" : ""}">`;
+            const open = `<li role="option" id="${o.id}-${i}" data-i="${i}" aria-selected="${i === active}" class="${i === active ? "is-active" : ""}">`;
             if (r.kind === "filter") return `${open}<span class="palette-group">Filter</span><span class="palette-title">@${esc(r.word)}</span><span class="palette-keys">${r.count}</span></li>`;
             const c = r.command;
             return `${open}<span class="palette-group">${esc(c.group)}</span><span class="palette-title">${esc(c.title)}</span>${c.keys ? `<kbd>${esc(c.keys)}</kbd>` : ""}</li>`;
           })
           .join("")
       : `<li class="palette-empty" role="presentation">No command matches.</li>`;
-    input.setAttribute("aria-activedescendant", shown.length ? `palette-${active}` : "");
+    input.setAttribute("aria-activedescendant", shown.length ? `${o.id}-${active}` : "");
     list.querySelector(".is-active")?.scrollIntoView({ block: "nearest" });
   };
   const close = (): void => {

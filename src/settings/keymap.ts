@@ -148,6 +148,7 @@ export const KEY_COMMANDS: readonly KeyCommand[] = [
   cmd("bookmark.next", "Go to the next bookmark", BOOKMARK_GROUP, "]"),
   ...[1, 2, 3, 4, 5, 6, 7, 8, 9].map((n) => cmd(`bookmark.${n}`, `Go to bookmark ${n}`, BOOKMARK_GROUP, `Alt+${n}`)),
   cmd("find.palette", "The command palette", FIND_GROUP, ["Ctrl+K", "Ctrl+Shift+P"], undefined, "global"),
+  cmd("find.switcher", "The quick switcher", FIND_GROUP, "Ctrl+P", undefined, "global"),
   cmd("find.slash", "The command palette (a plain key)", FIND_GROUP, "/"),
   cmd("find.canvas", "Search the canvas by file or layer name", FIND_GROUP, "Ctrl+F", undefined, "global"),
   cmd("find.library", "Go to the Library and search it", FIND_GROUP, "Ctrl+Shift+F", undefined, "global"),

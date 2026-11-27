@@ -2396,7 +2396,7 @@ Open a panel from its tab in a sidebar: Layers, Adjust, Tags, Styles and Pattern
 
 ### The command palette
 
-`Ctrl/⌘+K` runs any command by name, takes a value where one is needed (`@kind` narrows the list), and records and replays **macros**: **Record a macro**, then do it with the buttons, menus, keys or the palette, then **Save the macro**; a slider's steps are left out, the value it ends on is kept. `/` on the canvas opens it too.
+`Ctrl/⌘+K` runs any command by name, takes a value where one is needed (`@kind` narrows the list), and records and replays **macros**: **Record a macro**, then do it with the buttons, menus, keys or the palette, then **Save the macro**; a slider's steps are left out, the value it ends on is kept. `/` on the canvas opens it too. **`Ctrl/⌘+P`** is the quick switcher, the same box over the places to go to: the canvases, the Library's notes, PDFs and 3D models, and this canvas's bookmarks (`@canvas`, `@note`, `@bookmark` narrow it); `Enter` opens one in the active tab.
 
 Run any command by name: typing flip finds the flip commands for the selected print.
 
