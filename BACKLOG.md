@@ -22,8 +22,8 @@ The work on canvast that is not done yet, and what became of each item. **Priori
 | B9 | Hiding and showing big hidden items faster (about 30 to 60 MB/s today) | low | open | Waits for a decision: encrypting in the desktop app's main process means the key leaves the page |
 | B10 | Speed and memory measured on real devices (an older laptop, a phone), not only on the test machine | low | open | The benchmarks and the qualification matrix exist and were run on the test machine |
 | B11 | The Retroma theme | low | open | Parked on the `retroma-v4` branch until the owner resumes it |
-| B12 | Math in notes (formulas) | low | open | On hold |
 | B26 | The Layers panel's row buttons show which state they are in: today some icons (such as the clipping and the frame toggles) look the same whether on or off | low | open | Icon audit of every Layers panel toggle first |
+| B12 | Math in notes (formulas) | low | closed | 0.63.19 (branch feat/note-editor): KaTeX in the notes editor, with Mermaid diagrams |
 | B35 | The Library opens without expanding every folder (a library of many subfolders opened slowly), and still remembers which folders you expanded or collapsed | medium | closed | 0.62.3 |
 | B36 | The Pins button and Pins rows show a pin icon | low | closed | 0.62.3 |
 | B1 | README pictures for the newest features: the ZIP and comic book viewer, maybe the rename and move progress notice | high | closed | 0.60.16: the ZIP and comic book view's section and picture (a progress notice is too brief to picture) |

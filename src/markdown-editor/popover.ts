@@ -8,7 +8,8 @@ export interface PopItem {
   disabled?: boolean;
   /** Shown as chosen. */
   on?: boolean;
-  run(): void;
+  /** Chosen: what it does (it edits the note through the editor, as typing does). */
+  pick(): void;
 }
 
 let close: (() => void) | null = null;
@@ -39,7 +40,7 @@ export function openPopover(anchor: HTMLElement | DOMRect, items: readonly PopIt
     // typing: (each choice writes the note's Markdown through the editor)
     b.addEventListener("click", () => {
       closePopover();
-      item.run();
+      item.pick();
     });
     box.append(b);
   }

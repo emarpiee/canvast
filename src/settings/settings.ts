@@ -221,6 +221,7 @@ export const SETTINGS = {
   "notes.folder": { scope: "workspace", default: "Notes", validate: text(60), effect: "immediate" } as Def<string>,
   "notes.look": { scope: "device", default: "auto", validate: oneOf("auto", "light", "dark"), effect: "immediate" } as Def<"auto" | "light" | "dark">,
   "notes.panelMode": { scope: "device", default: "panel", validate: oneOf("panel", "window"), effect: "immediate" } as Def<"panel" | "window">,
+  "notes.vim": { scope: "device", default: false, validate: bool, effect: "immediate" } as Def<boolean>,
   "notes.editorMode": { scope: "device", default: "live", validate: oneOf("live", "source", "preview"), effect: "immediate" } as Def<"live" | "source" | "preview">,
   "assets.edgeWidth": { scope: "device", default: 15, validate: (v: unknown) => (Number.isInteger(v) && (v as number) >= 0 && (v as number) <= 40 ? (v as number) : undefined), effect: "immediate" } as Def<number>,
   "assets.playerHideSeconds": { scope: "device", default: 1.5, validate: (v: unknown) => (typeof v === "number" && v >= 0.5 && v <= 10 ? v : undefined), effect: "immediate" } as Def<number>,

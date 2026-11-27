@@ -125,6 +125,33 @@ export const EDITOR_CSS = `
 :where(.me-pop-item:disabled) { opacity: 0.4; cursor: default; }
 :where(.me-pop-item small) { color: var(--me-faint); }
 :where(.me-pop-sep) { height: 1px; margin: 4px 2px; background: var(--me-line); }
+/* table cells and columns */
+:where(.me-table) .me-cell { outline: none; min-height: 1.4em; cursor: text; }
+:where(.me-table) th { position: relative; }
+:where(.me-col-resize) { position: absolute; top: 0; right: -3px; bottom: 0; width: 6px; cursor: col-resize; z-index: 1; }
+:where(.me-col-resize):hover { background: color-mix(in oklch, var(--me-accent) 40%, transparent); }
+:where(.me-col-grip) { position: absolute; top: -12px; left: 50%; transform: translateX(-50%); display: grid; place-items: center; width: 22px; height: 12px; border-radius: 4px; background: var(--me-code-bg); color: var(--me-faint); cursor: grab; opacity: 0; touch-action: none; }
+:where(.me-table:hover) .me-col-grip { opacity: 1; }
+:where(.me-table) th.me-drop-target { box-shadow: inset -2px 0 0 var(--me-accent); }
+:where(.me-live) .me-code-lang.is-detected { border: 1px dashed var(--me-line); opacity: 0.85; }
+/* math and diagrams */
+:where(.me) .me-math { cursor: pointer; }
+:where(.me) .me-math-block { display: block; text-align: center; padding: 6px 0; overflow-x: auto; }
+:where(.me) .me-math-error { color: var(--me-red); font-family: var(--me-mono); font-size: 0.9em; }
+:where(.me) .me-diagram, :where(.me-preview) .me-diagram { display: block; text-align: center; padding: 8px 0; overflow-x: auto; cursor: pointer; }
+:where(.me) .me-diagram svg, :where(.me-preview) .me-diagram svg { max-width: 100%; height: auto; }
+:where(.me-preview) .math-block { display: block; text-align: center; margin: 0.6em 0; overflow-x: auto; }
+/* the link popover */
+:where(.me-link-pop) { position: fixed; z-index: 1000; display: flex; flex-direction: column; width: min(30rem, calc(100vw - 16px)); max-height: min(22rem, 60vh); background: var(--me-bg); color: var(--me-fg); border: 1px solid var(--me-line); border-radius: 8px; box-shadow: 0 10px 30px color-mix(in oklch, var(--me-fg) 22%, transparent); overflow: hidden; font-family: var(--me-font); }
+:where(.me-link-pop-head) { display: flex; align-items: center; gap: 8px; padding: 6px 10px; border-bottom: 1px solid var(--me-line); font-size: 13px; }
+:where(.me-link-pop-title) { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+:where(.me-link-pop-btn) { width: auto; padding: 0 8px; font-size: 12px; color: var(--me-accent); }
+:where(.me-link-pop-body) { flex: 1; min-height: 6rem; overflow: auto; padding: 4px 0; font-size: 0.9em; color: var(--me-muted); }
+:where(.me-link-pop-body) > .me { height: auto; min-height: 6rem; --me-pad: 12px; }
+:where(.me-link-pop-body) img, :where(.me-link-pop-body) video { display: block; max-width: 100%; margin: 8px auto; border-radius: var(--me-radius); }
+/* the date picker */
+:where(.me-date) { flex-direction: row; align-items: center; gap: 6px; padding: 6px; min-width: 0; }
+:where(.me-date) input { font: inherit; color: var(--me-fg); background: var(--me-code-bg); border: 1px solid var(--me-line); border-radius: 4px; padding: 2px 6px; }
 /* the bar over selected words */
 :where(.me-selbar) { position: relative; display: flex; align-items: center; gap: 2px; padding: 3px; }
 :where(.me-selbar-turn) { padding: 0 8px; font-size: 0.85em; color: var(--me-fg); }

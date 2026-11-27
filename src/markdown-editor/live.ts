@@ -9,6 +9,7 @@ import type { SyntaxNode } from "@lezer/common";
 import { toggleTask } from "./commands";
 import { tableField } from "./table";
 import { openPopover } from "./popover";
+import { guessLanguage } from "./detect";
 
 /** What live mode asks of the host. */
 export interface LiveContext {
@@ -25,11 +26,16 @@ export interface LiveContext {
   tableWords: TableWords;
   /** The languages a code block's label offers. */
   languages: readonly string[];
+  /** Math as HTML (`display`: a block of its own); absent, math stays as written. */
+  renderMath?: (tex: string, display: boolean) => string;
+  /** A diagram (a ```mermaid block) as SVG; absent, it stays code. */
+  renderDiagram?: (code: string) => Promise<string>;
   /** Whether a wiki link's target reaches anything (undefined: not known). */
   exists?: (target: string) => boolean | undefined;
   /** Words for a picture's resize handle and the "no language" choice. */
   resizeLabel: string;
   plainLabel: string;
+  detectedLabel: string;
 }
 
 /** The words of a table's actions. */
@@ -221,6 +227,102 @@ class RuleWidget extends WidgetType {
   }
 }
 
+/** Math drawn (inline, or a block of its own); a click puts the cursor in its source. */
+class MathWidget extends WidgetType {
+  constructor(readonly tex: string, readonly display: boolean, readonly at: number, readonly ctx: LiveContext) {
+    super();
+  }
+  override eq(o: MathWidget): boolean {
+    return o.tex === this.tex && o.display === this.display;
+  }
+  override toDOM(view: EditorView): HTMLElement {
+    const el = document.createElement(this.display ? "div" : "span");
+    el.className = this.display ? "me-math me-math-block" : "me-math";
+    try {
+      el.innerHTML = this.ctx.renderMath?.(this.tex, this.display) ?? "";
+    } catch (e) {
+      el.textContent = this.tex;
+      el.classList.add("me-math-error");
+      el.title = (e as Error).message;
+    }
+    // view-state: (a click on drawn math puts the cursor in its source, to edit it)
+    el.addEventListener("mousedown", (e) => {
+      e.preventDefault();
+      view.dispatch({ selection: { anchor: this.at } });
+      view.focus();
+    });
+    return el;
+  }
+  override ignoreEvent(): boolean {
+    return true;
+  }
+}
+
+/** A diagram drawn from its code; a click puts the cursor in its code. */
+class DiagramWidget extends WidgetType {
+  constructor(readonly code: string, readonly at: number, readonly ctx: LiveContext) {
+    super();
+  }
+  override eq(o: DiagramWidget): boolean {
+    return o.code === this.code;
+  }
+  override toDOM(view: EditorView): HTMLElement {
+    const el = document.createElement("div");
+    el.className = "me-diagram";
+    el.textContent = "…";
+    void this.ctx.renderDiagram?.(this.code).then((svg) => void (el.innerHTML = svg), (e: Error) => {
+      el.textContent = e.message;
+      el.classList.add("me-math-error");
+    });
+    // view-state: (a click on the drawn diagram puts the cursor in its code)
+    el.addEventListener("mousedown", (e) => {
+      e.preventDefault();
+      view.dispatch({ selection: { anchor: this.at } });
+      view.focus();
+    });
+    return el;
+  }
+  override ignoreEvent(): boolean {
+    return true;
+  }
+}
+
+/** Math blocks and diagrams drawn while the cursor is out of them (block replacements: a state field's). */
+function blockField(ctx: LiveContext): Extension {
+  const build = (state: EditorState): DecorationSet => {
+    const active = activeLines(state);
+    const out: Range<Decoration>[] = [];
+    const inside = (from: number, to: number): boolean => {
+      for (let l = state.doc.lineAt(from).number; l <= state.doc.lineAt(to).number; l++) if (active.has(l)) return true;
+      return false;
+    };
+    syntaxTree(state).iterate({
+      enter: (ref) => {
+        if (ref.name === "BlockMath" && ctx.renderMath) {
+          const from = state.doc.lineAt(ref.from).from, to = state.doc.lineAt(ref.to).to;
+          if (!inside(from, to)) out.push(Decoration.replace({ widget: new MathWidget(state.sliceDoc(ref.from, ref.to).trim().replace(/^\$\$|\$\$$/g, "").trim(), true, ref.from + 2, ctx), block: true }).range(from, to));
+          return false;
+        }
+        if (ref.name === "FencedCode" && ctx.renderDiagram) {
+          const info = ref.node.getChild("CodeInfo");
+          if (!info || state.sliceDoc(info.from, info.to).trim().toLowerCase() !== "mermaid") return false;
+          const from = state.doc.lineAt(ref.from).from, to = state.doc.lineAt(ref.to).to;
+          const body = ref.node.getChild("CodeText");
+          if (!inside(from, to)) out.push(Decoration.replace({ widget: new DiagramWidget(body ? state.sliceDoc(body.from, body.to) : "", info.to, ctx), block: true }).range(from, to));
+          return false;
+        }
+        return ref.name === "Document" || ref.name === "Blockquote" || ref.name === "ListItem" || ref.name === "BulletList" || ref.name === "OrderedList";
+      },
+    });
+    return Decoration.set(out, true);
+  };
+  return StateField.define<DecorationSet>({
+    create: build,
+    update: (deco, tr) => (tr.docChanged || tr.selection || syntaxTree(tr.startState) !== syntaxTree(tr.state) || tr.effects.some((e) => e.is(setRevealing)) ? build(tr.state) : deco.map(tr.changes)),
+    provide: (f) => EditorView.decorations.from(f),
+  });
+}
+
 /** A callout's title when it has none of its own: its type, capitalised. */
 class CalloutTitle extends WidgetType {
   constructor(readonly label: string) {
@@ -243,11 +345,11 @@ const CHECK_ICON = ICON('<path d="M20 6 9 17l-5-5"/>');
 
 /** A code card's corner: its language (a click puts the cursor on the fence, to change it) and a button that copies its code. */
 class CodeFlair extends WidgetType {
-  constructor(readonly language: string, readonly fenceEnd: number, readonly from: number, readonly to: number, readonly ctx: LiveContext) {
+  constructor(readonly language: string, readonly fenceEnd: number, readonly from: number, readonly to: number, readonly ctx: LiveContext, readonly detected = false) {
     super();
   }
   override eq(o: CodeFlair): boolean {
-    return o.language === this.language && o.fenceEnd === this.fenceEnd && o.from === this.from && o.to === this.to;
+    return o.language === this.language && o.fenceEnd === this.fenceEnd && o.from === this.from && o.to === this.to && o.detected === this.detected;
   }
   override toDOM(view: EditorView): HTMLElement {
     const bar = document.createElement("span");
@@ -255,9 +357,9 @@ class CodeFlair extends WidgetType {
     bar.contentEditable = "false";
     const lang = document.createElement("button");
     lang.type = "button";
-    lang.className = "me-code-lang";
+    lang.className = `me-code-lang${this.detected ? " is-detected" : ""}`;
     lang.innerHTML = `<span></span>${ICON('<path d="m6 9 6 6 6-6"/>')}`;
-    lang.firstElementChild!.textContent = this.language;
+    lang.firstElementChild!.textContent = this.detected ? `${this.language} · ${this.ctx.detectedLabel}` : this.language;
     lang.title = this.ctx.languageLabel;
     const copy = document.createElement("button");
     copy.type = "button";
@@ -276,7 +378,7 @@ class CodeFlair extends WidgetType {
         const from = line.from + fence[1]!.length + fence[2]!.length;
         view.dispatch({ changes: { from, to: line.to, insert: name }, userEvent: "input.language" });
       };
-      openPopover(lang, [{ label: this.ctx.plainLabel, on: !fence[3]!.trim(), run: () => set("") }, ...this.ctx.languages.map((l) => ({ label: l, on: fence[3]!.trim() === l, run: () => set(l) }))], this.ctx.languageLabel);
+      openPopover(lang, [{ label: this.ctx.plainLabel, on: !fence[3]!.trim(), pick: () => set("") }, ...this.ctx.languages.map((l) => ({ label: l, on: fence[3]!.trim() === l, pick: () => set(l) }))], this.ctx.languageLabel);
     });
     // view-state: (copies the block's code to the clipboard; the note is unchanged)
     copy.addEventListener("click", () => {
@@ -355,6 +457,11 @@ function decorations(view: EditorView, ctx: LiveContext): DecorationSet {
           case "Escape":
             if (!lineActive(n.from)) hideMark(n.from, n.from + 1);
             return;
+          case "InlineMath":
+            if (ctx.renderMath && !touches(state, n.from, n.to)) out.push(Decoration.replace({ widget: new MathWidget(state.sliceDoc(n.from + 1, n.to - 1), false, n.from + 1, ctx) }).range(n.from, n.to));
+            return false;
+          case "BlockMath":
+            return false;
           case "Link": {
             // (`[-]` cancelled, `[/]` in progress, `[>]` forwarded at a list item's start: task states the parser reads as links)
             const state3 = /^\[([-/>])\]$/.exec(text(n));
@@ -483,8 +590,9 @@ function decorations(view: EditorView, ctx: LiveContext): DecorationSet {
             }
             const info = n.getChild("CodeInfo");
             const body = n.getChild("CodeText");
-            const language = info ? text(info).trim().split(/\s+/)[0]! : "text";
-            out.push(Decoration.widget({ widget: new CodeFlair(language, first.to, body?.from ?? first.to, body?.to ?? first.to, ctx), side: 1 }).range(first.to));
+            const guess = !info && body ? guessLanguage(state.sliceDoc(body.from, body.to)) : null;
+            const language = info ? text(info).trim().split(/\s+/)[0]! : (guess ?? ctx.plainLabel);
+            out.push(Decoration.widget({ widget: new CodeFlair(language, first.to, body?.from ?? first.to, body?.to ?? first.to, ctx, !!guess), side: 1 }).range(first.to));
             return false;
           }
           case "Table":
@@ -527,5 +635,5 @@ export function livePreview(ctx: LiveContext): Extension {
     },
     { decorations: (v) => v.decorations },
   );
-  return [revealOnFocus, plugin, tableField(ctx), EditorView.editorAttributes.of({ class: "me-live" })];
+  return [revealOnFocus, plugin, tableField(ctx), blockField(ctx), EditorView.editorAttributes.of({ class: "me-live" })];
 }

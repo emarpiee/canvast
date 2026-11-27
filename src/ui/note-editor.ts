@@ -1,6 +1,8 @@
 import { ICONS } from "./icons";
 import { createMarkdownEditor, type EditorMode, type FollowedLink, type MarkdownEditor, type SlashItem } from "../markdown-editor";
 import { CODE_LANGUAGES, codeSpans, dropCode, paintCode } from "../notes/code-colours";
+import { renderMath } from "../notes/math";
+import { noteKindOf } from "../notes/note-file";
 import { WIKI, encodeLinkPart, libraryLink, linkTarget } from "../notes/note-file";
 import type { NoteKind, PathTarget } from "../notes/note-file";
 import { splitFrontmatter, type Prop } from "../notes/frontmatter";
@@ -52,6 +54,14 @@ export interface NoteHost {
   templates(): Promise<Array<{ name: string; kind: NoteKind; text: string; dir: string[] }>>;
   /** The editor's Save button (and Ctrl+S): whether it was saved. */
   save(): Promise<boolean>;
+  /** Another note's words (without its properties) written as its new version: its new hash (the link popover's edits). */
+  saveOther(hash: string, words: string): Promise<string | null>;
+  /** A new note of this name in the library: its item, or null. */
+  createNote(name: string): Promise<NoteItem | null>;
+  /** A new note, named as Settings say, opened. */
+  newNote(): void;
+  /** Vim keys in notes (Settings). */
+  vim: boolean;
 }
 
 export interface NoteEditor {
@@ -84,6 +94,17 @@ function fillTemplate(text: string, title: string): string {
   return text.replace(/\{\{\s*(date|time|title)\s*\}\}/gi, (_m, k: string) =>
     k.toLowerCase() === "date" ? `${now.getFullYear()}-${two(now.getMonth() + 1)}-${two(now.getDate())}` : k.toLowerCase() === "time" ? `${two(now.getHours())}:${two(now.getMinutes())}` : title,
   );
+}
+
+/** Diagrams in notes (```mermaid), drawn by Mermaid, loaded the first time one is shown; light or dark with the app. */
+let mermaidReady: Promise<typeof import("mermaid").default> | null = null;
+let diagramCount = 0;
+async function renderDiagram(code: string): Promise<string> {
+  mermaidReady ??= import("mermaid").then((m) => m.default);
+  const mermaid = await mermaidReady;
+  mermaid.initialize({ startOnLoad: false, securityLevel: "strict", theme: document.documentElement.dataset["theme"] === "dark" || matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "default" });
+  const { svg } = await mermaid.render(`me-diagram-${++diagramCount}`, code);
+  return svg;
 }
 
 /** The app's icons on the editor's toolbar (the same thing shows the same icon everywhere). */
@@ -152,6 +173,7 @@ export async function mountNoteEditor(el: HTMLElement, opts: { kind: Exclude<Not
     value: md ? splitFrontmatter(opts.text).body : opts.text,
     mode: opts.mode,
     plain: !md,
+    vim: host.vim,
     icons: NOTE_ICONS,
     wrapSelection: opts.wrapSelection ?? true,
     injectStyles: true,
@@ -183,6 +205,24 @@ export async function mountNoteEditor(el: HTMLElement, opts: { kind: Exclude<Not
       slash: templateItems,
       ...(opts.codeColours !== false ? { codeSpans } : {}),
       save: () => void host.save(),
+      renderMath,
+      renderDiagram,
+      // The link popover: a linked note to read and write in (its properties kept by the save), a picture shown, or what is missing.
+      linkTarget: async (target) => {
+        const item = await host.findWiki(target);
+        if (!item) return { kind: "missing", title: target };
+        if (noteKindOf(item.name)) {
+          const blob = await host.blob(item.hash);
+          if (!blob) return null;
+          const file = await blob.text();
+          let hash = item.hash;
+          return { kind: "note", title: item.name.replace(/\.(md|markdown|txt)$/i, ""), text: noteKindOf(item.name) === "md" ? splitFrontmatter(file).body : file, save: async (words) => void (hash = (await host.saveOther(hash, words)) ?? hash) };
+        }
+        const shown = await media(target, true);
+        return shown ? { kind: "media", title: item.name, ...shown } : { kind: "missing", title: item.name };
+      },
+      createNote: async (target) => !!(await host.createNote(target.split("/").pop()!)),
+      newNote: () => host.newNote(),
       rendered: (page) => void (opts.codeColours !== false && paintCode(el, page)),
     },
   });

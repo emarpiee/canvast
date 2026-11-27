@@ -89,8 +89,67 @@ const highlight: MarkdownConfig = {
   ],
 };
 
+const DOLLAR = 36;
+/** Math: `$…$` in words (not `$ 5` or `5$`), and `$$` … `$$` blocks whose fences are lines of their own (or `$$…$$` alone on a line). */
+const math: MarkdownConfig = {
+  defineNodes: [{ name: "InlineMath", style: tags.special(tags.string) }, { name: "BlockMath", block: true, style: tags.special(tags.string) }, { name: "MathMark", style: tags.processingInstruction }],
+  parseInline: [
+    {
+      name: "InlineMath",
+      before: "Emphasis",
+      parse(cx, next, pos) {
+        if (next !== DOLLAR || cx.char(pos + 1) === DOLLAR || /\s/.test(cx.slice(pos + 1, pos + 2))) return -1;
+        for (let p = pos + 1; p < cx.end; p++) {
+          const c = cx.char(p);
+          if (c === 10) return -1;
+          if (c === 92) {
+            p++;
+            continue;
+          }
+          if (c === DOLLAR) {
+            if (p === pos + 1 || /\s/.test(cx.slice(p - 1, p)) || /\d/.test(cx.slice(p + 1, p + 2))) return -1;
+            return cx.addElement(cx.elt("InlineMath", pos, p + 1, [cx.elt("MathMark", pos, pos + 1), cx.elt("MathMark", p, p + 1)]));
+          }
+        }
+        return -1;
+      },
+    },
+  ],
+  parseBlock: [
+    {
+      name: "BlockMath",
+      before: "FencedCode",
+      parse(cx, line) {
+        const text = line.text.slice(line.pos);
+        if (!text.startsWith("$$")) return false;
+        const start = cx.lineStart + line.pos;
+        const one = /^\$\$(.+)\$\$\s*$/.exec(text);
+        if (one) {
+          const end = cx.lineStart + line.text.length;
+          cx.addElement(cx.elt("BlockMath", start, end, [cx.elt("MathMark", start, start + 2), cx.elt("MathMark", end - 2 - (text.length - text.trimEnd().length), end - (text.length - text.trimEnd().length))]));
+          cx.nextLine();
+          return true;
+        }
+        if (text.trim() !== "$$") return false;
+        const marks = [cx.elt("MathMark", start, start + 2)];
+        let end = cx.lineStart + line.text.length;
+        while (cx.nextLine()) {
+          end = cx.lineStart + line.text.length;
+          if (line.text.trim() === "$$") {
+            marks.push(cx.elt("MathMark", cx.lineStart + line.text.indexOf("$$"), cx.lineStart + line.text.indexOf("$$") + 2));
+            cx.nextLine();
+            break;
+          }
+        }
+        cx.addElement(cx.elt("BlockMath", start, end, marks));
+        return true;
+      },
+    },
+  ],
+};
+
 /** Every extension, for `markdown({ extensions })` in the editor and for the renderer's parser. */
-export const EXTENSIONS: MarkdownConfig[] = [...GFM, wiki, hashTag, highlight];
+export const EXTENSIONS: MarkdownConfig[] = [...GFM, wiki, hashTag, highlight, math];
 
 /** The parser the renderer uses: the same one the editor's language is built from. */
 export const parser = baseParser.configure(EXTENSIONS);

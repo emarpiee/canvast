@@ -133,10 +133,10 @@ test("New note makes a markdown note in the open folder and opens it to write in
   await expect.poll(() => text(p)).toContain("| Column 1 | Column 2 |\n| --- | --- |");
   await expect(page(p).locator(".me-table table th")).toHaveText(["Column 1", "Column 2"]);
   // A cell typed in, Tab to the next: the table's Markdown follows.
-  await page(p).locator(".me-table td").first().click();
+  await page(p).locator(".me-table td .me-cell").first().click();
   await p.keyboard.type("Ink");
   await p.keyboard.press("Tab");
-  await expect(page(p).locator('.me-table td[data-c="1"]').first()).toBeFocused();
+  await expect(page(p).locator('.me-table td .me-cell[data-c="1"]').first()).toBeFocused();
   await p.keyboard.type("Paper");
   await p.keyboard.press("Escape");
   await expect.poll(() => text(p)).toContain("| Ink | Paper |");
@@ -1133,7 +1133,7 @@ test("callouts are cards (typed with [! and its list), a heading folds what is u
   await p.locator('[data-testid="asset-card"][title="folds.md"]').dblclick();
   await expect(page(p).locator(".me-callout-warning.me-callout-head")).toContainText("Mind");
   // Sort by the first column from a cell's menu.
-  await page(p).locator(".me-table td").first().click({ button: "right" });
+  await page(p).locator(".me-table td .me-cell").first().click({ button: "right" });
   await p.locator(".me-pop .me-pop-item", { hasText: "Sort column (A → Z)" }).click();
   await expect.poll(() => text(p)).toContain("| 1 | y |\n| 2 | x |");
   // A new callout: `[!` in a quote offers the types.
@@ -1147,4 +1147,34 @@ test("callouts are cards (typed with [! and its list), a heading folds what is u
   await page(p).locator(".me-foldable .me-fold").first().dispatchEvent("mousedown");
   await expect(page(p).locator(".cm-foldPlaceholder")).toHaveCount(1);
   await expect(page(p).locator(".cm-line", { hasText: "Under the heading." })).toHaveCount(0);
+});
+
+test("the right-click menu highlights in colours; the link popover opens a linked note to write in; math and diagrams are drawn", async ({ app }) => {
+  test.skip(test.info().project.name !== "chromium", "one browser is enough for what the libraries draw");
+  const p = app.page;
+  const OTHER = "# Other\n\nIts words.\n";
+  const NOTE = "# Note\n\nSee [[Other]] here.\n\nArea $a^2$ found.\n\n```mermaid\ngraph TD; A-->B\n```\n\nlast\n";
+  await p.getByTestId("view-assets").click();
+  await p.getByTestId("assets-import-input").setInputFiles([{ name: "Other.md", mimeType: "text/markdown", buffer: Buffer.from(OTHER) }, { name: "Note.md", mimeType: "text/markdown", buffer: Buffer.from(NOTE) }]);
+  await card(p, hashOf(NOTE)).dblclick();
+  await expect(page(p).locator(".me-math .katex")).toHaveCount(1);
+  await expect(page(p).locator(".me-diagram svg")).toHaveCount(1, { timeout: 20_000 });
+  // The popover: the pointer resting on the link opens the note; what is typed there is saved into that note.
+  await page(p).locator('[data-wiki="Other"]').hover();
+  const pop = p.locator(".me-link-pop");
+  await expect(pop.locator(".me-link-pop-title")).toHaveText("Other");
+  await pop.locator(".cm-content").click();
+  await p.keyboard.press("Control+End");
+  await p.keyboard.type(" More.");
+  await expect.poll(() => p.evaluate(async () => (await window.__canvastDebug.assetListing()).entries.find((e) => e.name === "Other.md")!.hash), { timeout: 10_000 }).not.toBe(hashOf(OTHER));
+  await p.keyboard.press("Escape");
+  await expect(pop).toHaveCount(0);
+  // Right click on selected words: Highlight: Red.
+  await page(p).locator(".cm-line", { hasText: "last" }).click();
+  await p.keyboard.press("End");
+  await p.keyboard.press("Shift+Home");
+  const line = (await page(p).locator(".cm-line", { hasText: "last" }).boundingBox())!;
+  await p.mouse.click(line.x + 8, line.y + line.height / 2, { button: "right" });
+  await p.locator(".me-pop .me-pop-item", { hasText: "Highlight: Red" }).click();
+  await expect.poll(() => text(p)).toContain('<mark class="hl-red">last</mark>');
 });

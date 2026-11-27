@@ -20,7 +20,12 @@ A Markdown editor for the web with three modes: **live** (the text shown as it r
 | Typed over a selection | A sign goes round the words (`*`, `_`, `~`, `` ` ``, `=`, brackets, quotes) and they stay selected, so a second `*` makes them bold |
 | Lists as you type | `[[` offers links, `#` tags, `/` at a line's start blocks and the host's own rows (templates) |
 | Paste | A page (HTML) becomes Markdown unless its plain text is Markdown already; a web address or `[[link]]` pasted over words makes them the link; files go to the host |
-| Code | Fenced code is coloured by the host's tokenizer (`codeSpans`), in every mode |
+| Code | Fenced code is coloured by the host's tokenizer (`codeSpans`), in every mode; a block that names no language is coloured as a guess, its label saying so (never written into the note) |
+| Math and diagrams | `$…$` and `$$…$$` drawn by the host's `renderMath`, ```` ```mermaid ```` blocks by its `renderDiagram`, their source shown where the cursor is |
+| Link popover | The pointer resting on a `[[link]]` (or Ctrl+Shift+K) opens its note in a small editor to write in (the host's `linkTarget`), or offers to make it |
+| Right-click menu | The link (open, copy), highlights in eight colours, cut, copy, paste, a callout (make, change, remove), select all, undo, redo (also the Menu key, Shift+F10) |
+| Folding | Headings, list items with children, callouts (`> [!type]-` starts folded) |
+| Vim | Vim keys, as an option (`vim: true`; `@replit/codemirror-vim`) |
 
 ## Use it
 
@@ -82,7 +87,6 @@ CommonMark with GitHub's tables, task lists, strikethrough and bare links, and w
 
 | | |
 | --- | --- |
-| Math | Not drawn (`$…$` stays as written) |
 | Footnotes | Written and kept as text; not drawn as such |
 | Callouts in preview | Drawn as quotes |
 | Tables | Cells hold inline Markdown on one line; the column alignment is kept, not set from the table |

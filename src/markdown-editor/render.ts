@@ -116,6 +116,8 @@ export function renderMarkdown(md: string, opts: RenderOptions = {}): string {
         const dims = size ? ` width="${size[0]}"${size[1] ? ` height="${size[1]}"` : ""}` : "";
         return `<img src="${escapeHtml(embedSrc(target))}" alt="${escapeHtml(alt)}" data-embed="${escapeHtml(target)}"${dims}>`;
       }
+      case "InlineMath":
+        return `<span class="math" data-tex="${escapeHtml(text(n.from + 1, n.to - 1))}">${escapeHtml(text(n.from, n.to))}</span>`;
       case "Tag": {
         const t = text(n.from + 1, n.to);
         return `<span class="tag" data-tag="${escapeHtml(t)}">#${escapeHtml(t)}</span>`;
@@ -237,6 +239,10 @@ export function renderMarkdown(md: string, opts: RenderOptions = {}): string {
       }
       case "HorizontalRule":
         return "<hr>";
+      case "BlockMath": {
+        const tex = text(n.from, n.to).trim().replace(/^\$\$|\$\$$/g, "").trim();
+        return `<div class="math math-block" data-tex="${escapeHtml(tex)}">${escapeHtml(text(n.from, n.to))}</div>`;
+      }
       case "HTMLBlock":
         return opts.html ? text(n.from, n.to) : `<p>${escapeHtml(text(n.from, n.to))}</p>`;
       case "Table":

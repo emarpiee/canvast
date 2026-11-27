@@ -27,7 +27,7 @@ const result = await build({
     __CANVAST_VERSION__: JSON.stringify(pkg.version),
     "import.meta.url": '""', // (only in pdf.js' branch for Node)
   },
-  loader: { ".svg": "text", ".ttf": "binary", ".md": "text", ".wasm": "binary" },
+  loader: { ".svg": "text", ".ttf": "binary", ".woff2": "binary", ".md": "text", ".wasm": "binary" },
   // pdf.js' worker, as the text of a plain script: a page opened from a file cannot start a module worker in every browser.
   plugins: [{
     name: "pdf-worker",
@@ -48,7 +48,9 @@ const result = await build({
 });
 
 const script = result.outputFiles[0].text.replace(/<\/script/gi, "<\\/script").replace(/<!--/g, "<\\!--");
-const styles = await readFile(resolve(root, "src/styles.css"), "utf8");
+// KaTeX's stylesheet for math in notes, without its @font-face rules: its fonts are registered from bytes in the file (src/notes/math.ts).
+const katexCss = (await readFile(resolve(root, "node_modules/katex/dist/katex.min.css"), "utf8")).replace(/@font-face\{[^}]*\}/g, "");
+const styles = `${await readFile(resolve(root, "src/styles.css"), "utf8")}\n${katexCss}`;
 const template = await readFile(resolve(root, "src/index.html"), "utf8");
 // Third-party notices travel inside the single file (Lucide icons are ISC, Inter is OFL-1.1).
 const pkgOf = async (name) => JSON.parse(await readFile(resolve(root, "node_modules", name, "package.json"), "utf8"));
@@ -57,6 +59,9 @@ const lucide = await pkgOf("lucide-static");
 const inter = await pkgOf("@expo-google-fonts/inter");
 const cm = await pkgOf("@codemirror/view");
 const lezer = await pkgOf("@lezer/markdown");
+const katexPkg = await pkgOf("katex");
+const mermaidPkg = await pkgOf("mermaid");
+const vimPkg = await pkgOf("@replit/codemirror-vim");
 const pdfjs = await pkgOf("pdfjs-dist");
 const threejs = await pkgOf("three");
 // PhotoCraft's released web build (scripts/artcraft/photocraft/): an inert data block, read only when PhotoCraft is first opened.
@@ -66,6 +71,9 @@ const notices =
   `<!--\ncanvast, copyright (C) 2026 emarpiee. Free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version. Source: https://github.com/emarpiee/canvast\n\n${own}\n-->\n<!--\nThird-party notices\n\nLucide icons (lucide-static ${lucide.version})\n${await licence("lucide-static/LICENSE")}\n\n` +
   `Inter Regular font (@expo-google-fonts/inter ${inter.version}, Inter_400Regular.ttf, unmodified)\n${await licence("@expo-google-fonts/inter/LICENSE_FONT")}\n\n` +
   `CodeMirror (@codemirror/view ${cm.version} and its packages) and Lezer (@lezer/markdown ${lezer.version}), the notes editor's text view and Markdown reader\n${await licence("@codemirror/view/LICENSE")}\n\n` +
+  `KaTeX (katex ${katexPkg.version}, math in notes, with its fonts)\n${await licence("katex/LICENSE")}\n\n` +
+  `Mermaid (mermaid ${mermaidPkg.version}, diagrams in notes)\n${await licence("mermaid/LICENSE")}\n\n` +
+  `codemirror-vim (@replit/codemirror-vim ${vimPkg.version}, Vim keys in notes)\n${await licence("@replit/codemirror-vim/LICENSE")}\n\n` +
   `pdf.js (pdfjs-dist ${pdfjs.version}, draws PDFs), Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0\n\n` +
   `three.js (three ${threejs.version}, draws 3D models)\n${await licence("three/LICENSE")}\n` +
   (photocraft ? `\nPhotoCraft ${photocraft.version} (its released web build, unmodified; the photo editor opened from canvast), MIT OR Apache-2.0\n${photocraft.notice.replace(/--/g, "- -")}\n` : "") +

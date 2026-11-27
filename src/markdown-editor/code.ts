@@ -4,6 +4,7 @@ import { syntaxTree } from "@codemirror/language";
 import type { Extension, Range } from "@codemirror/state";
 import { Decoration, ViewPlugin, type DecorationSet, type EditorView, type ViewUpdate } from "@codemirror/view";
 import { refresh } from "./live";
+import { guessLanguage } from "./detect";
 
 export interface CodeSpan {
   readonly group: string;
@@ -27,9 +28,11 @@ export function codeColours(spans: CodeSpans): Extension {
           if (ref.name !== "FencedCode") return;
           const info = ref.node.getChild("CodeInfo");
           const body = ref.node.getChild("CodeText");
-          const lang = info ? view.state.sliceDoc(info.from, info.to).trim().split(/\s+/)[0]!.toLowerCase() : "";
-          if (!lang || !body || body.to - body.from > MAX_CODE) return false;
+          if (!body || body.to - body.from > MAX_CODE) return false;
           const code = view.state.sliceDoc(body.from, body.to);
+          // (a block that names no language is coloured as its guess)
+          const lang = info ? view.state.sliceDoc(info.from, info.to).trim().split(/\s+/)[0]!.toLowerCase() : (guessLanguage(code) ?? "");
+          if (!lang) return false;
           const key = `${lang}\0${code}`;
           if (!known.has(key)) {
             known.set(key, null);

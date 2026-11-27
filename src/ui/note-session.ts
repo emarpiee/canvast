@@ -6,7 +6,8 @@ import { concealedUnder } from "../assets/library-match";
 import { chipOf } from "../assets/file-kind";
 import type { SettingsStore } from "../settings/settings";
 import { desktopBridge } from "../storage/desktop-bridge";
-import { WIKI, linkTarget, noteKindOf, wikiTarget, wikiKeyOf } from "../notes/note-file";
+import { WIKI, linkTarget, newNoteFile, noteKindOf, wikiTarget, wikiKeyOf } from "../notes/note-file";
+import { newNoteName } from "../app/frames";
 import type { NoteKind } from "../notes/note-file";
 import { autoDates, noteFileName, stampNote } from "../notes/note-dates";
 import { splitFrontmatter, underProps, wholeMarkdown, withFileMeta, withPastedProps, type NoteMeta } from "../notes/frontmatter";
@@ -236,6 +237,25 @@ export class OpenNote {
       },
       save: () => this.save(),
       refreshWhole: () => this.readWhole(),
+      vim: this.deps.settings.get("notes.vim"),
+      // A linked note's words (the link popover), under the properties its file has now, as its new version.
+      async saveOther(h, words) {
+        const rec = await assets.record(h).catch(() => undefined);
+        if (!rec) return null;
+        const file = await rec.blob.text();
+        const kind = noteKindOf(rec.name);
+        if (!kind) return null;
+        const text = stampNote(kind, kind === "md" ? underProps(file, words) : words, undefined, Date.now());
+        return (await session.saveVersion(h, new File([text], rec.name, { type: rec.blob.type || "text/markdown" }))) ?? null;
+      },
+      createNote: async (name) => {
+        const [made] = await take([newNoteFile(name)]);
+        return made ?? null;
+      },
+      newNote: () =>
+        void take([newNoteFile(newNoteName(session, this.deps.settings))]).then(async ([made]) => {
+          if (made && (await this.leave())) await this.place.show(made.hash);
+        }),
       whole: (words, pasted) => (this.kind === "txt" ? null : wholeMarkdown(this.fileNow, words, this.metaNow, pasted)),
     };
     return host;

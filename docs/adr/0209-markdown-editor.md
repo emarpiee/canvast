@@ -33,10 +33,17 @@ own that it can change as it likes, made as a package like the colour picker: ea
 - The editor's toolbar, buttons and lists are the package's own (it cannot use the app's components); they take the app's look through
   the tokens. Its buttons write the note (`// typing:`), the mode buttons only change what is shown.
 
+- **Libraries the host brings**: math (KaTeX) and diagrams (Mermaid) are the host's (`renderMath`, `renderDiagram`), so the package
+  carries none; KaTeX's fonts are registered from bytes in the file (the page's policy loads no font from an address). Vim keys
+  (`@replit/codemirror-vim`) are the package's own option (Settings > Notes > Vim keys, off). The package's own lists of choices (a
+  table's actions, a code block's language, the right-click menu) are groups of buttons, not the app's menus, and their rows `pick`
+  (they write the note, as typing does).
+- **Not taken**: embeds and bookmarks of web pages (the app goes nowhere), grammar checking (the browser's spell check stays).
+
 ## Consequences
 
 - Saving is what was typed; the old canonical-markdown code (`readableMarkdown`, `obsidianMarkdown`, `keepSpelling`, `wikiToLinks`,
   `linksToWiki`, `note-markdown.ts`) is gone, and a note's links stay as written instead of temporary addresses.
 - No fonts, colours, sizes or alignment in notes (Markdown has none); raw HTML in a note is kept and drawn, cleaned, in preview mode.
-- The single file is smaller (about 460 KB) with CodeMirror than with SunEditor.
+- The single file is about 6 MB larger with Mermaid (and about 460 KB smaller with CodeMirror than with SunEditor).
 - README text and pictures for the new editor wait for the owner's go.

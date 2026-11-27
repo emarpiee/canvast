@@ -10,6 +10,10 @@ import { EditorView, drawSelection, keymap, placeholder as placeholderExt } from
 import { codeColours, type CodeSpans } from "./code";
 import { COMMANDS, autoPair, hopMarker, reflowParagraph, renumberLists, tightListEnter, toggleCheckbox, toggleTask, wrapTyped, type FormatName } from "./commands";
 import { foldAtCursor, folding, initialFolds } from "./fold";
+import { HIGHLIGHTS, applyHighlight, openContextMenu } from "./context-menu";
+import { linkPopover, type LinkTarget } from "./link-popover";
+import { closePopover, openPopover } from "./popover";
+import { vim } from "@replit/codemirror-vim";
 import { pastedMarkdown } from "./html-to-markdown";
 import { DEFAULT_ICONS, type IconName } from "./icons";
 import { markdownLook } from "./highlight";
@@ -79,6 +83,16 @@ export interface EditorHost {
   wikiExists?(target: string): boolean | undefined;
   /** The languages a code block's label offers. */
   languages?: readonly string[];
+  /** Math as HTML (`display`: a block of its own). Absent: math stays as written. */
+  renderMath?(tex: string, display: boolean): string;
+  /** A ```mermaid diagram as SVG. Absent: it stays code. */
+  renderDiagram?(code: string): Promise<string>;
+  /** What a `[[target]]` names, for the link popover: a note (to read and write in), a picture, or nothing. */
+  linkTarget?(target: string): Promise<LinkTarget | null>;
+  /** Make the note a link names (the popover's Create). Whether it was made. */
+  createNote?(target: string): Promise<boolean>;
+  /** `/Page`: a new note, opened. */
+  newNote?(): void;
 }
 
 export interface EditorLabels {
@@ -93,6 +107,11 @@ export interface EditorLabels {
   rowAbove: string; rowBelow: string; colBefore: string; colAfter: string; rowUp: string; rowDown: string; colLeft: string; colRight: string;
   dupRow: string; dupCol: string; alignLeft: string; alignCenter: string; alignRight: string; sortUp: string; sortDown: string;
   delRow: string; delCol: string; copyTable: string; duplicateTable: string; calloutTypes: string;
+  page: string; pickDate: string; dateLabel: string; insertDate: string;
+  open: string; openNote: string; copyLink: string; highlightIn: string; removeHighlight: string; cut: string; copy: string; paste: string;
+  toCallout: string; calloutType: string; removeCallout: string; selectAll: string; undo: string; redo: string; menu: string;
+  create: string; missing: string; close: string; detected: string;
+  yellow: string; orange: string; red: string; pink: string; purple: string; blue: string; green: string; gray: string;
 }
 
 export const DEFAULT_LABELS: EditorLabels = {
@@ -108,6 +127,11 @@ export const DEFAULT_LABELS: EditorLabels = {
   colLeft: "Move column left", colRight: "Move column right", dupRow: "Duplicate row", dupCol: "Duplicate column", alignLeft: "Align left", alignCenter: "Align center",
   alignRight: "Align right", sortUp: "Sort column (A → Z)", sortDown: "Sort column (Z → A)", delRow: "Delete row", delCol: "Delete column", copyTable: "Copy table as Markdown",
   duplicateTable: "Duplicate table", calloutTypes: "Callout type",
+  page: "Page", pickDate: "Date…", dateLabel: "Pick any date", insertDate: "Insert",
+  open: "Open link", openNote: "Open note", copyLink: "Copy link", highlightIn: "Highlight:", removeHighlight: "Remove highlight", cut: "Cut", copy: "Copy", paste: "Paste",
+  toCallout: "Turn into callout…", calloutType: "Change callout type…", removeCallout: "Remove callout", selectAll: "Select all", undo: "Undo", redo: "Redo", menu: "Edit",
+  create: "Create note", missing: "No note is named “{name}” yet.", close: "Close", detected: "detected",
+  yellow: "Yellow", orange: "Orange", red: "Red", pink: "Pink", purple: "Purple", blue: "Blue", green: "Green", gray: "Gray",
 };
 
 /** The callout types `> [!` offers: its keyword, colour family and what it is for. */
@@ -133,6 +157,8 @@ export interface EditorOptions {
   icons?: Partial<Record<IconName, string>>;
   /** Show the toolbar. Default true. */
   toolbar?: boolean;
+  /** Vim keys (normal, insert, visual modes). Default false. */
+  vim?: boolean;
   /** A sign typed over selected words goes round them (`*`, `` ` ``, brackets, quotes). Default true. */
   wrapSelection?: boolean;
   /** Add the stylesheet to the page (once). Default true; else include `EDITOR_CSS` yourself. */
@@ -213,8 +239,10 @@ export function createMarkdownEditor(opts: EditorOptions): MarkdownEditor {
       ? livePreview({
           ...(host.media ? { media: host.media.bind(host) } : {}),
           ...(host.wikiExists ? { exists: host.wikiExists.bind(host) } : {}),
+          ...(host.renderMath ? { renderMath: host.renderMath.bind(host) } : {}),
+          ...(host.renderDiagram ? { renderDiagram: host.renderDiagram.bind(host) } : {}),
           taskLabel: labels.task, copyLabel: labels.copyCode, copiedLabel: labels.copied, languageLabel: labels.codeLanguage, addRowLabel: labels.addRow, addColumnLabel: labels.addColumn,
-          tableLabel: labels.tableActions, languages: host.languages ?? LANGUAGES, resizeLabel: labels.resize, plainLabel: labels.plainText,
+          tableLabel: labels.tableActions, languages: host.languages ?? LANGUAGES, resizeLabel: labels.resize, plainLabel: labels.plainText, detectedLabel: labels.detected,
           tableWords: { rowAbove: labels.rowAbove, rowBelow: labels.rowBelow, colBefore: labels.colBefore, colAfter: labels.colAfter, rowUp: labels.rowUp, rowDown: labels.rowDown, colLeft: labels.colLeft, colRight: labels.colRight, dupRow: labels.dupRow, dupCol: labels.dupCol, alignLeft: labels.alignLeft, alignCenter: labels.alignCenter, alignRight: labels.alignRight, sortUp: labels.sortUp, sortDown: labels.sortDown, delRow: labels.delRow, delCol: labels.delCol, copy: labels.copyTable, duplicate: labels.duplicateTable },
         })
       : [];
@@ -261,10 +289,11 @@ export function createMarkdownEditor(opts: EditorOptions): MarkdownEditor {
       const day = (n: number): Date => new Date(Date.now() + n * 86_400_000);
       const now = new Date();
       const time = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
-      const rows: Array<[string, string, string]> = [[labels.today, iso(day(0)), "today"], [labels.yesterday, iso(day(-1)), "yesterday"], [labels.tomorrow, iso(day(1)), "tomorrow"], [labels.now, time, "now time"]];
+      const rows: Array<[string, string, string]> = [[labels.today, iso(day(0)), "today"], [labels.yesterday, iso(day(-1)), "yesterday"], [labels.tomorrow, iso(day(1)), "tomorrow"], [labels.now, time, "now time"], [labels.pickDate, labels.dateLabel, "date pick any"]];
       const query = date.text.slice(at + 1).toLowerCase();
       const options = rows.filter(([l, v, k]) => !query || `${l} ${v} ${k}`.toLowerCase().includes(query)).map(([l, v]): Completion => ({ label: l, detail: v, type: "text", apply: (view, _c, _from, to) => {
         const from = date.from + at;
+        if (l === labels.pickDate) return void (view.dispatch({ changes: { from, to }, selection: { anchor: from } }), pickDate(view, from));
         view.dispatch({ changes: { from, to, insert: v }, selection: { anchor: from + v.length } });
       } }));
       if (options.length) return { from: date.from + at + 1, options, filter: false };
@@ -293,6 +322,10 @@ export function createMarkdownEditor(opts: EditorOptions): MarkdownEditor {
         block(labels.mathBlock, "$$", "$$\n\n$$", 3), block(labels.callout, ">", "> [!note]\n> "),
         block(labels.link, "[]", "[]()", 3), block(labels.image, "![]", "![]()", 3),
       ];
+      if (host.newNote) own.push({ label: `${labels.page} new note`, displayLabel: labels.page, detail: "new note", type: "text", apply: (view, _c, _from, to) => {
+        view.dispatch({ changes: { from: start, to } });
+        host.newNote!();
+      } });
       if (host.choosePicture) own.push({ label: labels.picture, detail: "", type: "text", apply: (view, _c, _from, to) => {
         view.dispatch({ changes: { from: start, to } });
         void pickPicture();
@@ -325,6 +358,9 @@ export function createMarkdownEditor(opts: EditorOptions): MarkdownEditor {
     { key: "Mod-Alt-f", run: foldAtCursor(true) },
     { key: "Mod-Alt-u", run: foldAtCursor(false) },
     { key: "Alt-q", mac: "Ctrl-q", run: reflowParagraph },
+    { key: "Shift-Mod-k", run: () => popover?.atCursor() ?? false },
+    { key: "Shift-F10", run: (v: EditorView) => (menuAtCursor(v), true) },
+    { key: "ContextMenu", run: (v: EditorView) => (menuAtCursor(v), true) },
   ];
   const appKeys = keymap.of([
     { key: "Mod-s", preventDefault: true, run: () => (host.save?.(), true) },
@@ -357,6 +393,16 @@ export function createMarkdownEditor(opts: EditorOptions): MarkdownEditor {
       return false;
     }),
     EditorView.domEventHandlers({
+      contextmenu: (e, v) => {
+        if (plain) return false;
+        e.preventDefault();
+        // (a right click outside the selection moves the cursor there first, as an editor does)
+        const pos = v.posAtCoords({ x: e.clientX, y: e.clientY });
+        const sel = v.state.selection.main;
+        if (pos !== null && (pos < sel.from || pos > sel.to)) v.dispatch({ selection: { anchor: pos } });
+        openContextMenu(v, { x: e.clientX, y: e.clientY }, menuWords, CALLOUTS.map(([t]) => t), (link, wiki) => host.open?.({ link, wiki, media: false }));
+        return true;
+      },
       paste: (e, view) => onPaste(e, view),
       drop: (e, view) => onDrop(e, view),
       // A click on a link drawn as a link (in live mode, the cursor not in it) follows it, as Ctrl+click (⌘ on a Mac) does anywhere; a
@@ -379,6 +425,7 @@ export function createMarkdownEditor(opts: EditorOptions): MarkdownEditor {
       },
     }),
   ];
+  if (opts.vim && !plain) extensions.unshift(Prec.highest(vim()));
   if (!plain) {
     extensions.push(Prec.high(keymap.of([{ key: "Enter", run: tightListEnter }])), markdown({ base: markdownLanguage, extensions: EXTENSIONS, addKeymap: true }), markdownLook, folding, renumberLists, selectionBar({ icons, labels: labels as unknown as Record<string, string> }), liveLayer.of(liveExt()), autocompletion({ override: [complete], icons: false, activateOnTyping: true }));
     if (host.codeSpans) extensions.push(codeColours(host.codeSpans));
@@ -389,6 +436,19 @@ export function createMarkdownEditor(opts: EditorOptions): MarkdownEditor {
   const stateOf = (text: string): EditorState => EditorState.create({ doc: text, extensions: [extensions, lineEnds(text)] });
   const view = new EditorView({ state: stateOf(opts.value ?? ""), parent: body });
   if (!plain) initialFolds(view);
+  // The link popover: a wiki link's note in a small editor, to read and write in.
+  const popover = !plain && host.linkTarget
+    ? linkPopover(view, {
+        find: (t) => host.linkTarget!(t),
+        ...(host.createNote ? { create: (t: string) => host.createNote!(t) } : {}),
+        open: (t) => host.open?.({ link: t, wiki: true, media: false }),
+        editor: (parent, text, onChange) => {
+          const mini = createMarkdownEditor({ parent, value: text, mode: "live", toolbar: false, host: { ...host, linkTarget: undefined as never, save: undefined as never }, labels, icons, onChange });
+          return { focus: () => mini.focus(), destroy: () => mini.destroy() };
+        },
+        words: { open: labels.openNote, create: labels.create, missing: labels.missing, close: labels.close },
+      })
+    : null;
   body.append(preview);
 
   const followed = (t: HTMLElement): FollowedLink => {
@@ -428,6 +488,44 @@ export function createMarkdownEditor(opts: EditorOptions): MarkdownEditor {
     e.preventDefault();
     v.dispatch(v.state.replaceSelection(md), { scrollIntoView: true, userEvent: "input.paste" });
     return true;
+  };
+  const menuWords = {
+    open: labels.open, openNote: labels.openNote, copyLink: labels.copyLink, highlight: labels.highlight, highlightIn: labels.highlightIn, removeHighlight: labels.removeHighlight,
+    cut: labels.cut, copy: labels.copy, paste: labels.paste, toCallout: labels.toCallout, calloutType: labels.calloutType, removeCallout: labels.removeCallout,
+    selectAll: labels.selectAll, undo: labels.undo, redo: labels.redo, menu: labels.menu,
+    colours: Object.fromEntries(HIGHLIGHTS.map((c) => [c, labels[c]])),
+  };
+  /** The right-click menu opened from the keyboard, at the cursor. */
+  const menuAtCursor = (v: EditorView): void => {
+    const r = v.coordsAtPos(v.state.selection.main.head);
+    openContextMenu(v, { x: r?.left ?? 0, y: r?.bottom ?? 0 }, menuWords, CALLOUTS.map(([t]) => t), (link, wiki) => host.open?.({ link, wiki, media: false }));
+  };
+  /** `@` → Date…: a date chosen in a small calendar, written where the `@` was. */
+  const pickDate = (v: EditorView, at: number): void => {
+    const r = v.coordsAtPos(at);
+    const box = document.createElement("div");
+    box.className = "me-pop me-date";
+    box.style.left = `${r?.left ?? 0}px`;
+    box.style.top = `${(r?.bottom ?? 0) + 4}px`;
+    const input = document.createElement("input");
+    input.type = "date";
+    input.setAttribute("aria-label", labels.dateLabel);
+    input.value = new Date().toISOString().slice(0, 10);
+    const ok = document.createElement("button");
+    ok.type = "button";
+    ok.className = "me-pop-item";
+    ok.textContent = labels.insertDate;
+    const done = (put: boolean): void => {
+      if (put && input.value) v.dispatch({ changes: { from: Math.min(at, v.state.doc.length), insert: input.value }, selection: { anchor: Math.min(at, v.state.doc.length) + input.value.length } });
+      box.remove();
+      v.focus();
+    };
+    // typing: (writes the chosen date into the note)
+    ok.addEventListener("click", () => done(true));
+    input.addEventListener("keydown", (e) => (e.key === "Enter" ? (e.preventDefault(), done(true)) : e.key === "Escape" ? (e.preventDefault(), done(false)) : undefined));
+    box.append(input, ok);
+    document.body.append(box);
+    input.focus();
   };
   /** The link, wiki link or address round `pos`. */
   const linkAround = (v: EditorView, pos: number): { from: number; to: number } | null => {
@@ -485,6 +583,24 @@ export function createMarkdownEditor(opts: EditorOptions): MarkdownEditor {
           img.replaceWith(m);
         } else img.src = got.url;
       });
+    }
+    for (const m of page.querySelectorAll<HTMLElement>(".math[data-tex]")) {
+      if (!host.renderMath) break;
+      try {
+        m.innerHTML = host.renderMath(m.dataset["tex"]!, m.classList.contains("math-block"));
+      } catch {
+        /* (left as written) */
+      }
+    }
+    for (const pre of page.querySelectorAll<HTMLElement>("pre.language-mermaid")) {
+      if (!host.renderDiagram) break;
+      const code = pre.textContent ?? "";
+      void host.renderDiagram(code).then((svg) => {
+        const d = document.createElement("div");
+        d.className = "me-diagram";
+        d.innerHTML = svg;
+        pre.replaceWith(d);
+      }, () => undefined);
     }
     host.rendered?.(page);
   };
@@ -634,6 +750,8 @@ export function createMarkdownEditor(opts: EditorOptions): MarkdownEditor {
       else view.focus();
     },
     destroy() {
+      popover?.destroy();
+      closePopover();
       view.destroy();
       el.remove();
     },

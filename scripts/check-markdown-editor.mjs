@@ -10,7 +10,7 @@ for (const f of await readdir(dir)) {
   if (!f.endsWith(".ts")) continue;
   const src = await readFile(resolve(dir, f), "utf8");
   for (const m of src.matchAll(/(?:from|import)\s*\(?\s*["']([^"']+)["']/g)) {
-    if (!m[1].startsWith("./") && !/^@(codemirror|lezer)\//.test(m[1])) {
+    if (!m[1].startsWith("./") && !/^@(codemirror|lezer)\/|^@replit\/codemirror-vim$/.test(m[1])) {
       bad++;
       console.error(`FAIL markdown-editor: ${f} imports "${m[1]}"; it may import only files in its own folder and @codemirror/ or @lezer/ packages.`);
     }

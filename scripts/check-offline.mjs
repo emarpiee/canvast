@@ -31,6 +31,11 @@ const KNOWN = [
   /^http:\/\/ns\.adobe\.com\/(xdp|xfdf|xmpmeta)\//,
   /^https?:\/\/(example\.com|foo\.bar)$/,
   /^http:\/\/\$\{[a-zA-Z]\}$/,
+  // Mermaid (diagrams in notes) and the libraries it bundles: their error messages' help pages, licence comments and XML namespaces, only
+  // text (the page's policy, default-src 'none', loads nothing from them).
+  /^https:\/\/chevrotain\.io\/docs\/[\w./#-]*$/, /^https:\/\/github\.com\/(chevrotain\/chevrotain|mermaid-js\/mermaid|babel\/babel|jquery\/jquery|gre\/bezier-easing|markedjs\/marked)[\w./#-]*$/,
+  /^https:\/\/langium\.org\/docs\/[\w./#-]*$/, /^https?:\/\/(en\.wikipedia\.org\/wiki\/[\w#.()_-]+|lodash\.com\/(license)?|openjsf\.org\/|jquery\.org\/license\/|tldrlegal\.com\/license\/mit-license|opensource\.org\/licenses\/MIT|underscorejs\.org\/LICENSE|engelschall\.com)$/,
+  /^http:\/\/www\.eclipse\.org\/(elk\/ElkGraph|emf\/2002\/Ecore|emf\/2003\/XMLType)$/, /^http:\/\/\/org\/eclipse\/emf\/ecore\/util\/ExtendedMetaData$/,
   /^https:\/\/\$\{[a-zA-Z]\}$/, // a note's bare `www.` address made a link (an href on the page, followed only by the host; nothing is fetched)
   /^https:\/\/lea\.verou\.me/, // (the author in the licence comment of the code colouring)
   /^https?:\/\/www\.w3\.org\//, // XML namespaces (SVG, XLink)

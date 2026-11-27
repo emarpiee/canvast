@@ -1,5 +1,5 @@
 // Folding: a heading folds what is under it up to the next heading of its level or higher, a list item its indented children, a callout
-// what is under its title. A ▾ beside each (shown on the line under the pointer or the cursor, and while folded) folds and unfolds it;
+// what is under its title. An arrow beside each (shown on the line under the pointer or the cursor, and while folded) folds and unfolds it;
 // Ctrl+Alt+F and Ctrl+Alt+U fold and unfold at the cursor. A callout written `> [!type]-` starts folded.
 import { codeFolding, foldEffect, foldService, foldedRanges, syntaxTree, unfoldEffect } from "@codemirror/language";
 import type { EditorState, Extension, Range } from "@codemirror/state";
