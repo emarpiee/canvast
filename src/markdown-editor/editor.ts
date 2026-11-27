@@ -1,20 +1,20 @@
 // The Markdown editor: one CodeMirror view for live and source mode, a rendered page for preview mode, a toolbar, and the hooks a host fills in
 // (pictures, links, tags, files, saving). It knows nothing of the app it is in.
 import { autocompletion, type Completion, type CompletionContext, type CompletionResult } from "@codemirror/autocomplete";
-import { defaultKeymap, history, historyKeymap, indentWithTab, moveLineDown, moveLineUp, redo, undo } from "@codemirror/commands";
+import { defaultKeymap, history, historyKeymap, indentWithTab, redo, undo } from "@codemirror/commands";
 import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
 import { syntaxTree } from "@codemirror/language";
 import { openSearchPanel, search, searchKeymap } from "@codemirror/search";
 import { Compartment, EditorSelection, EditorState, Prec, type Extension } from "@codemirror/state";
 import { EditorView, drawSelection, keymap, placeholder as placeholderExt } from "@codemirror/view";
 import { codeColours, type CodeSpans } from "./code";
-import { COMMANDS, autoPair, hopMarker, reflowParagraph, renumberLists, tightListEnter, toggleCheckbox, toggleTask, wrapTyped, type FormatName } from "./commands";
+import { COMMANDS, type FormatName } from "./commands";
+import { behaviorExtensions, hopMarker, insertBlockMarkdown, linkFollow, pasteRules, reflowParagraph, toggleCheckbox, toggleTask, type BehaviorId } from "./behaviors";
 import { foldAtCursor, folding, initialFolds } from "./fold";
-import { HIGHLIGHTS, applyHighlight, openContextMenu } from "./context-menu";
+import { HIGHLIGHTS, openContextMenu } from "./context-menu";
 import { linkPopover, type LinkTarget } from "./link-popover";
-import { closePopover, openPopover, setMenuHost, type MenuHost } from "./popover";
+import { closePopover, setMenuHost, type MenuHost } from "./popover";
 import { vim } from "@replit/codemirror-vim";
-import { pastedMarkdown } from "./html-to-markdown";
 import { DEFAULT_ICONS, type IconName } from "./icons";
 import { markdownLook } from "./highlight";
 import { livePreview, refresh } from "./live";
@@ -163,6 +163,8 @@ export interface EditorOptions {
   toolbar?: boolean;
   /** Vim keys (normal, insert, visual modes). Default false. */
   vim?: boolean;
+  /** Behaviours turned off by their id (behaviors/index.ts): every one is on unless set to false here. */
+  behaviors?: Partial<Record<BehaviorId, boolean>>;
   /** A sign typed over selected words goes round them (`*`, `` ` ``, brackets, quotes). Default true. */
   wrapSelection?: boolean;
   /** Add the stylesheet to the page (once). Default true; else include `EDITOR_CSS` yourself. */
@@ -217,6 +219,8 @@ export function createMarkdownEditor(opts: EditorOptions): MarkdownEditor {
   const labels: EditorLabels = { ...DEFAULT_LABELS, ...opts.labels };
   const icons = { ...DEFAULT_ICONS, ...opts.icons };
   const plain = !!opts.plain;
+  /** Whether a behaviour is on (all are, unless the options turn one off; Auto-surround also follows `wrapSelection`). */
+  const on = (id: BehaviorId): boolean => opts.behaviors?.[id] !== false && (id !== "wrap-selection" || opts.wrapSelection !== false);
   let mode: EditorMode = plain ? "source" : (opts.mode ?? "live");
   let silent = false;
 
@@ -359,12 +363,11 @@ export function createMarkdownEditor(opts: EditorOptions): MarkdownEditor {
     { key: "Shift-Mod-h", run: COMMANDS.highlight },
     { key: "Shift-Mod-m", run: COMMANDS.math },
     { key: "Mod-k", run: COMMANDS.link },
-    { key: "Mod-l", run: toggleCheckbox },
-    { key: "Alt-]", mac: "Ctrl-.", run: hopMarker(1) },
-    { key: "Alt-[", mac: "Ctrl-,", run: hopMarker(-1) },
+    ...(on("task-toggle") ? [{ key: "Mod-l", run: toggleCheckbox }] : []),
+    ...(on("marker-hop") ? [{ key: "Alt-]", mac: "Ctrl-.", run: hopMarker(1) }, { key: "Alt-[", mac: "Ctrl-,", run: hopMarker(-1) }] : []),
     { key: "Mod-Alt-f", run: foldAtCursor(true) },
     { key: "Mod-Alt-u", run: foldAtCursor(false) },
-    { key: "Alt-q", mac: "Ctrl-q", run: reflowParagraph },
+    ...(on("reflow") ? [{ key: "Alt-q", mac: "Ctrl-q", run: reflowParagraph }] : []),
     { key: "Shift-Mod-k", run: () => popover?.atCursor() ?? false },
     { key: "Shift-F10", run: (v: EditorView) => (menuAtCursor(v), true) },
     { key: "ContextMenu", run: (v: EditorView) => (menuAtCursor(v), true) },
@@ -374,8 +377,6 @@ export function createMarkdownEditor(opts: EditorOptions): MarkdownEditor {
     { key: "Mod-4", preventDefault: true, run: () => (plain ? false : (setModeBy("live"), true)) },
     { key: "Mod-5", preventDefault: true, run: () => (plain ? false : (setModeBy("source"), true)) },
     { key: "Mod-6", preventDefault: true, run: () => (plain ? false : (setModeBy("preview"), true)) },
-    { key: "Alt-ArrowUp", run: moveLineUp },
-    { key: "Alt-ArrowDown", run: moveLineDown },
   ]);
 
   const extensions: Extension[] = [
@@ -391,14 +392,9 @@ export function createMarkdownEditor(opts: EditorOptions): MarkdownEditor {
     EditorView.updateListener.of((u) => {
       if (u.docChanged && !silent) opts.onChange?.(u.state.sliceDoc());
     }),
-    EditorView.inputHandler.of((view, _from, _to, text) => {
-      const tr = opts.wrapSelection === false || (plain && /[*_~`=]/.test(text)) ? null : wrapTyped(view.state, text);
-      if (tr) return view.dispatch(tr), true;
-      // (brackets close themselves; quotes only in code, where they pair as code's)
-      const pair = plain ? null : autoPair(view.state, text, (pos) => inCodeAt(view, pos) || inInlineCode(view, pos));
-      if (pair) return view.dispatch(pair), true;
-      return false;
-    }),
+    ...behaviorExtensions(on, plain),
+    ...(on("paste-rules") ? [pasteRules(host, plain)] : []),
+    ...(on("link-follow") ? [linkFollow((t) => (host.open ? (host.open(followed(t)), true) : false), () => mode === "live")] : []),
     EditorView.domEventHandlers({
       contextmenu: (e, v) => {
         if (plain) return false;
@@ -410,31 +406,11 @@ export function createMarkdownEditor(opts: EditorOptions): MarkdownEditor {
         openContextMenu(v, { x: e.clientX, y: e.clientY }, menuWords, CALLOUTS.map(([t]) => t), (link, wiki) => host.open?.({ link, wiki, media: false }));
         return true;
       },
-      paste: (e, view) => onPaste(e, view),
-      drop: (e, view) => onDrop(e, view),
-      // A click on a link drawn as a link (in live mode, the cursor not in it) follows it, as Ctrl+click (⌘ on a Mac) does anywhere; a
-      // click on a link whose Markdown shows puts the cursor in it, to edit.
-      mousedown: (e, v) => {
-        if (e.button !== 0 || e.altKey || e.shiftKey || !host.open) return false;
-        const t = (e.target as HTMLElement).closest<HTMLElement>("[data-href], [data-wiki]");
-        if (!t) return false;
-        const mod = isMac ? e.metaKey : e.ctrlKey;
-        if (!mod) {
-          if (mode !== "live") return false;
-          const pos = v.posAtDOM(t);
-          const node = linkAround(v, pos);
-          const sel = v.state.selection.main;
-          if (!node || !(sel.to < node.from || sel.from > node.to)) return false;
-        }
-        e.preventDefault();
-        host.open(followed(t));
-        return true;
-      },
     }),
   ];
   if (opts.vim && !plain) extensions.unshift(Prec.highest(vim()));
   if (!plain) {
-    extensions.push(Prec.high(keymap.of([{ key: "Enter", run: tightListEnter }])), markdown({ base: markdownLanguage, extensions: EXTENSIONS, addKeymap: true }), markdownLook, folding, renumberLists, selectionBar({ icons, labels: labels as unknown as Record<string, string> }), liveLayer.of(liveExt()), autocompletion({ override: [complete], icons: false, activateOnTyping: true }));
+    extensions.push(markdown({ base: markdownLanguage, extensions: EXTENSIONS, addKeymap: true }), markdownLook, folding, selectionBar({ icons, labels: labels as unknown as Record<string, string> }), liveLayer.of(liveExt()), autocompletion({ override: [complete], icons: false, activateOnTyping: true }));
     if (host.codeSpans) extensions.push(codeColours(host.codeSpans));
   }
 
@@ -465,36 +441,8 @@ export function createMarkdownEditor(opts: EditorOptions): MarkdownEditor {
     return { link: t.getAttribute("data-href") ?? t.getAttribute("href") ?? "", wiki: false, media: false };
   };
 
-  const onPaste = (e: ClipboardEvent, v: EditorView): boolean => {
-    const data = e.clipboardData;
-    if (!data) return false;
-    const files = [...data.files];
-    if (files.length && host.files) {
-      e.preventDefault();
-      void host.files(files).then((md) => md && insertBlock(v, md));
-      return true;
-    }
-    if (plain) return false;
-    const text = data.getData("text/plain");
-    const html = data.getData("text/html");
-    // (in a code block, words are words)
-    if (inCodeAt(v, v.state.selection.main.head)) return false;
-    // A web address or a [[link]] pasted over words on one line: those words become the link.
-    const sel = v.state.selection.main;
-    const words = v.state.sliceDoc(sel.from, sel.to);
-    const address = text.trim();
-    const wiki = /^\[\[([^[\]|\n]+)\]\]$/.exec(address);
-    if (words.trim() && !words.includes("\n") && (wiki || /^(https?:\/\/|mailto:)\S+$/i.test(address))) {
-      e.preventDefault();
-      v.dispatch(v.state.replaceSelection(wiki ? `[[${wiki[1]}|${words}]]` : `[${words}](${address})`), { scrollIntoView: true, userEvent: "input.paste" });
-      return true;
-    }
-    if (!html && !host.pasting) return false;
-    let md = pastedMarkdown(text, html);
-    if (host.pasting) md = host.pasting(md);
-    e.preventDefault();
+  const insertAt = (v: EditorView, md: string): void => {
     v.dispatch(v.state.replaceSelection(md), { scrollIntoView: true, userEvent: "input.paste" });
-    return true;
   };
   const menuWords = {
     open: labels.open, openNote: labels.openNote, copyLink: labels.copyLink, highlight: labels.highlight, highlightIn: labels.highlightIn, removeHighlight: labels.removeHighlight,
@@ -534,42 +482,9 @@ export function createMarkdownEditor(opts: EditorOptions): MarkdownEditor {
     document.body.append(box);
     input.focus();
   };
-  /** The link, wiki link or address round `pos`. */
-  const linkAround = (v: EditorView, pos: number): { from: number; to: number } | null => {
-    for (let n: ReturnType<typeof syntaxTree>["topNode"] | null = syntaxTree(v.state).resolveInner(pos, 1); n; n = n.parent) if (/^(Link|WikiLink|Autolink|URL)$/.test(n.name)) return { from: n.from, to: n.to };
-    return null;
-  };
-  const inInlineCode = (v: EditorView, pos: number): boolean => {
-    for (let n: ReturnType<typeof syntaxTree>["topNode"] | null = syntaxTree(v.state).resolveInner(pos, -1); n; n = n.parent) if (n.name === "InlineCode") return true;
-    return false;
-  };
-  const inCodeAt = (v: EditorView, pos: number): boolean => {
-    for (let n: ReturnType<typeof syntaxTree>["topNode"] | null = syntaxTree(v.state).resolveInner(pos, -1); n; n = n.parent) if (n.name === "FencedCode" || n.name === "CodeBlock") return true;
-    return false;
-  };
-  const onDrop = (e: DragEvent, v: EditorView): boolean => {
-    const files = [...(e.dataTransfer?.files ?? [])];
-    if (!files.length || !host.files) return false;
-    e.preventDefault();
-    const at = v.posAtCoords({ x: e.clientX, y: e.clientY }) ?? v.state.selection.main.head;
-    v.dispatch({ selection: { anchor: at } });
-    void host.files(files).then((md) => md && insertBlock(v, md));
-    return true;
-  };
-  const insertAt = (v: EditorView, md: string): void => {
-    v.dispatch(v.state.replaceSelection(md), { scrollIntoView: true, userEvent: "input.paste" });
-  };
-  /** Markdown on lines of its own at the cursor (a picture: never inside a heading or a sentence). */
-  const insertBlock = (v: EditorView, md: string): void => {
-    const r = v.state.selection.main;
-    const line = v.state.doc.lineAt(r.from), endLine = v.state.doc.lineAt(r.to);
-    const before = line.text.slice(0, r.from - line.from).trim() ? "\n\n" : "";
-    const after = endLine.text.slice(r.to - endLine.from).trim() ? "\n\n" : "";
-    v.dispatch({ changes: { from: r.from, to: r.to, insert: `${before}${md}${after}` }, selection: { anchor: r.from + before.length + md.length }, scrollIntoView: true, userEvent: "input.paste" });
-  };
   const pickPicture = async (): Promise<void> => {
     const md = await host.choosePicture?.();
-    if (md) insertBlock(view, md);
+    if (md) insertBlockMarkdown(view, md);
   };
 
   // Preview mode: the text drawn as a page. A click on a link follows it; a click on a task's box ticks it in the text.

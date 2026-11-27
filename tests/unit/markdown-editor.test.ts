@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { EditorSelection, EditorState } from "@codemirror/state";
 import { renderMarkdown } from "../../src/markdown-editor/render";
-import { wrapTyped } from "../../src/markdown-editor/commands";
+import { wrapTyped } from "../../src/markdown-editor/behaviors/wrap-selection";
 
 describe("the Markdown editor's renderer", () => {
   it("draws CommonMark, GitHub's extras and notes apps' links, without the front matter", () => {

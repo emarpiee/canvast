@@ -9,7 +9,7 @@ import { mediaElement } from "./live";
 import { renderMarkdown } from "./render";
 import { cleanHtml } from "./clean";
 import { openPopover, type PopItem } from "./popover";
-import { WRAP_PAIRS } from "./commands";
+import { WRAP_PAIRS } from "./behaviors/wrap-selection";
 
 type Align = "left" | "center" | "right" | "";
 interface Model {

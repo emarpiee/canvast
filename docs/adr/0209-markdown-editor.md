@@ -38,6 +38,10 @@ own that it can change as it likes, made as a package like the colour picker: ea
   (`@replit/codemirror-vim`) are the package's own option (Settings > Notes > Vim keys, off). The package's own lists of choices (a
   table's actions, a code block's language, the right-click menu) are groups of buttons, not the app's menus, and their rows `pick`
   (they write the note, as typing does).
+- **Behaviours apart**: how typing, keys, clicks and pastes act (format keys, wrapping a selection, closing brackets, list Enter, list
+  numbers, moving lines, hopping marks, tasks, joining paragraphs, following links, pastes) are modules of their own in
+  `src/markdown-editor/behaviors/`, each saying where it comes from (canvast's first notes editor, or common notes apps), apart from the
+  reading and drawing of Markdown; the editor's `behaviors` option turns any off.
 - **Not taken**: embeds and bookmarks of web pages (the app goes nowhere), grammar checking (the browser's spell check stays).
 
 ## Consequences

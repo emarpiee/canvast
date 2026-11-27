@@ -92,6 +92,12 @@ CommonMark with GitHub's tables, task lists, strikethrough and bare links, and w
 | Tables | Cells hold inline Markdown on one line; the column alignment is kept, not set from the table |
 | Raw HTML | Kept as written; drawn only in preview mode, cleaned |
 
+## Behaviours
+
+How the editor acts as it is used (typing, keys, clicks, pastes) is kept apart from how Markdown is read and drawn: one module per
+behaviour in [`behaviors/`](behaviors/README.md), listed with what it does and where it comes from (`BEHAVIORS`). The `behaviors` option
+turns any of them off by its id (`{ "auto-pair": false }`).
+
 ## Files and tests
 
-`editor.ts` (the editor), `live.ts` (live mode), `commands.ts` (formats and blocks), `syntax.ts` (the parser), `render.ts` (Markdown to HTML), `html-to-markdown.ts` (pastes), `code.ts` (code colours), `style.ts`, `icons.ts`, `index.ts`. `npm run check:markdown-editor` fails when a file imports anything but its own folder, CodeMirror or Lezer. Tests: `tests/unit/markdown-editor.test.ts` (the renderer, typed signs) and, in canvast, `tests/e2e/notes.spec.ts`.
+`editor.ts` (the editor), `live.ts` (live mode), `commands.ts` (formats and blocks), `behaviors/` (how typing, keys, clicks and pastes act), `syntax.ts` (the parser), `render.ts` (Markdown to HTML), `html-to-markdown.ts` (pastes), `code.ts` (code colours), `style.ts`, `icons.ts`, `index.ts`. `npm run check:markdown-editor` fails when a file imports anything but its own folder, CodeMirror or Lezer. Tests: `tests/unit/markdown-editor.test.ts` (the renderer, typed signs) and, in canvast, `tests/e2e/notes.spec.ts`.

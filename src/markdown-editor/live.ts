@@ -6,7 +6,7 @@ import { syntaxTree } from "@codemirror/language";
 import { StateEffect, StateField, type EditorState, type Extension, type Range } from "@codemirror/state";
 import { Decoration, EditorView, ViewPlugin, WidgetType, type DecorationSet, type ViewUpdate } from "@codemirror/view";
 import type { SyntaxNode } from "@lezer/common";
-import { toggleTask } from "./commands";
+import { toggleTask } from "./behaviors/task-toggle";
 import { tableField } from "./table";
 import { openPopover } from "./popover";
 import { guessLanguage } from "./detect";
