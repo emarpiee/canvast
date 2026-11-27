@@ -2252,7 +2252,7 @@ async function start(): Promise<void> {
     markNav(v);
     host.inert = v !== "canvas";
     closeMoreMenu(); // (a menu opened on the canvas, e.g. the long-press list, does not follow to another view)
-    if (was === "assets") assetsView.hide();
+    if (was === "assets" && document.documentElement.dataset["splitView"] !== "library") assetsView.hide(); // (not the Library beside the canvas)
     // Leaving the canvas: its tiles and the pictures it decoded are let go (made again when it is back), so the Library does not run on top of them.
     if (was === "canvas") {
       tiles.clear();
@@ -2421,23 +2421,38 @@ async function start(): Promise<void> {
   function splitOn(): boolean {
     return root.dataset["split"] === "on";
   }
+  /** The Library beside the canvas (a split's tab), or not. */
+  const splitLibrary = (on: boolean): void => {
+    if (on === (root.dataset["splitView"] === "library")) return;
+    if (on) (root.dataset["splitView"] = "library"), assetsView.show();
+    else {
+      delete root.dataset["splitView"];
+      if (appView !== "assets") assetsView.hide();
+    }
+  };
   const endSplit = (): void => {
     if (!splitOn()) return;
     delete root.dataset["split"];
+    splitLibrary(false);
     if (!noteTabEl.hidden) void notePanel.close();
   };
   const splitTabs = mountTabs(document.getElementById("tabbar-split")!, document.getElementById("viewhead-split")!, {
     show: (place) => {
-      if (place.kind !== "file") return endSplit(); // (its last file closed)
+      if (place.kind !== "file" && place.kind !== "library") return endSplit(); // (its last tab closed)
       tabsMoving = true;
       try {
+        if (place.kind === "library") {
+          if (!noteTabEl.hidden) void notePanel.close();
+          return splitLibrary(true);
+        }
+        splitLibrary(false);
         void notePanel.open(place.hash);
       } finally {
         tabsMoving = false;
       }
     },
     describe: (place) => describePlace(place),
-    valid: (place) => place.kind === "file",
+    valid: (place) => place.kind === "file" || place.kind === "library",
     storeKey: () => null,
     openMenu: () => undefined,
   });
@@ -2447,8 +2462,8 @@ async function start(): Promise<void> {
     if (tabsMoving) return;
     if (splitOn()) {
       const at = splitTabs.active;
-      if (!noteTabEl.hidden && notePanel.hash && !(at.kind === "file" && at.hash === notePanel.hash)) splitTabs.follow({ kind: "file", hash: notePanel.hash });
-      else if (noteTabEl.hidden) endSplit();
+      if (!noteTabEl.hidden && notePanel.hash && !(at.kind === "file" && at.hash === notePanel.hash)) splitLibrary(false), splitTabs.follow({ kind: "file", hash: notePanel.hash });
+      else if (noteTabEl.hidden && at.kind === "file") splitTabs.close(); // (its file closed: its tab too)
       return;
     }
     const active = tabs.active;
@@ -2459,7 +2474,7 @@ async function start(): Promise<void> {
   session.subscribe(() => {
     const now = session.current?.canvasId ?? null;
     // (a canvas opened from the Files pane, the palette or a link: the active tab goes to it)
-    if (now !== tabCanvas && appView === "canvas" && startPage.hidden && noteTabEl.hidden) followView("canvas");
+    if (now !== tabCanvas && appView === "canvas" && startPage.hidden && (noteTabEl.hidden || splitOn())) followView("canvas");
     tabCanvas = now;
     tabs.refresh();
   });
@@ -2476,20 +2491,20 @@ async function start(): Promise<void> {
     tabCommand("tab.back", "Back", "Where this tab was before", [], () => tabs.back()),
     tabCommand("tab.forward", "Forward", "Where this tab went next", [], () => tabs.forward()),
     {
-      id: "tab.split", group: "Tabs", kind: "settings", title: "Open beside the canvas", hint: "The file in a split beside the canvas", risk: "edit", words: "tab split side by side columns",
-      why: () => (tabs.active.kind === "file" ? null : "Only a file (a note, a PDF, a 3D model) opens beside the canvas"),
+      id: "tab.split", group: "Tabs", kind: "settings", title: "Open beside the canvas", hint: "A file or the Library beside the canvas", risk: "edit", words: "tab split side by side columns",
+      why: () => (tabs.active.kind === "file" || tabs.active.kind === "library" ? null : "Only a file or the Library opens beside the canvas"),
       exec: () => {
         const place = tabs.active;
-        if (place.kind !== "file") return { ok: false, error: "Only a file (a note, a PDF, a 3D model) opens beside the canvas" };
+        if (place.kind !== "file" && place.kind !== "library") return { ok: false, error: "Only a file or the Library opens beside the canvas" };
         root.dataset["split"] = "on";
+        // (this tab goes back to where it was, the canvas; with nowhere to go back to, it closes. Then the split shows the file or Library)
+        if (!tabs.back()) tabs.close();
         tabsMoving = true;
         try {
           splitTabs.restore(place);
         } finally {
           tabsMoving = false;
         }
-        // (this tab goes back to where it was, the canvas; with nowhere to go back to, it closes)
-        if (!tabs.back()) tabs.close();
         return { ok: true };
       },
     },
@@ -2512,7 +2527,7 @@ async function start(): Promise<void> {
     sidebarLeft.add({ id: "library", title: "Library", icon: ICONS.images, mount: (body) => body.append(librarySide) });
     // commands: go.library (a folder, tag or search chosen while the canvas shows)
     librarySide.addEventListener("click", (e) => {
-      if (appView !== "assets" && (e.target as HTMLElement).closest(".side-item")) void pressCommand("go.library");
+      if (appView !== "assets" && document.documentElement.dataset["splitView"] !== "library" && (e.target as HTMLElement).closest(".side-item")) void pressCommand("go.library");
     });
   }
   // A font's card on a canvas: the viewer's sample sentence, on its ground (a ground that follows the theme is drawn again with it).

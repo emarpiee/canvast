@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.63.32 — The Library beside the canvas (2026-11-27)
+
+- **Added:** the Library opens beside the canvas too (*Open beside the canvas* in its view header), in the split's own tabs with the files (B39). ([The interface](README.md#the-interface))
+- **Fixed before release:** with a file or the Library in a tab or a split, a key pressed in it (Delete, a tool key) no longer reaches the canvas behind.
+
 ## 0.63.31 — A file beside the canvas (2026-11-27)
 
 - **Added:** *Open beside the canvas* (a file's view header, or the palette: `tab.split`): a note, PDF or 3D model moves to a group of tabs of its own on the right while the canvas stays in view on the left; files opened then join it, and it ends when its last file closes (B39). ([The interface](README.md#the-interface))

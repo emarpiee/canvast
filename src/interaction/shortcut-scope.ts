@@ -11,6 +11,8 @@ export function canvasShortcutsActive(e: KeyboardEvent): boolean {
   if (t && (t.isContentEditable || /^(TEXTAREA|SELECT)$/.test(t.tagName))) return false;
   if (t?.tagName === "INPUT" && !/^(range|checkbox|radio|button|color)$/.test((t as HTMLInputElement).type)) return false;
   if (t?.closest?.("dialog")) return false;
+  // (a file or the Library in a tab or a split beside the canvas has the focus: its keys are its own)
+  if (t?.closest?.(".library-view, .note-tab")) return false;
   // (a Pins window in use takes the canvas's keys over any view: its own canvas's handlers answer, the main view's stand down)
   return (document.body.dataset["view"] ?? "canvas") === "canvas" || focusedCanvasView() !== "main";
 }
