@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.63.31 — A file beside the canvas (2026-11-27)
+
+- **Added:** *Open beside the canvas* (a file's view header, or the palette: `tab.split`): a note, PDF or 3D model moves to a group of tabs of its own on the right while the canvas stays in view on the left; files opened then join it, and it ends when its last file closes (B39). ([The interface](README.md#the-interface))
+
 ## 0.63.30 — The panels' buttons beside the right sidebar (2026-11-27)
 
 - **Fixed before release:** with the panels' buttons shown (the layout the tests use), an open right sidebar no longer covers them (B39).

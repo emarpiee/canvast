@@ -349,3 +349,4 @@ One icon per function: two buttons that do different things never share an icon,
 | `cast` | Switch workspace: Connect to a shared workspace (another computer's, on the local network) |
 | `text-search` | Find (Actions bar): the command palette, to find any option or action by name |
 | `bot` | AI agents: the Settings page of the link to AI agents (an MCP client) |
+| `columns-2` | Open beside the canvas: a file in a split of the workspace (its own tab group) |

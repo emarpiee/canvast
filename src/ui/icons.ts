@@ -350,6 +350,7 @@ import squareIcon from "lucide-static/icons/square.svg";
 import arrowUpDown from "lucide-static/icons/arrow-up-down.svg";
 import ellipsisIcon from "lucide-static/icons/ellipsis.svg";
 import columns3 from "lucide-static/icons/columns-3.svg";
+import columns2 from "lucide-static/icons/columns-2.svg";
 import fileIcon from "lucide-static/icons/file.svg";
 import maximize from "lucide-static/icons/maximize.svg";
 import imageUpscale from "lucide-static/icons/image-upscale.svg";
@@ -666,6 +667,7 @@ export const ICONS = {
   maximize: clean(maximize),
   imageUpscale: clean(imageUpscale),
   columns3: clean(columns3),
+  columns2: clean(columns2),
   fileIcon: clean(fileIcon),
   ellipsis: clean(ellipsisIcon),
   arrowUpDown: clean(arrowUpDown),

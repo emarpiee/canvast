@@ -3689,6 +3689,13 @@ button.archive-crumb:hover { background: var(--hud-hover); color: var(--hud-fg);
 .start-meta { color: var(--hud-muted); font: var(--font-meta); }
 /* (the ∞ pill and the Library button of the top left: the Files pane, the tabs and the ribbon took their place) */
 @media (min-width: 641px) { :root:not([data-shell="legacy"]) :is(#nav .nav-pill, #view-switch > .view-switch) { display: none; } }
+/* A split (B39): a second group of tabs beside the canvas, for a file; the canvas and its tabs take the half on the left */
+:root:not([data-split="on"]) :is(.tabbar-split, .viewhead-split) { display: none; }
+:root[data-split="on"] { --split-w: calc((100vw - var(--ribbon-w) - var(--side-l) - var(--side-r)) / 2); --shell-r: calc(var(--side-r) + var(--split-w)); }
+:root[data-split="on"] :is(.tabbar-split, .viewhead-split) { left: auto; right: var(--side-r); width: var(--split-w); border-left: 1px solid var(--hud-border); }
+:root[data-split="on"] .layers-panel.note-tab { left: auto; right: var(--side-r); width: var(--split-w); border-left: 1px solid var(--hud-border); }
+.tabbar-split :is(.tab-new, .tab-side), .viewhead-split .view-split { display: none; }
+@media (max-width: 900px) { :root[data-split="on"] { --split-w: 0px; --shell-r: var(--side-r); } :root[data-split="on"] .layers-panel.note-tab { left: var(--shell-l); width: auto; } }
 /* The canvas view's small stack (B39): zoom in and out, fit the selection, fit all, home; the rest are in the view header's ⋯ menu */
 @media (min-width: 641px) {
   :root:not([data-shell="legacy"]) .hud-controls :is([data-action="pattern"], [data-action="background"], [data-action="info"], [data-action="names"], [data-action="zen"], [data-action="cam-back"], [data-action="random-view"], [data-action="cam-fwd"], .hud-sep) { display: none; }

@@ -33,12 +33,15 @@ export interface Tabs {
   close(key?: string): void;
   activate(key: string): void;
   step(by: 1 | -1): void;
-  back(): void;
+  /** Back in the active tab's history; false when it is at its start. */
+  back(): boolean;
   forward(): void;
   /** Names changed (a canvas renamed): draw again. */
   refresh(): void;
   /** Read the tabs kept for this workspace and show the active one (at start, and after a workspace switch). */
   restore(fallback: Place): void;
+  /** Whether a tab of this group has this key. */
+  owns(key: string): boolean;
   readonly active: Place;
   readonly count: number;
 }
@@ -85,6 +88,7 @@ export function mountTabs(strip: HTMLElement, head: HTMLElement, deps: TabsDeps)
       <button type="button" class="layer-btn" data-tabs="back" data-testid="tab-back" aria-label="Back" title="Back"${t.at > 0 ? "" : " disabled"}>${ICONS.arrowLeft}</button>
       <button type="button" class="layer-btn is-forward" data-tabs="forward" data-testid="tab-forward" aria-label="Forward" title="Forward"${t.at < t.history.length - 1 ? "" : " disabled"}>${ICONS.arrowLeft}</button>
       <nav class="view-path" aria-label="Where this is" data-testid="view-path">${d.path.map((p, i) => `<span class="view-crumb${i === d.path.length - 1 ? " is-here" : ""}">${esc(p)}</span>`).join(`<span class="view-sep" aria-hidden="true">/</span>`)}</nav>
+      ${placeOf(t).kind === "file" ? `<button type="button" class="layer-btn view-split" data-command="tab.split" data-testid="view-split" aria-label="Open beside the canvas" title="Open beside the canvas (a split)">${ICONS.columns2}</button>` : ""}
       ${placeOf(t).kind === "canvas" ? `<button type="button" class="layer-btn view-more" data-tabs="menu" data-testid="view-more" aria-haspopup="menu" aria-expanded="false" aria-label="More for this view" title="More: views, pattern, background, information, names, Zen">${ICONS.ellipsis}</button>` : ""}`;
   };
 
@@ -128,7 +132,10 @@ export function mountTabs(strip: HTMLElement, head: HTMLElement, deps: TabsDeps)
     },
     back() {
       const t = cur();
-      if (t.at > 0) (t.at -= 1), showActive();
+      if (t.at <= 0) return false;
+      t.at -= 1;
+      showActive();
+      return true;
     },
     forward() {
       const t = cur();
@@ -156,6 +163,7 @@ export function mountTabs(strip: HTMLElement, head: HTMLElement, deps: TabsDeps)
       activeKey = (tabs[kept?.active ?? 0] ?? tabs[0]!).key;
       showActive();
     },
+    owns: (key) => tabs.some((t) => t.key === key),
     get active() {
       return placeOf(cur());
     },
@@ -164,7 +172,7 @@ export function mountTabs(strip: HTMLElement, head: HTMLElement, deps: TabsDeps)
     },
   };
 
-  // commands: tab.new, tab.close, layout.leftSidebar, layout.rightSidebar; choosing a tab, Back and Forward are view state (where the tab is)
+  // commands: tab.new, tab.close, tab.split, layout.leftSidebar, layout.rightSidebar; choosing a tab, Back and Forward are view state (where the tab is)
   const onClick = (e: MouseEvent): void => {
     const t = e.target as HTMLElement;
     const close = t.closest<HTMLElement>("[data-tab-close]")?.dataset["tabClose"];
@@ -177,6 +185,7 @@ export function mountTabs(strip: HTMLElement, head: HTMLElement, deps: TabsDeps)
     else if (what === "right") void pressCommand("layout.rightSidebar");
     else if (what === "back") api.back(); // view-state: (the tab's own history)
     else if (what === "forward") api.forward(); // view-state: (the tab's own history)
+    else if (t.closest("[data-command='tab.split']")) void pressCommand("tab.split");
     else if (what === "menu") deps.openMenu(api.active, t.closest<HTMLElement>("[data-tabs]")!); // (each row of the menu runs its command)
   };
   // commands: tab.new, tab.close, layout.leftSidebar, layout.rightSidebar (through onClick)

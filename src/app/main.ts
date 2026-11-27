@@ -163,6 +163,7 @@ import { mountRibbon } from "../ui/ribbon";
 import { mountSidebar } from "../ui/sidebar";
 import { mountFilesPane } from "../ui/files-pane";
 import { mountTabs } from "../ui/workspace-tabs";
+import type { Place } from "../ui/workspace-tabs";
 import { mountStartPage } from "../ui/start-page";
 import { mountViewSwitch } from "../ui/view-switch";
 import { followFrameSetting, mountWindowRow } from "../ui/window-frame";
@@ -2365,12 +2366,23 @@ async function start(): Promise<void> {
   // place moves the active tab there; Ctrl+click and the + button make another. The open tabs are kept per workspace on this device.
   let tabsMoving = false;
   const startShow = mountStartPage(startPage, session);
+  const describePlace = (place: Place): { title: string; icon: string; path: string[] } => {
+    if (place.kind === "start") return { title: "New tab", icon: ICONS.plus, path: [] };
+    if (place.kind === "library") return { title: "Library", icon: ICONS.images, path: ["Library"] };
+    if (place.kind === "file") {
+      const name = assetNames.map.get(place.hash) ?? "File";
+      return { title: name.replace(/\.[^.]+$/, ""), icon: ICONS.fileText, path: ["Library", name] };
+    }
+    const entry = session.tree?.boards.find((b) => b.canvases.some((c) => c.id === place.id));
+    const name = entry?.canvases.find((c) => c.id === place.id)?.name ?? "Canvas";
+    return { title: name, icon: ICONS.infinity, path: entry ? [entry.board.name, name] : [name] };
+  };
   const tabs = mountTabs(document.getElementById("tabbar")!, document.getElementById("viewhead")!, {
     show: (place) => {
       tabsMoving = true;
       try {
         // (leaving a file's tab closes the file; it asks first when there is unsaved work)
-        if (place.kind !== "file" && !noteTabEl.hidden) void notePanel.close();
+        if (place.kind !== "file" && !noteTabEl.hidden && !splitOn()) void notePanel.close();
         if (place.kind === "file") {
           startPage.hidden = true;
           void notePanel.open(place.hash);
@@ -2389,17 +2401,7 @@ async function start(): Promise<void> {
         tabsMoving = false;
       }
     },
-    describe: (place) => {
-      if (place.kind === "start") return { title: "New tab", icon: ICONS.plus, path: [] };
-      if (place.kind === "library") return { title: "Library", icon: ICONS.images, path: ["Library"] };
-      if (place.kind === "file") {
-        const name = assetNames.map.get(place.hash) ?? "File";
-        return { title: name.replace(/\.[^.]+$/, ""), icon: ICONS.fileText, path: ["Library", name] };
-      }
-      const entry = session.tree?.boards.find((b) => b.canvases.some((c) => c.id === place.id));
-      const name = entry?.canvases.find((c) => c.id === place.id)?.name ?? "Canvas";
-      return { title: name, icon: ICONS.infinity, path: entry ? [entry.board.name, name] : [name] };
-    },
+    describe: describePlace,
     valid: (place) => place.kind !== "canvas" || !!session.tree?.boards.some((b) => b.canvases.some((c) => c.id === place.id)),
     storeKey: () => (session.tree ? `canvast.tabs.${session.tree.workspace.id}` : null),
     openMenu: (place, anchor) => {
@@ -2413,9 +2415,42 @@ async function start(): Promise<void> {
     if (v === "assets") tabs.follow({ kind: "library" });
     else if (session.current) tabs.follow({ kind: "canvas", id: session.current.canvasId });
   }
-  // A file opened in a tab (from a canvas, a link, the Library): the active tab goes to it; the file closed (its ×, Escape): its tab closes.
+  // A split (B39, option A): a second group of tabs beside the canvas, for files (a note, a PDF, a 3D model) while the canvas stays in view.
+  // One canvas engine: the canvas is always in the first group. The split ends when its last file closes; it is not kept over a reload.
+  const root = document.documentElement;
+  function splitOn(): boolean {
+    return root.dataset["split"] === "on";
+  }
+  const endSplit = (): void => {
+    if (!splitOn()) return;
+    delete root.dataset["split"];
+    if (!noteTabEl.hidden) void notePanel.close();
+  };
+  const splitTabs = mountTabs(document.getElementById("tabbar-split")!, document.getElementById("viewhead-split")!, {
+    show: (place) => {
+      if (place.kind !== "file") return endSplit(); // (its last file closed)
+      tabsMoving = true;
+      try {
+        void notePanel.open(place.hash);
+      } finally {
+        tabsMoving = false;
+      }
+    },
+    describe: (place) => describePlace(place),
+    valid: (place) => place.kind === "file",
+    storeKey: () => null,
+    openMenu: () => undefined,
+  });
+  // A file opened in a tab (from a canvas, a link, the Library): the active tab goes to it (the split's, while there is one); the file closed
+  // (its ×, Escape): its tab closes, and a split with no file left ends.
   new MutationObserver(() => {
     if (tabsMoving) return;
+    if (splitOn()) {
+      const at = splitTabs.active;
+      if (!noteTabEl.hidden && notePanel.hash && !(at.kind === "file" && at.hash === notePanel.hash)) splitTabs.follow({ kind: "file", hash: notePanel.hash });
+      else if (noteTabEl.hidden) endSplit();
+      return;
+    }
     const active = tabs.active;
     if (!noteTabEl.hidden && notePanel.hash && !(active.kind === "file" && active.hash === notePanel.hash)) tabs.follow({ kind: "file", hash: notePanel.hash });
     else if (noteTabEl.hidden && active.kind === "file") tabs.close();
@@ -2435,11 +2470,29 @@ async function start(): Promise<void> {
   });
   commands.setProvider("tabs", () => [
     tabCommand("tab.new", "New tab", "A new tab, or a canvas in one", [{ name: "canvas", type: "id", doc: "a canvas to show in it" }], (o) => tabs.open(o["canvas"] ? { kind: "canvas", id: String(o["canvas"]) } : { kind: "start" })),
-    tabCommand("tab.close", "Close tab", "The tab, or the active one", [TAB_ID], (o) => tabs.close(o["tab"] ? String(o["tab"]) : undefined)),
+    tabCommand("tab.close", "Close tab", "The tab, or the active one", [TAB_ID], (o) => (o["tab"] && splitTabs.owns(String(o["tab"])) ? splitTabs.close(String(o["tab"])) : tabs.close(o["tab"] ? String(o["tab"]) : undefined))),
     tabCommand("tab.next", "Next tab", "The tab on the right", [], () => tabs.step(1)),
     tabCommand("tab.previous", "Previous tab", "The tab on the left", [], () => tabs.step(-1)),
     tabCommand("tab.back", "Back", "Where this tab was before", [], () => tabs.back()),
     tabCommand("tab.forward", "Forward", "Where this tab went next", [], () => tabs.forward()),
+    {
+      id: "tab.split", group: "Tabs", kind: "settings", title: "Open beside the canvas", hint: "The file in a split beside the canvas", risk: "edit", words: "tab split side by side columns",
+      why: () => (tabs.active.kind === "file" ? null : "Only a file (a note, a PDF, a 3D model) opens beside the canvas"),
+      exec: () => {
+        const place = tabs.active;
+        if (place.kind !== "file") return { ok: false, error: "Only a file (a note, a PDF, a 3D model) opens beside the canvas" };
+        root.dataset["split"] = "on";
+        tabsMoving = true;
+        try {
+          splitTabs.restore(place);
+        } finally {
+          tabsMoving = false;
+        }
+        // (this tab goes back to where it was, the canvas; with nowhere to go back to, it closes)
+        if (!tabs.back()) tabs.close();
+        return { ok: true };
+      },
+    },
   ]);
   const markTab = mountViewSwitch(document.getElementById("view-switch")!, setView, PHOTOCRAFT_FEATURES.entry.view && photoCraft.available);
   // (the Pins window's button is the ribbon's, with its handler)
