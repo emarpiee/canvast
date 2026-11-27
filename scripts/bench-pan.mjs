@@ -9,6 +9,7 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { PAN_ZOOM_BUDGET, overBudget } from "./lib/pan-zoom-budget.mjs";
+import { legacyShell } from "./lib/legacy-shell.mjs";
 
 const check = process.argv.includes("--check");
 const args = process.argv.slice(2).filter((a) => a !== "--check");
@@ -23,6 +24,7 @@ const url = pathToFileURL(resolve(process.env.CANVAST_BUILD_DIR ?? "dist", "canv
 
 const browser = await chromium.launch();
 const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+await page.addInitScript(legacyShell);
 await page.goto(url);
 await page.waitForFunction(() => typeof window.__canvastDebug !== "undefined");
 const H = (fn, arg) => page.evaluate(fn, arg);

@@ -7,6 +7,7 @@ import { tmpdir } from "node:os";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import * as S from "./scenes.mjs";
+import { legacyShell } from "../lib/legacy-shell.mjs";
 
 const [out, shots] = process.argv.slice(2);
 // The showcase text is set in Space Grotesk (SIL Open Font License, see fonts/OFL.txt): a bold for titles, a regular for the rest. Both are
@@ -15,6 +16,7 @@ const FONTS = [["Space Grotesk.ttf", "SpaceGrotesk_400Regular.ttf"], ["Space Gro
 const FONT_REGULAR = "Space Grotesk", FONT_BOLD = "Space Grotesk Bold";
 const fontDir = join(dirname(fileURLToPath(import.meta.url)), "fonts");
 const ctx = await chromium.launchPersistentContext(mkdtempSync(join(process.env.TMPDIR ?? tmpdir(), "cv-")), { viewport: { width: 1440, height: 900 }, acceptDownloads: true });
+await ctx.addInitScript(legacyShell);
 const p = ctx.pages()[0] ?? (await ctx.newPage());
 p.on("pageerror", (e) => console.log("PAGEERROR", String(e)));
 await p.goto("file://" + process.cwd() + "/dist/canvast.html#debug");
