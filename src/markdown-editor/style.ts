@@ -64,27 +64,36 @@ export const EDITOR_CSS = `
 :where(.me-live) .me-task:checked::after { content: ""; position: absolute; left: 50%; top: 45%; width: 0.32em; height: 0.6em; border: solid var(--me-bg); border-width: 0 0.16em 0.16em 0; transform: translate(-50%, -55%) rotate(45deg); }
 :where(.me-live) .me-done { color: var(--me-faint); text-decoration: line-through; }
 :where(.me-live) .me-rule { display: inline-block; width: 100%; height: 0; border-top: 2px solid var(--me-line); vertical-align: middle; }
-:where(.me-live) .me-code-card { position: relative; background: color-mix(in oklch, var(--me-code-bg) 80%, transparent); border-left: 1px solid var(--me-line); border-right: 1px solid var(--me-line); padding-left: 16px !important; padding-right: 16px !important; }
+:where(.me-live) .me-code-card { position: relative; background: color-mix(in oklch, var(--me-code-bg) 80%, transparent); line-height: 1.7; border-left: 1px solid var(--me-line); border-right: 1px solid var(--me-line); padding-left: 16px !important; padding-right: 16px !important; }
 :where(.me-live) .me-code-begin { border-top: 1px solid var(--me-line); border-top-left-radius: 8px; border-top-right-radius: 8px; }
 :where(.me-live) .me-code-end { border-bottom: 1px solid var(--me-line); border-bottom-left-radius: 8px; border-bottom-right-radius: 8px; }
 :where(.me-live) .me-code-flair { position: absolute; top: 3px; right: 8px; z-index: 2; display: inline-flex; align-items: center; gap: 2px; font-family: var(--me-font); font-size: 11px; line-height: 1.5; white-space: nowrap; }
 :where(.me-live) :is(.me-code-lang, .me-code-copy) { display: inline-flex; align-items: center; justify-content: center; border: 1px solid transparent; border-radius: 6px; background: transparent; color: var(--me-faint); font: inherit; cursor: pointer; }
-:where(.me-live) .me-code-lang { padding: 0 6px; } :where(.me-live) .me-code-copy { width: 20px; height: 18px; padding: 0; }
+:where(.me-live) .me-code-lang { gap: 3px; padding: 0 5px 0 7px; } :where(.me-live) .me-code-lang svg { width: 11px; height: 11px; opacity: 0.7; } :where(.me-live) .me-code-copy { width: 20px; height: 18px; padding: 0; }
 :where(.me-live) :is(.me-code-lang, .me-code-copy):hover { background: var(--me-line); color: var(--me-fg); }
 :where(.me-media) { display: inline-block; color: var(--me-faint); font-size: 0.9em; }
 :where(.me-media img, .me-media video) { display: block; max-width: 100%; height: auto; border-radius: var(--me-radius); }
-:where(.me-table) { position: relative; padding: 0 24px 24px 0; cursor: default; }
-:where(.me-table-scroll) { overflow-x: auto; }
-:where(.me-table, .me-preview) table { border-collapse: collapse; margin: 4px 0; }
-:where(.me-table, .me-preview) :is(th, td) { border: 1px solid var(--me-line); padding: 4px 10px; min-width: 3em; }
+:where(.me-table) { padding: 4px 0; cursor: default; }
+:where(.me-table-box) { position: relative; display: inline-grid; grid-template-columns: minmax(0, auto) 14px; grid-template-rows: auto 14px; gap: 2px; max-width: 100%; vertical-align: top; }
+:where(.me-table-scroll) { grid-column: 1; grid-row: 1; overflow-x: auto; border: 1px solid var(--me-line); border-radius: 6px; }
+:where(.me-table) table, :where(.me-preview) table { border-collapse: collapse; margin: 0; }
+:where(.me-preview) table { margin: 4px 0; }
+:where(.me-table, .me-preview) :is(th, td) { border: 1px solid var(--me-line); padding: 8px 12px; min-width: 6em; height: 2.4em; box-sizing: border-box; text-align: left; vertical-align: top; }
+:where(.me-table) tr:first-child > * { border-top: 0; } :where(.me-table) tr:last-child > * { border-bottom: 0; }
+:where(.me-table) tr > :first-child { border-left: 0; } :where(.me-table) tr > :last-child { border-right: 0; }
 :where(.me-table, .me-preview) th { background: var(--me-code-bg); font-weight: 600; }
 :where(.me-table) :is(th, td) { outline: none; cursor: text; }
 :where(.me-table) :is(th, td):focus { box-shadow: inset 0 0 0 2px color-mix(in oklch, var(--me-accent) 60%, transparent); }
-:where(.me-table-add) { position: absolute; display: grid; place-items: center; border: 1px dashed var(--me-line); border-radius: var(--me-radius); background: var(--me-bg); color: var(--me-faint); font: inherit; cursor: pointer; opacity: 0; transition: opacity 0.12s; }
+:where(.me-table-add) { display: grid; place-items: center; padding: 0; border: 0; border-radius: 4px; background: var(--me-code-bg); color: var(--me-faint); font: inherit; font-size: 11px; line-height: 1; cursor: pointer; opacity: 0; transition: opacity 0.12s; }
 :where(.me-table:hover) .me-table-add, :where(.me-table:focus-within) .me-table-add { opacity: 1; }
-:where(.me-table-add):hover { color: var(--me-fg); border-color: var(--me-accent); }
-:where(.me-table-add-col) { top: 4px; right: 0; width: 20px; bottom: 28px; }
-:where(.me-table-add-row) { left: 0; right: 24px; bottom: 0; height: 20px; }
+:where(.me-table-add):hover { color: var(--me-fg); background: var(--me-line); }
+:where(.me-table-add-col) { grid-column: 2; grid-row: 1; }
+:where(.me-table-grip) { position: absolute; left: -14px; width: 12px; display: grid; place-items: center; border-radius: 4px; background: var(--me-code-bg); color: var(--me-faint); cursor: grab; opacity: 0; transition: opacity 0.12s; touch-action: none; }
+:where(.me-table:hover) .me-table-grip { opacity: 1; }
+:where(.me-table-grip[hidden]) { display: none; }
+:where(.me-table-grip.is-dragging) { cursor: grabbing; color: var(--me-fg); }
+:where(.me-table) tr.me-drop-target > * { box-shadow: inset 0 -2px 0 var(--me-accent); }
+:where(.me-table-add-row) { grid-column: 1; grid-row: 2; }
 /* the bar over selected words */
 :where(.me-selbar) { position: relative; display: flex; align-items: center; gap: 2px; padding: 3px; }
 :where(.me-selbar-turn) { padding: 0 8px; font-size: 0.85em; color: var(--me-fg); }

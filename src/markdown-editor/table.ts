@@ -169,10 +169,60 @@ class TableWidget extends WidgetType {
       for (const r of model.rows) r.push("");
       commit({ row: 0, col: model.head.length - 1 });
     });
+    // (the table framed, a bar on its right edge adds a column and one under it a row, as wide and tall as the table)
+    const box = document.createElement("div");
+    box.className = "me-table-box";
     const scroll = document.createElement("div");
     scroll.className = "me-table-scroll";
     scroll.append(table);
-    wrap.append(scroll, addCol, addRow);
+    // A grip at the left of the row under the pointer: dragged up or down, the row moves there.
+    const grip = document.createElement("span");
+    grip.className = "me-table-grip";
+    grip.setAttribute("aria-hidden", "true");
+    grip.innerHTML = '<svg width="8" height="12" viewBox="0 0 8 12" fill="currentColor"><circle cx="2" cy="2" r="1"/><circle cx="6" cy="2" r="1"/><circle cx="2" cy="6" r="1"/><circle cx="6" cy="6" r="1"/><circle cx="2" cy="10" r="1"/><circle cx="6" cy="10" r="1"/></svg>';
+    let gripRow = -1;
+    const bodyRows = (): HTMLElement[] => [...tbody.rows];
+    const placeGrip = (i: number): void => {
+      const tr = bodyRows()[i];
+      gripRow = tr ? i : -1;
+      grip.hidden = !tr;
+      if (!tr) return;
+      grip.style.top = `${tr.getBoundingClientRect().top - box.getBoundingClientRect().top}px`;
+      grip.style.height = `${tr.getBoundingClientRect().height}px`;
+    };
+    // view-state: (shows the grip beside the row under the pointer)
+    tbody.addEventListener("mousemove", (e) => {
+      const tr = (e.target as HTMLElement).closest("tr");
+      if (tr) placeGrip(bodyRows().indexOf(tr as HTMLTableRowElement));
+    });
+    grip.hidden = true;
+    grip.addEventListener("pointerdown", (e) => {
+      if (gripRow < 0) return;
+      e.preventDefault();
+      const from = gripRow;
+      let to = from;
+      grip.setPointerCapture(e.pointerId);
+      grip.classList.add("is-dragging");
+      const move = (ev: PointerEvent): void => {
+        const rows = bodyRows();
+        to = rows.findIndex((r) => ev.clientY < r.getBoundingClientRect().bottom);
+        if (to < 0) to = rows.length - 1;
+        rows.forEach((r, i) => r.classList.toggle("me-drop-target", i === to && to !== from));
+      };
+      const up = (): void => {
+        grip.removeEventListener("pointermove", move);
+        grip.classList.remove("is-dragging");
+        for (const r of bodyRows()) r.classList.remove("me-drop-target");
+        if (to === from) return;
+        const [row] = model.rows.splice(from, 1);
+        model.rows.splice(to, 0, row!);
+        commit();
+      };
+      grip.addEventListener("pointermove", move);
+      grip.addEventListener("pointerup", up, { once: true });
+    });
+    box.append(grip, scroll, addCol, addRow);
+    wrap.append(box);
     const want = focusNext.get(view);
     if (want && want.at === this.from) {
       focusNext.delete(view);

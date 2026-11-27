@@ -180,7 +180,8 @@ class CodeFlair extends WidgetType {
     const lang = document.createElement("button");
     lang.type = "button";
     lang.className = "me-code-lang";
-    lang.textContent = this.language;
+    lang.innerHTML = `<span></span>${ICON('<path d="m6 9 6 6 6-6"/>')}`;
+    lang.firstElementChild!.textContent = this.language;
     lang.title = this.ctx.languageLabel;
     const copy = document.createElement("button");
     copy.type = "button";
