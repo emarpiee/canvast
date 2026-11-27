@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.63.41 — The tool rail beside the sidebar (2026-11-27)
+
+- **Fixed before release:** the canvas's tool rail stood at the window's left edge, behind the ribbon and the left sidebar; it is at the canvas's left edge again (B39).
+
 ## 0.63.40 — The Library's view buttons in the status bar (2026-11-27)
 
 - **Fixed before release:** the Library's view buttons (columns, grid, list, size, reload) stand in a row in the status bar again, not in a column over the right sidebar (B39).

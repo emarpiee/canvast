@@ -1270,7 +1270,7 @@ input[type="radio"]:checked::before { content: ""; width: var(--sp-3); height: v
 .win-row button:hover { background: var(--hud-hover); }
 .win-row button:focus-visible { outline: 2px solid var(--hud-accent); outline-offset: -2px; }
 .win-row svg { width: var(--icon-md); height: var(--icon-md); }
-#toolbar > .rail { left: calc(var(--edge) / var(--ui-scale, 1)); }
+#toolbar > .rail { left: calc((var(--shell-l) + var(--edge)) / var(--ui-scale, 1)); }
 #toolbar { top: var(--edge); left: calc((var(--nav-w, 0px) + var(--edge)) / var(--ui-scale, 1)); right: calc((var(--gear-w) + 2 * var(--near) + 2 * var(--edge)) / var(--ui-scale, 1)); }
 /* The Properties bar takes the room between the left cluster and the dock and no more: wider than that, its row scrolls (ADR 0128). */
 #toolbar > .toolbar { min-width: 0; }
