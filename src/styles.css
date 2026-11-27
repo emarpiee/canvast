@@ -3627,6 +3627,11 @@ button.archive-crumb:hover { background: var(--hud-hover); color: var(--hud-fg);
 .files-ws:hover, .files-ws[aria-expanded="true"] { background: var(--hud-hover); }
 .files-ws svg { flex: none; width: var(--icon-sm); height: var(--icon-sm); color: var(--hud-muted); }
 .files-ws-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* A panel as a sidebar's pane: it fills the pane, with no card of its own; its header is the pane's (title and tools), the sidebar hides it. */
+.sb-pane > .layers-panel { position: static; width: 100%; max-width: none; max-height: none; margin: 0; border: 0; border-radius: 0; box-shadow: none; background: none; backdrop-filter: none; animation: none; }
+.sb-pane > .layers-panel .panel-head [data-close] { display: none; }
+/* (the panels' buttons were a column at the view's right edge: they are the sidebars' tabs now) */
+#toolbar > .dock { display: none; }
 /* The status bar: what the focused view says (its counts, zoom and whether it is saved), at the bottom right, as wide as what it says. */
 #statusbar { position: fixed; z-index: var(--z-edge); right: 0; bottom: 0; height: var(--status-h); box-sizing: border-box; display: flex; align-items: center; max-width: calc(100vw - var(--shell-l)); padding: 0 var(--s-4); background: var(--shell-bg); border-top: 1px solid var(--hud-border); border-left: 1px solid var(--hud-border); border-top-left-radius: var(--r-sm); color: var(--hud-muted); font: var(--font-meta); }
 #statusbar.is-empty { display: none; }

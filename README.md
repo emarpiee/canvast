@@ -2367,7 +2367,7 @@ Go between the Library, the canvas and PhotoCraft from the top left.
 
 ![The view buttons at the top left: Library; the canvas, its icon and its name Studies in one pill; PhotoCraft's icon and its close button](docs/screenshots/view-buttons.webp)
 
-Open the panels from the right edge: they dock beside the column of their buttons.
+Open a panel from its tab in a sidebar: Layers, Adjust, Tags, Styles and Pattern on the right, Bookmarks on the left.
 
 ![The panels' buttons in a column on the right edge under the Settings button, the Layers panel docked beside them listing three Hokusai prints](docs/screenshots/panel-buttons.webp)
 
@@ -2378,11 +2378,10 @@ Open the panels from the right edge: they dock beside the column of their button
 | **Sidebars** | Left and right of the view | Each holds panes, a tab for each at its top, and hides from its button (or *Left sidebar*, *Right sidebar* in the palette). Whether each shows, and which pane, is kept on this device; a narrow window keeps the whole width for the view |
 | **Status bar** | Bottom right | The zoom (click to type one), where the view is, whether the work is saved, and the counts: as wide as what it says |
 | **View buttons** | Top left | Three sets apart: **Library**; the canvas (its icon goes to it, its name opens the board and canvas menu); **PhotoCraft** (its tab, and its **×** while it runs). **Settings** is the gear at the bottom of the ribbon |
-| **Panels' buttons** | Right edge of the view | A column at the top right: Adjust, Layers, Tags, Styles, Pattern and Bookmarks. The panels docked on the right open beside it; a short window scrolls it |
 | **Tool rail** | Left | Undo and Redo, the tools (Import after Note), then Screenshot and Search |
 | **Properties bar** | By the selection, or at the top (the whole top row is its own) | The options of the tool or of what is selected, as named chips just above what is selected, each showing its first value; a chip opens its options as a short form, one named option a row; the menus it opens (Outline, Paragraph and box, Font, Columns and rows) are forms too, with switches for what is on or off. They never stand under the bars on the edges: just past or beside the one in the way. With nothing selected, or another tool picked, the chips stand at the top. On a small window the chips scroll sideways |
 | **Actions bar** | Bottom | What can be done with the selection, in named groups (Objects, Files, Adjust, Edit shapes, Arrange, Attach, Selection, Find), always in that order, some of them menus (Align, Arrange, Shapes, Masks, Path tools, Sheets, Export, Initial state) that list only what applies. The names of its groups show over the buttons. When wider than the window it shows a fade and an arrow; the mouse wheel scrolls it sideways |
-| **Panels** | Either side, or floating | Layers, Bookmarks, Tags, Styles, Adjust, Pattern: they float or dock to either side, are resizable, and can minimize when inactive. *Reset the panel layout* puts them back |
+| **Panels** | Sidebar panes | Layers, Adjust, Tags, Styles and Pattern are panes of the right sidebar, Bookmarks of the left: choose one by its tab. A panel opened another way (its command, Adjust on the Actions bar) shows its pane and opens the sidebar. A file's panel still floats over the canvas; *Reset the panel layout* puts it back |
 | **Zen mode** | `Z`, or the leaf button | Fades the bars and panels until the pointer is over them |
 | **Screenshot** | The camera button | Saves the selection, or the whole view, to the library. Settings choose the format, quality, name, folder and tags, and whether to include the canvas pattern and the interface, a transparent background, and a copy on the clipboard |
 | **Hint line** | Bottom | What the tool does, and what each key does over a handle |

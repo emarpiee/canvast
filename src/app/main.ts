@@ -1321,14 +1321,10 @@ async function start(): Promise<void> {
         }
       },
   });
-  // Every floating panel lives in the dock (ADR 0123): stacked on a side, or floating, folded by its title bar.
+  // The panels are panes of the workspace's sidebars (B39, below); what still floats (a file's panel, Pins) lives in the dock (ADR 0123).
   const panelEl = (testid: string): HTMLElement => side.querySelector<HTMLElement>(`[data-testid="${testid}"]`)!;
-  dock.add(panelEl("layers-panel"), { id: "layers", title: "Layers", side: "right" });
   side.append(notePanelEl);
   dock.add(notePanelEl, { id: "note", title: "File", side: "float", width: 760, ownWidth: true, maxWidth: 1400, noFold: true });
-  dock.add(panelEl("bookmarks-panel"), { id: "bookmarks", title: "Bookmarks", side: "left" });
-  dock.add(panelEl("styles-panel"), { id: "styles", title: "Styles", side: "left" });
-  dock.add(panelEl("tags-panel"), { id: "tags", title: "Tags", side: "left" });
   // (the Adjust panel follows the view in use, as the Actions bar's Adjust does: a pinned view's pictures are adjusted there too)
   mountAdjustPanel(side, editorInUse, {
     selectedAdjust: () => selectedAdjust(docInUse, editorInUse),
@@ -1338,7 +1334,6 @@ async function start(): Promise<void> {
     backdropState: () => backdropState(docInUse, editorInUse),
     setBackdrop: (on) => setBackdrop(docInUse, editorInUse, on),
   });
-  dock.add(panelEl("adjust-panel"), { id: "adjust", title: "Adjust", side: "right" });
   const patternSession = newPatternSession();
   const patternPanel = mountPatternPanel(side, editor, {
     make: (g, values, seed) => (makePatternEach(doc, editor, view, g, values, seed) === null ? makePattern(doc, editor, view, patternSession, g, values, seed) : false),
@@ -1358,7 +1353,6 @@ async function start(): Promise<void> {
       });
     },
   });
-  dock.add(panelEl("pattern-panel"), { id: "pattern", title: "Pattern", side: "right" });
   // A speech balloon's options and a text in a shape's: groups of the Properties bar, chips by the selection (ADR 0198; once a panel).
   const balloonActions: BalloonActions = {
     selected: () => selectedBalloon(doc, editor),
@@ -2279,7 +2273,44 @@ async function start(): Promise<void> {
     classWhen(statusbar, "is-empty", () => !!canvasReadout.hidden, [canvasReadout], ["hidden"]);
   }
   sidebarLeft.add({ id: "files", title: "Files", icon: ICONS.files, mount: (body) => mountFilesPane(body, { session, foot: sidebarLeft.foot }) });
-  void sidebarRight;
+  // The panels as panes (B39): Bookmarks on the left, the canvas's tools on the right. A pane shown in an open sidebar is its panel open
+  // (`editor.<id>Open`), and a panel opened another way (its command, the Actions bar) shows its pane and opens the sidebar.
+  type PanelId = "adjust" | "layers" | "tags" | "styles" | "pattern" | "bookmarks";
+  const PANELS: ReadonlyArray<{ id: PanelId; title: string; icon: string; left?: true }> = [
+    { id: "layers", title: "Layers", icon: ICONS.layers },
+    { id: "adjust", title: "Adjust", icon: ICONS.slidersVertical },
+    { id: "tags", title: "Tags", icon: ICONS.tag },
+    { id: "styles", title: "Styles", icon: ICONS.swatchBook },
+    { id: "pattern", title: "Pattern", icon: ICONS.mountainSnow },
+    { id: "bookmarks", title: "Bookmarks", icon: ICONS.bookmark, left: true },
+  ];
+  const openFlag = (p: PanelId): "adjustOpen" | "layersOpen" | "tagsOpen" | "stylesOpen" | "patternOpen" | "bookmarksOpen" => `${p}Open`;
+  const barOf = (p: (typeof PANELS)[number]) => (p.left ? { bar: sidebarLeft, key: "ui.sidebarLeft" as const } : { bar: sidebarRight, key: "ui.sidebarRight" as const });
+  const paneShows = (p: (typeof PANELS)[number]): boolean => settings.get(barOf(p).key) && barOf(p).bar.active === p.id;
+  let syncing = false;
+  /** The panels' flags from the sidebars (a pane chosen, a sidebar shown or hidden). */
+  const flagsFromPanes = (): void => {
+    let changed = false;
+    for (const p of PANELS) if (editor[openFlag(p.id)] !== paneShows(p)) (editor[openFlag(p.id)] = paneShows(p)), (changed = true);
+    if (changed) (syncing = true), editor.changed(), (syncing = false);
+  };
+  for (const p of PANELS) barOf(p).bar.add({ id: p.id, title: p.title, icon: p.icon, mount: (body) => body.append(panelEl(`${p.id}-panel`)) });
+  settings.subscribe((key) => (key === "ui.sidebarLeft" || key === "ui.sidebarRight" || key === "ui.paneLeft" || key === "ui.paneRight") && flagsFromPanes());
+  // (a panel opened or closed elsewhere: its pane and its sidebar follow)
+  editor.subscribe(() => {
+    if (syncing) return;
+    for (const p of PANELS) {
+      const want = editor[openFlag(p.id)];
+      if (want === paneShows(p)) continue;
+      const { bar, key } = barOf(p);
+      if (want) {
+        bar.show(p.id);
+        if (!settings.get(key)) settings.set(key, true);
+        else flagsFromPanes();
+      } else if (bar.active === p.id) settings.set(key, false);
+    }
+  });
+  flagsFromPanes();
   const markTab = mountViewSwitch(document.getElementById("view-switch")!, setView, PHOTOCRAFT_FEATURES.entry.view && photoCraft.available);
   // (the Pins window's button is the ribbon's, with its handler)
   const pinsButton = document.querySelector<HTMLElement>('[data-testid="reference-open"]');

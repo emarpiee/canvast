@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.63.24 — The panels are sidebar panes (2026-11-27)
+
+- **Changed:** Layers, Adjust, Tags, Styles and Pattern are panes of the right sidebar, and Bookmarks of the left (B39): each is chosen by its tab, and one opened another way (its command, Adjust on the Actions bar) shows its pane and opens its sidebar. The column of panel buttons at the view's right edge is gone. ([The interface](README.md#the-interface))
+
 ## 0.63.23 — Files rows as the Library's folders (2026-11-27)
 
 - **Changed:** the Files pane's rows look and act as the Library's folder rows: no arrow before the icon, a board shows the branch mark and its count at the right and folds on a click, and More comes under the pointer before the marks; a New note button joins its tools. ([The interface](README.md#the-interface))
