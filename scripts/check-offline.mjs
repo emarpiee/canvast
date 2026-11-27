@@ -31,6 +31,7 @@ const KNOWN = [
   /^http:\/\/ns\.adobe\.com\/(xdp|xfdf|xmpmeta)\//,
   /^https?:\/\/(example\.com|foo\.bar)$/,
   /^http:\/\/\$\{[a-zA-Z]\}$/,
+  /^https:\/\/\$\{[a-zA-Z]\}$/, // a note's bare `www.` address made a link (an href on the page, followed only by the host; nothing is fetched)
   /^https:\/\/lea\.verou\.me/, // (the author in the licence comment of the code colouring)
   /^https?:\/\/www\.w3\.org\//, // XML namespaces (SVG, XLink)
   /^https:\/\/github\.com\/rsms\/inter$/, // the Inter licence text
