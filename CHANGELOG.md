@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.63.29 — Sidebar widths, sidebars over a narrow view (2026-11-27)
+
+- **Added:** a sidebar's inner edge drags it wider or narrower (left 200–480 px, right 220–480 px; the arrow keys, a double-click resets), kept on this device; in a narrow window a sidebar comes over the view from the tab strip's buttons and goes after a pick, a click outside or Esc (B39). ([The interface](README.md#the-interface))
+- **Fixed before release:** a bookmarks tour's caption is centred on the canvas, not on the window.
+
 ## 0.63.28 — The canvas's zoom stack and ⋯ menu (2026-11-27)
 
 - **Changed:** the canvas keeps a small stack at its right edge (zoom in and out, fit the selection, fit everything, home); previous, next and random view, the canvas pattern, background colour, information shown, object names and Zen mode move to the view header's ⋯ menu, each still its command (B39). ([The interface](README.md#the-interface))

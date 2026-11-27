@@ -412,6 +412,8 @@ async function start(): Promise<void> {
     // The workspace's sidebars (B39): shown or hidden, per device; the stylesheet gives the view the room between them
     root.dataset["left"] = settings.get("ui.sidebarLeft") ? "open" : "closed";
     root.dataset["right"] = settings.get("ui.sidebarRight") ? "open" : "closed";
+    root.style.setProperty("--sidebar-w", `${settings.get("ui.sidebarLeftW")}px`);
+    root.style.setProperty("--sidebar-r-w", `${settings.get("ui.sidebarRightW")}px`);
     if (settings.get("ui.corners") === "sharp") root.dataset["corners"] = "sharp";
     else delete root.dataset["corners"]; // round is the default
     // Where the names of the Actions bar's groups show (under the buttons is the default)
@@ -2275,13 +2277,42 @@ async function start(): Promise<void> {
   // The workspace (B39): the ribbon, a sidebar on each side, and the status bar, which takes the canvas's information line
   const startPage = document.getElementById("start-page")!;
   mountRibbon(document.getElementById("ribbon")!);
-  const sidebarLeft = mountSidebar(document.getElementById("sidebar-left")!, { side: "left", label: "Left sidebar", toggleCommand: "layout.leftSidebar", initial: settings.get("ui.paneLeft") || null, onShow: (id) => void settings.set("ui.paneLeft", id) });
-  const sidebarRight = mountSidebar(document.getElementById("sidebar-right")!, { side: "right", label: "Right sidebar", toggleCommand: "layout.rightSidebar", initial: settings.get("ui.paneRight") || null, onShow: (id) => void settings.set("ui.paneRight", id) });
-  settings.subscribe((key) => (key === "ui.sidebarLeft" || key === "ui.sidebarRight") && applyAppearance());
+  const sidebarLeft = mountSidebar(document.getElementById("sidebar-left")!, { side: "left", label: "Left sidebar", toggleCommand: "layout.leftSidebar", widthKey: "ui.sidebarLeftW", settings, initial: settings.get("ui.paneLeft") || null, onShow: (id) => void settings.set("ui.paneLeft", id) });
+  const sidebarRight = mountSidebar(document.getElementById("sidebar-right")!, { side: "right", label: "Right sidebar", toggleCommand: "layout.rightSidebar", widthKey: "ui.sidebarRightW", settings, initial: settings.get("ui.paneRight") || null, onShow: (id) => void settings.set("ui.paneRight", id) });
+  settings.subscribe((key) => (key === "ui.sidebarLeft" || key === "ui.sidebarRight" || key === "ui.sidebarLeftW" || key === "ui.sidebarRightW") && applyAppearance());
   const sidebarCommand = (id: string, title: string, key: "ui.sidebarLeft" | "ui.sidebarRight"): Command => ({
     id, group: "Layout", kind: "settings", title, hint: "Show it or hide it", risk: "edit", words: "sidebar panel pane toggle show hide",
     why: () => null,
-    exec: () => (settings.set(key, !(settings.get(key) as boolean)), { ok: true }),
+    exec: () => {
+      // (a narrow window: the sidebar comes over the view for a moment, and its kept state is left as it is)
+      if (narrowShell.matches) {
+        const side = key === "ui.sidebarLeft" ? "left" : "right";
+        if (document.documentElement.dataset["overlay"] === side) delete document.documentElement.dataset["overlay"];
+        else document.documentElement.dataset["overlay"] = side;
+        return { ok: true };
+      }
+      settings.set(key, !(settings.get(key) as boolean));
+      return { ok: true };
+    },
+  });
+  // A sidebar over the view (a narrow window, B39) closes on a pick in it, a press outside it or Escape.
+  const narrowShell = matchMedia("(min-width: 641px) and (max-width: 900px)");
+  const closeOverlay = (): void => void delete document.documentElement.dataset["overlay"];
+  // view-state: (the window grew past narrow: no sidebar over the view)
+  narrowShell.addEventListener("change", closeOverlay);
+  // view-state: (a sidebar over the view closes: after a pick in it, the pick's own command has run)
+  document.addEventListener("click", (e) => {
+    const t = e.target as HTMLElement;
+    if (document.documentElement.dataset["overlay"] && t.closest(".sidebar .side-item, .sidebar [data-open]")) setTimeout(closeOverlay);
+  });
+  // view-state: (a press outside a sidebar over the view closes it)
+  document.addEventListener("pointerdown", (e) => {
+    const t = e.target as HTMLElement;
+    if (document.documentElement.dataset["overlay"] && !t.closest(".sidebar, .tab-side, .pop-menu, [role='dialog']")) closeOverlay();
+  }, true);
+  // view-state: (Escape closes a sidebar over the view)
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && document.documentElement.dataset["overlay"]) closeOverlay();
   });
   commands.setProvider("layout", () => [sidebarCommand("layout.leftSidebar", "Left sidebar", "ui.sidebarLeft"), sidebarCommand("layout.rightSidebar", "Right sidebar", "ui.sidebarRight")]);
   const statusbar = document.getElementById("statusbar")!;

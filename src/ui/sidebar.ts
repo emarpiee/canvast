@@ -1,6 +1,7 @@
 import { ICONS } from "./icons";
 import { esc } from "./format";
 import { pressCommand } from "../commands/registry";
+import type { SettingsStore } from "../settings/settings";
 
 /** One pane of a sidebar (B39): its tab, and its body drawn the first time it shows. */
 export interface SidebarPane {
@@ -26,14 +27,15 @@ export interface Sidebar {
  * A sidebar of the workspace (B39), the one implementation of both: a header of pane tabs and the button that hides it, the shown pane's body,
  * and a foot. Which pane shows is view state (`onShow` keeps it, `initial` brings it back); hiding the sidebar is its command.
  */
-export function mountSidebar(el: HTMLElement, o: { side: "left" | "right"; label: string; toggleCommand: string; initial?: string | null; onShow?(id: string): void }): Sidebar {
+export function mountSidebar(el: HTMLElement, o: { side: "left" | "right"; label: string; toggleCommand: string; widthKey: "ui.sidebarLeftW" | "ui.sidebarRightW"; settings: SettingsStore; initial?: string | null; onShow?(id: string): void }): Sidebar {
   el.innerHTML = `
     <header class="sb-head">
       <div class="sb-tabs" role="tablist" aria-label="${esc(o.label)}"></div>
       <button type="button" class="layer-btn sb-collapse" data-command="${o.toggleCommand}" aria-label="Hide the ${o.side} sidebar" title="Hide the ${o.side} sidebar">${o.side === "left" ? ICONS.panelLeft : ICONS.panelRight}</button>
     </header>
     <div class="sb-body"></div>
-    <footer class="sb-foot" hidden></footer>`;
+    <footer class="sb-foot" hidden></footer>
+    <div class="col-grip sb-grip" data-testid="sidebar-grip-${o.side}" role="separator" aria-orientation="vertical" aria-label="Resize the ${o.side} sidebar" title="Drag to resize the ${o.side} sidebar (double-click to reset)" tabindex="0"></div>`;
   const tabs = el.querySelector<HTMLElement>(".sb-tabs")!;
   const body = el.querySelector<HTMLElement>(".sb-body")!;
   const foot = el.querySelector<HTMLElement>(".sb-foot")!;
@@ -57,6 +59,43 @@ export function mountSidebar(el: HTMLElement, o: { side: "left" | "right"; label
   });
   // commands: (the button that hides the sidebar runs its toggle command)
   el.querySelector(".sb-collapse")!.addEventListener("click", () => void pressCommand(o.toggleCommand));
+  // Its width: the grip at its inner edge follows the pointer, and the sidebar takes the width once it is let go (the view is laid out once);
+  // the arrow keys step it, a double-click resets it. Kept on this device.
+  // view-state: (a sidebar's width)
+  const grip = el.querySelector<HTMLElement>(".sb-grip")!;
+  const dir = o.side === "left" ? 1 : -1;
+  const setW = (w: number): void => void o.settings.set(o.widthKey, Math.max(o.side === "left" ? 200 : 220, Math.min(480, Math.round(w))));
+  grip.addEventListener("pointerdown", (e) => {
+    e.preventDefault();
+    const x0 = e.clientX;
+    const w0 = el.offsetWidth;
+    let w = w0;
+    grip.setPointerCapture(e.pointerId);
+    grip.classList.add("is-dragging");
+    const move = (ev: PointerEvent): void => {
+      w = Math.max(o.side === "left" ? 200 : 220, Math.min(480, w0 + dir * (ev.clientX - x0)));
+      grip.style.transform = `translateX(${dir * (w - w0)}px)`;
+    };
+    const up = (): void => {
+      grip.removeEventListener("pointermove", move);
+      grip.removeEventListener("pointerup", up);
+      grip.removeEventListener("pointercancel", up);
+      grip.classList.remove("is-dragging");
+      grip.style.transform = "";
+      setW(w);
+    };
+    grip.addEventListener("pointermove", move);
+    grip.addEventListener("pointerup", up);
+    grip.addEventListener("pointercancel", up);
+  });
+  // view-state: (a sidebar's width back to its default)
+  grip.addEventListener("dblclick", () => o.settings.reset(o.widthKey));
+  // view-state: (a sidebar's width, by the arrow keys)
+  grip.addEventListener("keydown", (e) => {
+    if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
+    e.preventDefault();
+    setW(el.offsetWidth + (e.key === "ArrowRight" ? 1 : -1) * dir * 16);
+  });
   // (the foot shows only while something is in it)
   new MutationObserver(() => void (foot.hidden = !foot.childElementCount)).observe(foot, { childList: true });
   return {

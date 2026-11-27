@@ -994,7 +994,7 @@ dialog.confirm .secret-field .prompt-input { padding-right: calc(var(--icon-xl) 
 .palette-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .palette-list kbd { color: var(--hud-muted); font: var(--font-meta); }
 .palette-list li.palette-empty { color: var(--hud-muted); cursor: default; }
-.tour-caption { position: fixed; left: 50%; bottom: var(--s-12); transform: translateX(-50%); z-index: var(--z-edge); display: flex; align-items: center; gap: var(--s-6); padding: var(--s-4) var(--s-6); background: var(--hud-bg); border: 1px solid var(--hud-border); border-radius: var(--r-lg); box-shadow: var(--hud-lift); color: var(--hud-fg); font: var(--font-value); }
+.tour-caption { position: fixed; left: calc(var(--shell-l) + (100vw - var(--shell-l) - var(--shell-r)) / 2); bottom: var(--s-12); transform: translateX(-50%); z-index: var(--z-edge); display: flex; align-items: center; gap: var(--s-6); padding: var(--s-4) var(--s-6); background: var(--hud-bg); border: 1px solid var(--hud-border); border-radius: var(--r-lg); box-shadow: var(--hud-lift); color: var(--hud-fg); font: var(--font-value); }
 .tour-caption[hidden] { display: none; }
 .tour-caption .tour-n { color: var(--hud-muted); font: var(--font-meta); }
 .tour-caption button { min-width: var(--ctl); height: var(--ctl); border: 0; border-radius: var(--r-md); background: transparent; color: inherit; cursor: pointer; }
@@ -3615,6 +3615,14 @@ button.archive-crumb:hover { background: var(--hud-hover); color: var(--hud-fg);
 .sb-tab[aria-selected="true"] { color: var(--hud-fg); background: var(--row-active); }
 .sb-tab svg { width: var(--icon-md); height: var(--icon-md); }
 .sb-body { flex: 1; min-height: 0; overflow-y: auto; }
+/* A sidebar's width grip (the Library's column grip, at the sidebar's inner edge): its hit area goes out over the view, away from the sidebar's scrollbar */
+@media (min-width: 901px) {
+  .sidebar > .sb-grip { position: absolute; top: 0; bottom: 0; margin: 0; z-index: 1; }
+  #sidebar-left > .sb-grip { right: 0; }
+  #sidebar-right > .sb-grip { left: 0; }
+  #sidebar-left > .sb-grip::before { left: 0; }
+  #sidebar-right > .sb-grip::before { left: auto; right: 0; }
+}
 .sb-pane[hidden] { display: none; }
 .sb-foot { flex: none; border-top: 1px solid var(--hud-border); padding: var(--s-4); }
 .sb-foot[hidden] { display: none; }
@@ -3697,6 +3705,12 @@ button.archive-crumb:hover { background: var(--hud-hover); color: var(--hud-fg);
 @media (max-width: 900px) {
   :root, :root[data-left="open"], :root[data-right="open"] { --side-l: 0px; --side-r: 0px; }
   :root .sidebar { display: none; }
+}
+/* There a sidebar comes over the view from its toggle (the tab strip's buttons, the palette), and goes on a pick */
+@media (min-width: 641px) and (max-width: 900px) {
+  :root[data-overlay="left"] #sidebar-left, :root[data-overlay="right"] #sidebar-right { display: flex; box-shadow: var(--hud-lift); }
+  :root[data-overlay="left"] #sidebar-left { left: var(--shell-l); }
+  :root .tabbar .tab-side { display: inline-flex; }
 }
 @media (max-width: 640px) {
   :root { --shell-l: 0px; --shell-t: 0px; }
