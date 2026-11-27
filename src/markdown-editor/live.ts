@@ -3,7 +3,7 @@
 // highlights show theirs only where the selection touches them. Elsewhere marks are hidden and pictures, task boxes, rules, callouts,
 // code cards and tables are drawn. Source mode is the same editor without this layer.
 import { syntaxTree } from "@codemirror/language";
-import { StateEffect, StateField, type EditorState, type Extension, type Range } from "@codemirror/state";
+import { StateEffect, StateField, type ChangeSet, type EditorState, type Extension, type Range } from "@codemirror/state";
 import { Decoration, EditorView, ViewPlugin, WidgetType, type DecorationSet, type ViewUpdate } from "@codemirror/view";
 import type { SyntaxNode } from "@lezer/common";
 import { toggleTask } from "./behaviors/task-toggle";
@@ -32,10 +32,9 @@ export interface LiveContext {
   renderDiagram?: (code: string) => Promise<string>;
   /** A small editor for a table's cell (its Markdown on one line): Tab, Enter and Escape `move` on, undo with nothing left in it is the
    *  note's. `close` gives its words and removes it. */
-  cellEditor?: (parent: HTMLElement, text: string, on: CellEvents, at?: { x: number; y: number }) => { close(): string; extend(to: { x: number; y: number }): void };
-  /** The note's own undo and redo (a cell with nothing left to undo hands Ctrl+Z on). */
-  undo?: () => boolean;
-  redo?: () => boolean;
+  cellEditor?: (parent: HTMLElement, text: string, on: CellEvents) => CellEditor;
+  /** Only what is drawn in a line's words (a table cell's editor): no tables or other blocks. */
+  inline?: boolean;
   /** A pair's sign typed over selected words goes round them (Settings). */
   wrapSelection?: boolean;
   /** Whether a wiki link's target reaches anything (undefined: not known). */
@@ -49,9 +48,23 @@ export interface LiveContext {
 /** What a table cell's editor reports. */
 export interface CellEvents {
   move(to: "next" | "prev" | "down" | "out"): void;
+  /** The cell's words changed (positions in the cell's text): written into the note at the cell's place. */
+  change(changes: ChangeSet, userEvent: string): void;
   blur(): void;
-  undo(): boolean;
-  redo(): boolean;
+}
+
+/** A table cell's editor, as the table drives it. */
+export interface CellEditor {
+  /** Focus it, the cursor where `at` points (else at the end). */
+  focus(at?: { x: number; y: number }): void;
+  /** Select from where it was pressed to `to` (a drag in the cell). */
+  extend(to: { x: number; y: number }): void;
+  text(): string;
+  /** The note changed under it (an undo): its words follow. */
+  setText(text: string): void;
+  /** Take the focus back, the cursor kept (the table was drawn again round it). */
+  refocus(): void;
+  destroy(): void;
 }
 
 /** The words of a table's actions. */
@@ -651,5 +664,6 @@ export function livePreview(ctx: LiveContext): Extension {
     },
     { decorations: (v) => v.decorations },
   );
+  if (ctx.inline) return [revealOnFocus, plugin];
   return [revealOnFocus, plugin, tableField(ctx), blockField(ctx), EditorView.editorAttributes.of({ class: "me-live" })];
 }

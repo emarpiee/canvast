@@ -1,10 +1,11 @@
 // Tables in live mode: a table is drawn as a table whose cells are edited in place (Tab and Shift+Tab move between them, Enter goes down a
 // row, adding one at the end, Escape leaves the table), with buttons that add a row or a column. The Markdown stays the one truth: an edited
 // cell writes the whole table back as one change (one undo step). The cursor never lands in the raw pipes; source mode edits those.
+import { redo, undo } from "@codemirror/commands";
 import { syntaxTree } from "@codemirror/language";
 import { RangeSet, StateField, type EditorState, type Extension, type Range } from "@codemirror/state";
 import { Decoration, EditorView, WidgetType, type DecorationSet } from "@codemirror/view";
-import type { LiveContext } from "./live";
+import type { CellEditor, LiveContext } from "./live";
 import { mediaElement } from "./live";
 import { renderMarkdown } from "./render";
 import { cleanHtml } from "./clean";
@@ -57,192 +58,319 @@ export function writeTable(m: Model): string {
   return [row(m.head), `| ${sep.join(" | ")} |`, ...m.rows.map(row), ...widths].join("\n");
 }
 
-/** The cell each view should focus once its table is drawn again (after an edit wrote it back). */
-const focusNext = new WeakMap<EditorView, { at: number; row: number; col: number }>();
+/** Where each cell's words are on a row's line: [from, to) offsets, the spaces round them left out (an empty cell: a place between them). */
+export function cellSpans(line: string): Array<[number, number]> {
+  const out: Array<[number, number]> = [];
+  // (a table in a quote or a list: its rows start after the quote's marks)
+  const first = line.search(/[^\s>]/);
+  if (first < 0) return out;
+  const piped = line[first] === "|";
+  let start = piped ? first + 1 : first, code = false;
+  const push = (from: number, to: number): void => {
+    let a = from, b = to;
+    while (a < b && /\s/.test(line[a]!)) a++;
+    while (b > a && /\s/.test(line[b - 1]!)) b--;
+    if (a === b) a = b = Math.min(from + (line[from] === " " ? 1 : 0), to);
+    out.push([a, b]);
+  };
+  for (let i = start; i < line.length; i++) {
+    const c = line[i]!;
+    if (c === "\\" && line[i + 1] === "|") i++;
+    else if (c === "`") code = !code;
+    else if (c === "|" && !code) {
+      push(start, i);
+      start = i + 1;
+    }
+  }
+  if (line.slice(start).trim() || !/(?<!\\)\|\s*$/.test(line)) push(start, line.length);
+  return out;
+}
 
-class TableWidget extends WidgetType {
-  constructor(readonly source: string, readonly from: number, readonly ctx: LiveContext) {
-    super();
-  }
-  override eq(o: TableWidget): boolean {
-    return o.source === this.source && o.from === this.from;
-  }
-  override ignoreEvent(): boolean {
-    return true;
-  }
-  override toDOM(view: EditorView): HTMLElement {
-    const model = parseTable(this.source);
-    const wrap = document.createElement("div");
-    wrap.className = "me-table";
-    wrap.contentEditable = "false";
-    const table = document.createElement("table");
-    const cellAt = (row: number, col: number): HTMLElement | null => table.querySelector(`[data-r="${row}"][data-c="${col}"]`);
-    /** Write the model back (one change) and focus `next` once the table is drawn again. */
-    const commit = (next?: { row: number; col: number }): void => {
-      const text = writeTable(model);
-      if (next) focusNext.set(view, { at: this.from, ...next });
-      if (text === this.source) return void (next && edit(next.row, next.col));
-      view.dispatch({ changes: { from: this.from, to: this.from + this.source.length, insert: text }, userEvent: "input.table" });
-    };
-    const drawCell = (cell: HTMLElement, md: string): void => {
-      cell.dataset["md"] = md;
-      cell.innerHTML = md ? cleanHtml(renderMarkdown(md, { html: true })).replace(/^<p>|<\/p>$/g, "") : "";
-      for (const img of cell.querySelectorAll("img")) img.replaceWith(mediaElement(this.ctx, img.getAttribute("data-embed") ?? img.getAttribute("src") ?? "", img.alt, img.hasAttribute("data-embed")));
-    };
-    const rowCount = model.rows.length + 1;
-    const cols = model.head.length;
-    const mdAt = (row: number, col: number): string => (row === 0 ? model.head[col] : model.rows[row - 1]?.[col]) ?? "";
+/**
+ * One drawn table. It stays on the page while the note changes (`update`), so a cell being edited keeps its editor: the cell's editor is a
+ * window onto that cell's words in the note, its every change written there at once (`ctx.cellEditor`), so the note keeps one document and
+ * one history. The table's own actions (rows, columns, sort, widths) write the whole table back as one change.
+ */
+class TableView {
+  readonly dom = document.createElement("div");
+  model: Model;
+  private editing: { row: number; col: number; ed: CellEditor } | null = null;
+  private range: { r0: number; c0: number; r1: number; c1: number } | null = null;
+  private table!: HTMLTableElement;
 
-    // ---- One cell edited at a time, in a small editor of its own on the cell's Markdown (the note's keys, formats and undo there too) ----
-    let editing: { row: number; col: number; close(): string; extend(to: { x: number; y: number }): void } | null = null;
-    /** Stop editing: the cell's words into the table (written back when they changed, or when `next` asks for another cell). */
-    const finish = (next?: { row: number; col: number }): void => {
-      if (!editing) return next ? void commit(next) : undefined;
-      const { row, col } = editing;
-      const md = editing.close();
-      editing = null;
-      set(row, col, md);
-      drawCell(cellAt(row, col)!, md);
-      commit(next);
-    };
-    /** Edit the cell at `row`, `col` (the cursor where `at` points in it, else at its end). */
-    const edit = (row: number, col: number, at?: { x: number; y: number }): void => {
-      clearCells();
-      if (editing?.row === row && editing.col === col) return;
-      if (editing) {
-        const md = editing.close(), was = editing;
-        editing = null;
-        set(was.row, was.col, md);
-        drawCell(cellAt(was.row, was.col)!, md);
+  constructor(readonly view: EditorView, readonly ctx: LiveContext, public source: string, public from: number) {
+    this.model = parseTable(source);
+    this.dom.className = "me-table";
+    this.dom.contentEditable = "false";
+    this.dom.tabIndex = -1;
+    this.render();
+    this.listen();
+  }
+
+  /** The note changed: the table's text is now `source`, at `from`. Only what changed is drawn again; the cell being edited follows. */
+  update(source: string, from: number): void {
+    const b = { cols: this.model.head.length, rows: this.model.rows.length, aligns: this.model.aligns.join(), widths: this.model.widths.join() };
+    this.source = source;
+    this.from = from;
+    // (in place: the drawn table's buttons and grips read this one model)
+    const m = Object.assign(this.model, parseTable(source));
+    const same = m.head.length === b.cols && m.rows.length === b.rows && m.aligns.join() === b.aligns && m.widths.join() === b.widths;
+    if (!same) {
+      const ed = this.editing;
+      this.render();
+      if (ed) {
+        const cell = this.cellAt(ed.row, ed.col);
+        if (cell) {
+          cell.textContent = "";
+          cell.classList.add("is-editing");
+          cell.parentElement!.classList.add("is-editing");
+          // (the cell's editor moves into the cell drawn again)
+          cell.append(...(this.editingHost ? [...this.editingHost.childNodes] : []));
+          this.editingHost = cell;
+          ed.ed.setText(this.mdAt(ed.row, ed.col));
+          ed.ed.refocus();
+        } else this.stopEditing();
       }
-      const cell = cellAt(row, col);
-      if (!cell || !this.ctx.cellEditor) return;
-      // (the note's own selection goes to the table, so one selection shows: the cell's)
-      if (!view.state.selection.main.empty || view.state.selection.main.from !== this.from) view.dispatch({ selection: { anchor: this.from } });
-      cell.textContent = "";
-      cell.classList.add("is-editing");
-      cell.parentElement!.classList.add("is-editing");
-      const ed = this.ctx.cellEditor(cell, mdAt(row, col).replace(/\\\|/g, "|"), {
-        move: (to) => {
-          const i = row * cols + col;
-          if (to === "out") {
-            finish();
-            const end = this.from + writeTable(model).length;
-            view.dispatch({ selection: { anchor: Math.min(end + 1, view.state.doc.length) } });
-            view.focus();
-            return;
-          }
-          let r = row, c = col;
-          if (to === "next" || to === "prev") {
-            const k = i + (to === "next" ? 1 : -1);
-            if (k < 0) return;
-            if (k >= (model.rows.length + 1) * cols) model.rows.push(Array<string>(cols).fill(""));
-            (r = Math.floor(k / cols)), (c = k % cols);
-          } else {
-            if (row + 1 >= model.rows.length + 1) model.rows.push(Array<string>(cols).fill(""));
-            r = row + 1;
-          }
-          finish({ row: r, col: c });
-        },
-        blur: () => finish(),
-        // (nothing left to undo in the cell: the note's own history, a sort or a moved row too)
-        undo: () => (finish(), this.ctx.undo?.() ?? false),
-        redo: () => (finish(), this.ctx.redo?.() ?? false),
-      }, at);
-      editing = { row, col, extend: (to) => ed.extend(to), close: () => (cell.classList.remove("is-editing"), cell.parentElement!.classList.remove("is-editing"), ed.close().replace(/\|/g, "\\|").replace(/\n/g, "<br>")) };
-    };
+      return;
+    }
+    for (let r = 0; r <= m.rows.length; r++) {
+      for (let c = 0; c < m.head.length; c++) {
+        const md = this.mdAt(r, c);
+        // (the cell's own typing is in it already: its spaces at the ends, which the table's text trims, stay)
+        if (this.editing?.row === r && this.editing.col === c) {
+          if (!this.writing) this.editing.ed.setText(md);
+        } else if (this.cellAt(r, c)?.dataset["md"] !== md) this.drawCell(this.cellAt(r, c)!, md);
+      }
+    }
+  }
 
-    // ---- Cells selected together: dragged across, or Shift+clicked (cleared, copied, cut or formatted at once) ----
-    let range: { r0: number; c0: number; r1: number; c1: number } | null = null;
-    const inRange = (r: number, c: number): boolean => !!range && r >= Math.min(range.r0, range.r1) && r <= Math.max(range.r0, range.r1) && c >= Math.min(range.c0, range.c1) && c <= Math.max(range.c0, range.c1);
-    const paintRange = (): void => {
-      for (const cell of table.querySelectorAll<HTMLElement>(".me-cell")) cell.parentElement!.classList.toggle("me-cell-selected", inRange(Number(cell.dataset["r"]), Number(cell.dataset["c"])));
-    };
-    const clearCells = (): void => {
-      range = null;
-      paintRange();
-    };
-    const eachSelected = (f: (r: number, c: number) => void): void => {
-      if (!range) return;
-      for (let r = Math.min(range.r0, range.r1); r <= Math.max(range.r0, range.r1); r++) for (let c = Math.min(range.c0, range.c1); c <= Math.max(range.c0, range.c1); c++) f(r, c);
-    };
-    const selectedTable = (): string => {
-      const rows: string[][] = [];
-      eachSelected((r, c) => {
-        const i = r - Math.min(range!.r0, range!.r1);
-        (rows[i] ??= []).push(mdAt(r, c));
-      });
-      const head = rows[0] ?? [];
-      return [`| ${head.join(" | ")} |`, `| ${head.map(() => "---").join(" | ")} |`, ...rows.slice(1).map((r) => `| ${r.join(" | ")} |`)].join("\n");
-    };
+  destroy(): void {
+    this.editing?.ed.destroy();
+    this.editing = null;
+  }
+
+  private mdAt(row: number, col: number): string {
+    return (row === 0 ? this.model.head[col] : this.model.rows[row - 1]?.[col]) ?? "";
+  }
+  private cellAt(row: number, col: number): HTMLElement | null {
+    return this.table.querySelector(`[data-r="${row}"][data-c="${col}"]`);
+  }
+  private drawCell(cell: HTMLElement, md: string): void {
+    cell.dataset["md"] = md;
+    cell.innerHTML = md ? cleanHtml(renderMarkdown(md, { html: true })).replace(/^<p>|<\/p>$/g, "") : "";
+    for (const img of cell.querySelectorAll("img")) img.replaceWith(mediaElement(this.ctx, img.getAttribute("data-embed") ?? img.getAttribute("src") ?? "", img.alt, img.hasAttribute("data-embed")));
+  }
+  /** A change from the cell being edited is being written into the note. */
+  private writing = false;
+  /** The element holding the cell's editor. */
+  private editingHost: HTMLElement | null = null;
+
+  /** Where the cell's words are in the note now ([from, to)), or null when its row is short of it. */
+  private spanOf(row: number, col: number): [number, number] | null {
+    const doc = this.view.state.doc;
+    const first = doc.lineAt(this.from).number;
+    const line = doc.line(first + (row === 0 ? 0 : row + 1));
+    const span = cellSpans(line.text)[col];
+    return span ? [line.from + span[0], line.from + span[1]] : null;
+  }
+
+  /** Write the model back (one change: one undo step), then edit `next`. */
+  commit(next?: { row: number; col: number }): void {
+    const text = writeTable(this.model);
+    if (text !== this.source) this.view.dispatch({ changes: { from: this.from, to: this.from + this.source.length, insert: text }, userEvent: "input.table" });
+    if (next) this.edit(next.row, next.col);
+  }
+
+  stopEditing(): void {
+    const ed = this.editing;
+    if (!ed) return;
+    this.editing = null;
+    ed.ed.destroy();
+    this.editingHost = null;
+    const cell = this.cellAt(ed.row, ed.col);
+    if (cell) {
+      cell.classList.remove("is-editing");
+      cell.parentElement!.classList.remove("is-editing");
+      this.drawCell(cell, this.mdAt(ed.row, ed.col));
+    }
+  }
+
+  /** Edit the cell at `row`, `col`, the cursor where `at` points in it (else at its end). */
+  edit(row: number, col: number, at?: { x: number; y: number }): void {
+    this.clearCells();
+    if (this.editing?.row === row && this.editing.col === col) return void this.editing.ed.focus(at);
+    this.stopEditing();
+    if (!this.ctx.cellEditor) return;
+    // (a short row is filled out first, so the cell has a place in the note)
+    if (!this.spanOf(row, col)) this.commit();
+    const cell = this.cellAt(row, col);
+    if (!cell || !this.spanOf(row, col)) return;
+    // (the note's own selection goes to the table, so one selection shows: the cell's)
+    const sel = this.view.state.selection.main;
+    if (!sel.empty || sel.from !== this.from) this.view.dispatch({ selection: { anchor: this.from } });
+    cell.textContent = "";
+    cell.classList.add("is-editing");
+    cell.parentElement!.classList.add("is-editing");
+    this.editingHost = cell;
+    const ed = this.ctx.cellEditor(cell, this.view.state.sliceDoc(...this.spanOf(row, col)!), {
+      change: (changes, userEvent) => {
+        const span = this.spanOf(row, col);
+        if (!span) return;
+        const specs: { from: number; to: number; insert: string }[] = [];
+        changes.iterChanges((a, b, _c, _d, ins) => void specs.push({ from: span[0] + a, to: span[0] + b, insert: ins.toString() }));
+        // (an empty cell's words get a space each side, as tables are written)
+        const empty = span[0] === span[1];
+        const line = this.view.state.doc.lineAt(span[0]);
+        if (empty && specs.length) {
+          const before = this.view.state.sliceDoc(span[0] - 1, span[0]), after = this.view.state.sliceDoc(span[1], span[1] + 1);
+          if (before === "|") specs[0]!.insert = ` ${specs[0]!.insert}`;
+          if (after === "|" && line.to > span[1]) specs[specs.length - 1]!.insert += " ";
+        }
+        this.writing = true;
+        try {
+          this.view.dispatch({ changes: specs, userEvent });
+        } finally {
+          this.writing = false;
+        }
+      },
+      move: (to) => this.move(row, col, to),
+      blur: () => {
+        if (this.editing?.ed === ed) this.stopEditing();
+      },
+    });
+    this.editing = { row, col, ed };
+    ed.focus(at);
+  }
+
+  private move(row: number, col: number, to: "next" | "prev" | "down" | "out"): void {
+    const cols = this.model.head.length;
+    if (to === "out") {
+      this.stopEditing();
+      const end = this.from + this.source.length;
+      this.view.dispatch({ selection: { anchor: Math.min(end + 1, this.view.state.doc.length) } });
+      this.view.focus();
+      return;
+    }
+    let r = row, c = col;
+    if (to === "down") r = row + 1;
+    else {
+      const k = row * cols + col + (to === "next" ? 1 : -1);
+      if (k < 0) return;
+      (r = Math.floor(k / cols)), (c = k % cols);
+    }
+    if (r > this.model.rows.length) {
+      // (past the last row: a new one)
+      this.stopEditing();
+      this.model.rows.push(Array<string>(cols).fill(""));
+      return this.commit({ row: r, col: c });
+    }
+    this.edit(r, c);
+  }
+
+  private set(row: number, col: number, md: string): void {
+    if (row === 0) this.model.head[col] = md;
+    else this.model.rows[row - 1]![col] = md;
+  }
+
+  // ---- Cells selected together: dragged across, or Shift+clicked (cleared, copied, cut or formatted at once) ----
+  private inRange(r: number, c: number): boolean {
+    const g = this.range;
+    return !!g && r >= Math.min(g.r0, g.r1) && r <= Math.max(g.r0, g.r1) && c >= Math.min(g.c0, g.c1) && c <= Math.max(g.c0, g.c1);
+  }
+  private paintRange(): void {
+    for (const cell of this.table.querySelectorAll<HTMLElement>(".me-cell")) cell.parentElement!.classList.toggle("me-cell-selected", this.inRange(Number(cell.dataset["r"]), Number(cell.dataset["c"])));
+  }
+  private clearCells(): void {
+    this.range = null;
+    this.paintRange();
+  }
+  private eachSelected(f: (r: number, c: number) => void): void {
+    const g = this.range;
+    if (!g) return;
+    for (let r = Math.min(g.r0, g.r1); r <= Math.max(g.r0, g.r1); r++) for (let c = Math.min(g.c0, g.c1); c <= Math.max(g.c0, g.c1); c++) f(r, c);
+  }
+  private selectedTable(): string {
+    const rows: string[][] = [];
+    const top = Math.min(this.range!.r0, this.range!.r1);
+    this.eachSelected((r, c) => void (rows[r - top] ??= []).push(this.mdAt(r, c)));
+    const head = rows[0] ?? [];
+    return [`| ${head.join(" | ")} |`, `| ${head.map(() => "---").join(" | ")} |`, ...rows.slice(1).map((r) => `| ${r.join(" | ")} |`)].join("\n");
+  }
+
+  private listen(): void {
     const FORMAT_KEYS: Record<string, [string, string]> = { b: ["**", "**"], i: ["*", "*"], e: ["`", "`"], S: ["~~", "~~"], H: ["==", "=="] };
-    wrap.tabIndex = -1;
-    // typing: (keys on cells selected together write the table: clear, cut, a format on each)
-    wrap.addEventListener("keydown", (e) => {
-      if (!range || editing) return;
+    // typing: (keys on cells selected together write the table: clear, cut, a format on each; Ctrl+Z is the note's)
+    this.dom.addEventListener("keydown", (e) => {
+      if (!this.range || this.editing) return;
       const mod = e.ctrlKey || e.metaKey;
       const key = e.shiftKey && mod ? e.key.toUpperCase() : e.key.toLowerCase();
-      if (e.key === "Escape") return void (clearCells(), view.focus(), e.preventDefault());
+      if (e.key === "Escape") return void (this.clearCells(), this.view.focus(), e.preventDefault());
+      if (mod && (key === "z" || key === "y" || key === "Z")) return void (e.preventDefault(), (key === "z" ? undo : redo)(this.view));
       if (e.key === "Delete" || e.key === "Backspace" || (mod && key === "x")) {
-        if (mod) void navigator.clipboard?.writeText(selectedTable()).catch(() => undefined);
-        eachSelected((r, c) => set(r, c, ""));
-      } else if (mod && key === "c") return void (navigator.clipboard?.writeText(selectedTable()).catch(() => undefined), e.preventDefault());
+        if (mod) void navigator.clipboard?.writeText(this.selectedTable()).catch(() => undefined);
+        this.eachSelected((r, c) => this.set(r, c, ""));
+      } else if (mod && key === "c") return void (navigator.clipboard?.writeText(this.selectedTable()).catch(() => undefined), e.preventDefault());
       else if (mod && FORMAT_KEYS[key]) {
         const [a, b] = FORMAT_KEYS[key]!;
         let all = true;
-        eachSelected((r, c) => void (all &&= mdAt(r, c).startsWith(a) && mdAt(r, c).endsWith(b) && mdAt(r, c).length >= a.length + b.length));
-        eachSelected((r, c) => {
-          const md = mdAt(r, c);
-          if (md) set(r, c, all ? md.slice(a.length, md.length - b.length) : `${a}${md}${b}`);
+        this.eachSelected((r, c) => void (all &&= this.mdAt(r, c).startsWith(a) && this.mdAt(r, c).endsWith(b) && this.mdAt(r, c).length >= a.length + b.length));
+        this.eachSelected((r, c) => {
+          const md = this.mdAt(r, c);
+          if (md) this.set(r, c, all ? md.slice(a.length, md.length - b.length) : `${a}${md}${b}`);
         });
       } else return;
       e.preventDefault();
       e.stopPropagation();
-      const keep = range;
-      commit();
-      range = keep;
+      const keep = this.range;
+      this.commit();
+      this.range = keep;
+      this.paintRange();
     });
     const cellOf = (t: EventTarget | null): HTMLElement | null => (t instanceof Element ? t.closest<HTMLElement>(".me-cell") : null);
     // view-state: (a press on a cell edits it; dragged on to other cells, or with Shift, it selects cells instead; presses in the cell being
-    // edited are its editor's own. Not ".cm-editor": the whole table is inside the note's editor, which is one too)
-    // (mousedown, not pointerdown: only cancelling mousedown keeps the browser from starting a text selection of its own in the drawn table)
-    table.addEventListener("mousedown", (e) => {
+    // edited are its editor's own. mousedown, not pointerdown: only that keeps the browser from a text selection of its own in the table)
+    this.dom.addEventListener("mousedown", (e) => {
       const cell = cellOf(e.target);
       if (!cell || e.button !== 0 || (e.target as HTMLElement).closest(".me-col-resize, .me-cell.is-editing")) return;
       const r = Number(cell.dataset["r"]), c = Number(cell.dataset["c"]);
-      if (e.shiftKey && (editing || range)) {
-        e.preventDefault();
-        const from = range ? { r: range.r0, c: range.c0 } : { r: editing!.row, c: editing!.col };
-        if (editing) finish();
-        range = { r0: from.r, c0: from.c, r1: r, c1: c };
-        paintRange();
-        wrap.focus({ preventScroll: true });
+      e.preventDefault();
+      if (e.shiftKey && (this.editing || this.range)) {
+        const from = this.range ? { r: this.range.r0, c: this.range.c0 } : { r: this.editing!.row, c: this.editing!.col };
+        this.stopEditing();
+        this.range = { r0: from.r, c0: from.c, r1: r, c1: c };
+        this.paintRange();
+        this.dom.focus({ preventScroll: true });
         return;
       }
-      e.preventDefault();
       const start = { x: e.clientX, y: e.clientY };
       let dragged = false;
+      this.edit(r, c, start);
       const move = (ev: MouseEvent): void => {
         const over = cellOf(document.elementFromPoint(ev.clientX, ev.clientY));
-        if (!dragged && over === cell) return void editing?.extend({ x: ev.clientX, y: ev.clientY });
+        if (!dragged && over === this.cellAt(r, c)) return void this.editing?.ed.extend({ x: ev.clientX, y: ev.clientY });
         if (!over) return;
         if (!dragged) {
           dragged = true;
-          if (editing) finish();
+          this.stopEditing();
         }
-        range = { r0: r, c0: c, r1: Number(over.dataset["r"]), c1: Number(over.dataset["c"]) };
-        paintRange();
+        this.range = { r0: r, c0: c, r1: Number(over.dataset["r"]), c1: Number(over.dataset["c"]) };
+        this.paintRange();
       };
-      // (a drag inside the one cell is a selection in its editor: opened at once, the drag goes on there)
-      edit(r, c, start);
       const up = (): void => {
         document.removeEventListener("mousemove", move);
-        if (dragged) wrap.focus({ preventScroll: true });
+        if (dragged) this.dom.focus({ preventScroll: true });
       };
       document.addEventListener("mousemove", move);
       document.addEventListener("mouseup", up, { once: true });
     });
+  }
 
+  private render(): void {
+    const view = this.view;
+    const model = this.model;
+    const commit = (next?: { row: number; col: number }): void => this.commit(next);
+    const table = (this.table = document.createElement("table"));
+    this.dom.textContent = "";
     const make = (tag: "th" | "td", md: string, row: number, col: number): HTMLElement => {
       // (the cell holds its words in an element of their own, beside a heading cell's grips)
       const box = document.createElement(tag);
@@ -252,11 +380,12 @@ class TableWidget extends WidgetType {
       cell.dataset["r"] = String(row);
       cell.dataset["c"] = String(col);
       if (model.aligns[col]) box.style.textAlign = model.aligns[col]!;
-      drawCell(cell, md);
+      this.drawCell(cell, md);
       // view-state: (opens the table's list of actions; each writes the table through `commit`)
       cell.addEventListener("contextmenu", (e) => {
         e.preventDefault();
-        if (editing) finish();
+        e.stopPropagation();
+        this.stopEditing();
         openPopover(new DOMRect(e.clientX, e.clientY, 0, 0), actions(row, col), this.ctx.tableLabel);
       });
       return box;
@@ -264,6 +393,7 @@ class TableWidget extends WidgetType {
     /** The table's actions for the cell at `row` (0: the heading row), `col`. */
     const actions = (row: number, col: number): PopItem[] => {
       const L = this.ctx.tableWords;
+      this.stopEditing();
       const cols = model.head.length, body = row - 1, last = model.rows.length - 1;
       const blank = (): string[] => Array<string>(cols).fill("");
       const eachRow = (f: (r: string[]) => void): void => [model.head, ...model.rows].forEach(f);
@@ -295,10 +425,6 @@ class TableWidget extends WidgetType {
         { id: "table.copy", label: L.copy, sep: true, pick: () => void navigator.clipboard?.writeText(writeTable(model)).catch(() => undefined) },
         { id: "table.duplicate", label: L.duplicate, pick: () => view.dispatch({ changes: { from: this.from + this.source.length, insert: `\n\n${writeTable(model)}` }, userEvent: "input.table" }) },
       ];
-    };
-    const set = (row: number, col: number, md: string): void => {
-      if (row === 0) model.head[col] = md;
-      else model.rows[row - 1]![col] = md;
     };
     const thead = document.createElement("thead");
     const htr = document.createElement("tr");
@@ -467,13 +593,36 @@ class TableWidget extends WidgetType {
       }, { once: true });
     });
     box.append(grip, colGrip, scroll, addCol, addRow);
-    wrap.append(box);
-    const want = focusNext.get(view);
-    if (want && want.at === this.from) {
-      focusNext.delete(view);
-      queueMicrotask(() => edit(want.row, want.col)); // (once the editor has put the new table in, before the next key)
-    }
-    return wrap;
+    this.dom.append(box);
+  }
+}
+
+const tables = new WeakMap<HTMLElement, TableView>();
+
+class TableWidget extends WidgetType {
+  constructor(readonly source: string, readonly from: number, readonly ctx: LiveContext) {
+    super();
+  }
+  override eq(o: TableWidget): boolean {
+    return o.source === this.source && o.from === this.from;
+  }
+  override ignoreEvent(): boolean {
+    return true;
+  }
+  override toDOM(view: EditorView): HTMLElement {
+    const t = new TableView(view, this.ctx, this.source, this.from);
+    tables.set(t.dom, t);
+    return t.dom;
+  }
+  /** The same table, changed: drawn again in place (the cell being edited keeps its editor). */
+  override updateDOM(dom: HTMLElement): boolean {
+    const t = tables.get(dom);
+    if (!t) return false;
+    t.update(this.source, this.from);
+    return true;
+  }
+  override destroy(dom: HTMLElement): void {
+    tables.get(dom)?.destroy();
   }
 }
 

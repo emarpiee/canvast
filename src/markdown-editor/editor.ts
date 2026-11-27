@@ -1,11 +1,11 @@
 // The Markdown editor: one CodeMirror view for live and source mode, a rendered page for preview mode, a toolbar, and the hooks a host fills in
 // (pictures, links, tags, files, saving). It knows nothing of the app it is in.
 import { autocompletion, type Completion, type CompletionContext, type CompletionResult } from "@codemirror/autocomplete";
-import { defaultKeymap, history, historyKeymap, indentWithTab, redo, redoDepth, undo, undoDepth } from "@codemirror/commands";
+import { defaultKeymap, history, historyKeymap, indentWithTab, redo, undo } from "@codemirror/commands";
 import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
 import { syntaxTree } from "@codemirror/language";
 import { openSearchPanel, search, searchKeymap } from "@codemirror/search";
-import { Compartment, EditorSelection, EditorState, Prec, type Extension } from "@codemirror/state";
+import { Compartment, EditorSelection, EditorState, Prec, Transaction, type Extension } from "@codemirror/state";
 import { EditorView, drawSelection, keymap, placeholder as placeholderExt } from "@codemirror/view";
 import { codeColours, type CodeSpans } from "./code";
 import { COMMANDS, type FormatName } from "./commands";
@@ -17,7 +17,10 @@ import { closePopover, setMenuHost, type MenuHost } from "./popover";
 import { vim } from "@replit/codemirror-vim";
 import { DEFAULT_ICONS, type IconName } from "./icons";
 import { markdownLook } from "./highlight";
-import { livePreview, refresh, type CellEvents } from "./live";
+import { livePreview, refresh, type CellEditor, type CellEvents, type LiveContext } from "./live";
+
+/** The toolbar formats that act on words (so on a table cell's too). */
+const INLINE_FORMATS = new Set(["bold", "italic", "strike", "highlight", "code", "link", "math"]);
 import { selectionBar } from "./selection-bar";
 import { renderMarkdown } from "./render";
 import { cleanHtml } from "./clean";
@@ -243,22 +246,19 @@ export function createMarkdownEditor(opts: EditorOptions): MarkdownEditor {
   opts.parent.append(el);
 
   const liveLayer = new Compartment();
-  const liveExt = (): Extension =>
-    mode === "live"
-      ? livePreview({
-          ...(host.media ? { media: host.media.bind(host) } : {}),
-          ...(host.wikiExists ? { exists: host.wikiExists.bind(host) } : {}),
-          ...(host.renderMath ? { renderMath: host.renderMath.bind(host) } : {}),
-          wrapSelection: opts.wrapSelection !== false,
-          cellEditor: (parent: HTMLElement, text: string, events: CellEvents, at?: { x: number; y: number }) => cellEditor(parent, text, events, at),
-          undo: () => undo(view),
-          redo: () => redo(view),
-          ...(host.renderDiagram ? { renderDiagram: host.renderDiagram.bind(host) } : {}),
-          taskLabel: labels.task, copyLabel: labels.copyCode, copiedLabel: labels.copied, languageLabel: labels.codeLanguage, addRowLabel: labels.addRow, addColumnLabel: labels.addColumn,
-          tableLabel: labels.tableActions, languages: host.languages ?? LANGUAGES, resizeLabel: labels.resize, plainLabel: labels.plainText, detectedLabel: labels.detected,
-          tableWords: { rowAbove: labels.rowAbove, rowBelow: labels.rowBelow, colBefore: labels.colBefore, colAfter: labels.colAfter, rowUp: labels.rowUp, rowDown: labels.rowDown, colLeft: labels.colLeft, colRight: labels.colRight, dupRow: labels.dupRow, dupCol: labels.dupCol, alignLeft: labels.alignLeft, alignCenter: labels.alignCenter, alignRight: labels.alignRight, sortUp: labels.sortUp, sortDown: labels.sortDown, delRow: labels.delRow, delCol: labels.delCol, copy: labels.copyTable, duplicate: labels.duplicateTable },
-        })
-      : [];
+  /** What live mode draws with (the note's and its tables' cells alike). */
+  const liveCtx: LiveContext = {
+    ...(host.media ? { media: host.media.bind(host) } : {}),
+    ...(host.wikiExists ? { exists: host.wikiExists.bind(host) } : {}),
+    ...(host.renderMath ? { renderMath: host.renderMath.bind(host) } : {}),
+    wrapSelection: opts.wrapSelection !== false,
+    cellEditor: (parent: HTMLElement, text: string, events: CellEvents) => cellEditor(parent, text, events),
+    ...(host.renderDiagram ? { renderDiagram: host.renderDiagram.bind(host) } : {}),
+    taskLabel: labels.task, copyLabel: labels.copyCode, copiedLabel: labels.copied, languageLabel: labels.codeLanguage, addRowLabel: labels.addRow, addColumnLabel: labels.addColumn,
+    tableLabel: labels.tableActions, languages: host.languages ?? LANGUAGES, resizeLabel: labels.resize, plainLabel: labels.plainText, detectedLabel: labels.detected,
+    tableWords: { rowAbove: labels.rowAbove, rowBelow: labels.rowBelow, colBefore: labels.colBefore, colAfter: labels.colAfter, rowUp: labels.rowUp, rowDown: labels.rowDown, colLeft: labels.colLeft, colRight: labels.colRight, dupRow: labels.dupRow, dupCol: labels.dupCol, alignLeft: labels.alignLeft, alignCenter: labels.alignCenter, alignRight: labels.alignRight, sortUp: labels.sortUp, sortDown: labels.sortDown, delRow: labels.delRow, delCol: labels.delCol, copy: labels.copyTable, duplicate: labels.duplicateTable },
+  };
+  const liveExt = (): Extension => (mode === "live" ? livePreview(liveCtx) : []);
 
   // `[[` → links, `#` → tags, `/` at a line's start or after a space → blocks.
   const complete = async (cx: CompletionContext): Promise<CompletionResult | null> => {
@@ -381,22 +381,39 @@ export function createMarkdownEditor(opts: EditorOptions): MarkdownEditor {
     { key: "Mod-6", preventDefault: true, run: () => (plain ? false : (setModeBy("preview"), true)) },
   ]);
 
+  /**
+   * How the editor reads, looks and acts: keys, behaviours, the format bar, completion, pastes, links. The note and each table cell it is
+   * editing are built from this one list, so whatever the note does a cell does too; a cell leaves out only what has no meaning on a cell's
+   * one line (its own history, search, folds, the drawing of blocks) and the right-click menu, which is the table's there.
+   */
+  const editorSetup = (cell: boolean): Extension[] => {
+    const out: Extension[] = [
+      drawSelection(),
+      EditorView.theme(CM_THEME),
+      EditorView.lineWrapping,
+      EditorView.contentAttributes.of({ spellcheck: "true", autocorrect: "on", autocapitalize: "sentences" }),
+      appKeys,
+      keymap.of([...(plain ? [] : formatKeys), ...(cell ? [] : searchKeymap), ...historyKeymap, ...defaultKeymap, ...(cell ? [] : [indentWithTab])]),
+      ...behaviorExtensions(on, plain),
+      ...(on("paste-rules") ? [pasteRules(host, plain)] : []),
+      ...(on("link-follow") ? [linkFollow((t) => (host.open ? (host.open(followed(t)), true) : false), () => mode === "live")] : []),
+    ];
+    // shortcut: no Vim keys in a table cell (its Escape and Enter move between cells); give cells Vim's modes if Vim users ask for them.
+    if (opts.vim && !plain && !cell) out.unshift(Prec.highest(vim()));
+    if (!plain) {
+      out.push(markdown({ base: markdownLanguage, extensions: EXTENSIONS, addKeymap: !cell }), markdownLook, selectionBar({ icons, labels: labels as unknown as Record<string, string>, turnInto: !cell }), autocompletion({ override: [complete], icons: false, activateOnTyping: true }));
+      if (host.codeSpans) out.push(codeColours(host.codeSpans));
+    }
+    return out;
+  };
   const extensions: Extension[] = [
     history(),
-    drawSelection(),
-    EditorView.theme(CM_THEME),
-    EditorView.lineWrapping,
     search({ top: true }),
     placeholderExt(labels.placeholder),
-    EditorView.contentAttributes.of({ spellcheck: "true", autocorrect: "on", autocapitalize: "sentences" }),
-    appKeys,
-    keymap.of([...(plain ? [] : formatKeys), ...searchKeymap, ...historyKeymap, ...defaultKeymap, indentWithTab]),
     EditorView.updateListener.of((u) => {
       if (u.docChanged && !silent) opts.onChange?.(u.state.sliceDoc());
     }),
-    ...behaviorExtensions(on, plain),
-    ...(on("paste-rules") ? [pasteRules(host, plain)] : []),
-    ...(on("link-follow") ? [linkFollow((t) => (host.open ? (host.open(followed(t)), true) : false), () => mode === "live")] : []),
+    ...editorSetup(false),
     EditorView.domEventHandlers({
       contextmenu: (e, v) => {
         if (plain) return false;
@@ -410,65 +427,86 @@ export function createMarkdownEditor(opts: EditorOptions): MarkdownEditor {
       },
     }),
   ];
-  if (opts.vim && !plain) extensions.unshift(Prec.highest(vim()));
-  if (!plain) {
-    extensions.push(markdown({ base: markdownLanguage, extensions: EXTENSIONS, addKeymap: true }), markdownLook, folding, selectionBar({ icons, labels: labels as unknown as Record<string, string> }), liveLayer.of(liveExt()), autocompletion({ override: [complete], icons: false, activateOnTyping: true }));
-    if (host.codeSpans) extensions.push(codeColours(host.codeSpans));
-  }
+  if (!plain) extensions.push(folding, liveLayer.of(liveExt()));
 
+  /** The table cell being edited, if any: the toolbar's formats act on it. */
+  let activeCell: EditorView | null = null;
   /**
-   * A table cell's editor: the cell's Markdown on one line in a small editor with the note's reading, look, keys and behaviours (Ctrl+B,
-   * wrapping, brackets, the format bar), so a cell is edited as the note is. Tab and Shift+Tab go to the next or previous cell, Enter down a
-   * row, Escape out of the table; Shift+Enter is a line break (`<br>`); Ctrl+Z with nothing left in the cell undoes the note's last step.
+   * A table cell's editor: a window onto the cell's text in the note. It is built from the note's own setup (above), and every change in it
+   * is written straight into the note at the cell's place, so there is one document and one history: Ctrl+Z in a cell is the note's undo.
+   * Only moving is the table's: Tab and Shift+Tab to the next or previous cell, Enter down a row, Escape out; Shift+Enter a line break.
    */
-  const cellEditor = (parent: HTMLElement, text: string, events: CellEvents, at?: { x: number; y: number }): { close(): string; extend(to: { x: number; y: number }): void } => {
-    let closed = false;
+  const cellEditor = (parent: HTMLElement, text: string, events: CellEvents): CellEditor => {
+    let syncing = false;
     const cellView: EditorView = new EditorView({
       parent,
       state: EditorState.create({
-        doc: text.replace(/<br\s*\/?>/gi, "\n"),
+        doc: text,
         extensions: [
-          history(),
-          drawSelection(),
-          EditorView.lineWrapping,
-          EditorView.theme(CM_THEME),
-          EditorView.theme({ ".cm-content": { padding: "0", maxWidth: "none" }, ".cm-scroller": { padding: "0" } }),
-          markdown({ base: markdownLanguage, extensions: EXTENSIONS, addKeymap: false }),
-          markdownLook,
-          ...behaviorExtensions((id) => on(id) && id !== "list-enter" && id !== "renumber-lists" && id !== "move-lines", false),
-          selectionBar({ icons, labels: labels as unknown as Record<string, string>, turnInto: false }),
-          Prec.high(keymap.of([
+          Prec.highest(keymap.of([
             { key: "Tab", run: () => (events.move("next"), true) },
             { key: "Shift-Tab", run: () => (events.move("prev"), true) },
             { key: "Enter", run: () => (events.move("down"), true) },
-            { key: "Shift-Enter", run: (v) => (v.dispatch(v.state.replaceSelection("\n")), true) },
+            { key: "Shift-Enter", run: (v) => (v.dispatch(v.state.replaceSelection("<br>"), { userEvent: "input" }), true) },
             { key: "Escape", run: () => (events.move("out"), true) },
-            { key: "Mod-z", run: (v) => (undoDepth(v.state) ? undo(v) : events.undo()) },
-            { key: "Mod-y", run: (v) => (redoDepth(v.state) ? redo(v) : events.redo()) },
-            { key: "Mod-Shift-z", run: (v) => (redoDepth(v.state) ? redo(v) : events.redo()) },
-            { key: "Mod-s", preventDefault: true, run: () => (events.blur(), host.save?.(), true) },
+            { key: "Mod-z", preventDefault: true, run: () => (undo(view), true) },
+            { key: "Mod-y", preventDefault: true, run: () => (redo(view), true) },
+            { key: "Mod-Shift-z", preventDefault: true, run: () => (redo(view), true) },
           ])),
-          keymap.of([...formatKeys.filter((k) => !/^Mod-Alt|^Alt-q|^Shift-Mod-k|F10|ContextMenu/.test(k.key)), ...historyKeymap, ...defaultKeymap]),
-          EditorView.domEventHandlers({ blur: () => void setTimeout(() => !closed && !cellView.hasFocus && events.blur()) }),
-          EditorView.contentAttributes.of({ spellcheck: "true" }),
+          ...editorSetup(true),
+          mode === "live" ? livePreview({ ...liveCtx, inline: true }) : [],
+          EditorView.theme({ ".cm-content": { padding: "0", maxWidth: "none" }, ".cm-scroller": { padding: "0" }, "&": { background: "transparent" } }),
+          // (a cell is one line of a table row: a typed or pasted | is written \|, a line break <br>)
+          EditorState.transactionFilter.of((tr) => {
+            if (!tr.docChanged || syncing) return tr;
+            let fix = false;
+            tr.changes.iterChanges((_a, _b, _c, _d, ins) => void (fix ||= /(?<!\\)\||\n/.test(ins.toString())));
+            if (!fix) return tr;
+            const specs: { from: number; to: number; insert: string }[] = [];
+            tr.changes.iterChanges((from, to, _c, _d, ins) => void specs.push({ from, to, insert: ins.toString().replace(/\r?\n/g, "<br>").replace(/(?<!\\)\|/g, "\\|") }));
+            const changes = tr.startState.changes(specs);
+            return { changes, selection: EditorSelection.cursor(changes.mapPos(tr.startState.selection.main.head, 1)), userEvent: tr.annotation(Transaction.userEvent) ?? "input" };
+          }),
+          EditorView.updateListener.of((u) => {
+            if (u.docChanged && !syncing) for (const tr of u.transactions) if (tr.docChanged) events.change(tr.changes, tr.annotation(Transaction.userEvent) ?? "input");
+            if (u.focusChanged) activeCell = u.view.hasFocus ? u.view : activeCell === u.view ? null : activeCell;
+          }),
+          EditorView.domEventHandlers({ blur: () => void setTimeout(() => !cellView.dom.isConnected || cellView.hasFocus || events.blur()) }),
         ],
       }),
     });
-    cellView.focus();
-    const pos = at ? cellView.posAtCoords(at) : null;
-    const anchor = pos ?? cellView.state.doc.length;
-    cellView.dispatch({ selection: { anchor } });
+    let anchor = 0;
     return {
-      /** The words from where the press began to `to` selected (a drag inside the cell). */
+      focus(at) {
+        cellView.focus();
+        const pos = at ? cellView.posAtCoords(at) : null;
+        anchor = pos ?? cellView.state.doc.length;
+        cellView.dispatch({ selection: { anchor } });
+      },
       extend(to) {
         const head = cellView.posAtCoords(to);
         if (head !== null) cellView.dispatch({ selection: { anchor, head } });
       },
-      close() {
-        closed = true;
-        const value = cellView.state.doc.toString();
+      text: () => cellView.state.doc.toString(),
+      refocus: () => cellView.focus(),
+      setText(next) {
+        // (the note changed under the cell, an undo or another view: the smallest change, the cursor kept where it can be)
+        const cur = cellView.state.doc.toString();
+        if (cur === next) return;
+        let a = 0;
+        while (a < cur.length && a < next.length && cur[a] === next[a]) a++;
+        let b = 0;
+        while (b < cur.length - a && b < next.length - a && cur[cur.length - 1 - b] === next[next.length - 1 - b]) b++;
+        syncing = true;
+        try {
+          cellView.dispatch({ changes: { from: a, to: cur.length - b, insert: next.slice(a, next.length - b) } });
+        } finally {
+          syncing = false;
+        }
+      },
+      destroy() {
+        if (activeCell === cellView) activeCell = null;
         cellView.destroy();
-        return value;
       },
     };
   };
@@ -634,6 +672,8 @@ export function createMarkdownEditor(opts: EditorOptions): MarkdownEditor {
     if (name === "save") return host.save?.();
     if (name === "find") return void openSearchPanel(view);
     if (name === "picture") return void pickPicture();
+    // (in a table cell the words' own formats act on the cell; a block's have no place on a cell's line)
+    if (activeCell && INLINE_FORMATS.has(name)) return void (COMMANDS[name as FormatName]?.(activeCell), activeCell.focus());
     COMMANDS[name as FormatName]?.(view);
     view.focus();
   });

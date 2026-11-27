@@ -37,3 +37,16 @@ describe("a sign typed over selected words", () => {
     expect(wrapTyped(EditorState.create({ doc: "x" }), "*"), "nothing selected: typed as usual").toBeNull();
   });
 });
+
+describe("a table row's cells", () => {
+  it("are found where their words are, spaces and escaped pipes kept out, an empty cell a place between its spaces", async () => {
+    const { cellSpans } = await import("../../src/markdown-editor/table");
+    const at = (line: string) => cellSpans(line).map(([a, b]) => line.slice(a, b));
+    expect(at("| Ink | a \\| b |")).toEqual(["Ink", "a \\| b"]);
+    expect(at("| `x|y` |  |")).toEqual(["`x|y`", ""]);
+    expect(cellSpans("|  |")).toEqual([[2, 2]]);
+    expect(cellSpans("||")).toEqual([[1, 1]]);
+    expect(at("> | q | r |")).toEqual(["q", "r"]);
+    expect(at("a | b")).toEqual(["a", "b"]);
+  });
+});

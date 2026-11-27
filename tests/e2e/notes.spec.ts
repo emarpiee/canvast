@@ -140,35 +140,63 @@ test("New note makes a markdown note in the open folder and opens it to write in
   await p.keyboard.type("Paper");
   await p.keyboard.press("Escape");
   await expect.poll(() => text(p)).toContain("| Ink | Paper |");
-  // A bracket typed over a cell's selected words goes round them, as in the note's text.
-  await page(p).locator(".me-table td .me-cell").first().click();
+});
+
+test("a table cell is the note's own words: one selection, the note's keys, its one undo (a sort too), cells selected together", async ({ app }) => {
+  const p = app.page;
+  const FILE = "Above the table.\n\n| Tool | Use |\n| --- | --- |\n| Ink | lines |\n| Brush | washes |\n";
+  await p.getByTestId("view-assets").click();
+  await p.getByTestId("assets-import-input").setInputFiles({ name: "tools.md", mimeType: "text/markdown", buffer: Buffer.from(FILE) });
+  await p.locator('[data-testid="asset-card"][title="tools.md"]').dblclick();
+  const cell = (i: number) => page(p).locator(".me-table td .me-cell").nth(i);
+  // Words selected above the table, then a cell pressed: the note's selection and its bar go, the cell's is the one selection.
+  await page(p).locator(".cm-line", { hasText: "Above the table." }).dblclick();
+  await expect(page(p).locator(".me-selbar:visible")).toHaveCount(1);
+  await cell(0).click();
+  await expect(cell(0).locator(".cm-content")).toBeFocused();
+  await expect(page(p).locator(".me-selbar:visible")).toHaveCount(0);
+  // Typed words are in the note at once (before leaving the cell); the note's keys work in it: Ctrl+B bolds (never the browser's key).
+  await p.keyboard.press("End");
+  await p.keyboard.type(" pen");
+  await expect.poll(() => text(p)).toContain("| Ink pen | lines |");
+  await p.keyboard.press("Shift+Home");
+  await p.keyboard.press("Control+b");
+  await expect.poll(() => text(p)).toContain("| **Ink pen** | lines |");
+  // A pair's sign over selected words goes round them, as in the note.
+  await p.keyboard.press("Tab");
   await p.keyboard.press("Control+a");
   await p.keyboard.type("(");
+  await expect.poll(() => text(p)).toContain("| **Ink pen** | (lines) |");
+  // Ctrl+Z in a cell is the note's undo: the wrap, then the bold, come off.
+  await p.keyboard.press("Control+z");
+  await expect.poll(() => text(p)).toContain("| **Ink pen** | lines |");
+  await p.keyboard.press("Control+z");
+  await expect.poll(() => text(p)).toContain("| Ink pen | lines |");
+  await p.keyboard.press("Control+Shift+z");
+  await expect.poll(() => text(p)).toContain("| **Ink pen** | lines |");
+  // A sort from a cell's menu, undone from a cell.
+  await cell(0).click({ button: "right" });
+  await p.locator(".pop-menu [role=menuitem]", { hasText: "Sort column (A → Z)" }).click();
+  await expect.poll(() => text(p)).toContain("| Brush | washes |\n| **Ink pen** | lines |");
+  await cell(1).click();
+  await p.keyboard.press("Control+z");
+  await expect.poll(() => text(p)).toContain("| **Ink pen** | lines |\n| Brush | washes |");
+  // Cells dragged across are selected together; Delete empties them, Ctrl+Z brings them back.
   await p.keyboard.press("Escape");
-  await expect.poll(() => text(p)).toContain("| (Ink) | Paper |");
-  // A cell is edited as the note is: words dragged over in it are the cell editor's one selection (the note keeps none, so no second bar),
-  // and Ctrl+B bolds them (never the browser's own key).
-  const first = (await page(p).locator(".me-table td .me-cell").first().boundingBox())!;
-  await p.mouse.move(first.x + 1, first.y + first.height / 2);
-  await p.mouse.down();
-  await p.mouse.move(first.x + first.width - 2, first.y + first.height / 2, { steps: 4 });
-  await p.mouse.up();
-  await expect(page(p).locator(".me-table td .me-cell.is-editing .cm-content")).toBeFocused();
-  await expect.poll(() => p.evaluate(() => (getSelection()?.toString() ?? "").length > 0 && !document.querySelector(".me-table .me-cell:not(.is-editing)")?.contains(getSelection()!.anchorNode))).toBe(true);
-  await expect(page(p).locator(".me-selbar:visible")).toHaveCount(1);
-  await p.keyboard.press("Control+a");
-  await p.keyboard.press("Control+b");
-  await p.keyboard.press("Escape");
-  await expect.poll(() => text(p)).toContain("| **(Ink)** | Paper |");
-  // Cells dragged across are selected together; Delete empties them.
-  const a = (await page(p).locator(".me-table td .me-cell").nth(0).boundingBox())!, b = (await page(p).locator(".me-table td .me-cell").nth(1).boundingBox())!;
+  const a = (await cell(2).boundingBox())!, b = (await cell(3).boundingBox())!;
   await p.mouse.move(a.x + 4, a.y + a.height / 2);
   await p.mouse.down();
   await p.mouse.move(b.x + b.width / 2, b.y + b.height / 2, { steps: 5 });
   await p.mouse.up();
   await expect(page(p).locator(".me-table .me-cell-selected")).toHaveCount(2);
   await p.keyboard.press("Delete");
-  await expect.poll(() => text(p)).toContain("| Column 1 | Column 2 |\n| --- | --- |\n|  |  |");
+  await expect.poll(() => text(p)).toContain("| **Ink pen** | lines |\n|  |  |");
+  await p.keyboard.press("Control+z");
+  await expect.poll(() => text(p)).toContain("| Brush | washes |");
+  // Escape leaves the table: the cursor is in the note after it.
+  await cell(0).click();
+  await p.keyboard.press("Escape");
+  await expect(page(p).locator(".cm-content").first()).toBeFocused();
 });
 
 test("a note's properties (YAML, as notes apps write them) are its item's tags, note and fields, both ways", async ({ app }) => {
@@ -1178,13 +1206,8 @@ test("callouts are cards (typed with [! and its list), a heading folds what is u
   await expect(page(p).locator(".me-callout-warning.me-callout-head")).toContainText("Mind");
   // Sort by the first column from a cell's menu.
   await page(p).locator(".me-table td .me-cell").first().click({ button: "right" });
-  await p.locator(".me-pop .me-pop-item", { hasText: "Sort column (A → Z)" }).click();
+  await p.locator(".pop-menu [role=menuitem]", { hasText: "Sort column (A → Z)" }).click();
   await expect.poll(() => text(p)).toContain("| 1 | y |\n| 2 | x |");
-  // The sort is a step of the note's undo, also from a cell (the cell's own typing is undone first).
-  await page(p).locator(".me-table td .me-cell").first().click();
-  await p.keyboard.press("Control+z");
-  await expect.poll(() => text(p)).toContain("| 2 | x |\n| 1 | y |");
-  await p.keyboard.press("Escape");
   // A new callout: `[!` in a quote offers the types.
   await page(p).click();
   await p.keyboard.press("Control+End");
@@ -1224,6 +1247,6 @@ test("the right-click menu highlights in colours; the link popover opens a linke
   await p.keyboard.press("Shift+Home");
   const line = (await page(p).locator(".cm-line", { hasText: "last" }).boundingBox())!;
   await p.mouse.click(line.x + 8, line.y + line.height / 2, { button: "right" });
-  await p.locator(".me-pop .me-pop-item", { hasText: "Highlight: Red" }).click();
+  await p.locator(".pop-menu [role=menuitem]", { hasText: "Highlight: Red" }).click();
   await expect.poll(() => text(p)).toContain('<mark class="hl-red">last</mark>');
 });
