@@ -390,6 +390,7 @@ export function createMarkdownEditor(opts: EditorOptions): MarkdownEditor {
       e.preventDefault();
       toggleTask(view, Number(box.getAttribute("data-task")));
       drawPreview();
+      preview.focus({ preventScroll: true }); // (the box clicked is gone with the page drawn again: the keys stay the note's)
       return;
     }
     const a = t.closest<HTMLElement>("a[href], [data-wiki], img[data-embed], img[data-src]");
@@ -465,7 +466,7 @@ export function createMarkdownEditor(opts: EditorOptions): MarkdownEditor {
     e.preventDefault();
     e.stopPropagation();
     setModeBy("live");
-  });
+  }, true);
   preview.tabIndex = -1;
 
   drawBar();

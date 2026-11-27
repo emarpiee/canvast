@@ -301,7 +301,7 @@ test("a note on a canvas opens in the note panel (a double-click, or Edit note):
   await panel.locator(".panel-head h2").click();
   await expect(heading(p, 1, panel)).toBeVisible();
   const size = (l: Locator) => l.evaluate((e) => parseFloat(getComputedStyle(e).fontSize));
-  expect(await size(heading(p, 2, panel))).toBeGreaterThan(await size(words(p, panel)));
+  expect(await size(heading(p, 2, panel).locator(".me-t-h2").first())).toBeGreaterThan(await size(words(p, panel)));
   await endOf(p, words(p, panel));
   await p.keyboard.type(" More words.");
   await p.keyboard.press("Control+s");
@@ -770,7 +770,7 @@ test("the Note tool (M) makes a note file in the Notes folder, places its card a
   await p.keyboard.press("m");
   await p.mouse.click(420, 260);
   const panel = p.getByTestId("note-panel");
-  await expect(heading(p, 1, panel)).toHaveText(/^Idea \d{4}$/);
+  await expect(heading(p, 1, panel)).toHaveText(/^(# )?Idea \d{4}$/); // (opened to write in: its line may show its mark)
   await expect(panel.locator(".panel-head h2")).toHaveText(/^Idea \d{4}\.md$/);
   await expect.poll(async () => (await objs()).map((o) => o.kind)).toEqual(["image"]);
   // A text on a card (made before notes were files) becomes a note: the same place and stacking, its words in the file.

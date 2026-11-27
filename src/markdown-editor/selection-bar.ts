@@ -31,15 +31,16 @@ function bar(opts: SelectionBarOptions): (view: EditorView) => { dom: HTMLElemen
     };
     const turn = btn("turn", `<span>${opts.labels["turnInto"] ?? "Turn into"}</span>`, opts.labels["turnInto"] ?? "Turn into");
     turn.classList.add("me-selbar-turn");
-    turn.setAttribute("aria-haspopup", "menu");
+    turn.setAttribute("aria-expanded", "false");
+    // (a group of the block buttons the Turn into button shows and hides: the package carries no menu of its own)
     const menu = document.createElement("div");
     menu.className = "me-selbar-menu";
-    menu.setAttribute("role", "menu");
+    menu.setAttribute("role", "group");
+    menu.setAttribute("aria-label", opts.labels["turnInto"] ?? "Turn into");
     menu.hidden = true;
     for (const name of TURN_INTO) {
       const item = btn(name, `${opts.icons[name] ?? ""}<span>${opts.labels[name] ?? name}</span>`, opts.labels[name] ?? name);
       item.className = "me-selbar-item";
-      item.setAttribute("role", "menuitem");
       menu.append(item);
     }
     dom.append(turn, ...INLINE.map((n) => btn(n, opts.icons[n] ?? n, opts.labels[n] ?? n)), menu);
@@ -50,8 +51,9 @@ function bar(opts: SelectionBarOptions): (view: EditorView) => { dom: HTMLElemen
       const b = (e.target as HTMLElement).closest<HTMLElement>("[data-me]");
       if (!b) return;
       const name = b.dataset["me"]!;
-      if (name === "turn") return void (menu.hidden = !menu.hidden);
+      if (name === "turn") return void ((menu.hidden = !menu.hidden), turn.setAttribute("aria-expanded", String(!menu.hidden)));
       menu.hidden = true;
+      turn.setAttribute("aria-expanded", "false");
       COMMANDS[name as FormatName]?.(view);
       view.focus();
     });
