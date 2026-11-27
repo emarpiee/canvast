@@ -11,7 +11,9 @@ import { codeColours, type CodeSpans } from "./code";
 import { COMMANDS, toggleTask, wrapTyped, type FormatName } from "./commands";
 import { pastedMarkdown } from "./html-to-markdown";
 import { DEFAULT_ICONS, type IconName } from "./icons";
+import { markdownLook } from "./highlight";
 import { livePreview, refresh } from "./live";
+import { selectionBar } from "./selection-bar";
 import { renderMarkdown } from "./render";
 import { EXTENSIONS } from "./syntax";
 import { CM_THEME, injectStyles } from "./style";
@@ -80,6 +82,7 @@ export interface EditorLabels {
   heading1: string; heading2: string; heading3: string; paragraph: string;
   bulletList: string; orderedList: string; taskList: string; toggleTask: string; quote: string; codeBlock: string; table: string; rule: string;
   picture: string; find: string; save: string; task: string; placeholder: string; toolbar: string; format: string; insert: string;
+  turnInto: string; copyCode: string; copied: string; codeLanguage: string; addRow: string; addColumn: string;
 }
 
 export const DEFAULT_LABELS: EditorLabels = {
@@ -88,6 +91,7 @@ export const DEFAULT_LABELS: EditorLabels = {
   heading1: "Heading 1", heading2: "Heading 2", heading3: "Heading 3", paragraph: "Text",
   bulletList: "Bulleted list", orderedList: "Numbered list", taskList: "Task list", toggleTask: "Tick task", quote: "Quote", codeBlock: "Code block", table: "Table", rule: "Divider",
   picture: "Picture", find: "Find", save: "Save", task: "Done", placeholder: "Write, or press / for blocks", toolbar: "Formatting", format: "Format", insert: "Insert",
+  turnInto: "Turn into", copyCode: "Copy code", copied: "Copied", codeLanguage: "Code language: click to change it", addRow: "Add a row", addColumn: "Add a column",
 };
 
 export interface EditorOptions {
@@ -179,7 +183,7 @@ export function createMarkdownEditor(opts: EditorOptions): MarkdownEditor {
   opts.parent.append(el);
 
   const liveLayer = new Compartment();
-  const liveExt = (): Extension => (mode === "live" ? livePreview({ ...(host.media ? { media: host.media.bind(host) } : {}), taskLabel: labels.task }) : []);
+  const liveExt = (): Extension => (mode === "live" ? livePreview({ ...(host.media ? { media: host.media.bind(host) } : {}), taskLabel: labels.task, copyLabel: labels.copyCode, copiedLabel: labels.copied, languageLabel: labels.codeLanguage, addRowLabel: labels.addRow, addColumnLabel: labels.addColumn }) : []);
 
   // `[[` → links, `#` → tags, `/` at a line's start or after a space → blocks.
   const complete = async (cx: CompletionContext): Promise<CompletionResult | null> => {
@@ -189,7 +193,7 @@ export function createMarkdownEditor(opts: EditorOptions): MarkdownEditor {
       const list = await host.links();
       return {
         from: wiki.from + open,
-        options: list.map((l): Completion => ({ label: l.label ?? l.target, ...(l.detail ? { detail: l.detail } : {}), apply: (view, _c, from, to) => {
+        options: list.map((l): Completion => ({ label: l.target, displayLabel: l.label ?? l.target, ...(l.detail ? { detail: l.detail } : {}), apply: (view, _c, from, to) => {
           const close = view.state.sliceDoc(to, to + 2) === "]]" ? "" : "]]";
           view.dispatch({ changes: { from, to, insert: `${l.target}${close}` }, selection: { anchor: from + l.target.length + 2 } });
         } })),
@@ -256,7 +260,7 @@ export function createMarkdownEditor(opts: EditorOptions): MarkdownEditor {
     appKeys,
     keymap.of([...(plain ? [] : formatKeys), ...searchKeymap, ...historyKeymap, ...defaultKeymap, indentWithTab]),
     EditorView.updateListener.of((u) => {
-      if (u.docChanged && !silent) opts.onChange?.(u.state.doc.toString());
+      if (u.docChanged && !silent) opts.onChange?.(u.state.sliceDoc());
     }),
     EditorView.inputHandler.of((view, _from, _to, text) => {
       if (opts.wrapSelection === false) return false;
@@ -280,7 +284,7 @@ export function createMarkdownEditor(opts: EditorOptions): MarkdownEditor {
     }),
   ];
   if (!plain) {
-    extensions.push(markdown({ base: markdownLanguage, extensions: EXTENSIONS, addKeymap: true }), liveLayer.of(liveExt()), autocompletion({ override: [complete], icons: false, activateOnTyping: true }));
+    extensions.push(markdown({ base: markdownLanguage, extensions: EXTENSIONS, addKeymap: true }), markdownLook, selectionBar({ icons, labels: labels as unknown as Record<string, string> }), liveLayer.of(liveExt()), autocompletion({ override: [complete], icons: false, activateOnTyping: true }));
     if (host.codeSpans) extensions.push(codeColours(host.codeSpans));
   }
 
@@ -359,7 +363,7 @@ export function createMarkdownEditor(opts: EditorOptions): MarkdownEditor {
 
   // Preview mode: the text drawn as a page. A click on a link follows it; a click on a task's box ticks it in the text.
   const drawPreview = (): void => {
-    page.innerHTML = cleanHtml(renderMarkdown(view.state.doc.toString(), { html: true, taskOffsets: true, taskLabel: labels.task, wikiHref: () => "#" }));
+    page.innerHTML = cleanHtml(renderMarkdown(view.state.sliceDoc(), { html: true, taskOffsets: true, taskLabel: labels.task, wikiHref: () => "#" }));
     for (const img of page.querySelectorAll<HTMLImageElement>("img")) {
       const embed = img.getAttribute("data-embed");
       const link = embed ?? img.getAttribute("src") ?? "";
@@ -454,6 +458,16 @@ export function createMarkdownEditor(opts: EditorOptions): MarkdownEditor {
     if (m !== "preview") view.focus();
   };
 
+  // Ctrl+E from preview mode, where the text (and its keys) are hidden.
+  // view-state: (switches how the note is shown)
+  el.addEventListener("keydown", (e) => {
+    if (mode !== "preview" || plain || e.altKey || e.shiftKey || !(isMac ? e.metaKey : e.ctrlKey) || e.key.toLowerCase() !== "e") return;
+    e.preventDefault();
+    e.stopPropagation();
+    setModeBy("live");
+  });
+  preview.tabIndex = -1;
+
   drawBar();
   applyMode();
 
@@ -461,7 +475,7 @@ export function createMarkdownEditor(opts: EditorOptions): MarkdownEditor {
     el,
     view,
     get value() {
-      return view.state.doc.toString();
+      return view.state.sliceDoc(); // (with the file's own line ends)
     },
     setValue(text, fresh = false) {
       silent = true;

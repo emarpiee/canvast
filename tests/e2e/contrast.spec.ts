@@ -45,7 +45,7 @@ test("code in a note: every colour keeps 4.5:1 on a code block, and inline code 
   await p.getByTestId("view-assets").click();
   await p.getByTestId("assets-import-input").setInputFiles({ name: "code.md", mimeType: "text/markdown", buffer: Buffer.from("```python\ndef f(): pass\n```\n\nSome `code` here\n") });
   await p.locator('[data-testid="asset-card"][title="code.md"]').dblclick();
-  await expect(p.locator(".me-code-block").first()).toBeVisible();
+  await expect(p.locator(".me-code-line").first()).toBeVisible();
   for (const theme of ["light", "dark"] as const) {
     await p.evaluate((t) => window.__canvastDebug.setSetting("ui.theme", t), theme);
     await p.waitForTimeout(100);
@@ -54,7 +54,7 @@ test("code in a note: every colour keeps 4.5:1 on a code block, and inline code 
       const editor = document.querySelector(".me .cm-editor")!;
       editor.querySelector("[data-probe-box]")?.remove();
       const box = document.createElement("div");
-      box.className = "me-code-block";
+      box.className = "cm-line me-code-line me-code-card";
       box.dataset["probeBox"] = "";
       for (const g of ["keyword", "string", "comment", "number", "function", "tag"]) {
         const s = document.createElement("span");
@@ -65,8 +65,8 @@ test("code in a note: every colour keeps 4.5:1 on a code block, and inline code 
       editor.append(box);
     });
     expect(await lowContrast(p, "[data-probe-box]"), theme).toEqual([]);
-    expect(await lowContrast(p, ".me .me-code"), theme).toEqual([]);
-    expect(await lowContrast(p, ".me .cm-line:not(.me-code-block)"), theme).toEqual([]);
+    expect(await lowContrast(p, ".me .me-t-mono"), theme).toEqual([]);
+    expect(await lowContrast(p, ".me .cm-line:not(.me-code-line)"), theme).toEqual([]);
   }
 });
 

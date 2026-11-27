@@ -17,9 +17,10 @@ own that it can change as it likes, made as a package like the colour picker: ea
   the tokens to its own (`.me` in `src/styles.css`) and passes its icons.
 - **The text is the note.** The editor holds the Markdown as written and the file gets exactly that back: no conversion, no "keeps all"
   check, no question about formatting on save. A file's CR LF line ends are kept.
-- **Three modes**: live (marks hidden away from the cursor, pictures, task boxes, dividers and tables drawn in place; marks show only
-  while the editor has the focus, so a note opens as it reads), source (every mark, the code font) and preview (the page, its links
-  followed and its tasks ticked by a click). Settings > Notes > *Notes open in* is the default; each note's toolbar switches (Ctrl+E:
+- **Three modes**: live (from the editor's first focus on, the selection's lines show their marks, and links, wiki links and
+  highlights theirs under the selection; elsewhere pictures, task boxes, dividers, callouts and code cards are drawn, and tables are
+  edited in place as tables), source (every mark, styled as it reads) and preview (the page, its links followed and its tasks ticked
+  by a click). Selected words get a bar (Turn into, the formats). The reveal rules follow common notes apps' live preview. Settings > Notes > *Notes open in* is the default; each note's toolbar switches (Ctrl+E:
   preview and back).
 - **One parser** (`syntax.ts`: CommonMark, GitHub's extras, `[[links]]`, embeds, `#tags`, `==highlights==`) for the editor and the
   renderer (`render.ts`, Markdown to HTML without a DOM), which also draws note cards and previews.

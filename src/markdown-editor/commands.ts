@@ -82,7 +82,9 @@ function lineMark(make: (n: number) => string, same: RegExp): Command {
       const from = line.from + m[1]!.length, to = from + (m[2]?.length ?? 0);
       changes.push({ from, to, insert: allHave ? "" : make(i) });
     });
-    view.dispatch(state.update({ changes, scrollIntoView: true, userEvent: "input.format" }));
+    const set = state.changes(changes);
+    // (the cursor after what went in at a line's start, so typing goes on after the mark)
+    view.dispatch(state.update({ changes: set, selection: state.selection.map(set, 1), scrollIntoView: true, userEvent: "input.format" }));
     return true;
   };
 }

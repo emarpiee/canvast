@@ -119,7 +119,7 @@ test("a markdown note opens in live mode with its library links, saves exactly w
   await expect(p.getByTestId("slide-view")).toBeHidden();
 });
 
-test("New note makes a markdown note in the open folder and opens it to write in; the toolbar's Table puts a table in, drawn once the cursor leaves it", async ({ app }) => {
+test("New note makes a markdown note in the open folder and opens it to write in; the toolbar's Table puts a table in, whose cells are edited in place", async ({ app }) => {
   const p = app.page;
   await p.getByTestId("view-assets").click();
   await p.getByTestId("assets-import-menu").click();
@@ -131,9 +131,15 @@ test("New note makes a markdown note in the open folder and opens it to write in
   await p.keyboard.press("Control+End");
   await note(p).locator('[data-me="table"]').click();
   await expect.poll(() => text(p)).toContain("| Column | Column |\n| --- | --- |");
-  await expect(page(p).locator(".me-table table"), "its Markdown while the cursor is in it").toHaveCount(0);
-  await heading(p).click();
   await expect(page(p).locator(".me-table table th")).toHaveText(["Column", "Column"]);
+  // A cell typed in, Tab to the next: the table's Markdown follows.
+  await page(p).locator(".me-table td").first().click();
+  await p.keyboard.type("Ink");
+  await p.keyboard.press("Tab");
+  await expect(page(p).locator('.me-table td[data-c="1"]').first()).toBeFocused();
+  await p.keyboard.type("Paper");
+  await p.keyboard.press("Escape");
+  await expect.poll(() => text(p)).toContain("| Ink | Paper |");
 });
 
 test("a note's properties (YAML, as notes apps write them) are its item's tags, note and fields, both ways", async ({ app }) => {

@@ -3,6 +3,7 @@
 ## 0.63.19 — canvast's own Markdown editor (2026-11-28)
 
 - **Changed:** notes are written in canvast's own Markdown editor, in place of the rich text editor: live mode shows a note as it reads while you write (its marks only where the cursor is, pictures, task boxes and tables drawn in place), source mode shows the Markdown as written, preview mode draws the page; Settings > Notes > Notes open in sets the default and each note's toolbar switches (Ctrl+E: preview and back). What is saved is exactly what was typed (B37). ([Notes](README.md#notes))
+- **Changed:** in live mode the lines being written show their marks once the note has been clicked into (links, wiki links and highlights only under the cursor); code blocks are cards with their language and a Copy button, `> [!note]` callouts are coloured cards, tables are edited in place (Tab, Enter, add a row or a column), and selected words get a bar with Turn into and the formats. Source mode shows the Markdown styled as it reads. (B37) ([Notes](README.md#notes))
 - **Changed:** a page pasted into a note becomes Markdown (a notes app's front matter, embeds and pictures too); a web address or a `[[link]]` pasted over words makes them the link; pictures pasted, dropped or chosen go on a line of their own. ([Notes](README.md#notes))
 - **Removed:** rich text notes and the editor styles: a `.note.html` file is now a page of the library, not a note. ([Notes](README.md#notes))
 

@@ -8,8 +8,10 @@ A Markdown editor for the web with three modes: **live** (the text shown as it r
 
 | | |
 | --- | --- |
-| Live mode | Headings, emphasis, strikethrough, highlights, code and links show as they read; their marks show on the line or the element the cursor is in. Pictures, embeds, task boxes, dividers and tables are drawn in place; a click on a drawn table puts the cursor in its Markdown |
-| Source mode | The same text in the code font, every mark shown |
+| Live mode | The text reads as a page. Once the editor has been focused, the lines the selection is on show their marks (headings, emphasis, code, quotes, lists, task boxes, pictures' source); links, wiki links and highlights show theirs only under the selection. Elsewhere pictures, embeds, task boxes, dividers, callouts (`> [!note]`) and code cards (language, Copy) are drawn |
+| Tables | Drawn as tables in live mode, their cells edited in place (Tab, Shift+Tab, Enter, Escape), a row or a column added by a button; the cursor never lands in the pipes |
+| Selection bar | Over selected words: Turn into (text, headings, lists, task list, quote, code block), bold, italic, strikethrough, highlight, code, link |
+| Source mode | Every mark shown, the text styled as it reads (heading sizes, emphasis, links, code in the code font) |
 | Preview mode | The page drawn (raw HTML cleaned of scripts, frames and event attributes); a click on a link follows it, a click on a task's box ticks it in the text |
 | Exact text | What is saved is what was typed: nothing is read into another form and written back. A file's CR LF line ends are kept |
 | Toolbar | The modes, the formats (bold, italic, strikethrough, highlight, code, link) and the blocks (headings, lists, tasks, quote, code block, table, divider), the host's Picture, Find and Save |
@@ -81,8 +83,9 @@ CommonMark with GitHub's tables, task lists, strikethrough and bare links, and w
 | | |
 | --- | --- |
 | Math | Not drawn (`$…$` stays as written) |
-| Footnotes, callouts | Written and kept as text; not drawn as such in live or preview mode |
-| Tables | Edited as Markdown text (drawn while the cursor is outside them) |
+| Footnotes | Written and kept as text; not drawn as such |
+| Callouts in preview | Drawn as quotes |
+| Tables | Cells hold inline Markdown on one line; the column alignment is kept, not set from the table |
 | Raw HTML | Kept as written; drawn only in preview mode, cleaned |
 
 ## Files and tests

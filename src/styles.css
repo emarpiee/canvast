@@ -1605,6 +1605,7 @@ button.asset-preview { display: flex; align-items: center; justify-content: cent
   --me-bg: var(--paper); --me-fg: var(--hud-fg); --me-muted: var(--hud-muted); --me-faint: var(--hud-muted); --me-line: var(--hud-border); --me-accent: var(--hud-accent-text);
   --me-code-bg: var(--hud-hover); --me-mark-bg: var(--text-found); --me-mark-fg: inherit; --me-tag-bg: color-mix(in oklch, var(--hud-accent) 14%, transparent); --me-tag-fg: var(--hud-accent-text); --me-select: color-mix(in oklch, var(--hud-accent) 24%, transparent);
   --me-tok-keyword: var(--code-keyword); --me-tok-string: var(--code-string); --me-tok-comment: var(--code-comment); --me-tok-number: var(--code-number); --me-tok-function: var(--code-function); --me-tok-tag: var(--code-tag);
+  --me-blue: var(--code-function); --me-green: var(--hud-success); --me-purple: var(--code-keyword); --me-yellow: var(--code-number); --me-red: var(--hud-danger); --me-grey: var(--hud-muted);
   --me-font: var(--font-ui); --me-mono: var(--font-mono); --me-size: var(--text-md); --me-pad: var(--s-10); --me-gap: var(--s-4); --me-radius: var(--r-sm); --me-btn: var(--ctl); --me-icon: var(--icon-sm);
 }
 .viewer-note .me { --me-size: calc(var(--text-md) * var(--note-zoom, 1)); } /* (the text size and not `zoom` or a transform: the editor measures what it selects unscaled) */
