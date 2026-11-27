@@ -3,6 +3,7 @@
  * list of commands comes from the app (what is possible now: `enabled`), so the palette has no list of its own to keep up to date.
  */
 import { esc } from "./format";
+import { ICONS } from "./icons";
 import type { Command } from "../commands/types";
 import type { CommandRegistry } from "../commands/registry";
 import { findCommands, parseQuery } from "../commands/registry";
@@ -21,7 +22,7 @@ type Row = { kind: "command"; command: Command } | { kind: "filter"; word: strin
 export function mountCommandPalette(
   registry: CommandRegistry,
   /** Another palette over another list (the quick switcher): its own ids, name and prompt. */
-  o: { id: string; label: string; placeholder: string } = { id: "palette", label: "Commands", placeholder: "Type a command (select, zoom, export…); @ narrows it to a kind (@settings, @toolbar, @tool…)" },
+  o: { id: string; label: string; placeholder: string; foot: string } = { id: "palette", label: "Commands", placeholder: "Type a command (select, zoom, export…); @ narrows it to a kind (@settings, @toolbar, @tool…)", foot: "Ctrl+P to go to a canvas or a file" },
 ): { open(): void; close(): void } {
   const root = document.createElement("div");
   root.className = "palette";
@@ -30,8 +31,9 @@ export function mountCommandPalette(
   root.setAttribute("aria-modal", "true");
   root.setAttribute("aria-label", o.label);
   root.hidden = true;
-  root.innerHTML = `<input class="palette-input" type="text" role="combobox" aria-expanded="true" aria-controls="${o.id}-list" aria-autocomplete="list" placeholder="${o.placeholder}" autocomplete="off" spellcheck="false" aria-label="Command">
-    <ul class="palette-list" id="${o.id}-list" role="listbox" aria-label="${o.label}"></ul>`;
+  root.innerHTML = `<div class="palette-field">${ICONS.findCommand}<input class="palette-input" type="text" role="combobox" aria-expanded="true" aria-controls="${o.id}-list" aria-autocomplete="list" placeholder="${o.placeholder}" autocomplete="off" spellcheck="false" aria-label="Command"></div>
+    <ul class="palette-list" id="${o.id}-list" role="listbox" aria-label="${o.label}"></ul>
+    <div class="palette-foot" aria-hidden="true"><span><kbd>↑</kbd><kbd>↓</kbd> to move</span><span><kbd>↵</kbd> to run</span><span><kbd>Esc</kbd> to close</span><span>${esc(o.foot)}</span></div>`;
   document.body.appendChild(root);
   const input = root.querySelector<HTMLInputElement>(".palette-input")!;
   const list = root.querySelector<HTMLUListElement>(".palette-list")!;

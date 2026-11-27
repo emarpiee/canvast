@@ -992,7 +992,16 @@ dialog.confirm .secret-field .prompt-input { padding-right: calc(var(--icon-xl) 
 .palette-list li.is-active { background: var(--hud-hover); }
 .palette-group { min-width: 5.5rem; color: var(--hud-muted); font: var(--font-meta); }
 .palette-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.palette-list kbd { color: var(--hud-muted); font: var(--font-meta); }
+.palette-list kbd, .palette-foot kbd { padding: 0 var(--s-2); border: 1px solid var(--hud-border); border-radius: var(--r-sm); color: var(--hud-muted); font: var(--font-meta); }
+/* The palette's look (B39): a prompt mark before the box, "Group: Title" rows, key hints at its foot, the workspace dimmed behind it */
+.palette { top: 12vh; width: min(37rem, calc(100vw - var(--sp-8))); box-shadow: var(--hud-lift), 0 0 0 100vmax color-mix(in oklch, var(--theme-bg) 45%, transparent); }
+.palette-field { display: flex; align-items: center; gap: var(--s-6); padding-left: var(--s-8); border-bottom: 1px solid var(--hud-border); color: var(--hud-muted); }
+.palette-field > svg { flex: none; width: var(--icon-md); height: var(--icon-md); }
+.palette-field > .palette-input { flex: 1; min-width: 0; border: 0; }
+.palette-group { min-width: 0; }
+.palette-group::after { content: ":"; }
+.palette-foot { display: flex; flex-wrap: wrap; gap: var(--s-4) var(--s-10); padding: var(--s-4) var(--s-8); border-top: 1px solid var(--hud-border); color: var(--hud-muted); font: var(--font-meta); }
+.palette-foot kbd { margin-right: var(--s-1); }
 .palette-list li.palette-empty { color: var(--hud-muted); cursor: default; }
 .tour-caption { position: fixed; left: calc(var(--shell-l) + (100vw - var(--shell-l) - var(--shell-r)) / 2); bottom: var(--s-12); transform: translateX(-50%); z-index: var(--z-edge); display: flex; align-items: center; gap: var(--s-6); padding: var(--s-4) var(--s-6); background: var(--hud-bg); border: 1px solid var(--hud-border); border-radius: var(--r-lg); box-shadow: var(--hud-lift); color: var(--hud-fg); font: var(--font-value); }
 .tour-caption[hidden] { display: none; }

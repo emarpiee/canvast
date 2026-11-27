@@ -3254,7 +3254,7 @@ async function start(): Promise<void> {
     for (const b of bookmarkList.items) out.push(row(`go.bookmark.${b.id}`, "bookmark", b.name, "A bookmark of this canvas", () => void pressCommand("bookmark.go", { bookmark: b.id })));
     return out;
   });
-  const switcher = mountCommandPalette(places, { id: "quick-switcher", label: "Go to", placeholder: "Go to a canvas, a file or a bookmark; @ narrows it (@canvas, @note, @bookmark…)" });
+  const switcher = mountCommandPalette(places, { id: "quick-switcher", label: "Go to", placeholder: "Go to a canvas, a file or a bookmark; @ narrows it (@canvas, @note, @bookmark…)", foot: "Ctrl+K for the commands" });
   commands.setProvider("switcher", () => [
     { id: "find.switcher", group: "Find", kind: "find", title: "Quick switcher", hint: "Go to a canvas, a file or a bookmark", risk: "read", words: "go open switch jump", why: () => null, exec: () => (switcher.open(), { ok: true }) },
   ]);
