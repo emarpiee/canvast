@@ -89,6 +89,7 @@ export function mountTabs(strip: HTMLElement, head: HTMLElement, deps: TabsDeps)
       <button type="button" class="layer-btn is-forward" data-tabs="forward" data-testid="tab-forward" aria-label="Forward" title="Forward"${t.at < t.history.length - 1 ? "" : " disabled"}>${ICONS.arrowLeft}</button>
       <nav class="view-path" aria-label="Where this is" data-testid="view-path">${d.path.map((p, i) => `<span class="view-crumb${i === d.path.length - 1 ? " is-here" : ""}">${esc(p)}</span>`).join(`<span class="view-sep" aria-hidden="true">/</span>`)}</nav>
       ${placeOf(t).kind === "file" || placeOf(t).kind === "library" ? `<button type="button" class="layer-btn view-split" data-command="tab.split" data-testid="view-split" aria-label="Open beside the canvas" title="Open beside the canvas (a split)">${ICONS.columns2}</button>` : ""}
+      ${placeOf(t).kind === "canvas" ? `<button type="button" class="layer-btn view-bookmark" data-command="bookmark.add" data-testid="view-bookmark" aria-label="Bookmark this view" title="Bookmark this view">${ICONS.bookmark}</button>` : ""}
       ${placeOf(t).kind === "canvas" ? `<button type="button" class="layer-btn view-more" data-tabs="menu" data-testid="view-more" aria-haspopup="menu" aria-expanded="false" aria-label="More for this view" title="More: views, pattern, background, information, names, Zen">${ICONS.ellipsis}</button>` : ""}`;
   };
 
@@ -172,7 +173,7 @@ export function mountTabs(strip: HTMLElement, head: HTMLElement, deps: TabsDeps)
     },
   };
 
-  // commands: tab.new, tab.close, tab.split, layout.leftSidebar, layout.rightSidebar; choosing a tab, Back and Forward are view state (where the tab is)
+  // commands: tab.new, tab.close, tab.split, bookmark.add, layout.leftSidebar, layout.rightSidebar; choosing a tab, Back and Forward are view state (where the tab is)
   const onClick = (e: MouseEvent): void => {
     const t = e.target as HTMLElement;
     const close = t.closest<HTMLElement>("[data-tab-close]")?.dataset["tabClose"];
@@ -186,6 +187,7 @@ export function mountTabs(strip: HTMLElement, head: HTMLElement, deps: TabsDeps)
     else if (what === "back") api.back(); // view-state: (the tab's own history)
     else if (what === "forward") api.forward(); // view-state: (the tab's own history)
     else if (t.closest("[data-command='tab.split']")) void pressCommand("tab.split");
+    else if (t.closest("[data-command='bookmark.add']")) void pressCommand("bookmark.add");
     else if (what === "menu") deps.openMenu(api.active, t.closest<HTMLElement>("[data-tabs]")!); // (each row of the menu runs its command)
   };
   // commands: tab.new, tab.close, layout.leftSidebar, layout.rightSidebar (through onClick)

@@ -3624,6 +3624,36 @@ button.archive-crumb:hover { background: var(--hud-hover); color: var(--hud-fg);
 .sb-tab[aria-selected="true"] { color: var(--hud-fg); background: var(--row-active); }
 .sb-tab svg { width: var(--icon-md); height: var(--icon-md); }
 .sb-body { flex: 1; min-height: 0; overflow-y: auto; }
+/* The left sidebar's panes in the reference's order, whatever order they are made in (B39) */
+.sb-tab[data-pane="files"] { order: 1; } .sb-tab[data-pane="library"] { order: 2; } .sb-tab[data-pane="search"] { order: 3; } .sb-tab[data-pane="bookmarks"] { order: 4; }
+/* The Search pane (B39): its box, how many results, the results under their place */
+.search-pane-box { display: flex; align-items: center; gap: var(--s-4); margin: var(--s-4) var(--s-4) 0; padding: 0 var(--s-4); height: var(--field-h); border: 1px solid var(--hud-border); border-radius: var(--r-sm); color: var(--hud-muted); }
+.search-pane-box:focus-within { border-color: var(--hud-accent); }
+.search-pane-icon > svg { width: var(--icon-md); height: var(--icon-md); }
+.search-pane-input { flex: 1; min-width: 0; border: 0; background: none; color: var(--hud-fg); font: var(--font-control); }
+.search-pane-input:focus-visible { outline: none; }
+.search-pane-count { margin: var(--s-2) var(--s-6); color: var(--hud-muted); font: var(--font-meta); }
+.search-pane-count:empty { display: none; }
+.search-pane-group .side-item { cursor: default; font-weight: var(--weight-semibold); }
+.search-pane-row { padding-left: var(--tree-indent); }
+.search-pane-row mark { background: none; color: var(--hud-accent-text); }
+/* The Properties pane (B39): the selection's card, as the Library's details: title, kind and size, picture, Show in Library, its properties */
+.sb-tab[data-pane="properties"] { order: -1; }
+.props-pane { display: flex; flex-direction: column; gap: var(--s-4); padding: var(--s-8); }
+.props-pane-title { display: flex; align-items: center; gap: var(--s-4); margin: 0; overflow: hidden; color: var(--hud-fg); font: var(--weight-semibold) var(--text-lg)/1.3 var(--font-ui); text-overflow: ellipsis; white-space: nowrap; }
+.props-pane-sub, .props-pane-empty { margin: 0; color: var(--hud-muted); font: var(--font-meta); }
+.props-pane-picture { width: 100%; max-height: 220px; object-fit: contain; border-radius: var(--r-sm); background: var(--card); }
+.props-pane-actions { display: flex; gap: var(--s-4); }
+.props-pane-h { margin: var(--s-6) 0 0; color: var(--hud-muted); font: var(--weight-semibold) var(--text-sm) var(--font-ui); }
+.props-pane-row { display: grid; grid-template-columns: 40% 1fr; gap: var(--s-4); align-items: start; font: var(--font-control); }
+.props-pane-key { display: flex; align-items: center; gap: var(--s-2); min-width: 0; color: var(--hud-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.props-pane-key > svg { flex: none; width: var(--icon-sm); height: var(--icon-sm); }
+.props-pane-value { min-width: 0; overflow-wrap: anywhere; color: var(--hud-fg); }
+.props-pane-tags { display: flex; flex-wrap: wrap; gap: var(--s-2); }
+.props-pane-tag { padding: 0 var(--s-4); border-radius: var(--r-pill); background: var(--accent-wash); color: var(--hud-accent-text); font: var(--font-meta); }
+.props-pane-list { display: grid; gap: var(--s-2); margin: 0; padding: 0; list-style: none; }
+.props-pane-item { display: flex; align-items: center; gap: var(--s-4); overflow: hidden; color: var(--hud-fg); font: var(--font-control); white-space: nowrap; }
+.props-pane-item > svg { flex: none; width: var(--icon-md); height: var(--icon-md); color: var(--hud-muted); }
 /* A sidebar's width grip (the Library's column grip, at the sidebar's inner edge): its hit area goes out over the view, away from the sidebar's scrollbar */
 @media (min-width: 901px) {
   .sidebar > .sb-grip { position: absolute; top: 0; bottom: 0; margin: 0; z-index: 1; }

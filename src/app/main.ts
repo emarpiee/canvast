@@ -163,6 +163,8 @@ import { mountRibbon } from "../ui/ribbon";
 import { mountSidebar } from "../ui/sidebar";
 import { mountFilesPane } from "../ui/files-pane";
 import { mountTabs } from "../ui/workspace-tabs";
+import { mountSearchPane } from "../ui/search-pane";
+import { mountPropertiesPane } from "../ui/properties-pane";
 import type { Place } from "../ui/workspace-tabs";
 import { mountStartPage } from "../ui/start-page";
 import { mountViewSwitch } from "../ui/view-switch";
@@ -2328,6 +2330,15 @@ async function start(): Promise<void> {
     classWhen(document.body, "no-readout", () => !!canvasReadout.hidden, [canvasReadout], ["hidden"]); // (the views then reach the bottom)
   }
   sidebarLeft.add({ id: "files", title: "Files", icon: ICONS.files, mount: (body) => mountFilesPane(body, { session, foot: sidebarLeft.foot }) });
+  // The Search pane (B39): the open canvas and the Library in one box
+  sidebarLeft.add({
+    id: "search", title: "Search", icon: ICONS.search,
+    mount: (body) => void mountSearchPane(body, {
+      canvas: () => ({ name: session.tree?.boards.flatMap((b) => b.canvases).find((c) => c.id === session.current?.canvasId)?.name ?? "This canvas", objects: doc.ordered() }),
+      names: assetNames.map,
+      openFile: (hash) => (viewKindNamed(assetNames.map.get(hash) ?? "") ? void notePanel.open(hash) : void pressCommand("library.reveal", { hashes: [hash] })),
+    }),
+  });
   // The panels as panes (B39): Bookmarks on the left, the canvas's tools on the right. A pane shown in an open sidebar is its panel open
   // (`editor.<id>Open`), and a panel opened another way (its command, the Actions bar) shows its pane and opens the sidebar.
   type PanelId = "adjust" | "layers" | "tags" | "styles" | "pattern" | "bookmarks";
@@ -2349,6 +2360,22 @@ async function start(): Promise<void> {
     for (const p of PANELS) if (editor[openFlag(p.id)] !== paneShows(p)) (editor[openFlag(p.id)] = paneShows(p)), (changed = true);
     if (changed) (syncing = true), editor.changed(), (syncing = false);
   };
+  // The Properties pane (B39), first on the right: what is selected on the canvas, as the Library's details say it
+  sidebarRight.add({
+    id: "properties", title: "Properties", icon: ICONS.slidersHorizontal,
+    mount: (body) => mountPropertiesPane(body, {
+      canvas: () => ({
+        name: session.tree?.boards.flatMap((b) => b.canvases).find((c) => c.id === session.current?.canvasId)?.name ?? "This canvas",
+        count: doc.size,
+        selected: [...editor.selection].flatMap((id) => doc.get(id) ?? []),
+      }),
+      names: assetNames.map,
+      entry: async (hash) => session.catalog?.entry(hash),
+      thumb: async (hash) => (await session.catalog?.thumb(hash))?.blob,
+      locked: (hash) => assets.isLocked(hash),
+      subscribe: (fn) => (editor.subscribe(fn), session.subscribe(fn)),
+    }),
+  });
   for (const p of PANELS) barOf(p).bar.add({ id: p.id, title: p.title, icon: p.icon, mount: (body) => body.append(panelEl(`${p.id}-panel`)) });
   settings.subscribe((key) => (key === "ui.sidebarLeft" || key === "ui.sidebarRight" || key === "ui.paneLeft" || key === "ui.paneRight") && flagsFromPanes());
   // (a panel opened or closed elsewhere: its pane and its sidebar follow)

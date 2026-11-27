@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.63.39 — Properties and Search panes, the bookmark button (2026-11-27)
+
+- **Added:** the Properties pane, first in the right sidebar: what is selected on the canvas as the Library's details say it (picture, name, kind and size, Show in Library, tags, fields, note), or the canvas itself; a locked hidden item shows only as one (B39). ([The interface](README.md#the-interface))
+- **Added:** the Search pane in the left sidebar: the open canvas and the Library in one box, results under their place (B39). ([The interface](README.md#the-interface))
+- **Added:** a bookmark button in a canvas's view header (B39). ([The interface](README.md#the-interface))
+
 ## 0.63.38 — Settings closes with ×; the app starts again (2026-11-27)
 
 - **Changed:** Settings closes with a **×** at its top right (or Esc), in place of *Back to canvas* (B39). ([Settings](README.md#settings))
