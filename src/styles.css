@@ -3695,6 +3695,7 @@ button.archive-crumb:hover { background: var(--hud-hover); color: var(--hud-fg);
 :root[data-split="on"] :is(.tabbar-split, .viewhead-split) { left: auto; right: var(--side-r); width: var(--split-w); border-left: 1px solid var(--hud-border); }
 :root[data-split="on"] .layers-panel.note-tab { left: auto; right: var(--side-r); width: var(--split-w); border-left: 1px solid var(--hud-border); }
 .tabbar-split :is(.tab-new, .tab-side), .viewhead-split .view-split { display: none; }
+:root[data-split-drop="on"] #canvas-host::after, :root[data-split-drop="on"] .layers-panel.note-tab::after, :root[data-split-drop="on"] .library-view::after { content: ""; position: absolute; z-index: var(--z-edge); top: 0; bottom: 0; right: 0; width: 50%; background: var(--accent-wash); pointer-events: none; }
 :root[data-split-view="library"] .library-view { left: auto; right: var(--side-r); width: var(--split-w); border-left: 1px solid var(--hud-border); }
 @media (max-width: 900px) { :root[data-split="on"] { --split-w: 0px; --shell-r: var(--side-r); } :root[data-split="on"] .layers-panel.note-tab { left: var(--shell-l); width: auto; } }
 /* The canvas view's small stack (B39): zoom in and out, fit the selection, fit all, home; the rest are in the view header's ⋯ menu */

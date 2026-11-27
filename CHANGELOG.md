@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.63.33 — Drag a tab beside the canvas (2026-11-27)
+
+- **Added:** a file's or the Library's tab dragged down onto the right half of the view opens beside the canvas; the half lights while it is over it (B39). ([The interface](README.md#the-interface))
+
 ## 0.63.32 — The Library beside the canvas (2026-11-27)
 
 - **Added:** the Library opens beside the canvas too (*Open beside the canvas* in its view header), in the split's own tabs with the files (B39). ([The interface](README.md#the-interface))

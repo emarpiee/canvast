@@ -197,6 +197,34 @@ export function mountTabs(strip: HTMLElement, head: HTMLElement, deps: TabsDeps)
     const tab = (e.target as HTMLElement).closest<HTMLElement>("[data-tab]")?.dataset["tab"];
     if (e.button === 1 && tab) void pressCommand("tab.close", { tab });
   });
+  // A tab dragged down onto the right half of the view opens beside the canvas (a split: a file's or the Library's tab); the half lights while
+  // the tab is over it.
+  // commands: tab.split (a tab dropped on the right half of the view)
+  strip.addEventListener("pointerdown", (e) => {
+    const key = (e.target as HTMLElement).closest<HTMLElement>("[data-tab]")?.dataset["tab"];
+    if (!key || e.button !== 0 || strip.classList.contains("tabbar-split")) return; // (the split's own tabs are beside the canvas already)
+    const place = tabs.find((t) => t.key === key);
+    if (!place || !["file", "library"].includes(placeOf(place).kind)) return;
+    const root = document.documentElement;
+    const over = (ev: PointerEvent): boolean => {
+      const box = strip.getBoundingClientRect();
+      return ev.clientY > box.bottom + 40 && ev.clientX > box.left + box.width / 2 && ev.clientX < box.right;
+    };
+    const move = (ev: PointerEvent): void => {
+      if (over(ev)) root.dataset["splitDrop"] = "on";
+      else delete root.dataset["splitDrop"];
+    };
+    const up = (ev: PointerEvent): void => {
+      removeEventListener("pointermove", move);
+      removeEventListener("pointerup", up);
+      delete root.dataset["splitDrop"];
+      if (!over(ev)) return;
+      api.activate(key);
+      void pressCommand("tab.split");
+    };
+    addEventListener("pointermove", move);
+    addEventListener("pointerup", up);
+  });
   // commands: tab.new (a double click on the strip's empty room)
   strip.addEventListener("dblclick", (e) => {
     if (!(e.target as HTMLElement).closest("button")) void pressCommand("tab.new");
