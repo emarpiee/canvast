@@ -161,6 +161,7 @@ import { translate } from "../doc/edit-ops";
 import { openExportDialog, exportAgain, setExportChoices, exportedBefore, exportPresetSummary, type ExportPreset } from "../ui/export-dialog";
 import { mountRibbon } from "../ui/ribbon";
 import { mountSidebar } from "../ui/sidebar";
+import { mountFilesPane } from "../ui/files-pane";
 import { mountViewSwitch } from "../ui/view-switch";
 import { followFrameSetting, mountWindowRow } from "../ui/window-frame";
 import { followScrolling } from "../ui/scrollbars";
@@ -2277,7 +2278,8 @@ async function start(): Promise<void> {
     statusbar.append(canvasReadout);
     classWhen(statusbar, "is-empty", () => !!canvasReadout.hidden, [canvasReadout], ["hidden"]);
   }
-  void sidebarLeft, void sidebarRight;
+  sidebarLeft.add({ id: "files", title: "Files", icon: ICONS.files, mount: (body) => mountFilesPane(body, { session, foot: sidebarLeft.foot }) });
+  void sidebarRight;
   const markTab = mountViewSwitch(document.getElementById("view-switch")!, setView, PHOTOCRAFT_FEATURES.entry.view && photoCraft.available);
   // (the Pins window's button is the ribbon's, with its handler)
   const pinsButton = document.querySelector<HTMLElement>('[data-testid="reference-open"]');

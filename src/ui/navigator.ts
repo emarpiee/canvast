@@ -10,6 +10,7 @@ import { ARCHIVE_ACCEPT, runExport, runExportFiles, runImport } from "./archive-
 import { ICONS } from "./icons";
 import type { AppView } from "./view-switch";
 import { canSwitchWorkspace, openWorkspaceSwitcher } from "./workspace-switch";
+import { NAV_COMMAND, navOptions, workspaceRowMenu } from "./workspace-menus";
 import { commands, pressCommand } from "../commands/registry";
 import { REASON } from "../commands/types";
 import type { Command, Options, OptionSpec, Risk, RunContext } from "../commands/types";
@@ -58,26 +59,8 @@ export function mountNavigator(root: HTMLElement, session: Session, openCanvasVi
         ? `<input class="nav-rename" data-rename="${kind}" data-id="${id}" value="${esc(name)}" aria-label="New ${kind} name">`
         : extra;
     /** The actions of a board or canvas, opened by its More button in the shared menu. */
-    const boards = tree.boards;
-    const actions = (kind: "board" | "canvas", id: string, name: string, canDelete: boolean, why: string, first: boolean, last: boolean, here: string): string => {
-      const row = (action: string, label: string, hint: string, icon: string, aria: string, more: Partial<MenuItem> = {}, attrs: Record<string, string> = {}): MenuItem => ({
-        label, hint, icon, aria, ...more, command: NAV_COMMAND[action]?.[0] ?? "canvas.renameId", run: () => pressAs(menu, { "data-action": action, "data-id": id, ...attrs }), // (as the row's button: its command)
-      });
-      rowMenus.set(`${kind}:${id}`, {
-        label: `Actions for ${kind} ${name}`,
-        items: [
-          row(`rename-${kind}`, "Rename", "Give it a new name", ICONS.textCursorInput, `Rename ${kind} ${name}`),
-          row(`duplicate-${kind}`, "Duplicate", "Make a copy", ICONS.copy, `Duplicate ${kind} ${name}`),
-          row(`up-${kind}`, "Move up", "Earlier in the list", ICONS.arrowUp, `Move ${kind} ${name} up`, { disabled: first }),
-          row(`down-${kind}`, "Move down", "Later in the list", ICONS.arrowDown, `Move ${kind} ${name} down`, { disabled: last }),
-          ...(kind === "canvas" && boards.length > 1
-            ? boards.filter((b) => b.board.id !== here).map((b) => row("to-board", `Move to ${b.board.name}`, "Another board", ICONS.squareStack, `Move canvas ${name} to board ${b.board.name}`, {}, { "data-board": b.board.id }))
-            : []),
-          row(`export-${kind}`, "Export to a file", "A file to keep or share", ICONS.fileOutput, `Export ${kind} ${name}`),
-          row(`export-files-${kind}`, "Export files as ZIP", "The files it uses", ICONS.fileArchive, `Export the files of ${kind} ${name} as a ZIP`),
-          row(`delete-${kind}`, "Delete", canDelete ? "Remove it" : why, ICONS.trash2, `Delete ${kind} ${name}`, { danger: true, disabled: !canDelete }),
-        ],
-      });
+    const actions = (kind: "board" | "canvas", id: string, name: string): string => {
+      rowMenus.set(`${kind}:${id}`, workspaceRowMenu(tree, kind, id, (action, attrs) => pressAs(menu, { "data-action": action, "data-id": id, ...attrs })));
       return `<button type="button" class="nav-more" data-action="more" data-kind="${kind}" data-id="${id}" aria-haspopup="menu" aria-expanded="false"
           aria-label="More actions for ${kind} ${esc(name)}" title="More: rename, export, delete">${ICONS.ellipsis}</button>`;
     };
@@ -90,7 +73,7 @@ export function mountNavigator(root: HTMLElement, session: Session, openCanvasVi
             board.id,
             board.name,
             `<span class="nav-board-icon" title="A board is a group of canvases">${ICONS.squareStack}</span><span class="nav-board-name">${esc(board.name)}</span><span class="nav-board-n">${canvases.length} ${canvases.length === 1 ? "canvas" : "canvases"}</span>
-             ${actions("board", board.id, board.name, tree.boards.length > 1, "A workspace keeps one board", tree.boards[0]!.board.id === board.id, tree.boards[tree.boards.length - 1]!.board.id === board.id, board.id)}`,
+             ${actions("board", board.id, board.name)}`,
           );
           const items = canvases
             .map((c) => {
@@ -100,7 +83,7 @@ export function mountNavigator(root: HTMLElement, session: Session, openCanvasVi
                 c.id,
                 c.name,
                 `<button type="button" role="menuitemradio" aria-checked="${active}" class="nav-canvas${active ? " is-active" : ""}" data-action="open" data-id="${c.id}"><span class="nav-name">${esc(c.name)}</span><span class="nav-count">${c.objectCount === 0 ? "empty" : `${c.objectCount} object${c.objectCount === 1 ? "" : "s"}`}</span></button>
-                 ${actions("canvas", c.id, c.name, canvases.length > 1, "A board keeps one canvas", canvases[0]!.id === c.id, canvases[canvases.length - 1]!.id === c.id, board.id)}`,
+                 ${actions("canvas", c.id, c.name)}`,
               )}</li>`;
             })
             .join("");
@@ -199,18 +182,10 @@ export function mountNavigator(root: HTMLElement, session: Session, openCanvasVi
     const cmd = NAV_COMMAND[action];
     if (!cmd) return;
     if (!["up-canvas", "down-canvas", "up-board", "down-board"].includes(action)) setOpen(false);
-    pressCommand(cmd[0], { ...(cmd[1] ? {} : { id }), ...(action.startsWith("up-") ? { by: -1 } : action.startsWith("down-") ? { by: 1 } : {}), ...(action === "to-board" ? { board: b.dataset["board"] ?? "" } : {}) });
+    pressCommand(cmd[0], navOptions(action, id, { "data-board": b.dataset["board"] ?? "" }));
   });
 
   // The boards' and canvases' commands (ADR 0205): the navigator's rows and menus run them, as the palette, a macro and an outside caller do.
-  /** Navigator action → its command, and whether it takes no id. */
-  const NAV_COMMAND: Readonly<Record<string, readonly [string, boolean?]>> = {
-    open: ["canvas.openId"], "new-board": ["workspace.newBoard", true], "new-canvas": ["canvas.newIn"], "export-workspace": ["workspace.backup", true],
-    "export-files-workspace": ["workspace.exportFiles", true], "export-files-board": ["board.exportFiles"], "export-files-canvas": ["canvas.exportFiles"],
-    "export-board": ["board.export"], "export-canvas": ["canvas.export"], "duplicate-canvas": ["canvas.duplicate"], "duplicate-board": ["board.duplicate"],
-    "up-canvas": ["canvas.moveBy"], "down-canvas": ["canvas.moveBy"], "up-board": ["board.moveBy"], "down-board": ["board.moveBy"], "to-board": ["canvas.moveTo"],
-    "delete-canvas": ["canvas.delete"], "delete-board": ["board.delete"],
-  };
   const ID: OptionSpec = { name: "id", type: "id", doc: "the canvas or board", required: true };
   const boardOf = (canvasId: string) => session.tree?.boards.find((bd) => bd.canvases.some((c) => c.id === canvasId));
   const hasCanvas = (o: Options): string | null => (boardOf(String(o["id"])) ? null : `There is no canvas "${String(o["id"])}".`);

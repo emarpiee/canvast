@@ -2374,6 +2374,7 @@ Open the panels from the right edge: they dock beside the column of their button
 | Part | Where | What it does |
 | --- | --- | --- |
 | **Ribbon** | Left edge | What is the app's: the Library, a new canvas, a new note, the command palette and the Pins window at the top; the shortcuts and **Settings** at the bottom |
+| **Files** | The left sidebar's first pane | The workspace's boards and their canvases as a tree: a click opens a canvas, a board folds, each row's ⋯ menu renames, duplicates, moves, exports or deletes it (a double-click renames too). Its foot is the workspace: rename it, back it up, export its files, import, or switch workspace |
 | **Sidebars** | Left and right of the view | Each holds panes, a tab for each at its top, and hides from its button (or *Left sidebar*, *Right sidebar* in the palette). Whether each shows, and which pane, is kept on this device; a narrow window keeps the whole width for the view |
 | **Status bar** | Bottom right | The zoom (click to type one), where the view is, whether the work is saved, and the counts: as wide as what it says |
 | **View buttons** | Top left | Three sets apart: **Library**; the canvas (its icon goes to it, its name opens the board and canvas menu); **PhotoCraft** (its tab, and its **×** while it runs). **Settings** is the gear at the bottom of the ribbon |

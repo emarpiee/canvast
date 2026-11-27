@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.63.22 — The Files pane (2026-11-27)
+
+- **Added:** the Files pane in the left sidebar (B39): the boards and their canvases as a tree; a click opens a canvas, a board folds, each row's ⋯ menu has the board and canvas actions, and its foot is the workspace (rename, back up, export files, import, switch). ([The interface](README.md#the-interface))
+- **Fixed before release:** renaming a board from its menu ran the canvas rename.
+
+### For developers
+
+- `ui/files-pane.ts`; the board and canvas menu and the action-to-command map are one module, `ui/workspace-menus.ts`, used by the Files pane and the old switcher.
+
 ## 0.63.21 — The workspace frame: ribbon, sidebars, status bar (2026-11-27)
 
 - **Added:** the workspace frame (B39): a ribbon at the left edge (Library, new canvas, new note, the command palette, Pins; the shortcuts and Settings at the bottom), a sidebar on each side that holds panes and hides from its button or the palette (kept per device), and a status bar at the bottom right with the zoom, position and save state. The view sits between them. ([The interface](README.md#the-interface))
