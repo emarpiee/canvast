@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.63.26 — Files in tabs, the Library pane (2026-11-27)
+
+- **Added:** a note, PDF or 3D model opened from a canvas takes the tab, as a canvas does (*Files on a canvas*: **Tab**, the new default; Panel and Window stay); Back returns, and closing the file closes its tab. The Library's folders, tags and searches are a pane of the left sidebar, shown with the Library (B39). ([The interface](README.md#the-interface))
+
 ## 0.63.25 — Tabs (work in progress) (2026-11-27)
 
 - **Added:** tabs (B39, in progress): a tab strip over the view and a view header with Back, Forward and where it is; a tab shows a canvas, the Library or a new tab's start page; Ctrl+click in the Files pane opens a canvas in a new tab; the tabs are kept per workspace on this device. The ∞ button and the Library button of the top left are gone on a wide window. ([The interface](README.md#the-interface))

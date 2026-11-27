@@ -3,7 +3,7 @@ import { esc } from "./format";
 import { pressCommand } from "../commands/registry";
 
 /** What a tab shows (B39): a canvas, the Library, or the start page of a new tab. */
-export type Place = { kind: "canvas"; id: string } | { kind: "library" } | { kind: "start" };
+export type Place = { kind: "canvas"; id: string } | { kind: "library" } | { kind: "start" } | { kind: "file"; hash: string };
 
 interface Tab {
   key: string;
@@ -41,7 +41,8 @@ export interface Tabs {
   readonly count: number;
 }
 
-const same = (a: Place, b: Place): boolean => a.kind === b.kind && (a.kind !== "canvas" || (b.kind === "canvas" && a.id === b.id));
+const same = (a: Place, b: Place): boolean =>
+  a.kind === b.kind && (a.kind === "canvas" ? b.kind === "canvas" && a.id === b.id : a.kind === "file" ? b.kind === "file" && a.hash === b.hash : true);
 let made = 0;
 const newKey = (): string => `t${++made}`;
 
@@ -144,7 +145,7 @@ export function mountTabs(strip: HTMLElement, head: HTMLElement, deps: TabsDeps)
       const kept = read();
       const back = (kept?.tabs ?? [])
         .map((t) => {
-          const history = (t.history ?? []).filter((p) => p && typeof p === "object" && ["canvas", "library", "start"].includes(p.kind) && deps.valid(p));
+          const history = (t.history ?? []).filter((p) => p && typeof p === "object" && ["canvas", "library", "start", "file"].includes(p.kind) && deps.valid(p));
           return history.length ? { key: newKey(), history, at: Math.min(Math.max(0, t.at ?? history.length - 1), history.length - 1) } : null;
         })
         .filter((t): t is Tab => t !== null);

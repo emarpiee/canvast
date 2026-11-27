@@ -751,7 +751,7 @@ async function start(): Promise<void> {
   // padlocks first (`padlocked`), so nothing readable of them leaves the app.
   // The file panel (file-panel.ts): made once the library view is, which it imports through.
   let pinsWindows: ReturnType<typeof mountPins> | null = null;
-  let notePanel: { open(hash: string, card?: CardActions): Promise<boolean>; close(): Promise<boolean>; closeHidden(): void } = { open: async () => false, close: async () => true, closeHidden: () => undefined };
+  let notePanel: { open(hash: string, card?: CardActions): Promise<boolean>; close(): Promise<boolean>; closeHidden(): void; readonly hash: string | null } = { open: async () => false, close: async () => true, closeHidden: () => undefined, hash: null };
   const syncReveal = (): void => {
     const on = ((settings.get("library.hiddenRemember") && hiddenRemembered()) || hiddenModeOn()) && (storage?.hidden ? storage.hidden.isOpen() : true);
     if (on === assets.revealing) return;
@@ -966,7 +966,13 @@ async function start(): Promise<void> {
   document.body.append(noteWindow);
   classWhen(noteWindow, "is-empty", () => !!noteWindowEl.hidden, [noteWindowEl], ["hidden"]); // (no scrim while its panel is closed)
   noteWindow.addEventListener("pointerdown", (e) => void (e.target === noteWindow && notePanel.close()));
-  const notePanelReady = (d: FilePanelDeps): void => void (notePanel = mountFilePanel({ panel: notePanelEl, window: noteWindowEl }, d, () => settings.get("notes.panelMode")));
+  // (a file in a tab of its own: the view's room, under the tabs, B39)
+  const noteTabEl = document.createElement("section");
+  noteTabEl.className = "layers-panel note-dock note-tab";
+  noteTabEl.dataset["testid"] = "note-tab";
+  noteTabEl.hidden = true;
+  document.body.append(noteTabEl);
+  const notePanelReady = (d: FilePanelDeps): void => void (notePanel = mountFilePanel({ panel: notePanelEl, window: noteWindowEl, tab: noteTabEl }, d, () => settings.get("notes.panelMode")));
   let newNoteAt: (at: ScreenPoint, widthPx?: number) => Promise<void> = async () => undefined;
   let makeNoteFiles: () => Promise<void> = async () => undefined;
   /**
@@ -2262,6 +2268,9 @@ async function start(): Promise<void> {
     // The Settings view is not remembered: a reload opens the canvas or the Assets view.
     if (v === "canvas" || v === "assets") settings.set("ui.view", v);
     if (v === "canvas" || v === "assets") (startPage.hidden = true), followView(v);
+    // (the left sidebar shows the Library's folders with the Library, and the Files again with a canvas)
+    if (v === "assets") sidebarLeft.show("library");
+    else if (v === "canvas" && sidebarLeft.active === "library") sidebarLeft.show("files");
   };
   // The workspace (B39): the ribbon, a sidebar on each side, and the status bar, which takes the canvas's information line
   const startPage = document.getElementById("start-page")!;
@@ -2329,6 +2338,13 @@ async function start(): Promise<void> {
     show: (place) => {
       tabsMoving = true;
       try {
+        // (leaving a file's tab closes the file; it asks first when there is unsaved work)
+        if (place.kind !== "file" && !noteTabEl.hidden) void notePanel.close();
+        if (place.kind === "file") {
+          startPage.hidden = true;
+          void notePanel.open(place.hash);
+          return;
+        }
         if (place.kind === "start") {
           startPage.hidden = false;
           startShow.render();
@@ -2345,6 +2361,10 @@ async function start(): Promise<void> {
     describe: (place) => {
       if (place.kind === "start") return { title: "New tab", icon: ICONS.plus, path: [] };
       if (place.kind === "library") return { title: "Library", icon: ICONS.images, path: ["Library"] };
+      if (place.kind === "file") {
+        const name = assetNames.map.get(place.hash) ?? "File";
+        return { title: name.replace(/\.[^.]+$/, ""), icon: ICONS.fileText, path: ["Library", name] };
+      }
       const entry = session.tree?.boards.find((b) => b.canvases.some((c) => c.id === place.id));
       const name = entry?.canvases.find((c) => c.id === place.id)?.name ?? "Canvas";
       return { title: name, icon: ICONS.infinity, path: entry ? [entry.board.name, name] : [name] };
@@ -2358,11 +2378,18 @@ async function start(): Promise<void> {
     if (v === "assets") tabs.follow({ kind: "library" });
     else if (session.current) tabs.follow({ kind: "canvas", id: session.current.canvasId });
   }
+  // A file opened in a tab (from a canvas, a link, the Library): the active tab goes to it; the file closed (its ×, Escape): its tab closes.
+  new MutationObserver(() => {
+    if (tabsMoving) return;
+    const active = tabs.active;
+    if (!noteTabEl.hidden && notePanel.hash && !(active.kind === "file" && active.hash === notePanel.hash)) tabs.follow({ kind: "file", hash: notePanel.hash });
+    else if (noteTabEl.hidden && active.kind === "file") tabs.close();
+  }).observe(noteTabEl, { attributes: true, attributeFilter: ["hidden"] });
   let tabCanvas = session.current?.canvasId ?? null;
   session.subscribe(() => {
     const now = session.current?.canvasId ?? null;
     // (a canvas opened from the Files pane, the palette or a link: the active tab goes to it)
-    if (now !== tabCanvas && appView === "canvas" && startPage.hidden) followView("canvas");
+    if (now !== tabCanvas && appView === "canvas" && startPage.hidden && noteTabEl.hidden) followView("canvas");
     tabCanvas = now;
     tabs.refresh();
   });
@@ -2390,6 +2417,16 @@ async function start(): Promise<void> {
   /** A Library view in `root` (the Library view, and a Pins window's: ADR 0208, embedded, without its details panel). */
   const libraryIn = (root: HTMLElement, embedded = false) => mountAssetsView(root, session, assets, () => setView("canvas"), notices, settings, libraryFonts, PHOTOCRAFT_FEATURES.entry.libraryItems && photoCraft.available ? (hash) => void photoCraft.editItem(hash) : undefined, { embedded });
   const assetsView = libraryIn(assetsRoot);
+  // The Library's folders, tags and searches are a pane of the left sidebar (B39), beside Files: they choose what the Library shows, and a
+  // choice made while another view shows opens the Library in the active tab.
+  const librarySide = assetsRoot.querySelector<HTMLElement>(".assets-side");
+  if (librarySide) {
+    sidebarLeft.add({ id: "library", title: "Library", icon: ICONS.images, mount: (body) => body.append(librarySide) });
+    // commands: go.library (a folder, tag or search chosen while the canvas shows)
+    librarySide.addEventListener("click", (e) => {
+      if (appView !== "assets" && (e.target as HTMLElement).closest(".side-item")) void pressCommand("go.library");
+    });
+  }
   // A font's card on a canvas: the viewer's sample sentence, on its ground (a ground that follows the theme is drawn again with it).
   const fontCardsLook = (): void => {
     setFontCardLook({ sample: session.fontSample, ground: session.viewGround });

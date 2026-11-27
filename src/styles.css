@@ -3632,6 +3632,8 @@ button.archive-crumb:hover { background: var(--hud-hover); color: var(--hud-fg);
 .sb-pane > .layers-panel .panel-head [data-close] { display: none; }
 /* (the panels' buttons were a column at the view's right edge: they are the sidebars' tabs now) */
 #toolbar > .dock { display: none; }
+/* The Library's folders and tags as a sidebar pane: the pane's width, its own scroll. */
+.sb-pane > .assets-side { flex: none; width: auto; overflow: visible; padding: var(--s-4) var(--s-4) var(--s-8); }
 /* The status bar: what the focused view says (its counts, zoom and whether it is saved), at the bottom right, as wide as what it says. */
 #statusbar { position: fixed; z-index: var(--z-edge); right: 0; bottom: 0; height: var(--status-h); box-sizing: border-box; display: flex; align-items: center; max-width: calc(100vw - var(--shell-l)); padding: 0 var(--s-4); background: var(--shell-bg); border-top: 1px solid var(--hud-border); border-left: 1px solid var(--hud-border); border-top-left-radius: var(--r-sm); color: var(--hud-muted); font: var(--font-meta); }
 #statusbar.is-empty { display: none; }
@@ -3661,6 +3663,9 @@ button.archive-crumb:hover { background: var(--hud-hover); color: var(--hud-fg);
 .view-crumb { overflow: hidden; text-overflow: ellipsis; }
 .view-crumb.is-here { color: var(--hud-fg); font-weight: var(--weight-semibold); }
 .view-sep { color: var(--hud-ghost); }
+/* A file in a tab of its own (Settings > Notes > Files on a canvas: Tab): the view's room, under the tabs. */
+.layers-panel.note-tab { position: fixed; z-index: 3; inset: var(--shell-t) var(--shell-r) 0 var(--shell-l); display: flex; flex-direction: column; width: auto; max-width: none; max-height: none; margin: 0; border: 0; border-radius: 0; box-shadow: none; background: var(--paper); animation: none; }
+.layers-panel.note-tab[hidden] { display: none; }
 /* A new tab's start page: over the view, under the tabs. */
 .start-page { position: fixed; z-index: 3; inset: var(--shell-t) var(--shell-r) 0 var(--shell-l); overflow-y: auto; background: var(--theme-bg); }
 .start-page[hidden] { display: none; }

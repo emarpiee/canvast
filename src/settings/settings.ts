@@ -223,7 +223,7 @@ export const SETTINGS = {
   "notes.cardWidth": { scope: "workspace", default: 320, validate: range(120, 1200), effect: "immediate" } as Def<number>,
   "notes.folder": { scope: "workspace", default: "Notes", validate: text(60), effect: "immediate" } as Def<string>,
   "notes.look": { scope: "device", default: "auto", validate: oneOf("auto", "light", "dark"), effect: "immediate" } as Def<"auto" | "light" | "dark">,
-  "notes.panelMode": { scope: "device", default: "panel", validate: oneOf("panel", "window"), effect: "immediate" } as Def<"panel" | "window">,
+  "notes.panelMode": { scope: "device", default: "tab", validate: oneOf("panel", "window", "tab"), effect: "immediate" } as Def<"panel" | "window" | "tab">,
   "notes.panelStyle": { scope: "device", default: "document", validate: oneOf("document", "classic", "bottom", "balloon", "notion"), effect: "immediate" } as Def<NoteStyle>,
   "notes.style": { scope: "device", default: "document", validate: oneOf("document", "classic", "bottom", "balloon", "notion"), effect: "immediate" } as Def<NoteStyle>,
   "assets.edgeWidth": { scope: "device", default: 15, validate: (v: unknown) => (Number.isInteger(v) && (v as number) >= 0 && (v as number) <= 40 ? (v as number) : undefined), effect: "immediate" } as Def<number>,

@@ -23,10 +23,10 @@ export interface FilePanelDeps extends ViewDeps {
  * the saved version at once (it follows the new version, as every placement does).
  */
 export function mountFilePanel(
-  hosts: { panel: HTMLElement; window: HTMLElement },
+  hosts: { panel: HTMLElement; window: HTMLElement; tab: HTMLElement },
   deps: FilePanelDeps,
-  /** Where a file opens (Settings > Notes): the dock's panel, or the window centred over the canvas. */
-  mode: () => "panel" | "window",
+  /** Where a file opens (Settings > Notes): a tab of its own (the view's room, B39), the dock's panel, or the window centred over the canvas. */
+  mode: () => "panel" | "window" | "tab",
 ): { open(hash: string, card?: CardActions): Promise<boolean>; close(): Promise<boolean>; closeHidden(): void; readonly hash: string | null } {
   let el = hosts.panel; // (the host of the file open now)
   /** The file being opened (its view shown, not ready: its hash), and whether Escape came meanwhile. */
@@ -126,7 +126,7 @@ export function mountFilePanel(
     deps.session.editor.message = `Renamed to “${name}”.`;
     deps.session.editor.changed();
   };
-  for (const host of [hosts.panel, hosts.window])
+  for (const host of [hosts.panel, hosts.window, hosts.tab])
     host.addEventListener("keydown", (e) => {
       if (e.key === "F2" && !e.ctrlKey && !e.altKey && !e.metaKey) return e.preventDefault(), void rename();
       // (a view's own keys: its pages, Ctrl+S; they stop here, and do not reach the canvas behind)
@@ -143,7 +143,7 @@ export function mountFilePanel(
   const showing = (q: Element): boolean => (q as HTMLElement).getClientRects().length > 0 && getComputedStyle(q).visibility !== "hidden";
   window.addEventListener("keydown", (e) => {
     if (e.key !== "Escape" || e.ctrlKey || e.altKey || e.metaKey || e.shiftKey || e.isComposing) return;
-    if (el.hidden) return void (hosts.panel.dataset["escape"] = `its host hidden (${el === hosts.window ? "window" : "panel"})`);
+    if (el.hidden) return void (hosts.panel.dataset["escape"] = `its host hidden (${el === hosts.window ? "window" : el === hosts.tab ? "tab" : "panel"})`);
     if (!note && !opening) return void (hosts.panel.dataset["escape"] = "no note open");
     // in the file, or in the window wherever the focus is; elsewhere (the canvas, the page, whatever holds the focus after the double-click
     // that opened it) when nothing is selected or only the card it opened from: never from a field, a dialog or another panel, whose it is
@@ -154,7 +154,7 @@ export function mountFilePanel(
     const elsewhere = !!t && !!t.closest("input, textarea, select, [contenteditable='true'], dialog, .pop-menu, .layers-panel");
     // (why an Escape did not close it, kept on the panel for a test or a bug report to read)
     const why = (w: string): void => void (el.dataset["escape"] = w);
-    if (!inside && el !== hosts.window && (elsewhere || !onlyItsCard || ed.editingText)) return why(elsewhere ? "a field or another panel" : ed.editingText ? "editing text" : "something else selected");
+    if (!inside && el !== hosts.window && el !== hosts.tab && (elsewhere || !onlyItsCard || ed.editingText)) return why(elsewhere ? "a field or another panel" : ed.editingText ? "editing text" : "something else selected");
     const pop = [...document.querySelectorAll(POPUPS)].find(showing);
     if (pop) return why(`a menu open: ${pop.className}`);
     e.preventDefault();
