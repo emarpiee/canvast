@@ -7,6 +7,7 @@ import { Decoration, EditorView, WidgetType, type DecorationSet } from "@codemir
 import type { LiveContext } from "./live";
 import { mediaElement } from "./live";
 import { renderMarkdown } from "./render";
+import { openPopover, type PopItem } from "./popover";
 
 type Align = "left" | "center" | "right" | "";
 interface Model {
@@ -100,6 +101,12 @@ class TableWidget extends WidgetType {
         drawCell(cell, md);
         if (!focusNext.has(view)) commit();
       });
+      // view-state: (opens the table's list of actions; each writes the table through `commit`)
+      cell.addEventListener("contextmenu", (e) => {
+        e.preventDefault();
+        set(row, col, read(cell));
+        openPopover(new DOMRect(e.clientX, e.clientY, 0, 0), actions(row, col), this.ctx.tableLabel);
+      });
       cell.addEventListener("keydown", (e) => {
         const cols = model.head.length;
         const go = (r: number, c: number): void => {
@@ -130,6 +137,40 @@ class TableWidget extends WidgetType {
         e.stopPropagation();
       });
       return cell;
+    };
+    /** The table's actions for the cell at `row` (0: the heading row), `col`. */
+    const actions = (row: number, col: number): PopItem[] => {
+      const L = this.ctx.tableWords;
+      const cols = model.head.length, body = row - 1, last = model.rows.length - 1;
+      const blank = (): string[] => Array<string>(cols).fill("");
+      const eachRow = (f: (r: string[]) => void): void => [model.head, ...model.rows].forEach(f);
+      const swapCols = (a: number, b: number): void => {
+        eachRow((r) => ([r[a], r[b]] = [r[b]!, r[a]!]));
+        [model.aligns[a], model.aligns[b]] = [model.aligns[b]!, model.aligns[a]!];
+      };
+      const sort = (dir: 1 | -1): void => void model.rows.sort((a, b) => dir * (a[col] ?? "").localeCompare(b[col] ?? "", undefined, { numeric: true, sensitivity: "base" }));
+      const align = (a: Align): void => void (model.aligns[col] = a);
+      return [
+        { label: L.rowAbove, disabled: row === 0, run: () => (model.rows.splice(body, 0, blank()), commit({ row, col })) },
+        { label: L.rowBelow, run: () => (model.rows.splice(body + 1, 0, blank()), commit({ row: row + 1, col })) },
+        { label: L.colBefore, run: () => (eachRow((r) => r.splice(col, 0, "")), model.aligns.splice(col, 0, ""), commit({ row, col })) },
+        { label: L.colAfter, run: () => (eachRow((r) => r.splice(col + 1, 0, "")), model.aligns.splice(col + 1, 0, ""), commit({ row, col: col + 1 })) },
+        { label: L.rowUp, sep: true, disabled: body <= 0, run: () => ([model.rows[body - 1], model.rows[body]] = [model.rows[body]!, model.rows[body - 1]!], commit({ row: row - 1, col })) },
+        { label: L.rowDown, disabled: row === 0 || body >= last, run: () => ([model.rows[body + 1], model.rows[body]] = [model.rows[body]!, model.rows[body + 1]!], commit({ row: row + 1, col })) },
+        { label: L.colLeft, disabled: col === 0, run: () => (swapCols(col, col - 1), commit({ row, col: col - 1 })) },
+        { label: L.colRight, disabled: col >= cols - 1, run: () => (swapCols(col, col + 1), commit({ row, col: col + 1 })) },
+        { label: L.dupRow, sep: true, disabled: row === 0, run: () => (model.rows.splice(body + 1, 0, [...model.rows[body]!]), commit({ row: row + 1, col })) },
+        { label: L.dupCol, run: () => (eachRow((r) => r.splice(col + 1, 0, r[col] ?? "")), model.aligns.splice(col + 1, 0, model.aligns[col] ?? ""), commit({ row, col: col + 1 })) },
+        { label: L.alignLeft, sep: true, on: model.aligns[col] === "left", run: () => (align(model.aligns[col] === "left" ? "" : "left"), commit()) },
+        { label: L.alignCenter, on: model.aligns[col] === "center", run: () => (align(model.aligns[col] === "center" ? "" : "center"), commit()) },
+        { label: L.alignRight, on: model.aligns[col] === "right", run: () => (align(model.aligns[col] === "right" ? "" : "right"), commit()) },
+        { label: L.sortUp, sep: true, disabled: model.rows.length < 2, run: () => (sort(1), commit()) },
+        { label: L.sortDown, disabled: model.rows.length < 2, run: () => (sort(-1), commit()) },
+        { label: L.delRow, sep: true, disabled: row === 0, run: () => (model.rows.splice(body, 1), commit()) },
+        { label: L.delCol, disabled: cols <= 1, run: () => (eachRow((r) => r.splice(col, 1)), model.aligns.splice(col, 1), commit()) },
+        { label: L.copy, sep: true, run: () => void navigator.clipboard?.writeText(writeTable(model)).catch(() => undefined) },
+        { label: L.duplicate, run: () => view.dispatch({ changes: { from: this.from + this.source.length, insert: `\n\n${writeTable(model)}` }, userEvent: "input.table" }) },
+      ];
     };
     const set = (row: number, col: number, md: string): void => {
       if (row === 0) model.head[col] = md;

@@ -1,6 +1,6 @@
 import { ICONS } from "./icons";
 import { createMarkdownEditor, type EditorMode, type FollowedLink, type MarkdownEditor, type SlashItem } from "../markdown-editor";
-import { codeSpans, dropCode, paintCode } from "../notes/code-colours";
+import { CODE_LANGUAGES, codeSpans, dropCode, paintCode } from "../notes/code-colours";
 import { WIKI, encodeLinkPart, libraryLink, linkTarget } from "../notes/note-file";
 import type { NoteKind, PathTarget } from "../notes/note-file";
 import { splitFrontmatter, type Prop } from "../notes/frontmatter";
@@ -140,6 +140,12 @@ export async function mountNoteEditor(el: HTMLElement, opts: { kind: Exclude<Not
     return list.map((t) => ({ label: t.name, detail: "Template", pick: (ed) => ed.insert(fillTemplate(t.text, opts.title)) }));
   };
 
+  /** The names `[[` links can reach (notes without `.md`, files whole, `canvas:` names), in lower case; read once the editor is open. */
+  let known: Set<string> | null = null;
+  void host.linkables().then((list) => {
+    known = new Set(list.flatMap((l) => [l.key.toLowerCase(), l.name.toLowerCase()]));
+    editor?.refresh();
+  }, () => undefined);
   let editor!: MarkdownEditor;
   editor = createMarkdownEditor({
     parent: el,
@@ -154,6 +160,9 @@ export async function mountNoteEditor(el: HTMLElement, opts: { kind: Exclude<Not
       media,
       open: (f) => host.open(hostLink(f)),
       links: async () => (await host.linkables()).map((l) => ({ target: l.key, label: l.name, ...(l.key !== l.name ? { detail: l.key } : {}) })),
+      // (a link to nothing is drawn muted; known once the library's names have been read)
+      wikiExists: (target) => (known ? known.has(target.toLowerCase()) || known.has(target.toLowerCase().split("/").pop()!) : undefined),
+      languages: CODE_LANGUAGES.filter((l) => !/^(js|ts|py|sh|shell|yml|md|cs|c\+\+)$/.test(l)),
       tags: () => host.tags(),
       files: async (files) => {
         const items = await host.importFiles(files);

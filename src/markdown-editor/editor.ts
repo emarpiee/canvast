@@ -1,14 +1,15 @@
 // The Markdown editor: one CodeMirror view for live and source mode, a rendered page for preview mode, a toolbar, and the hooks a host fills in
 // (pictures, links, tags, files, saving). It knows nothing of the app it is in.
 import { autocompletion, type Completion, type CompletionContext, type CompletionResult } from "@codemirror/autocomplete";
-import { defaultKeymap, history, historyKeymap, indentWithTab, redo, undo } from "@codemirror/commands";
+import { defaultKeymap, history, historyKeymap, indentWithTab, moveLineDown, moveLineUp, redo, undo } from "@codemirror/commands";
 import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
 import { syntaxTree } from "@codemirror/language";
 import { openSearchPanel, search, searchKeymap } from "@codemirror/search";
-import { Compartment, EditorSelection, EditorState, type Extension } from "@codemirror/state";
+import { Compartment, EditorSelection, EditorState, Prec, type Extension } from "@codemirror/state";
 import { EditorView, drawSelection, keymap, placeholder as placeholderExt } from "@codemirror/view";
 import { codeColours, type CodeSpans } from "./code";
-import { COMMANDS, toggleTask, wrapTyped, type FormatName } from "./commands";
+import { COMMANDS, autoPair, hopMarker, reflowParagraph, renumberLists, tightListEnter, toggleCheckbox, toggleTask, wrapTyped, type FormatName } from "./commands";
+import { foldAtCursor, folding, initialFolds } from "./fold";
 import { pastedMarkdown } from "./html-to-markdown";
 import { DEFAULT_ICONS, type IconName } from "./icons";
 import { markdownLook } from "./highlight";
@@ -74,6 +75,10 @@ export interface EditorHost {
   save?(): void;
   /** Preview mode drew its page (to colour its code, say). */
   rendered?(page: HTMLElement): void;
+  /** Whether a `[[target]]` reaches anything: one that does not is drawn muted, dashed. Undefined: not known. */
+  wikiExists?(target: string): boolean | undefined;
+  /** The languages a code block's label offers. */
+  languages?: readonly string[];
 }
 
 export interface EditorLabels {
@@ -83,6 +88,11 @@ export interface EditorLabels {
   bulletList: string; orderedList: string; taskList: string; toggleTask: string; quote: string; codeBlock: string; table: string; rule: string;
   picture: string; find: string; save: string; task: string; placeholder: string; toolbar: string; format: string; insert: string;
   turnInto: string; copyCode: string; copied: string; codeLanguage: string; addRow: string; addColumn: string;
+  heading4: string; callout: string; mathBlock: string; math: string; image: string; plainText: string; resize: string; tableActions: string;
+  today: string; yesterday: string; tomorrow: string; now: string;
+  rowAbove: string; rowBelow: string; colBefore: string; colAfter: string; rowUp: string; rowDown: string; colLeft: string; colRight: string;
+  dupRow: string; dupCol: string; alignLeft: string; alignCenter: string; alignRight: string; sortUp: string; sortDown: string;
+  delRow: string; delCol: string; copyTable: string; duplicateTable: string; calloutTypes: string;
 }
 
 export const DEFAULT_LABELS: EditorLabels = {
@@ -91,8 +101,23 @@ export const DEFAULT_LABELS: EditorLabels = {
   heading1: "Heading 1", heading2: "Heading 2", heading3: "Heading 3", paragraph: "Text",
   bulletList: "Bulleted list", orderedList: "Numbered list", taskList: "Task list", toggleTask: "Tick task", quote: "Quote", codeBlock: "Code block", table: "Table", rule: "Divider",
   picture: "Picture", find: "Find", save: "Save", task: "Done", placeholder: "Write, or press / for blocks", toolbar: "Formatting", format: "Format", insert: "Insert",
-  turnInto: "Turn into", copyCode: "Copy code", copied: "Copied", codeLanguage: "Code language: click to change it", addRow: "Add a row", addColumn: "Add a column",
+  turnInto: "Turn into", copyCode: "Copy code", copied: "Copied", codeLanguage: "Choose a language", addRow: "Add a row", addColumn: "Add a column",
+  heading4: "Heading 4", callout: "Callout", mathBlock: "Math block", math: "Math", image: "Image", plainText: "text", resize: "Drag to resize", tableActions: "Table",
+  today: "Today", yesterday: "Yesterday", tomorrow: "Tomorrow", now: "Now",
+  rowAbove: "Add row above", rowBelow: "Add row below", colBefore: "Add column before", colAfter: "Add column after", rowUp: "Move row up", rowDown: "Move row down",
+  colLeft: "Move column left", colRight: "Move column right", dupRow: "Duplicate row", dupCol: "Duplicate column", alignLeft: "Align left", alignCenter: "Align center",
+  alignRight: "Align right", sortUp: "Sort column (A → Z)", sortDown: "Sort column (Z → A)", delRow: "Delete row", delCol: "Delete column", copyTable: "Copy table as Markdown",
+  duplicateTable: "Duplicate table", calloutTypes: "Callout type",
 };
+
+/** The callout types `> [!` offers: its keyword, colour family and what it is for. */
+const CALLOUTS: ReadonlyArray<readonly [string, string]> = [
+  ["note", "General note or aside"], ["info", "Informational callout"], ["abstract", "Summary or TL;DR"], ["tip", "Helpful advice"], ["success", "Something that worked"],
+  ["question", "A question or FAQ"], ["example", "An example"], ["warning", "Proceed with care"], ["danger", "Something that can go wrong"], ["bug", "A known bug"],
+  ["failure", "Something that failed"], ["quote", "A quotation"],
+];
+/** The languages a code block offers when the host gives none. */
+const LANGUAGES = ["bash", "c", "cpp", "csharp", "css", "go", "html", "java", "javascript", "json", "kotlin", "markdown", "php", "python", "ruby", "rust", "sql", "swift", "typescript", "xml", "yaml"];
 
 export interface EditorOptions {
   /** The element the editor fills. */
@@ -183,7 +208,16 @@ export function createMarkdownEditor(opts: EditorOptions): MarkdownEditor {
   opts.parent.append(el);
 
   const liveLayer = new Compartment();
-  const liveExt = (): Extension => (mode === "live" ? livePreview({ ...(host.media ? { media: host.media.bind(host) } : {}), taskLabel: labels.task, copyLabel: labels.copyCode, copiedLabel: labels.copied, languageLabel: labels.codeLanguage, addRowLabel: labels.addRow, addColumnLabel: labels.addColumn }) : []);
+  const liveExt = (): Extension =>
+    mode === "live"
+      ? livePreview({
+          ...(host.media ? { media: host.media.bind(host) } : {}),
+          ...(host.wikiExists ? { exists: host.wikiExists.bind(host) } : {}),
+          taskLabel: labels.task, copyLabel: labels.copyCode, copiedLabel: labels.copied, languageLabel: labels.codeLanguage, addRowLabel: labels.addRow, addColumnLabel: labels.addColumn,
+          tableLabel: labels.tableActions, languages: host.languages ?? LANGUAGES, resizeLabel: labels.resize, plainLabel: labels.plainText,
+          tableWords: { rowAbove: labels.rowAbove, rowBelow: labels.rowBelow, colBefore: labels.colBefore, colAfter: labels.colAfter, rowUp: labels.rowUp, rowDown: labels.rowDown, colLeft: labels.colLeft, colRight: labels.colRight, dupRow: labels.dupRow, dupCol: labels.dupCol, alignLeft: labels.alignLeft, alignCenter: labels.alignCenter, alignRight: labels.alignRight, sortUp: labels.sortUp, sortDown: labels.sortDown, delRow: labels.delRow, delCol: labels.delCol, copy: labels.copyTable, duplicate: labels.duplicateTable },
+        })
+      : [];
 
   // `[[` → links, `#` → tags, `/` at a line's start or after a space → blocks.
   const complete = async (cx: CompletionContext): Promise<CompletionResult | null> => {
@@ -206,23 +240,69 @@ export function createMarkdownEditor(opts: EditorOptions): MarkdownEditor {
       const list = await host.tags();
       return { from: tag.from + at + 1, options: list.map((t) => ({ label: t.replace(/\s+/g, "-"), type: "keyword" })), validFor: /^[\p{L}\p{N}_\-/]*$/u };
     }
-    const slash = cx.matchBefore(/(?:^|\s)\/[\w ]*$/);
+    // `> [!` in a quote: the callout types.
+    const callout = cx.matchBefore(/^\s*>\s?\[!\w*$/);
+    if (callout) {
+      const at = callout.text.indexOf("[!") + 2;
+      return {
+        from: callout.from + at,
+        options: CALLOUTS.map(([type, what]): Completion => ({ label: type, displayLabel: type.charAt(0).toUpperCase() + type.slice(1), detail: what, type: "keyword", apply: (view, _c, from, to) => {
+          const close = view.state.sliceDoc(to, to + 1) === "]" ? 1 : 0;
+          view.dispatch({ changes: { from, to: to + close, insert: `${type}] ` }, selection: { anchor: from + type.length + 2 } });
+        } })),
+        validFor: /^\w*$/,
+      };
+    }
+    // `@`: today's date, yesterday's, tomorrow's, the time now.
+    const date = cx.matchBefore(/(?:^|[\s([{}])@[^\s@]*$/);
+    if (date && !inCode(cx)) {
+      const at = date.text.lastIndexOf("@");
+      const iso = (d: Date): string => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+      const day = (n: number): Date => new Date(Date.now() + n * 86_400_000);
+      const now = new Date();
+      const time = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
+      const rows: Array<[string, string, string]> = [[labels.today, iso(day(0)), "today"], [labels.yesterday, iso(day(-1)), "yesterday"], [labels.tomorrow, iso(day(1)), "tomorrow"], [labels.now, time, "now time"]];
+      const query = date.text.slice(at + 1).toLowerCase();
+      const options = rows.filter(([l, v, k]) => !query || `${l} ${v} ${k}`.toLowerCase().includes(query)).map(([l, v]): Completion => ({ label: l, detail: v, type: "text", apply: (view, _c, _from, to) => {
+        const from = date.from + at;
+        view.dispatch({ changes: { from, to, insert: v }, selection: { anchor: from + v.length } });
+      } }));
+      if (options.length) return { from: date.from + at + 1, options, filter: false };
+    }
+    // `/` at a line's start or after a space: blocks, then the host's rows (templates, a picture of its library).
+    const slash = cx.matchBefore(/(?:^|\s)\/[^\s]*$/);
     if (slash && !inCode(cx)) {
       const at = slash.text.indexOf("/");
-      const own: Completion[] = BLOCK_TOOLS.map((name) => ({ label: labels[name], type: "text", apply: (view, _c, from, to) => {
-        view.dispatch({ changes: { from: from - 1, to } });
-        COMMANDS[name](view);
-      } }));
-      if (host.choosePicture) own.push({ label: labels.picture, type: "text", apply: (view, _c, from, to) => {
-        view.dispatch({ changes: { from: from - 1, to } });
+      const start = slash.from + at;
+      const block = (label: string, detail: string, insert: string, back = 0, keywords = "", boost = 0, pad = false): Completion => ({
+        label: keywords ? `${label} ${keywords}` : label, displayLabel: label, detail, type: "text", ...(boost ? { boost } : {}),
+        apply: (view, _c, _from, to) => {
+          // (a table stands apart from the words round it, as a table must)
+          const before = pad && view.state.sliceDoc(view.state.doc.lineAt(start).from, start).trim() ? "\n\n" : pad && view.state.doc.lineAt(start).number > 1 && view.state.doc.line(view.state.doc.lineAt(start).number - 1).text.trim() ? "\n" : "";
+          const after = pad && view.state.sliceDoc(to, view.state.doc.lineAt(to).to).trim() ? "\n\n" : pad ? "\n" : "";
+          const text = before + insert + after;
+          view.dispatch({ changes: { from: start, to, insert: text }, selection: { anchor: start + text.length - back - (pad ? 0 : 0) } });
+        },
+      });
+      const own: Completion[] = [
+        block(labels.heading1, "#", "# "), block(labels.heading2, "##", "## "), block(labels.heading3, "###", "### "), block(labels.heading4, "####", "#### "),
+        block(labels.taskList, "[ ]", "- [ ] ", 0, "todo to-do checkbox check task list", 99),
+        block(labels.bulletList, "-", "- "), block(labels.orderedList, "1.", "1. "), block(labels.quote, ">", "> "),
+        block(labels.codeBlock, "```", "```\n\n```", 4), block(labels.rule, "---", "---\n"),
+        block(labels.table, "|", "| Column 1 | Column 2 |\n| --- | --- |\n|  |  |", 0, "", 0, true),
+        block(labels.mathBlock, "$$", "$$\n\n$$", 3), block(labels.callout, ">", "> [!note]\n> "),
+        block(labels.link, "[]", "[]()", 3), block(labels.image, "![]", "![]()", 3),
+      ];
+      if (host.choosePicture) own.push({ label: labels.picture, detail: "", type: "text", apply: (view, _c, _from, to) => {
+        view.dispatch({ changes: { from: start, to } });
         void pickPicture();
       } });
       const extra = host.slash ? await host.slash() : [];
-      for (const item of extra) own.push({ label: item.label, ...(item.detail ? { detail: item.detail } : {}), type: "text", apply: (view, _c, from, to) => {
-        view.dispatch({ changes: { from: from - 1, to } });
+      for (const item of extra) own.push({ label: item.label, ...(item.detail ? { detail: item.detail } : {}), type: "text", apply: (view, _c, _from, to) => {
+        view.dispatch({ changes: { from: start, to } });
         void item.pick(self);
       } });
-      return { from: slash.from + at + 1, options: own, validFor: /^[\w ]*$/ };
+      return { from: start + 1, options: own, validFor: /^[^\s]*$/ };
     }
     return null;
   };
@@ -234,19 +314,25 @@ export function createMarkdownEditor(opts: EditorOptions): MarkdownEditor {
   const formatKeys = [
     { key: "Mod-b", run: COMMANDS.bold },
     { key: "Mod-i", run: COMMANDS.italic },
-    { key: "Mod-Shift-x", run: COMMANDS.strike },
-    { key: "Mod-Shift-h", run: COMMANDS.highlight },
-    { key: "Mod-`", run: COMMANDS.code },
+    { key: "Mod-e", run: COMMANDS.code },
+    { key: "Shift-Mod-s", run: COMMANDS.strike },
+    { key: "Shift-Mod-h", run: COMMANDS.highlight },
+    { key: "Shift-Mod-m", run: COMMANDS.math },
     { key: "Mod-k", run: COMMANDS.link },
-    { key: "Mod-Enter", run: COMMANDS.toggleTask },
-    { key: "Mod-Alt-1", run: COMMANDS.heading1 },
-    { key: "Mod-Alt-2", run: COMMANDS.heading2 },
-    { key: "Mod-Alt-3", run: COMMANDS.heading3 },
-    { key: "Mod-Alt-0", run: COMMANDS.paragraph },
+    { key: "Mod-l", run: toggleCheckbox },
+    { key: "Alt-]", mac: "Ctrl-.", run: hopMarker(1) },
+    { key: "Alt-[", mac: "Ctrl-,", run: hopMarker(-1) },
+    { key: "Mod-Alt-f", run: foldAtCursor(true) },
+    { key: "Mod-Alt-u", run: foldAtCursor(false) },
+    { key: "Alt-q", mac: "Ctrl-q", run: reflowParagraph },
   ];
   const appKeys = keymap.of([
     { key: "Mod-s", preventDefault: true, run: () => (host.save?.(), true) },
-    { key: "Mod-e", preventDefault: true, run: () => (plain ? false : (setModeBy(mode === "preview" ? "live" : "preview"), true)) },
+    { key: "Mod-4", preventDefault: true, run: () => (plain ? false : (setModeBy("live"), true)) },
+    { key: "Mod-5", preventDefault: true, run: () => (plain ? false : (setModeBy("source"), true)) },
+    { key: "Mod-6", preventDefault: true, run: () => (plain ? false : (setModeBy("preview"), true)) },
+    { key: "Alt-ArrowUp", run: moveLineUp },
+    { key: "Alt-ArrowDown", run: moveLineDown },
   ]);
 
   const extensions: Extension[] = [
@@ -263,20 +349,30 @@ export function createMarkdownEditor(opts: EditorOptions): MarkdownEditor {
       if (u.docChanged && !silent) opts.onChange?.(u.state.sliceDoc());
     }),
     EditorView.inputHandler.of((view, _from, _to, text) => {
-      if (opts.wrapSelection === false) return false;
-      const tr = wrapTyped(view.state, text);
-      if (!tr || (plain && /[*_~`=]/.test(text))) return false;
-      view.dispatch(tr);
-      return true;
+      const tr = opts.wrapSelection === false || (plain && /[*_~`=]/.test(text)) ? null : wrapTyped(view.state, text);
+      if (tr) return view.dispatch(tr), true;
+      // (brackets close themselves; quotes only in code, where they pair as code's)
+      const pair = plain ? null : autoPair(view.state, text, (pos) => inCodeAt(view, pos) || inInlineCode(view, pos));
+      if (pair) return view.dispatch(pair), true;
+      return false;
     }),
     EditorView.domEventHandlers({
       paste: (e, view) => onPaste(e, view),
       drop: (e, view) => onDrop(e, view),
-      // Ctrl+click (⌘ on a Mac) on a link follows it; a plain click edits it.
-      mousedown: (e) => {
-        if (!(isMac ? e.metaKey : e.ctrlKey) || e.button !== 0) return false;
-        const t = (e.target as HTMLElement).closest<HTMLElement>("[data-href], [data-wiki], [data-embed], [data-src]");
-        if (!t || !host.open) return false;
+      // A click on a link drawn as a link (in live mode, the cursor not in it) follows it, as Ctrl+click (⌘ on a Mac) does anywhere; a
+      // click on a link whose Markdown shows puts the cursor in it, to edit.
+      mousedown: (e, v) => {
+        if (e.button !== 0 || e.altKey || e.shiftKey || !host.open) return false;
+        const t = (e.target as HTMLElement).closest<HTMLElement>("[data-href], [data-wiki]");
+        if (!t) return false;
+        const mod = isMac ? e.metaKey : e.ctrlKey;
+        if (!mod) {
+          if (mode !== "live") return false;
+          const pos = v.posAtDOM(t);
+          const node = linkAround(v, pos);
+          const sel = v.state.selection.main;
+          if (!node || !(sel.to < node.from || sel.from > node.to)) return false;
+        }
         e.preventDefault();
         host.open(followed(t));
         return true;
@@ -284,7 +380,7 @@ export function createMarkdownEditor(opts: EditorOptions): MarkdownEditor {
     }),
   ];
   if (!plain) {
-    extensions.push(markdown({ base: markdownLanguage, extensions: EXTENSIONS, addKeymap: true }), markdownLook, selectionBar({ icons, labels: labels as unknown as Record<string, string> }), liveLayer.of(liveExt()), autocompletion({ override: [complete], icons: false, activateOnTyping: true }));
+    extensions.push(Prec.high(keymap.of([{ key: "Enter", run: tightListEnter }])), markdown({ base: markdownLanguage, extensions: EXTENSIONS, addKeymap: true }), markdownLook, folding, renumberLists, selectionBar({ icons, labels: labels as unknown as Record<string, string> }), liveLayer.of(liveExt()), autocompletion({ override: [complete], icons: false, activateOnTyping: true }));
     if (host.codeSpans) extensions.push(codeColours(host.codeSpans));
   }
 
@@ -292,6 +388,7 @@ export function createMarkdownEditor(opts: EditorOptions): MarkdownEditor {
   const lineEnds = (text: string): Extension => (/\r\n/.test(text) && !/(^|[^\r])\n/.test(text) ? EditorState.lineSeparator.of("\r\n") : []);
   const stateOf = (text: string): EditorState => EditorState.create({ doc: text, extensions: [extensions, lineEnds(text)] });
   const view = new EditorView({ state: stateOf(opts.value ?? ""), parent: body });
+  if (!plain) initialFolds(view);
   body.append(preview);
 
   const followed = (t: HTMLElement): FollowedLink => {
@@ -331,6 +428,15 @@ export function createMarkdownEditor(opts: EditorOptions): MarkdownEditor {
     e.preventDefault();
     v.dispatch(v.state.replaceSelection(md), { scrollIntoView: true, userEvent: "input.paste" });
     return true;
+  };
+  /** The link, wiki link or address round `pos`. */
+  const linkAround = (v: EditorView, pos: number): { from: number; to: number } | null => {
+    for (let n: ReturnType<typeof syntaxTree>["topNode"] | null = syntaxTree(v.state).resolveInner(pos, 1); n; n = n.parent) if (/^(Link|WikiLink|Autolink|URL)$/.test(n.name)) return { from: n.from, to: n.to };
+    return null;
+  };
+  const inInlineCode = (v: EditorView, pos: number): boolean => {
+    for (let n: ReturnType<typeof syntaxTree>["topNode"] | null = syntaxTree(v.state).resolveInner(pos, -1); n; n = n.parent) if (n.name === "InlineCode") return true;
+    return false;
   };
   const inCodeAt = (v: EditorView, pos: number): boolean => {
     for (let n: ReturnType<typeof syntaxTree>["topNode"] | null = syntaxTree(v.state).resolveInner(pos, -1); n; n = n.parent) if (n.name === "FencedCode" || n.name === "CodeBlock") return true;
@@ -404,7 +510,7 @@ export function createMarkdownEditor(opts: EditorOptions): MarkdownEditor {
   const btn = (name: string, icon: string, label: string, keys = ""): string =>
     `<button type="button" class="me-btn" data-me="${name}" aria-label="${esc(label)}" title="${esc(keys ? `${label} (${keys})` : label)}">${icon}</button>`;
   const mod = isMac ? "⌘" : "Ctrl+";
-  const KEYS: Partial<Record<string, string>> = { bold: `${mod}B`, italic: `${mod}I`, strike: `${mod}Shift+X`, highlight: `${mod}Shift+H`, code: `${mod}\``, link: `${mod}K`, find: `${mod}F`, save: `${mod}S`, preview: `${mod}E` };
+  const KEYS: Partial<Record<string, string>> = { bold: `${mod}B`, italic: `${mod}I`, strike: `${mod}Shift+S`, highlight: `${mod}Shift+H`, code: `${mod}E`, link: `${mod}K`, taskList: `${mod}L`, find: `${mod}F`, save: `${mod}S`, live: `${mod}4`, source: `${mod}5`, preview: `${mod}6` };
   const drawBar = (): void => {
     const groups: string[] = [];
     if (!plain) {
@@ -459,13 +565,13 @@ export function createMarkdownEditor(opts: EditorOptions): MarkdownEditor {
     if (m !== "preview") view.focus();
   };
 
-  // Ctrl+E from preview mode, where the text (and its keys) are hidden.
+  // Ctrl+4 and Ctrl+5 from preview mode, where the text (and its keys) are hidden.
   // view-state: (switches how the note is shown)
   el.addEventListener("keydown", (e) => {
-    if (mode !== "preview" || plain || e.altKey || e.shiftKey || !(isMac ? e.metaKey : e.ctrlKey) || e.key.toLowerCase() !== "e") return;
+    if (mode !== "preview" || plain || e.altKey || e.shiftKey || !(isMac ? e.metaKey : e.ctrlKey) || (e.key !== "4" && e.key !== "5")) return;
     e.preventDefault();
     e.stopPropagation();
-    setModeBy("live");
+    setModeBy(e.key === "4" ? "live" : "source");
   }, true);
   preview.tabIndex = -1;
 

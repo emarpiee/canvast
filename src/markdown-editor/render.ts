@@ -186,8 +186,15 @@ export function renderMarkdown(md: string, opts: RenderOptions = {}): string {
         const mark = n.getChild("HeaderMark");
         return `<h${lv}>${inline(n, n.from, mark ? mark.from : n.to).trim()}</h${lv}>`;
       }
-      case "Blockquote":
-        return `<blockquote>${blocks(n)}</blockquote>`;
+      case "Blockquote": {
+        // (`> [!type] Title`: a callout, a card of its type's colour)
+        const head = /^\s*>\s?\[!(\w+)\][-+]?[ \t]*([^\n]*)/.exec(text(n.from, n.to));
+        if (!head) return `<blockquote>${blocks(n)}</blockquote>`;
+        const type = head[1]!.toLowerCase();
+        const title = head[2]!.trim() || type.charAt(0).toUpperCase() + type.slice(1);
+        const inner = blocks(n).replace(/^<p>\[!\w+\][-+]?[^<]*?(?:<br>|<\/p>)/, (m) => (m.endsWith("<br>") ? "<p>" : ""));
+        return `<div class="callout" data-callout="${escapeHtml(type)}"><div class="callout-title">${escapeHtml(title)}</div>${inner}</div>`;
+      }
       case "BulletList":
         return `<ul>${blocks(n)}</ul>`;
       case "OrderedList": {
@@ -199,6 +206,13 @@ export function renderMarkdown(md: string, opts: RenderOptions = {}): string {
         const task = n.getChild("Task");
         // (a tight list's item holds its words, not a paragraph: shown as words)
         const tight = !n.parent || !isLoose(n.parent);
+        // (`[-]` cancelled, `[/]` in progress, `[>]` forwarded: task states read as links)
+        const first = n.getChild("Paragraph");
+        const st = !task && first ? /^\[([-/>])\][ \t]/.exec(text(first.from, first.to)) : null;
+        if (st && first) {
+          const kind = st[1] === "-" ? "cancelled" : st[1] === "/" ? "progress" : "forwarded";
+          return `<li class="task ${kind}"><span class="task-state task-${kind}"></span> ${inline(first, first.from + 3).trim()}${blocks(n, (c) => c.from !== first.from && c.name !== "ListMark")}</li>`;
+        }
         if (task) {
           const marker = task.getChild("TaskMarker");
           const on = marker ? /x/i.test(text(marker.from, marker.to)) : false;

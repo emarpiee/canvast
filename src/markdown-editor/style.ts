@@ -94,6 +94,37 @@ export const EDITOR_CSS = `
 :where(.me-table-grip.is-dragging) { cursor: grabbing; color: var(--me-fg); }
 :where(.me-table) tr.me-drop-target > * { box-shadow: inset 0 -2px 0 var(--me-accent); }
 :where(.me-table-add-row) { grid-column: 1; grid-row: 2; }
+:where(.me) .me-list-line { padding-left: var(--me-hang) !important; text-indent: calc(-1 * var(--me-hang)); }
+:where(.me) .me-list-line > * { text-indent: 0; }
+/* folding */
+:where(.me) .me-foldable { position: relative; }
+:where(.me) .me-fold { position: absolute; left: -18px; top: 0.35em; display: inline-grid; place-items: center; width: 16px; height: 16px; border-radius: 4px; color: var(--me-faint); cursor: pointer; opacity: 0; transition: opacity 0.12s, transform 0.12s; text-indent: 0; }
+:where(.me) .me-foldable:hover .me-fold, :where(.me) .me-fold-cursor .me-fold, :where(.me) .me-fold.is-folded { opacity: 1; }
+:where(.me) .me-fold.is-folded { transform: rotate(-90deg); }
+:where(.me) .me-fold:hover { color: var(--me-fg); background: var(--me-code-bg); }
+:where(.me) .cm-foldPlaceholder { background: var(--me-code-bg); border: 1px solid var(--me-line); border-radius: 4px; color: var(--me-faint); padding: 0 6px; margin-left: 6px; }
+/* task states, broken links, coloured highlights, resizing pictures */
+:where(.me-live) .me-task-state { box-sizing: border-box; width: 1em; height: 1em; border: 1.5px solid var(--me-line); border-radius: 4px; vertical-align: text-bottom; position: relative; }
+:where(.me-live) .me-task-progress { background: linear-gradient(90deg, var(--me-accent) 50%, transparent 50%); border-color: var(--me-accent); cursor: pointer; }
+:where(.me-live) .me-task-cancelled::after { content: ""; position: absolute; inset: 2px; background: var(--me-faint); mask: linear-gradient(45deg, transparent 43%, #000 43% 57%, transparent 57%), linear-gradient(-45deg, transparent 43%, #000 43% 57%, transparent 57%); }
+:where(.me-live) .me-task-forwarded::after { content: ""; position: absolute; inset: 1px; background: var(--me-accent); mask: linear-gradient(#000 0 0) center / 60% 2px no-repeat, linear-gradient(45deg, transparent 50%, #000 50%) right 15% center / 40% 40% no-repeat; }
+:where(.me-live) .me-cancelled { color: var(--me-faint); text-decoration: line-through; }
+:where(.me-live) .me-wikilink-broken { color: var(--me-faint); text-decoration-style: dashed; text-decoration-color: var(--me-faint); }
+:where(.me) .me-hl-orange { background: color-mix(in oklch, var(--me-yellow) 40%, var(--me-red) 20%); } :where(.me) .me-hl-red { background: color-mix(in oklch, var(--me-red) 30%, transparent); }
+:where(.me) .me-hl-pink { background: color-mix(in oklch, var(--me-red) 18%, var(--me-purple) 14%); } :where(.me) .me-hl-purple { background: color-mix(in oklch, var(--me-purple) 30%, transparent); }
+:where(.me) .me-hl-blue { background: color-mix(in oklch, var(--me-blue) 30%, transparent); } :where(.me) .me-hl-green { background: color-mix(in oklch, var(--me-green) 30%, transparent); }
+:where(.me) .me-hl-gray { background: color-mix(in oklch, var(--me-grey) 30%, transparent); }
+:where(.me-media) { position: relative; }
+:where(.me-resize) { position: absolute; right: 4px; bottom: 4px; width: 12px; height: 12px; border-right: 2px solid var(--me-bg); border-bottom: 2px solid var(--me-bg); box-shadow: 1px 1px 0 var(--me-fg); cursor: nwse-resize; opacity: 0; touch-action: none; }
+:where(.me-media:hover) .me-resize { opacity: 1; }
+/* the package's lists of choices (popover.ts) */
+:where(.me-pop) { position: fixed; z-index: 1000; display: flex; flex-direction: column; min-width: 12em; max-height: min(24rem, 70vh); overflow: auto; padding: 4px; background: var(--me-bg); color: var(--me-fg); border: 1px solid var(--me-line); border-radius: var(--me-radius); box-shadow: 0 8px 24px color-mix(in oklch, var(--me-fg) 20%, transparent); font-family: var(--me-font); font-size: 13px; }
+:where(.me-pop-item) { display: flex; justify-content: space-between; gap: 12px; padding: 4px 8px; border: 0; border-radius: 4px; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+:where(.me-pop-item:hover, .me-pop-item:focus-visible) { background: var(--me-code-bg); outline: none; }
+:where(.me-pop-item.is-on) { color: var(--me-accent); font-weight: 600; }
+:where(.me-pop-item:disabled) { opacity: 0.4; cursor: default; }
+:where(.me-pop-item small) { color: var(--me-faint); }
+:where(.me-pop-sep) { height: 1px; margin: 4px 2px; background: var(--me-line); }
 /* the bar over selected words */
 :where(.me-selbar) { position: relative; display: flex; align-items: center; gap: 2px; padding: 3px; }
 :where(.me-selbar-turn) { padding: 0 8px; font-size: 0.85em; color: var(--me-fg); }
@@ -120,6 +151,21 @@ export const EDITOR_CSS = `
 :where(.me-preview) li.task > input { margin-right: 0.4em; cursor: pointer; }
 :where(.me-preview) li.done { color: var(--me-faint); text-decoration: line-through; }
 :where(.me-preview) hr { border: 0; border-top: 1px solid var(--me-line); }
+:where(.me-preview) .callout { --me-callout: var(--me-blue); margin: 0.8em 0; padding: 8px 14px; border: 1px solid color-mix(in oklch, var(--me-callout) 35%, transparent); border-radius: 8px; background: color-mix(in oklch, var(--me-callout) 8%, transparent); }
+:where(.me-preview) .callout-title { font-weight: 600; color: var(--me-callout); }
+:where(.me-preview) .callout > p { margin: 0.3em 0; }
+:where(.me-preview) .callout:is([data-callout="tip"], [data-callout="hint"], [data-callout="important"], [data-callout="success"], [data-callout="check"], [data-callout="done"]) { --me-callout: var(--me-green); }
+:where(.me-preview) .callout:is([data-callout="question"], [data-callout="help"], [data-callout="faq"], [data-callout="example"]) { --me-callout: var(--me-purple); }
+:where(.me-preview) .callout:is([data-callout="warning"], [data-callout="warn"], [data-callout="caution"], [data-callout="attention"]) { --me-callout: var(--me-yellow); }
+:where(.me-preview) .callout:is([data-callout="danger"], [data-callout="error"], [data-callout="bug"], [data-callout="failure"], [data-callout="fail"], [data-callout="missing"]) { --me-callout: var(--me-red); }
+:where(.me-preview) .callout:is([data-callout="quote"], [data-callout="cite"]) { --me-callout: var(--me-grey); }
+:where(.me-preview) .task-state { display: inline-block; width: 1em; height: 1em; margin-right: 0.3em; border: 1.5px solid var(--me-line); border-radius: 4px; vertical-align: text-bottom; }
+:where(.me-preview) .task-progress { background: linear-gradient(90deg, var(--me-accent) 50%, transparent 50%); border-color: var(--me-accent); }
+:where(.me-preview) li.cancelled { color: var(--me-faint); text-decoration: line-through; }
+:where(.me-preview) mark[class^="hl-"] { color: inherit; }
+:where(.me-preview) .hl-red { background: color-mix(in oklch, var(--me-red) 30%, transparent); } :where(.me-preview) .hl-blue { background: color-mix(in oklch, var(--me-blue) 30%, transparent); }
+:where(.me-preview) .hl-green { background: color-mix(in oklch, var(--me-green) 30%, transparent); } :where(.me-preview) .hl-purple { background: color-mix(in oklch, var(--me-purple) 30%, transparent); }
+:where(.me-preview) .hl-gray { background: color-mix(in oklch, var(--me-grey) 30%, transparent); }
 :where(.me-preview) .tag { color: var(--me-tag-fg); background: var(--me-tag-bg); border-radius: 4px; padding: 0 3px; }
 .me.me-plain .cm-editor .cm-scroller { font-family: var(--me-mono); }
 /* (preview mode: CodeMirror's own sheet keeps its editor shown, hidden attribute or not) */

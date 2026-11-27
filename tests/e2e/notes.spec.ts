@@ -130,8 +130,8 @@ test("New note makes a markdown note in the open folder and opens it to write in
   await page(p).click();
   await p.keyboard.press("Control+End");
   await note(p).locator('[data-me="table"]').click();
-  await expect.poll(() => text(p)).toContain("| Column | Column |\n| --- | --- |");
-  await expect(page(p).locator(".me-table table th")).toHaveText(["Column", "Column"]);
+  await expect.poll(() => text(p)).toContain("| Column 1 | Column 2 |\n| --- | --- |");
+  await expect(page(p).locator(".me-table table th")).toHaveText(["Column 1", "Column 2"]);
   // A cell typed in, Tab to the next: the table's Markdown follows.
   await page(p).locator(".me-table td").first().click();
   await p.keyboard.type("Ink");
@@ -472,7 +472,7 @@ test("the note keeps what is done at it: Undo and Redo with the focus off its wo
   await expect.poll(() => p.evaluate(() => window.__canvastDebug.assetListing().then((l) => l.entries.filter((e) => e.name === "keys.md").length))).toBe(1);
 });
 
-test("live, source and preview: a file is kept exactly as written; source shows its marks, preview draws its page and ticks its tasks; Ctrl+E switches", async ({ app }) => {
+test("live, source and preview: a file is kept exactly as written; source shows its marks, preview draws its page and ticks its tasks; Ctrl+4, 5 and 6 switch", async ({ app }) => {
   const p = app.page;
   const SAME = "# Same\n\nfirst line\nsecond line\n\n==marked== and <kbd>Ctrl</kbd>\n\n> [!note] Title\n> body\n\n```c++ x\nint a;\n\n  int b;\n```\n\n````md\n```x\ny\n```\n````\n\n| a | b |\n| :--- | ---: |\n| *i* **b** | 2 |\n\n[[Foo (bar)]] and [x](obsidian://open?f=1)\n\n- [ ] to do\n";
   const FIXED = "T\n===\n\n* star   list\n\n2 * 3 * 4 ![c](cat%20(2).png)\n\n![[cat (2).png]]\n\n1. a\n\n   para\n\n| a |\n|:--|\n| 1 | 2 |\n";
@@ -514,11 +514,11 @@ test("live, source and preview: a file is kept exactly as written; source shows 
   await expect(note(p).locator('[data-me="bold"]')).toBeDisabled();
   await preview.locator("input[data-task]").click();
   await expect.poll(() => text(p)).toBe(SAME.replace("- [ ] to do", "- [x] to do"));
-  // Ctrl+E: back to live and to preview again.
-  await p.keyboard.press("Control+e");
+  // Ctrl+4 back to live, Ctrl+6 to preview again.
+  await p.keyboard.press("Control+4");
   await expect(note(p).locator('[data-me="mode:live"]')).toHaveAttribute("aria-pressed", "true");
   await expect(preview).toBeHidden();
-  await p.keyboard.press("Control+e");
+  await p.keyboard.press("Control+6");
   await expect(preview).toBeVisible();
   await p.getByTestId("slide-view").locator('[data-act="close"]').click();
   await p.getByTestId("choose-dialog").getByLabel("Don't save").check();
@@ -967,7 +967,7 @@ test("Ctrl+F in an open note finds in that note with the focus off its words, in
   await expect.poll(inFind).toBe(true);
 });
 
-test("selected words: a sign typed over them goes round them as Markdown marks; Ctrl+B and Ctrl+I with the cursor in a word take the word", async ({ app }) => {
+test("selected words: a sign typed over them goes round them as Markdown marks; Ctrl+B and Ctrl+I wrap and unwrap, or make an empty pair to type in", async ({ app }) => {
   const p = app.page;
   await p.getByTestId("view-assets").click();
   await p.getByTestId("assets-import-input").setInputFiles({ name: "signs.md", mimeType: "text/markdown", buffer: Buffer.from("first\n\nsecond\n\nthird\n\nfourth word here\n") });
@@ -990,23 +990,20 @@ test("selected words: a sign typed over them goes round them as Markdown marks; 
   await select(2);
   await p.keyboard.type("`");
   await expect.poll(() => text(p)).toContain("\n`third`\n");
-  // With the cursor inside a word: the format goes on and off the word, the cursor staying where it was in it.
-  await line(3).click();
-  await p.keyboard.press("Home");
-  await p.keyboard.press("ArrowRight");
-  await p.keyboard.press("ArrowRight");
+  // Ctrl+B over selected words: marks round them, and off again. With nothing selected: an empty pair, the cursor in it; at its closing
+  // mark, Ctrl+I steps out.
+  await select(3);
   await p.keyboard.press("Control+b");
-  await p.keyboard.type("X");
-  await expect.poll(() => text(p), "the cursor is where it was").toContain("**foXurth** word here");
-  await p.keyboard.press("Backspace");
+  await expect.poll(() => text(p)).toContain("\n**fourth word here**");
   await p.keyboard.press("Control+b");
   await expect.poll(() => text(p)).toContain("\nfourth word here");
   await p.keyboard.press("End");
-  for (let i = 0; i < 7; i++) await p.keyboard.press("ArrowLeft"); // (in `word`)
+  await p.keyboard.type(" ");
   await p.keyboard.press("Control+i");
-  await expect.poll(() => text(p)).toContain("fourth *word* here");
+  await p.keyboard.type("x");
   await p.keyboard.press("Control+i");
-  await expect.poll(() => text(p)).toContain("fourth word here");
+  await p.keyboard.type(" y");
+  await expect.poll(() => text(p)).toContain("fourth word here *x* y");
   expect(app.consoleErrors).toEqual([]);
 });
 
@@ -1103,4 +1100,51 @@ test("Escape closes a note open on a canvas, in the panel and in the window: the
   await expect(p.getByTestId("note-panel")).toBeVisible();
   await p.keyboard.press("Escape");
   await expect(p.getByTestId("note-panel")).toBeHidden();
+});
+
+test("lists as notes apps write them: Enter adds the next item right below, numbers follow a moved line, Ctrl+L makes and ticks a task, Alt+Up moves a line", async ({ app }) => {
+  const p = app.page;
+  await p.getByTestId("view-assets").click();
+  await p.getByTestId("assets-import-input").setInputFiles({ name: "lists.md", mimeType: "text/markdown", buffer: Buffer.from("# Lists\n\n1. one\n\n2. two\n3. three\n\nplain\n") });
+  await p.locator('[data-testid="asset-card"][title="lists.md"]').dblclick();
+  await expect(heading(p)).toBeVisible();
+  // (a loose list: Enter still opens the next item without a blank line)
+  await page(p).locator(".cm-line", { hasText: "three" }).click();
+  await p.keyboard.press("End");
+  await p.keyboard.press("Enter");
+  await p.keyboard.type("four");
+  await expect.poll(() => text(p)).toContain("3. three\n4. four\n");
+  // Alt+Up: the line moves up, and the numbers follow it.
+  await p.keyboard.press("Alt+ArrowUp");
+  await expect.poll(() => text(p)).toContain("2. two\n3. four\n4. three\n");
+  // Ctrl+L: a plain line becomes a task, then is ticked.
+  await page(p).locator(".cm-line", { hasText: "plain" }).click();
+  await p.keyboard.press("Control+l");
+  await expect.poll(() => text(p)).toContain("- [ ] plain");
+  await p.keyboard.press("Control+l");
+  await expect.poll(() => text(p)).toContain("- [x] plain");
+});
+
+test("callouts are cards (typed with [! and its list), a heading folds what is under it, and a table cell's menu acts on its row and column", async ({ app }) => {
+  const p = app.page;
+  const FILE = "# Folds\n\nUnder the heading.\n\n> [!warning] Mind\n> the step\n\n| a | b |\n| --- | --- |\n| 2 | x |\n| 1 | y |\n";
+  await p.getByTestId("view-assets").click();
+  await p.getByTestId("assets-import-input").setInputFiles({ name: "folds.md", mimeType: "text/markdown", buffer: Buffer.from(FILE) });
+  await p.locator('[data-testid="asset-card"][title="folds.md"]').dblclick();
+  await expect(page(p).locator(".me-callout-warning.me-callout-head")).toContainText("Mind");
+  // Sort by the first column from a cell's menu.
+  await page(p).locator(".me-table td").first().click({ button: "right" });
+  await p.locator(".me-pop .me-pop-item", { hasText: "Sort column (A → Z)" }).click();
+  await expect.poll(() => text(p)).toContain("| 1 | y |\n| 2 | x |");
+  // A new callout: `[!` in a quote offers the types.
+  await page(p).click();
+  await p.keyboard.press("Control+End");
+  await p.keyboard.type("> [!");
+  await choice(p, "Tip").click();
+  await expect.poll(() => text(p)).toMatch(/> \[!tip\] $/);
+  // The heading's arrow folds everything under it.
+  await heading(p).hover();
+  await page(p).locator(".me-foldable .me-fold").first().dispatchEvent("mousedown");
+  await expect(page(p).locator(".cm-foldPlaceholder")).toHaveCount(1);
+  await expect(page(p).locator(".cm-line", { hasText: "Under the heading." })).toHaveCount(0);
 });

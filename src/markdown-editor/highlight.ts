@@ -54,4 +54,31 @@ const codeLines = ViewPlugin.fromClass(
   { decorations: (v) => v.decorations },
 );
 
-export const markdownLook: Extension = [syntaxHighlighting(style), codeLines];
+/** List items hang: a wrapped line starts under the item's words, not under its mark. */
+const LIST_LINE = /^(\s*(?:>\s?)*\s*(?:[-*+]|\d{1,9}[.)])\s+(?:\[[ xX/>-]\]\s+)?)/;
+const hangingLists = ViewPlugin.fromClass(
+  class {
+    decorations: DecorationSet;
+    constructor(view: EditorView) {
+      this.decorations = this.build(view);
+    }
+    update(u: ViewUpdate): void {
+      if (u.docChanged || u.viewportChanged) this.decorations = this.build(u.view);
+    }
+    build(view: EditorView): DecorationSet {
+      const out: Range<Decoration>[] = [];
+      for (const { from, to } of view.visibleRanges) {
+        for (let pos = from; pos <= to; ) {
+          const line = view.state.doc.lineAt(pos);
+          pos = line.to + 1;
+          const m = LIST_LINE.exec(line.text);
+          if (m) out.push(Decoration.line({ class: "me-list-line", attributes: { style: `--me-hang: ${m[1]!.replace(/\t/g, "    ").length}ch` } }).range(line.from));
+        }
+      }
+      return Decoration.set(out, true);
+    }
+  },
+  { decorations: (v) => v.decorations },
+);
+
+export const markdownLook: Extension = [syntaxHighlighting(style), codeLines, hangingLists];
