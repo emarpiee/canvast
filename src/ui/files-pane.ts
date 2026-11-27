@@ -3,7 +3,7 @@ import { esc } from "./format";
 import { openMoreMenu } from "./more-menu";
 import type { MenuItem } from "./more-menu";
 import { promptDialog } from "./confirm";
-import { treeGuides, treeSlot, walkTree } from "./tree";
+import { followRowActions, walkTree } from "./tree";
 import { NAV_COMMAND, navOptions, workspaceRowMenu } from "./workspace-menus";
 import { canSwitchWorkspace, openWorkspaceSwitcher } from "./workspace-switch";
 import { pressCommand } from "../commands/registry";
@@ -32,10 +32,11 @@ export function mountFilesPane(body: HTMLElement, o: { session: Session; foot: H
   body.innerHTML = `
     <div class="pane-actions" data-cmd-group="Files">
       <button type="button" class="layer-btn" data-files="new-canvas" data-testid="files-new-canvas" aria-label="New canvas" title="New canvas, on the open board">${ICONS.infinity}</button>
+      <button type="button" class="layer-btn" data-files="new-note" data-testid="files-new-note" aria-label="New note" title="New note, in the Library">${ICONS.notebookPen}</button>
       <button type="button" class="layer-btn" data-files="new-board" data-testid="files-new-board" aria-label="New board" title="New board, with its first canvas">${ICONS.squareStack}</button>
       <button type="button" class="layer-btn" data-files="fold-all" data-testid="files-fold-all" aria-label="Fold every board" title="Fold every board">${ICONS.chevronsDownUp}</button>
     </div>
-    <div class="files-tree" role="tree" aria-label="Boards and canvases" data-testid="files-tree"></div>`;
+    <ul class="side-list files-tree" role="tree" aria-label="Boards and canvases" data-testid="files-tree"></ul>`;
   const list = body.querySelector<HTMLElement>(".files-tree")!;
   o.foot.innerHTML = `<button type="button" class="files-ws" data-testid="files-workspace" aria-haspopup="menu" aria-expanded="false">${ICONS.folderOpen}<span class="files-ws-name"></span>${ICONS.chevronDown}</button>`;
   const wsButton = o.foot.querySelector<HTMLElement>(".files-ws")!;
@@ -57,13 +58,13 @@ export function mountFilesPane(body: HTMLElement, o: { session: Session; foot: H
     }
     const cur = session.current?.canvasId;
     const roots: Node[] = tree.boards.map(({ board, canvases }) => ({ kind: "board", id: board.id, name: board.name, kids: canvases.map((c) => ({ kind: "canvas", id: c.id, name: c.name, kids: [] })) }));
+    // (rows as the Library's folders: no arrow before the icon; a board shows the branch mark and its count at the right, and folds on a click)
     list.innerHTML = walkTree(roots, (n) => n.kids, (n) => !folded.has(n.id), (n, at) => {
       const here = n.kind === "canvas" && n.id === cur;
-      return `<div class="tree-row files-row${here ? " is-current" : ""}" role="treeitem" style="--depth:${at.depth}" data-kind="${n.kind}" data-id="${esc(n.id)}" aria-selected="${here}"${at.hasKids ? ` aria-expanded="${at.open}"` : ""}>
-        ${treeGuides(at.depth, at.last, at.conts)}${treeSlot(at, `data-twist="${esc(n.id)}"`)}
-        <button type="button" class="files-item" data-open="${n.kind}" data-id="${esc(n.id)}" title="${esc(n.name)}">${n.kind === "board" ? ICONS.squareStack : ICONS.infinity}<span class="files-name">${esc(n.name)}</span></button>
-        <button type="button" class="layer-btn files-more" data-more="${n.kind}" data-id="${esc(n.id)}" aria-haspopup="menu" aria-expanded="false" aria-label="More actions for ${n.kind} ${esc(n.name)}" title="More: rename, export, delete">${ICONS.ellipsis}</button>
-      </div>`;
+      return `<li class="side-row tree-row files-row has-more${here ? " is-current" : ""}" role="treeitem" style="--depth:${at.depth}" data-kind="${n.kind}" data-id="${esc(n.id)}" aria-selected="${here}"${n.kind === "board" ? ` aria-expanded="${at.open}"` : ""}>
+        <button type="button" class="side-item${here ? " is-active" : ""}" data-open="${n.kind}" data-id="${esc(n.id)}" title="${esc(n.name)}">${n.kind === "board" ? ICONS.squareStack : ICONS.infinity}<span class="side-label">${esc(n.name)}</span>${n.kind === "board" ? `<span class="side-kids" aria-hidden="true"></span><span class="side-n">${n.kids.length}</span>` : ""}</button>
+        <button type="button" class="side-more" data-more="${n.kind}" data-id="${esc(n.id)}" aria-haspopup="menu" aria-expanded="false" aria-label="More actions for ${n.kind} ${esc(n.name)}" title="More: rename, export, delete">${ICONS.ellipsis}</button>
+      </li>`;
     });
   };
 
@@ -85,11 +86,12 @@ export function mountFilesPane(body: HTMLElement, o: { session: Session; foot: H
     if (cmd) void pressCommand(cmd[0], navOptions(action, id, attrs));
   };
 
-  // commands: canvas.openId, go.canvas, workspace.newCanvas, workspace.newBoard, and each row's More menu (NAV_COMMAND); a board's fold is view state
+  // commands: canvas.openId, go.canvas, workspace.newCanvas, library.newNote, workspace.newBoard, and each row's More menu (NAV_COMMAND); a board's fold is view state
   body.addEventListener("click", (e) => {
     const t = e.target as HTMLElement;
     const tool = t.closest<HTMLElement>("[data-files]")?.dataset["files"];
     if (tool === "new-canvas") return void pressCommand("workspace.newCanvas");
+    if (tool === "new-note") return void pressCommand("library.newNote");
     if (tool === "new-board") return void pressCommand("workspace.newBoard");
     if (tool === "fold-all") {
       // view-state: (every board folded)
@@ -97,14 +99,13 @@ export function mountFilesPane(body: HTMLElement, o: { session: Session; foot: H
       keepFolded();
       return render();
     }
-    const twist = t.closest<HTMLElement>("[data-twist]")?.dataset["twist"];
     const more = t.closest<HTMLElement>("[data-more]");
     if (more && session.tree) {
       const m = workspaceRowMenu(session.tree, more.dataset["more"] as "board" | "canvas", more.dataset["id"]!, (action, attrs) => act(action, more.dataset["id"]!, attrs));
       return void openMoreMenu(more, m.items, m.label);
     }
     const open = t.closest<HTMLElement>("[data-open]");
-    const id = twist ?? (open?.dataset["open"] === "board" ? open.dataset["id"] : undefined);
+    const id = open?.dataset["open"] === "board" ? open.dataset["id"] : undefined;
     if (id) {
       // view-state: (a board folded or unfolded)
       if (folded.has(id)) folded.delete(id);
@@ -138,6 +139,7 @@ export function mountFilesPane(body: HTMLElement, o: { session: Session; foot: H
     openMoreMenu(wsButton, items, "The workspace");
   });
 
+  followRowActions(list);
   session.subscribe(render);
   render();
 }

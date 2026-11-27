@@ -54,7 +54,7 @@ import { bindContextMenu, grouped as groupedMenu } from "./context-menu";
 import { openTreeChooser } from "./tree-chooser";
 import type { ChoiceNode, ChoiceState, ChoiceTab, ChooserView } from "./tree-chooser";
 import { capList, showMoreButton } from "./show-more";
-import { pathNodes, treeGuides, treeSearch, treeSlot, walkTree } from "./tree";
+import { pathNodes, treeGuides, treeSearch, treeSlot, walkTree, followRowActions } from "./tree";
 import { formatTags } from "../doc/tags";
 import { cleanFileName, splitName } from "../doc/rename-rules";
 import { copyBytes, copyItemsAsFiles, copyItemsToClipboard, sayingProgress, type CopyDeps } from "../app/copy-items";
@@ -563,13 +563,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   const side = root.querySelector<HTMLElement>(".assets-side")!;
   // view-state: (a row the pointer or the keys come to places its Pin and More just before its marks, branch and count: their width,
   // measured once as it is entered, `--end-w`)
-  const placeRowActions = (e: Event): void => {
-    const row = (e.target as Element | null)?.closest?.<HTMLElement>(".side-row.tree-row.has-more");
-    const end = row?.querySelector(".side-item")?.querySelector(":scope > :is(.side-pinned, .side-kids, .side-n)");
-    if (row) row.style.setProperty("--end-w", `${end ? Math.round(row.getBoundingClientRect().right - end.getBoundingClientRect().left) : 0}px`);
-  };
-  side.addEventListener("pointerover", placeRowActions);
-  side.addEventListener("focusin", placeRowActions);
+  followRowActions(side);
 
   // What the user chose to hide (the details panel, the viewer's controls) is remembered on this device.
   const UI_KEY = "canvast.assets.ui";

@@ -82,3 +82,17 @@ export function pathNodes<V>(names: ReadonlyArray<{ id: string; name: string; va
   }
   return [...out.values()];
 }
+
+/**
+ * Under the pointer (or the focus), a sidebar row's Pin and More come just before its marks, branch mark and count, over the end of its name:
+ * `--end-w` is their width, measured as the pointer enters the row (the Library's folders, the Files pane). Watches `container`.
+ */
+export function followRowActions(container: HTMLElement): void {
+  const place = (e: Event): void => {
+    const row = (e.target as Element | null)?.closest?.<HTMLElement>(".side-row.tree-row.has-more");
+    const end = row?.querySelector(".side-item")?.querySelector(":scope > :is(.side-pinned, .side-kids, .side-n)");
+    if (row) row.style.setProperty("--end-w", `${end ? Math.round(row.getBoundingClientRect().right - end.getBoundingClientRect().left) : 0}px`);
+  };
+  container.addEventListener("pointerover", place);
+  container.addEventListener("focusin", place);
+}

@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.63.23 — Files rows as the Library's folders (2026-11-27)
+
+- **Changed:** the Files pane's rows look and act as the Library's folder rows: no arrow before the icon, a board shows the branch mark and its count at the right and folds on a click, and More comes under the pointer before the marks; a New note button joins its tools. ([The interface](README.md#the-interface))
+
+### For developers
+
+- `followRowActions` (`ui/tree.ts`): the one placement of a sidebar row's Pin and More, for the Library and the Files pane.
+
 ## 0.63.22 — The Files pane (2026-11-27)
 
 - **Added:** the Files pane in the left sidebar (B39): the boards and their canvases as a tree; a click opens a canvas, a board folds, each row's ⋯ menu has the board and canvas actions, and its foot is the workspace (rename, back up, export files, import, switch). ([The interface](README.md#the-interface))
