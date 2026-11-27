@@ -10,7 +10,7 @@ export const GROUPS = {
   library: ["assets", "organize", "components", "library-folder", "notes", "file-views"],
   storage: ["storage", "archive", "upgrade"],
   desktop: ["desktop"],
-  interface: ["settings", "dock", "a11y", "contrast", "icon-audit", "scrub-audit", "bar-layouts", "commands"],
+  interface: ["settings", "dock", "a11y", "contrast", "icon-audit", "scrub-audit", "bar-layouts", "commands", "shell"],
   packages: ["colour-picker", "colour-picker-package", "patterns-package"],
   artcraft: ["photocraft"],
   smoke: ["scenarios", "release"],
