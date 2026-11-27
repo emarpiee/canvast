@@ -343,7 +343,7 @@ html, body {
 
 #canvas-host {
   position: fixed;
-  inset: var(--shell-t) var(--shell-r) 0 var(--shell-l); /* (between the ribbon and sidebars, under the tabs, B39) */
+  inset: var(--shell-t) var(--shell-r) var(--shell-b) var(--shell-l); /* (between the ribbon and sidebars, under the tabs, B39) */
 }
 
 /* A finger that drags a slider or a number's name must not scroll the bar or page under it: the drag is the control's (otherwise the browser takes it and cancels it) */
@@ -1018,11 +1018,11 @@ dialog.confirm .secret-field .prompt-input { padding-right: calc(var(--icon-xl) 
 .media-volume { width: 84px; }
 
 /* Settings view (ui/settings-view.ts). */
-#settings-view { position: fixed; inset: var(--shell-t) var(--shell-r) 0 var(--shell-l); z-index: 2; display: flex; flex-direction: column; padding: calc((var(--nav-bottom, var(--s-15)) + 2 * var(--near)) / var(--ui-scale, 1)) var(--s-8) 0; background: var(--theme-bg); font: var(--text-md)/1.4 var(--font-ui); }
+#settings-view { position: fixed; inset: var(--shell-t) var(--shell-r) var(--shell-b) var(--shell-l); z-index: 2; display: flex; flex-direction: column; padding: calc((var(--nav-bottom, var(--s-15)) + 2 * var(--near)) / var(--ui-scale, 1)) var(--s-8) 0; background: var(--theme-bg); font: var(--text-md)/1.4 var(--font-ui); }
 #settings-view[hidden] { display: none; }
 /* PhotoCraft's view (src/artcraft/photocraft/): the shared panel over the whole app, its frame filling the body */
 /* (as the Library and Settings: the whole window, opaque, its frame under the top bar; nothing of the canvas shows or reaches through) */
-.photocraft-view.layers-panel { position: fixed; inset: var(--shell-t) var(--shell-r) 0 var(--shell-l); z-index: var(--z-view); padding-top: calc((var(--nav-bottom, var(--s-15)) + var(--near)) / var(--ui-scale, 1)); border: 0; border-radius: 0; background: var(--theme-bg); backdrop-filter: none; overflow: hidden; }
+.photocraft-view.layers-panel { position: fixed; inset: var(--shell-t) var(--shell-r) var(--shell-b) var(--shell-l); z-index: var(--z-view); padding-top: calc((var(--nav-bottom, var(--s-15)) + var(--near)) / var(--ui-scale, 1)); border: 0; border-radius: 0; background: var(--theme-bg); backdrop-filter: none; overflow: hidden; }
 .photocraft-view .panel-body { display: flex; overflow: hidden; }
 .photocraft-frame { flex: 1 1 auto; width: 100%; height: 100%; border: 0; display: block; }
 .photocraft-status { margin: 0; padding: var(--s-2) var(--s-6); }
@@ -1324,7 +1324,7 @@ body.has-ctx-bar:not([data-view="assets"]) #notices { bottom: calc(2 * var(--s-1
 /* ---- Assets view (ui/assets-view.ts, ADR 0054) ------------------------------------------------------------------------
    One flat page under the view tabs: a library bar on the tabs' row, the library on the left, a gallery (or the viewer) in the middle
    and the details on the right. Cards carry the picture only; the rest appears on hover, focus and selection. */
-.library-view { position: fixed; inset: var(--shell-t) var(--shell-r) 0 var(--shell-l); z-index: 2; display: flex; flex-direction: column; padding: var(--edge) var(--edge) 0; background: var(--theme-bg); font: var(--text-md)/1.4 var(--font-ui); }
+.library-view { position: fixed; inset: var(--shell-t) var(--shell-r) var(--shell-b) var(--shell-l); z-index: 2; display: flex; flex-direction: column; padding: var(--edge) var(--edge) 0; background: var(--theme-bg); font: var(--text-md)/1.4 var(--font-ui); }
 .library-view[hidden] { display: none; }
 /* (a Library in a Pins window, ADR 0208: the same view, laid out in the window, without its details panels) */
 .library-view.is-embedded { position: relative; inset: auto; z-index: auto; height: 100%; padding: var(--s-4) var(--s-4) 0; box-sizing: border-box; }
@@ -3613,9 +3613,9 @@ button.archive-crumb:hover { background: var(--hud-hover); color: var(--hud-fg);
 #ribbon button { display: inline-flex; align-items: center; justify-content: center; width: var(--ctl); height: var(--ctl); padding: 0; color: var(--hud-muted); background: transparent; border: 0; border-radius: var(--ctl-r); cursor: pointer; }
 #ribbon button:hover, #ribbon button[aria-pressed="true"] { color: var(--hud-fg); background: var(--hud-hover); }
 #ribbon button svg { width: var(--icon-md); height: var(--icon-md); }
-.sidebar { position: fixed; z-index: var(--z-edge); top: 0; bottom: 0; box-sizing: border-box; display: flex; flex-direction: column; min-width: 0; background: var(--paper); }
+.sidebar { position: fixed; z-index: var(--z-edge); top: 0; bottom: var(--shell-b); box-sizing: border-box; display: flex; flex-direction: column; min-width: 0; background: var(--paper); }
 #sidebar-left { left: var(--ribbon-w); width: var(--sidebar-w); border-right: 1px solid var(--hud-border); }
-#sidebar-right { right: 0; width: var(--sidebar-r-w); border-left: 1px solid var(--hud-border); padding-bottom: var(--status-h); }
+#sidebar-right { right: 0; width: var(--sidebar-r-w); border-left: 1px solid var(--hud-border); }
 :root:not([data-left="open"]) #sidebar-left, :root:not([data-right="open"]) #sidebar-right { display: none; }
 .sb-head { flex: none; display: flex; align-items: center; gap: var(--s-2); height: var(--tab-strip-h); box-sizing: border-box; padding: 0 var(--s-4); border-bottom: 1px solid var(--hud-border); background: var(--shell-bg); }
 .sb-tabs { flex: 1; min-width: 0; display: flex; gap: var(--s-1); overflow-x: auto; scrollbar-width: none; }
@@ -3654,6 +3654,18 @@ button.archive-crumb:hover { background: var(--hud-hover); color: var(--hud-fg);
 /* The status bar: what the focused view says (its counts, zoom and whether it is saved), at the bottom right, as wide as what it says. */
 #statusbar { position: fixed; z-index: var(--z-edge); right: 0; bottom: 0; height: var(--status-h); box-sizing: border-box; display: flex; align-items: center; max-width: calc(100vw - var(--shell-l)); padding: 0 var(--s-4); background: var(--shell-bg); border-top: 1px solid var(--hud-border); border-left: 1px solid var(--hud-border); border-top-left-radius: var(--r-sm); color: var(--hud-muted); font: var(--font-meta); }
 #statusbar.is-empty { display: none; }
+/* The status bar (B39): one strip along the bottom of the window, from the ribbon to the right edge, in every view; the sidebars and the
+   views end above it. It says what the view in front has to say: the canvas's information, or the Library's counts and view buttons. */
+:root { --shell-b: var(--status-h); }
+:root[data-shell="legacy"], :root[data-status="off"], body.no-readout:not([data-view="assets"]):not(.status-library) { --shell-b: 0px; }
+:root:not([data-shell="legacy"]) #statusbar { left: var(--ribbon-w); max-width: none; border-left: 0; border-top-left-radius: 0; }
+body:is([data-view="assets"], .status-library) #statusbar.is-empty { display: flex; }
+body:is([data-view="assets"], .status-library) #statusbar > .hud-readout, body:not([data-view="assets"]):not(.status-library) #statusbar > .assets-statusbar { display: none; }
+#statusbar > .assets-statusbar { position: static; flex: 1; display: flex; flex-direction: row; align-items: center; min-width: 0; height: 100%; margin: 0; background: none; border: 0; pointer-events: auto; }
+#statusbar > .assets-statusbar > .hud-readout { order: 1; flex: 1; min-width: 0; overflow: hidden; }
+#statusbar > .assets-statusbar > .hud-controls { position: static; order: 2; margin: 0; padding: 0; gap: var(--s-1); background: none; border: 0; box-shadow: none; backdrop-filter: none; }
+#statusbar > .assets-statusbar > .hud-controls > [hidden] { display: none; }
+#statusbar > .assets-statusbar > .hud-controls button { min-width: var(--row-btn); height: var(--row-btn); padding: 0 var(--s-2); }
 #statusbar .hud-readout { position: static; flex-direction: row; align-items: center; gap: var(--s-6); max-width: none; padding: 0; background: none; border: 0; border-radius: 0; box-shadow: none; backdrop-filter: none; font: inherit; color: inherit; }
 #statusbar .hud-readout button { font: inherit; color: inherit; }
 /* The tabs (B39): the strip at the top of the view's room, then the view header (Back, Forward, where this is). */
@@ -3681,10 +3693,10 @@ button.archive-crumb:hover { background: var(--hud-hover); color: var(--hud-fg);
 .view-crumb.is-here { color: var(--hud-fg); font-weight: var(--weight-semibold); }
 .view-sep { color: var(--hud-ghost); }
 /* A file in a tab of its own (Settings > Notes > Files on a canvas: Tab): the view's room, under the tabs. */
-.layers-panel.note-tab { position: fixed; z-index: 3; inset: var(--shell-t) var(--shell-r) 0 var(--shell-l); display: flex; flex-direction: column; width: auto; max-width: none; max-height: none; margin: 0; border: 0; border-radius: 0; box-shadow: none; background: var(--paper); animation: none; }
+.layers-panel.note-tab { position: fixed; z-index: 3; inset: var(--shell-t) var(--shell-r) var(--shell-b) var(--shell-l); display: flex; flex-direction: column; width: auto; max-width: none; max-height: none; margin: 0; border: 0; border-radius: 0; box-shadow: none; background: var(--paper); animation: none; }
 .layers-panel.note-tab[hidden] { display: none; }
 /* A new tab's start page: over the view, under the tabs. */
-.start-page { position: fixed; z-index: 3; inset: var(--shell-t) var(--shell-r) 0 var(--shell-l); overflow-y: auto; background: var(--theme-bg); }
+.start-page { position: fixed; z-index: 3; inset: var(--shell-t) var(--shell-r) var(--shell-b) var(--shell-l); overflow-y: auto; background: var(--theme-bg); }
 .start-page[hidden] { display: none; }
 .start-inner { max-width: 560px; margin: 12vh auto 0; padding: 0 var(--s-8); }
 .start-title { margin: 0 0 var(--s-8); font: var(--weight-semibold) var(--text-2xl) var(--font-ui); }

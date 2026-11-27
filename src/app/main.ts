@@ -2325,6 +2325,7 @@ async function start(): Promise<void> {
   if (canvasReadout) {
     statusbar.append(canvasReadout);
     classWhen(statusbar, "is-empty", () => !!canvasReadout.hidden, [canvasReadout], ["hidden"]);
+    classWhen(document.body, "no-readout", () => !!canvasReadout.hidden, [canvasReadout], ["hidden"]); // (the views then reach the bottom)
   }
   sidebarLeft.add({ id: "files", title: "Files", icon: ICONS.files, mount: (body) => mountFilesPane(body, { session, foot: sidebarLeft.foot }) });
   // The panels as panes (B39): Bookmarks on the left, the canvas's tools on the right. A pane shown in an open sidebar is its panel open
@@ -2427,6 +2428,7 @@ async function start(): Promise<void> {
   }
   /** The Library beside the canvas (a split's tab), or not. */
   const splitLibrary = (on: boolean): void => {
+    document.body.classList.toggle("status-library", on); // (the status bar follows the view just shown)
     if (on === (root.dataset["splitView"] === "library")) return;
     if (on) (root.dataset["splitView"] = "library"), assetsView.show();
     else {
@@ -2524,6 +2526,16 @@ async function start(): Promise<void> {
   /** A Library view in `root` (the Library view, and a Pins window's: ADR 0208, embedded, without its details panel). */
   const libraryIn = (root: HTMLElement, embedded = false) => mountAssetsView(root, session, assets, () => setView("canvas"), notices, settings, libraryFonts, PHOTOCRAFT_FEATURES.entry.libraryItems && photoCraft.available ? (hash) => void photoCraft.editItem(hash) : undefined, { embedded });
   const assetsView = libraryIn(assetsRoot);
+  // (the Library's status line and view buttons are the workspace's status bar's while the Library is in front, B39; the specs' layout keeps
+  // them in the Library's column)
+  const libraryStatus = assetsRoot.querySelector<HTMLElement>(".assets-statusbar");
+  if (libraryStatus && document.documentElement.dataset["shell"] !== "legacy") statusbar.append(libraryStatus);
+  // (with the Library beside the canvas, the status bar follows the one in use: a press in the Library shows its status, one elsewhere the canvas's)
+  // view-state: (which view's status the status bar shows)
+  document.addEventListener("pointerdown", (e) => {
+    const inLibrary = document.documentElement.dataset["splitView"] === "library" && !!(e.target as HTMLElement).closest?.(".library-view");
+    document.body.classList.toggle("status-library", inLibrary);
+  }, true);
   // The Library's folders, tags and searches are a pane of the left sidebar (B39), beside Files: they choose what the Library shows, and a
   // choice made while another view shows opens the Library in the active tab.
   const librarySide = assetsRoot.querySelector<HTMLElement>(".assets-side");

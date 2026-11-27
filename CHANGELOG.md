@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.63.37 — The status bar along the bottom (2026-11-27)
+
+- **Changed:** the status bar is one strip along the whole bottom of the window, under the sidebars and the view, in every view: the canvas's information on a canvas, the Library's counts and view buttons in the Library, and with the Library beside the canvas, the one last clicked (B39). ([The interface](README.md#the-interface))
+
 ## 0.63.36 — The palette's new look (2026-11-27)
 
 - **Changed:** the command palette and the quick switcher: a prompt mark before the box, rows read "Group: Title" with their keys in chips, key hints at the foot, and the workspace dimmed behind (B39). ([The command palette](README.md#the-command-palette))
