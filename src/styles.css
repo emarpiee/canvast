@@ -3779,7 +3779,11 @@ body:is([data-view="assets"], .status-library) #statusbar > .hud-readout, body:n
 }
 /* The tests' layout (tests/e2e/harness.ts sets data-shell="legacy"): the app as the specs were written, without the ribbon, the tabs and the
    view header, with the top-left buttons; the sidebars still hold the panels. */
-:root[data-shell="legacy"] { --shell-l: var(--side-l); --shell-t: 0px; }
+:root[data-shell="legacy"] { --shell-l: var(--side-l); --shell-r: 0px; --shell-t: 0px; }
+/* (there the right sidebar floats over the canvas, as the panels did: the canvas keeps its size when a panel opens; the panels' buttons and
+   the settings gear stay beside it) */
+:root[data-shell="legacy"] #toolbar > .dock { right: calc((var(--side-r) + var(--edge)) / var(--ui-scale, 1)); }
+:root[data-shell="legacy"] .view-settings { right: calc(var(--side-r) / var(--ui-scale, 1) + var(--edge)); }
 :root[data-shell="legacy"] :is(#ribbon, .tabbar, .viewhead) { display: none; }
 :root[data-shell="legacy"] #sidebar-left { left: 0; }
 :root[data-shell="legacy"] #notices { right: auto; left: 50%; bottom: var(--s-10); transform: translateX(-50%); align-items: center; width: min(520px, calc(100vw - 2 * var(--edge))); }

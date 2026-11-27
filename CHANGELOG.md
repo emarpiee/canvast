@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.63.44 — The specs' layout: panels over the canvas (2026-11-27)
+
+### For developers
+
+- In the specs' layout (`data-shell="legacy"`) the right sidebar floats over the canvas as the panels did, so the canvas keeps its size when a panel opens; the panels' buttons and the settings gear stay beside it (B39).
+
 ## 0.63.43 — Settings is a real modal; PhotoCraft on the ribbon; a flat Library pane (2026-11-27)
 
 - **Fixed before release:** with Settings open, the workspace around it no longer takes clicks or keyboard focus; a click on its backdrop closes it, as its × does (B39). ([Settings](README.md#settings))
