@@ -2247,6 +2247,13 @@ async function start(): Promise<void> {
   const assetsRoot = document.getElementById("assets-view")!;
   /** The right sidebar's pane before the Library took it for its details (shown again with the canvas). */
   let rightBeforeLibrary: string | null = null;
+  /** The backdrop of Settings over the workspace: a click on it closes Settings, as its × does. */
+  const settingsScrim = document.createElement("div");
+  settingsScrim.className = "settings-scrim";
+  settingsScrim.hidden = true;
+  document.body.append(settingsScrim);
+  // commands: (closes Settings through its × button, which returns to the view before)
+  settingsScrim.addEventListener("click", () => document.querySelector<HTMLElement>("#settings-view [data-done]")?.click());
   const setView = (v: AppView): void => {
     // (the start page of a new tab covers the view: going to the canvas or the Library uncovers it, and the tab goes there)
     if (v === appView) {
@@ -2256,6 +2263,10 @@ async function start(): Promise<void> {
     const was = appView;
     appView = v;
     document.body.dataset["view"] = v;
+    // (Settings over the workspace, B39, is a modal: the workspace around it takes no click and no focus, and its backdrop closes it)
+    const settingsModal = v === "settings" && document.documentElement.dataset["shell"] !== "legacy";
+    for (const id of ["ribbon", "sidebar-left", "sidebar-right", "tabbar", "viewhead", "tabbar-split", "viewhead-split", "statusbar", "nav"]) document.getElementById(id)?.toggleAttribute("inert", settingsModal);
+    settingsScrim.hidden = !settingsModal;
     markTab(v);
     markNav(v);
     host.inert = v !== "canvas";
@@ -2555,6 +2566,9 @@ async function start(): Promise<void> {
   // (the Pins window's button is the ribbon's, with its handler)
   const pinsButton = document.querySelector<HTMLElement>('[data-testid="reference-open"]');
   if (pinsButton && document.documentElement.dataset["shell"] !== "legacy") document.querySelector('[data-ribbon-slot="top"]')?.append(pinsButton);
+  // (PhotoCraft's button too: a ribbon button, as the Pins window's, not a leftover at the canvas's top left)
+  const photoCraftSwitch = document.getElementById("photocraft-switch");
+  if (photoCraftSwitch?.firstElementChild && document.documentElement.dataset["shell"] !== "legacy") document.querySelector('[data-ribbon-slot="top"]')?.append(photoCraftSwitch);
   void followFrameSetting(settings);
   followScrolling();
   markTab("canvas");

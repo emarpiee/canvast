@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.63.43 — Settings is a real modal; PhotoCraft on the ribbon; a flat Library pane (2026-11-27)
+
+- **Fixed before release:** with Settings open, the workspace around it no longer takes clicks or keyboard focus; a click on its backdrop closes it, as its × does (B39). ([Settings](README.md#settings))
+- **Changed:** PhotoCraft's button is on the ribbon (with Pins), not left over at the canvas's top left; the Library pane in the sidebar is flat sections with small capital names, as the reference draws it (B39). ([The interface](README.md#the-interface))
+
 ## 0.63.42 — The Library's details in the Properties pane (2026-11-27)
 
 - **Changed:** the Library's details (Place, favourite, tags, folder, properties, where it is used) are in the right sidebar's Properties pane while the Library is in front, so the Library keeps its whole width for its items, beside the canvas too; the right sidebar shows that pane with the Library and the canvas's pane again with the canvas. A narrow window keeps them in the Library as before (B39). ([The interface](README.md#the-interface))

@@ -85,7 +85,7 @@
   --z-item-pop: 7;
   --z-edge: 10;
   --z-view: 2; /* a view of the app under its top bar (Settings, PhotoCraft): above the canvas, under the bars and the menus */
-  --z-modal: 30; --z-pop: 60; /* menus and popovers opened from a button: above the edge bars, the panels and the Settings view */
+  --z-scrim: 29; --z-modal: 30; --z-pop: 60; /* menus and popovers opened from a button: above the edge bars, the panels and the Settings view */
   --z-reference: 50; /* the reference windows (ADR 0207): over every view, the bars and the panels; under menus, popovers and dialogs */
   --z-window: 70; /* the frameless window's row and its top edge, over everything of the page (in a modal, they are in its top layer) */
   /* Animation (Settings > Performance): every duration and curve here, so one setting changes them all. --anim-speed and --anim-move are set by the settings (none: the durations below are made 0 by the rule at the end of this block). */
@@ -3610,6 +3610,8 @@ button.archive-crumb:hover { background: var(--hud-hover); color: var(--hud-fg);
 #ribbon { position: fixed; z-index: var(--z-edge); left: 0; top: 0; bottom: 0; width: var(--ribbon-w); box-sizing: border-box; display: flex; flex-direction: column; justify-content: space-between; align-items: center; padding: var(--s-4) 0; background: var(--shell-bg); border-right: 1px solid var(--hud-border); }
 .ribbon-group { display: flex; flex-direction: column; align-items: center; gap: var(--s-2); }
 .ribbon-slot { display: contents; }
+#ribbon .pc-switch { display: flex; flex-direction: column; gap: var(--s-1); padding: 0; background: none; border: 0; box-shadow: none; backdrop-filter: none; }
+#ribbon .pc-switch button { border: 0; border-radius: var(--ctl-r); }
 #ribbon button { display: inline-flex; align-items: center; justify-content: center; width: var(--ctl); height: var(--ctl); padding: 0; color: var(--hud-muted); background: transparent; border: 0; border-radius: var(--ctl-r); cursor: pointer; }
 #ribbon button:hover, #ribbon button[aria-pressed="true"] { color: var(--hud-fg); background: var(--hud-hover); }
 #ribbon button svg { width: var(--icon-md); height: var(--icon-md); }
@@ -3639,6 +3641,9 @@ button.archive-crumb:hover { background: var(--hud-hover); color: var(--hud-fg);
 .search-pane-row mark { background: none; color: var(--hud-accent-text); }
 /* The Properties pane (B39): the selection's card, as the Library's details: title, kind and size, picture, Show in Library, its properties */
 .sb-tab[data-pane="properties"] { order: -1; }
+/* The Library pane in the sidebar (B39), as the reference draws it: flat sections, no cards, their names small, in capitals */
+.sb-pane .assets-side :is(.side-views, .side-sec) { padding: var(--s-2) 0; background: none; border: 0; border-radius: 0; }
+.sb-pane .assets-side .side-sec-toggle h2 { color: var(--hud-muted); font: var(--weight-semibold) var(--text-xs) var(--font-ui); letter-spacing: 0.04em; text-transform: uppercase; }
 /* The Library's details in the Properties pane (B39): shown while the Library is in front, the canvas's card otherwise; the Library's own
    details button and grip go, as its details are no longer beside its items */
 .sb-pane > .asset-inspector { flex: none; min-height: 0; border: 0; border-radius: 0; background: none; padding: var(--s-8); }
@@ -3753,8 +3758,9 @@ body:is([data-view="assets"], .status-library) #statusbar > .hud-readout, body:n
 :root[data-status="off"] #statusbar { display: none; }
 /* Settings over the workspace (B39): a box in the middle of the window, the workspace dimmed behind it and still in sight */
 @media (min-width: 641px) {
-  :root:not([data-shell="legacy"]) #settings-view { inset: auto; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: var(--z-modal); width: min(1040px, calc(100vw - 2 * var(--s-15))); height: min(720px, calc(100dvh - 2 * var(--s-15))); box-sizing: border-box; padding-top: var(--s-8); border: 1px solid var(--hud-border); border-radius: var(--r-lg); box-shadow: var(--hud-lift), 0 0 0 100vmax color-mix(in oklch, var(--theme-bg) 60%, transparent); overflow: hidden; }
+  :root:not([data-shell="legacy"]) #settings-view { inset: auto; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: var(--z-modal); width: min(1040px, calc(100vw - 2 * var(--s-15))); height: min(720px, calc(100dvh - 2 * var(--s-15))); box-sizing: border-box; padding-top: var(--s-8); border: 1px solid var(--hud-border); border-radius: var(--r-lg); box-shadow: var(--hud-lift); overflow: hidden; }
   :root:not([data-shell="legacy"]) body[data-view="settings"] #canvas-host { visibility: visible; }
+  .settings-scrim { position: fixed; inset: 0; z-index: var(--z-scrim); background: color-mix(in oklch, var(--theme-bg) 60%, transparent); }
 }
 /* A split (B39): a second group of tabs beside the canvas, for a file; the canvas and its tabs take the half on the left */
 :root:not([data-split="on"]) :is(.tabbar-split, .viewhead-split) { display: none; }
