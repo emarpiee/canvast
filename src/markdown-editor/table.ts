@@ -94,7 +94,7 @@ class TableWidget extends WidgetType {
     const mdAt = (row: number, col: number): string => (row === 0 ? model.head[col] : model.rows[row - 1]?.[col]) ?? "";
 
     // ---- One cell edited at a time, in a small editor of its own on the cell's Markdown (the note's keys, formats and undo there too) ----
-    let editing: { row: number; col: number; close(): string } | null = null;
+    let editing: { row: number; col: number; close(): string; extend(to: { x: number; y: number }): void } | null = null;
     /** Stop editing: the cell's words into the table (written back when they changed, or when `next` asks for another cell). */
     const finish = (next?: { row: number; col: number }): void => {
       if (!editing) return next ? void commit(next) : undefined;
@@ -118,7 +118,7 @@ class TableWidget extends WidgetType {
       const cell = cellAt(row, col);
       if (!cell || !this.ctx.cellEditor) return;
       // (the note's own selection goes to the table, so one selection shows: the cell's)
-      if (view.state.selection.main.from !== this.from) view.dispatch({ selection: { anchor: this.from } });
+      if (!view.state.selection.main.empty || view.state.selection.main.from !== this.from) view.dispatch({ selection: { anchor: this.from } });
       cell.textContent = "";
       cell.classList.add("is-editing");
       cell.parentElement!.classList.add("is-editing");
@@ -149,7 +149,7 @@ class TableWidget extends WidgetType {
         undo: () => (finish(), this.ctx.undo?.() ?? false),
         redo: () => (finish(), this.ctx.redo?.() ?? false),
       }, at);
-      editing = { row, col, close: () => (cell.classList.remove("is-editing"), cell.parentElement!.classList.remove("is-editing"), ed.close().replace(/\|/g, "\\|").replace(/\n/g, "<br>")) };
+      editing = { row, col, extend: (to) => ed.extend(to), close: () => (cell.classList.remove("is-editing"), cell.parentElement!.classList.remove("is-editing"), ed.close().replace(/\|/g, "\\|").replace(/\n/g, "<br>")) };
     };
 
     // ---- Cells selected together: dragged across, or Shift+clicked (cleared, copied, cut or formatted at once) ----
@@ -204,7 +204,8 @@ class TableWidget extends WidgetType {
     });
     const cellOf = (t: EventTarget | null): HTMLElement | null => (t instanceof Element ? t.closest<HTMLElement>(".me-cell") : null);
     // view-state: (a press on a cell edits it; dragged on to other cells, or with Shift, it selects cells instead)
-    table.addEventListener("pointerdown", (e) => {
+    // (mousedown, not pointerdown: only cancelling mousedown keeps the browser from starting a text selection of its own in the drawn table)
+    table.addEventListener("mousedown", (e) => {
       const cell = cellOf(e.target);
       if (!cell || e.button !== 0 || (e.target as HTMLElement).closest(".me-col-resize, .cm-editor")) return;
       const r = Number(cell.dataset["r"]), c = Number(cell.dataset["c"]);
@@ -220,9 +221,10 @@ class TableWidget extends WidgetType {
       e.preventDefault();
       const start = { x: e.clientX, y: e.clientY };
       let dragged = false;
-      const move = (ev: PointerEvent): void => {
+      const move = (ev: MouseEvent): void => {
         const over = cellOf(document.elementFromPoint(ev.clientX, ev.clientY));
-        if (!over || (!dragged && over === cell)) return;
+        if (!dragged && over === cell) return void editing?.extend({ x: ev.clientX, y: ev.clientY });
+        if (!over) return;
         if (!dragged) {
           dragged = true;
           if (editing) finish();
@@ -230,13 +232,14 @@ class TableWidget extends WidgetType {
         range = { r0: r, c0: c, r1: Number(over.dataset["r"]), c1: Number(over.dataset["c"]) };
         paintRange();
       };
+      // (a drag inside the one cell is a selection in its editor: opened at once, the drag goes on there)
+      edit(r, c, start);
       const up = (): void => {
-        document.removeEventListener("pointermove", move);
-        if (dragged) return void wrap.focus({ preventScroll: true });
-        edit(r, c, start);
+        document.removeEventListener("mousemove", move);
+        if (dragged) wrap.focus({ preventScroll: true });
       };
-      document.addEventListener("pointermove", move);
-      document.addEventListener("pointerup", up, { once: true });
+      document.addEventListener("mousemove", move);
+      document.addEventListener("mouseup", up, { once: true });
     });
 
     const make = (tag: "th" | "td", md: string, row: number, col: number): HTMLElement => {

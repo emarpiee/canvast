@@ -32,7 +32,7 @@ export interface LiveContext {
   renderDiagram?: (code: string) => Promise<string>;
   /** A small editor for a table's cell (its Markdown on one line): Tab, Enter and Escape `move` on, undo with nothing left in it is the
    *  note's. `close` gives its words and removes it. */
-  cellEditor?: (parent: HTMLElement, text: string, on: CellEvents, at?: { x: number; y: number }) => { close(): string };
+  cellEditor?: (parent: HTMLElement, text: string, on: CellEvents, at?: { x: number; y: number }) => { close(): string; extend(to: { x: number; y: number }): void };
   /** The note's own undo and redo (a cell with nothing left to undo hands Ctrl+Z on). */
   undo?: () => boolean;
   redo?: () => boolean;

@@ -146,8 +146,16 @@ test("New note makes a markdown note in the open folder and opens it to write in
   await p.keyboard.type("(");
   await p.keyboard.press("Escape");
   await expect.poll(() => text(p)).toContain("| (Ink) | Paper |");
-  // A cell is edited as the note is: Ctrl+B bolds the selected words (never the browser's own key).
-  await page(p).locator(".me-table td .me-cell").first().click();
+  // A cell is edited as the note is: words dragged over in it are the cell editor's one selection (the note keeps none, so no second bar),
+  // and Ctrl+B bolds them (never the browser's own key).
+  const first = (await page(p).locator(".me-table td .me-cell").first().boundingBox())!;
+  await p.mouse.move(first.x + 1, first.y + first.height / 2);
+  await p.mouse.down();
+  await p.mouse.move(first.x + first.width - 2, first.y + first.height / 2, { steps: 4 });
+  await p.mouse.up();
+  await expect(page(p).locator(".me-table td .me-cell.is-editing .cm-content")).toBeFocused();
+  await expect.poll(() => p.evaluate(() => (getSelection()?.toString() ?? "").length > 0 && !document.querySelector(".me-table .me-cell:not(.is-editing)")?.contains(getSelection()!.anchorNode))).toBe(true);
+  await expect(page(p).locator(".me-selbar:visible")).toHaveCount(1);
   await p.keyboard.press("Control+a");
   await p.keyboard.press("Control+b");
   await p.keyboard.press("Escape");

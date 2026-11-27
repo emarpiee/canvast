@@ -125,7 +125,8 @@ export const EDITOR_CSS = `
 :where(.me-pop-item small) { color: var(--me-faint); }
 :where(.me-pop-sep) { height: 1px; margin: 4px 2px; background: var(--me-line); }
 /* table cells and columns */
-:where(.me-table) .me-cell { outline: none; min-height: 1.4em; cursor: text; }
+:where(.me-table) .me-cell { outline: none; min-height: 1.4em; cursor: text; user-select: none; }
+:where(.me-table) .me-cell.is-editing { user-select: text; }
 :where(.me-table) .me-cell.is-editing .cm-editor { background: transparent; }
 :where(.me-table) :is(th, td).is-editing { box-shadow: inset 0 0 0 2px color-mix(in oklch, var(--me-accent) 60%, transparent); }
 :where(.me-table) .me-cell-selected { background: color-mix(in oklch, var(--me-accent) 18%, transparent); }

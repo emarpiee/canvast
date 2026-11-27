@@ -421,7 +421,7 @@ export function createMarkdownEditor(opts: EditorOptions): MarkdownEditor {
    * wrapping, brackets, the format bar), so a cell is edited as the note is. Tab and Shift+Tab go to the next or previous cell, Enter down a
    * row, Escape out of the table; Shift+Enter is a line break (`<br>`); Ctrl+Z with nothing left in the cell undoes the note's last step.
    */
-  const cellEditor = (parent: HTMLElement, text: string, events: CellEvents, at?: { x: number; y: number }): { close(): string } => {
+  const cellEditor = (parent: HTMLElement, text: string, events: CellEvents, at?: { x: number; y: number }): { close(): string; extend(to: { x: number; y: number }): void } => {
     let closed = false;
     const cellView: EditorView = new EditorView({
       parent,
@@ -456,8 +456,14 @@ export function createMarkdownEditor(opts: EditorOptions): MarkdownEditor {
     });
     cellView.focus();
     const pos = at ? cellView.posAtCoords(at) : null;
-    cellView.dispatch({ selection: { anchor: pos ?? cellView.state.doc.length } });
+    const anchor = pos ?? cellView.state.doc.length;
+    cellView.dispatch({ selection: { anchor } });
     return {
+      /** The words from where the press began to `to` selected (a drag inside the cell). */
+      extend(to) {
+        const head = cellView.posAtCoords(to);
+        if (head !== null) cellView.dispatch({ selection: { anchor, head } });
+      },
       close() {
         closed = true;
         const value = cellView.state.doc.toString();
