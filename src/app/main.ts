@@ -162,6 +162,8 @@ import { openExportDialog, exportAgain, setExportChoices, exportedBefore, export
 import { mountRibbon } from "../ui/ribbon";
 import { mountSidebar } from "../ui/sidebar";
 import { mountFilesPane } from "../ui/files-pane";
+import { mountTabs } from "../ui/workspace-tabs";
+import { mountStartPage } from "../ui/start-page";
 import { mountViewSwitch } from "../ui/view-switch";
 import { followFrameSetting, mountWindowRow } from "../ui/window-frame";
 import { followScrolling } from "../ui/scrollbars";
@@ -191,6 +193,7 @@ import { downloadSelection, pickedFiles } from "./download";
 import { mountCommandPalette } from "../ui/command-palette";
 import { commands, pressCommand } from "../commands/registry";
 import { REASON } from "../commands/types";
+import type { OptionSpec, Options } from "../commands/types";
 import { canvasCommands, ITEMS_MAX, OLD_CANVAS_IDS, type CanvasActions, type ItemRow } from "./canvas-commands";
 import type { ShapeKind } from "../doc/path";
 import { answer } from "./agent-link";
@@ -2160,7 +2163,7 @@ async function start(): Promise<void> {
   const measureNav = (): void => {
     const root = document.documentElement.style;
     // (x positions from the canvas host's left edge: what uses them is placed in it, and it starts after the ribbon and sidebar, B39)
-    const hostLeft = host.getBoundingClientRect().left;
+    const { left: hostLeft, top: hostTop } = host.getBoundingClientRect();
     root.setProperty("--nav-w", `${Math.ceil(navBox.getBoundingClientRect().right - hostLeft)}px`);
     // The panels' buttons are a column at the right edge: the panels docked on the right open beside it (stylesheet: --dock-w).
     const dock = barBox.querySelector<HTMLElement>(".dock")?.getBoundingClientRect();
@@ -2177,7 +2180,7 @@ async function start(): Promise<void> {
     // On a phone the three bars stack in rows. Their places come from measured heights (never from a guessed row height), so the gap between
     // the rows is the same everywhere: the rows are positioned by these (stylesheet: --nav-bottom, --dock-h), and the bottom of the last row follows.
     const near = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--near")) || 6;
-    const navBottom = navBox.getBoundingClientRect().bottom;
+    const navBottom = navBox.getBoundingClientRect().bottom - hostTop; // (from the canvas host's top: under the tabs, B39)
     const dockH = dock?.height ?? 0;
     root.setProperty("--nav-bottom", `${Math.ceil(navBottom)}px`);
     root.setProperty("--rail-right", `${Math.ceil((barBox.querySelector<HTMLElement>(".rail")?.getBoundingClientRect().right ?? hostLeft) - hostLeft)}px`);
@@ -2191,7 +2194,7 @@ async function start(): Promise<void> {
       main = navBottom + (mainH ? near + mainH : 0); // (the panels' buttons are a column on the right, not a row)
       below = extraH ? near + extraH : 0;
     } else {
-      main = Math.max(navBottom, ...mainRows.map((t) => t.getBoundingClientRect().bottom)); // (the panels' buttons are a column at the right edge)
+      main = Math.max(navBottom, ...mainRows.map((t) => t.getBoundingClientRect().bottom - hostTop)); // (the panels' buttons are a column at the right edge)
       below = 0; // (a wide window: the colours row is in the middle, between the panels at the sides; they stay where they are)
     }
     const html = document.documentElement;
@@ -2228,7 +2231,11 @@ async function start(): Promise<void> {
   // Top-level views. The canvas keeps its camera, selection and history while hidden.
   const assetsRoot = document.getElementById("assets-view")!;
   const setView = (v: AppView): void => {
-    if (v === appView) return;
+    // (the start page of a new tab covers the view: going to the canvas or the Library uncovers it, and the tab goes there)
+    if (v === appView) {
+      if (!startPage.hidden && (v === "canvas" || v === "assets")) (startPage.hidden = true), followView(v);
+      return;
+    }
     const was = appView;
     appView = v;
     document.body.dataset["view"] = v;
@@ -2254,8 +2261,10 @@ async function start(): Promise<void> {
     }
     // The Settings view is not remembered: a reload opens the canvas or the Assets view.
     if (v === "canvas" || v === "assets") settings.set("ui.view", v);
+    if (v === "canvas" || v === "assets") (startPage.hidden = true), followView(v);
   };
   // The workspace (B39): the ribbon, a sidebar on each side, and the status bar, which takes the canvas's information line
+  const startPage = document.getElementById("start-page")!;
   mountRibbon(document.getElementById("ribbon")!);
   const sidebarLeft = mountSidebar(document.getElementById("sidebar-left")!, { side: "left", label: "Left sidebar", toggleCommand: "layout.leftSidebar", initial: settings.get("ui.paneLeft") || null, onShow: (id) => void settings.set("ui.paneLeft", id) });
   const sidebarRight = mountSidebar(document.getElementById("sidebar-right")!, { side: "right", label: "Right sidebar", toggleCommand: "layout.rightSidebar", initial: settings.get("ui.paneRight") || null, onShow: (id) => void settings.set("ui.paneRight", id) });
@@ -2311,6 +2320,65 @@ async function start(): Promise<void> {
     }
   });
   flagsFromPanes();
+
+  // Tabs (B39): one group of tabs, each a place (a canvas, the Library, a new tab's start page) with its own Back and Forward. What opens a
+  // place moves the active tab there; Ctrl+click and the + button make another. The open tabs are kept per workspace on this device.
+  let tabsMoving = false;
+  const startShow = mountStartPage(startPage, session);
+  const tabs = mountTabs(document.getElementById("tabbar")!, document.getElementById("viewhead")!, {
+    show: (place) => {
+      tabsMoving = true;
+      try {
+        if (place.kind === "start") {
+          startPage.hidden = false;
+          startShow.render();
+          return;
+        }
+        startPage.hidden = true;
+        if (place.kind === "library") return setView("assets");
+        if (session.current?.canvasId !== place.id) void session.openCanvas(place.id);
+        setView("canvas");
+      } finally {
+        tabsMoving = false;
+      }
+    },
+    describe: (place) => {
+      if (place.kind === "start") return { title: "New tab", icon: ICONS.plus, path: [] };
+      if (place.kind === "library") return { title: "Library", icon: ICONS.images, path: ["Library"] };
+      const entry = session.tree?.boards.find((b) => b.canvases.some((c) => c.id === place.id));
+      const name = entry?.canvases.find((c) => c.id === place.id)?.name ?? "Canvas";
+      return { title: name, icon: ICONS.infinity, path: entry ? [entry.board.name, name] : [name] };
+    },
+    valid: (place) => place.kind !== "canvas" || !!session.tree?.boards.some((b) => b.canvases.some((c) => c.id === place.id)),
+    storeKey: () => (session.tree ? `canvast.tabs.${session.tree.workspace.id}` : null),
+  });
+  /** The app moved to a view by another way than the tabs: the active tab follows. */
+  function followView(v: "canvas" | "assets"): void {
+    if (tabsMoving) return;
+    if (v === "assets") tabs.follow({ kind: "library" });
+    else if (session.current) tabs.follow({ kind: "canvas", id: session.current.canvasId });
+  }
+  let tabCanvas = session.current?.canvasId ?? null;
+  session.subscribe(() => {
+    const now = session.current?.canvasId ?? null;
+    // (a canvas opened from the Files pane, the palette or a link: the active tab goes to it)
+    if (now !== tabCanvas && appView === "canvas" && startPage.hidden) followView("canvas");
+    tabCanvas = now;
+    tabs.refresh();
+  });
+  const TAB_ID: OptionSpec = { name: "tab", type: "text", doc: "which tab (its key); the active one when left out" };
+  const tabCommand = (id: string, title: string, hint: string, options: readonly OptionSpec[], exec: (o: Options) => void): Command => ({
+    id, group: "Tabs", kind: "settings", title, hint, risk: "edit", options, words: "tab tabs", why: () => null,
+    exec: (o) => (exec(o), { ok: true }),
+  });
+  commands.setProvider("tabs", () => [
+    tabCommand("tab.new", "New tab", "A new tab, or a canvas in one", [{ name: "canvas", type: "id", doc: "a canvas to show in it" }], (o) => tabs.open(o["canvas"] ? { kind: "canvas", id: String(o["canvas"]) } : { kind: "start" })),
+    tabCommand("tab.close", "Close tab", "The tab, or the active one", [TAB_ID], (o) => tabs.close(o["tab"] ? String(o["tab"]) : undefined)),
+    tabCommand("tab.next", "Next tab", "The tab on the right", [], () => tabs.step(1)),
+    tabCommand("tab.previous", "Previous tab", "The tab on the left", [], () => tabs.step(-1)),
+    tabCommand("tab.back", "Back", "Where this tab was before", [], () => tabs.back()),
+    tabCommand("tab.forward", "Forward", "Where this tab went next", [], () => tabs.forward()),
+  ]);
   const markTab = mountViewSwitch(document.getElementById("view-switch")!, setView, PHOTOCRAFT_FEATURES.entry.view && photoCraft.available);
   // (the Pins window's button is the ribbon's, with its handler)
   const pinsButton = document.querySelector<HTMLElement>('[data-testid="reference-open"]');
@@ -3476,6 +3544,8 @@ async function start(): Promise<void> {
   canvas.focus();
   editor.changed();
   if (settings.get("ui.view") === "assets") setView("assets");
+  // (the tabs kept for this workspace, else one showing where the app opened)
+  tabs.restore((appView as AppView) === "assets" ? { kind: "library" } : session.current ? { kind: "canvas", id: session.current.canvasId } : { kind: "start" });
 }
 
 startErrorLog();

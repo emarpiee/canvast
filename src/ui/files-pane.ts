@@ -86,7 +86,7 @@ export function mountFilesPane(body: HTMLElement, o: { session: Session; foot: H
     if (cmd) void pressCommand(cmd[0], navOptions(action, id, attrs));
   };
 
-  // commands: canvas.openId, go.canvas, workspace.newCanvas, library.newNote, workspace.newBoard, and each row's More menu (NAV_COMMAND); a board's fold is view state
+  // commands: canvas.openId, go.canvas, tab.new, workspace.newCanvas, library.newNote, workspace.newBoard, and each row's More menu (NAV_COMMAND); a board's fold is view state
   body.addEventListener("click", (e) => {
     const t = e.target as HTMLElement;
     const tool = t.closest<HTMLElement>("[data-files]")?.dataset["files"];
@@ -113,6 +113,7 @@ export function mountFilesPane(body: HTMLElement, o: { session: Session; foot: H
       keepFolded();
       return render();
     }
+    if (open?.dataset["open"] === "canvas" && (e.ctrlKey || e.metaKey)) return void pressCommand("tab.new", { canvas: open.dataset["id"]! }); // (in a new tab)
     if (open?.dataset["open"] === "canvas") {
       void pressCommand("canvas.openId", { id: open.dataset["id"]! });
       void pressCommand("go.canvas");

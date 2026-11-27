@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.63.25 — Tabs (work in progress) (2026-11-27)
+
+- **Added:** tabs (B39, in progress): a tab strip over the view and a view header with Back, Forward and where it is; a tab shows a canvas, the Library or a new tab's start page; Ctrl+click in the Files pane opens a canvas in a new tab; the tabs are kept per workspace on this device. The ∞ button and the Library button of the top left are gone on a wide window. ([The interface](README.md#the-interface))
+
 ## 0.63.24 — The panels are sidebar panes (2026-11-27)
 
 - **Changed:** Layers, Adjust, Tags, Styles and Pattern are panes of the right sidebar, and Bookmarks of the left (B39): each is chosen by its tab, and one opened another way (its command, Adjust on the Actions bar) shows its pane and opens its sidebar. The column of panel buttons at the view's right edge is gone. ([The interface](README.md#the-interface))
