@@ -13,11 +13,14 @@ const DARK = `
   --me-tok-keyword: oklch(0.8 0.11 310); --me-tok-string: oklch(0.84 0.1 150); --me-tok-comment: oklch(0.74 0.02 260); --me-tok-number: oklch(0.83 0.1 60); --me-tok-function: oklch(0.82 0.08 262); --me-tok-tag: oklch(0.78 0.11 20);
   --me-blue: oklch(0.74 0.12 255); --me-green: oklch(0.76 0.12 150); --me-purple: oklch(0.74 0.12 305); --me-yellow: oklch(0.8 0.12 85); --me-red: oklch(0.72 0.15 25); --me-grey: oklch(0.7 0.01 260);`;
 
-export const EDITOR_CSS = `
-:where(.me) {${LIGHT}
+/** The sizes a drawn page needs besides its colours. */
+const SIZES = `
   --me-font: system-ui, sans-serif; --me-mono: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace; --me-size: 16px; --me-line-height: 1.6;
-  --me-width: 46rem; --me-pad: 24px; --me-gap: 6px; --me-radius: 6px; --me-btn: 30px; --me-icon: 18px;
-  --me-h1: 1.9em; --me-h2: 1.5em; --me-h3: 1.25em; --me-h4: 1.1em; --me-h5: 1em; --me-h6: 0.95em;
+  --me-radius: 6px; --me-h1: 1.9em; --me-h2: 1.5em; --me-h3: 1.25em; --me-h4: 1.1em; --me-h5: 1em; --me-h6: 0.95em;`;
+
+export const EDITOR_CSS = `
+:where(.me) {${LIGHT}${SIZES}
+  --me-width: 46rem; --me-pad: 24px; --me-gap: 6px; --me-btn: 30px; --me-icon: 18px;
   display: flex; flex-direction: column; min-height: 0; height: 100%; background: var(--me-bg); color: var(--me-fg); font-family: var(--me-font); font-size: var(--me-size);
 }
 :where([data-me-theme="dark"] .me, .me[data-me-theme="dark"]) {${DARK}}
@@ -75,13 +78,14 @@ export const EDITOR_CSS = `
 :where(.me-media img, .me-media video) { display: block; max-width: 100%; height: auto; border-radius: var(--me-radius); }
 :where(.me-table) { padding: 4px 0; cursor: default; }
 :where(.me-table-box) { position: relative; display: inline-grid; grid-template-columns: minmax(0, auto) 14px; grid-template-rows: 12px auto 14px; gap: 2px; max-width: 100%; vertical-align: top; }
-:where(.me-table-scroll) { grid-column: 1; grid-row: 2; overflow-x: auto; border: 1px solid var(--me-line); border-radius: 6px; }
-:where(.me-table) table, :where(.me-preview, .me-cell) table { border-collapse: collapse; margin: 0; }
-:where(.me-preview, .me-cell) table { margin: 4px 0; }
-:where(.me-table, .me-preview) :is(th, td) { border: 1px solid var(--me-line); padding: 8px 12px; min-width: 6em; height: 2.4em; box-sizing: border-box; text-align: left; vertical-align: top; }
-:where(.me-table) tr:first-child > * { border-top: 0; } :where(.me-table) tr:last-child > * { border-bottom: 0; }
-:where(.me-table) tr > :first-child { border-left: 0; } :where(.me-table) tr > :last-child { border-right: 0; }
-:where(.me-table, .me-preview) th { background: var(--me-code-bg); font-weight: 600; }
+:where(.me-table) .me-table-scroll { grid-column: 1; grid-row: 2; }
+:where(.me-table-scroll) { overflow-x: auto; border: 1px solid var(--me-line); border-radius: 6px; }
+:where(.me-table, .me-doc) table { border-collapse: collapse; margin: 0; }
+:where(.me-doc) .me-table-scroll { display: inline-block; max-width: 100%; margin: 4px 0; vertical-align: top; }
+:where(.me-table-scroll) :is(th, td) { border: 1px solid var(--me-line); padding: 8px 12px; min-width: 6em; height: 2.4em; box-sizing: border-box; text-align: left; vertical-align: top; }
+:where(.me-table-scroll) tr:first-child > * { border-top: 0; } :where(.me-table-scroll) tr:last-child > * { border-bottom: 0; }
+:where(.me-table-scroll) tr > :first-child { border-left: 0; } :where(.me-table-scroll) tr > :last-child { border-right: 0; }
+:where(.me-table-scroll) th { background: var(--me-code-bg); font-weight: 600; }
 :where(.me-table) :is(th, td) { outline: none; cursor: text; }
 :where(.me-table-add) { display: grid; place-items: center; padding: 0; border: 0; border-radius: 4px; background: var(--me-code-bg); color: var(--me-faint); font: inherit; font-size: 11px; line-height: 1; cursor: pointer; opacity: 0; transition: opacity 0.12s; }
 :where(.me-table:hover) .me-table-add, :where(.me-table:focus-within) .me-table-add { opacity: 1; }
@@ -152,11 +156,11 @@ export const EDITOR_CSS = `
 :where(.me) .me-math { cursor: pointer; }
 :where(.me) .me-math-block { display: block; text-align: center; padding: 6px 0; overflow-x: auto; }
 :where(.me) .me-math-error { color: var(--me-red); font-family: var(--me-mono); font-size: 0.9em; }
-:where(.me) .me-diagram, :where(.me-preview, .me-cell) .me-diagram { display: block; text-align: center; padding: 8px 0; overflow-x: auto; cursor: pointer; }
-:where(.me) .me-diagram svg, :where(.me-preview, .me-cell) .me-diagram svg { max-width: 100%; height: auto; }
-:where(.me-preview, .me-cell) .math-block { display: block; text-align: center; margin: 0.6em 0; overflow-x: auto; }
+:where(.me) .me-diagram, :where(.me-doc) .me-diagram { display: block; text-align: center; padding: 8px 0; overflow-x: auto; cursor: pointer; }
+:where(.me) .me-diagram svg, :where(.me-doc) .me-diagram svg { max-width: 100%; height: auto; }
+:where(.me-doc) .math-block { display: block; text-align: center; margin: 0.6em 0; overflow-x: auto; }
 /* the link popover */
-:where(.me-link-pop) { position: fixed; z-index: 1000; display: flex; flex-direction: column; width: min(30rem, calc(100vw - 16px)); max-height: min(22rem, 60vh); background: var(--me-bg); color: var(--me-fg); border: 1px solid var(--me-line); border-radius: 8px; box-shadow: 0 10px 30px color-mix(in oklch, var(--me-fg) 22%, transparent); overflow: hidden; font-family: var(--me-font); }
+:where(.me-link-pop) { position: fixed; z-index: 1000; display: flex; flex-direction: column; height: auto; min-height: 0; width: min(30rem, calc(100vw - 16px)); max-height: min(22rem, 60vh); background: var(--me-bg); color: var(--me-fg); border: 1px solid var(--me-line); border-radius: 8px; box-shadow: 0 10px 30px color-mix(in oklch, var(--me-fg) 22%, transparent); overflow: hidden; font-family: var(--me-font); }
 :where(.me-link-pop-head) { display: flex; align-items: center; gap: 8px; padding: 6px 10px; border-bottom: 1px solid var(--me-line); font-size: 13px; }
 :where(.me-link-pop-title) { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
 :where(.me-link-pop-btn) { width: auto; padding: 0 8px; font-size: 12px; color: var(--me-accent); }
@@ -180,35 +184,35 @@ export const EDITOR_CSS = `
 /* preview mode */
 :where(.me-preview) { position: absolute; inset: 0; overflow: auto; padding: var(--me-pad) 0; line-height: var(--me-line-height); background: var(--me-bg); color: var(--me-fg); }
 :where(.me-preview > .me-page) { max-width: var(--me-width); margin: 0 auto; padding: 0 var(--me-pad); }
-:where(.me-preview, .me-cell) :is(h1, h2, h3, h4, h5, h6) { line-height: 1.3; margin: 1em 0 0.4em; }
-:where(.me-preview, .me-cell) h1 { font-size: var(--me-h1); } :where(.me-preview, .me-cell) h2 { font-size: var(--me-h2); } :where(.me-preview, .me-cell) h3 { font-size: var(--me-h3); }
-:where(.me-preview, .me-cell) a { color: var(--me-accent); cursor: pointer; }
-:where(.me-preview, .me-cell) code { font-family: var(--me-mono); font-size: 0.9em; background: var(--me-code-bg); border-radius: 3px; padding: 0 2px; }
-:where(.me-preview, .me-cell) pre { background: var(--me-code-bg); border-radius: var(--me-radius); padding: 10px 12px; overflow-x: auto; }
-:where(.me-preview, .me-cell) pre code { background: none; padding: 0; }
-:where(.me-preview, .me-cell) blockquote { border-left: 3px solid var(--me-line); margin: 0.6em 0; padding-left: 12px; color: var(--me-muted); }
-:where(.me-preview, .me-cell) mark { background: var(--me-mark-bg); color: var(--me-mark-fg); }
-:where(.me-preview, .me-cell) img, :where(.me-preview, .me-cell) video { max-width: 100%; height: auto; border-radius: var(--me-radius); }
-:where(.me-preview, .me-cell) li.task { list-style: none; margin-left: -1.3em; }
-:where(.me-preview, .me-cell) li.task > input { margin-right: 0.4em; cursor: pointer; }
-:where(.me-preview, .me-cell) li.done { color: var(--me-faint); text-decoration: line-through; }
-:where(.me-preview, .me-cell) hr { border: 0; border-top: 1px solid var(--me-line); }
-:where(.me-preview, .me-table) .callout { --me-callout: var(--me-blue); margin: 0.8em 0; padding: 8px 14px; border: 1px solid color-mix(in oklch, var(--me-callout) 35%, transparent); border-radius: 8px; background: color-mix(in oklch, var(--me-callout) 8%, transparent); }
-:where(.me-preview, .me-table) .callout-title { font-weight: 600; color: var(--me-callout); }
-:where(.me-preview, .me-table) .callout > p { margin: 0.3em 0; }
-:where(.me-preview, .me-table) .callout:is([data-callout="tip"], [data-callout="hint"], [data-callout="important"], [data-callout="success"], [data-callout="check"], [data-callout="done"]) { --me-callout: var(--me-green); }
-:where(.me-preview, .me-table) .callout:is([data-callout="question"], [data-callout="help"], [data-callout="faq"], [data-callout="example"]) { --me-callout: var(--me-purple); }
-:where(.me-preview, .me-table) .callout:is([data-callout="warning"], [data-callout="warn"], [data-callout="caution"], [data-callout="attention"]) { --me-callout: var(--me-yellow); }
-:where(.me-preview, .me-table) .callout:is([data-callout="danger"], [data-callout="error"], [data-callout="bug"], [data-callout="failure"], [data-callout="fail"], [data-callout="missing"]) { --me-callout: var(--me-red); }
-:where(.me-preview, .me-table) .callout:is([data-callout="quote"], [data-callout="cite"]) { --me-callout: var(--me-grey); }
-:where(.me-preview, .me-cell) .task-state { display: inline-block; width: 1em; height: 1em; margin-right: 0.3em; border: 1.5px solid var(--me-line); border-radius: 4px; vertical-align: text-bottom; }
-:where(.me-preview, .me-cell) .task-progress { background: linear-gradient(90deg, var(--me-accent) 50%, transparent 50%); border-color: var(--me-accent); }
-:where(.me-preview, .me-cell) li.cancelled { color: var(--me-faint); text-decoration: line-through; }
-:where(.me-preview, .me-cell) mark[class^="hl-"] { color: inherit; }
-:where(.me-preview, .me-cell) .hl-red { background: color-mix(in oklch, var(--me-red) 30%, transparent); } :where(.me-preview, .me-cell) .hl-blue { background: color-mix(in oklch, var(--me-blue) 30%, transparent); }
-:where(.me-preview, .me-cell) .hl-green { background: color-mix(in oklch, var(--me-green) 30%, transparent); } :where(.me-preview, .me-cell) .hl-purple { background: color-mix(in oklch, var(--me-purple) 30%, transparent); }
-:where(.me-preview, .me-cell) .hl-gray { background: color-mix(in oklch, var(--me-grey) 30%, transparent); }
-:where(.me-preview, .me-cell) .tag { color: var(--me-tag-fg); background: var(--me-tag-bg); border-radius: 4px; padding: 0 3px; }
+:where(.me-doc) :is(h1, h2, h3, h4, h5, h6) { line-height: 1.3; margin: 1em 0 0.4em; }
+:where(.me-doc) h1 { font-size: var(--me-h1); } :where(.me-doc) h2 { font-size: var(--me-h2); } :where(.me-doc) h3 { font-size: var(--me-h3); }
+:where(.me-doc) a { color: var(--me-accent); cursor: pointer; }
+:where(.me-doc) code { font-family: var(--me-mono); font-size: 0.9em; background: var(--me-code-bg); border-radius: 3px; padding: 0 2px; }
+:where(.me-doc) pre { background: var(--me-code-bg); border-radius: var(--me-radius); padding: 10px 12px; overflow-x: auto; }
+:where(.me-doc) pre code { background: none; padding: 0; }
+:where(.me-doc) blockquote { border-left: 3px solid var(--me-line); margin: 0.6em 0; padding-left: 12px; color: var(--me-muted); }
+:where(.me-doc) mark { background: var(--me-mark-bg); color: var(--me-mark-fg); }
+:where(.me-doc) img, :where(.me-doc) video { max-width: 100%; height: auto; border-radius: var(--me-radius); }
+:where(.me-doc) li.task { list-style: none; margin-left: -1.3em; }
+:where(.me-doc) li.task > input { margin-right: 0.4em; cursor: pointer; }
+:where(.me-doc) li.done { color: var(--me-faint); text-decoration: line-through; }
+:where(.me-doc) hr { border: 0; border-top: 1px solid var(--me-line); }
+:where(.me-doc) .callout { --me-callout: var(--me-blue); margin: 0.8em 0; padding: 8px 14px; border: 1px solid color-mix(in oklch, var(--me-callout) 35%, transparent); border-radius: 8px; background: color-mix(in oklch, var(--me-callout) 8%, transparent); }
+:where(.me-doc) .callout-title { font-weight: 600; color: var(--me-callout); }
+:where(.me-doc) .callout > p { margin: 0.3em 0; }
+:where(.me-doc) .callout:is([data-callout="tip"], [data-callout="hint"], [data-callout="important"], [data-callout="success"], [data-callout="check"], [data-callout="done"]) { --me-callout: var(--me-green); }
+:where(.me-doc) .callout:is([data-callout="question"], [data-callout="help"], [data-callout="faq"], [data-callout="example"]) { --me-callout: var(--me-purple); }
+:where(.me-doc) .callout:is([data-callout="warning"], [data-callout="warn"], [data-callout="caution"], [data-callout="attention"]) { --me-callout: var(--me-yellow); }
+:where(.me-doc) .callout:is([data-callout="danger"], [data-callout="error"], [data-callout="bug"], [data-callout="failure"], [data-callout="fail"], [data-callout="missing"]) { --me-callout: var(--me-red); }
+:where(.me-doc) .callout:is([data-callout="quote"], [data-callout="cite"]) { --me-callout: var(--me-grey); }
+:where(.me-doc) .task-state { display: inline-block; width: 1em; height: 1em; margin-right: 0.3em; border: 1.5px solid var(--me-line); border-radius: 4px; vertical-align: text-bottom; }
+:where(.me-doc) .task-progress { background: linear-gradient(90deg, var(--me-accent) 50%, transparent 50%); border-color: var(--me-accent); }
+:where(.me-doc) li.cancelled { color: var(--me-faint); text-decoration: line-through; }
+:where(.me-doc) mark[class^="hl-"] { color: inherit; }
+:where(.me-doc) .hl-red { background: color-mix(in oklch, var(--me-red) 30%, transparent); } :where(.me-doc) .hl-blue { background: color-mix(in oklch, var(--me-blue) 30%, transparent); }
+:where(.me-doc) .hl-green { background: color-mix(in oklch, var(--me-green) 30%, transparent); } :where(.me-doc) .hl-purple { background: color-mix(in oklch, var(--me-purple) 30%, transparent); }
+:where(.me-doc) .hl-gray { background: color-mix(in oklch, var(--me-grey) 30%, transparent); }
+:where(.me-doc) .tag { color: var(--me-tag-fg); background: var(--me-tag-bg); border-radius: 4px; padding: 0 3px; }
 .me.me-plain .cm-editor .cm-scroller { font-family: var(--me-mono); }
 /* (preview mode: CodeMirror's own sheet keeps its editor shown, hidden attribute or not) */
 .me.me-previewing .cm-editor { display: none !important; }
@@ -238,6 +242,14 @@ export const CM_THEME: Record<string, Record<string, string>> = {
 
 let injected = false;
 /** Add the stylesheet to the document once. */
+/**
+ * How a drawn page looks (the preview, a table's cells, and any page drawn elsewhere from \`renderMarkdown\`, such as a note's card): the
+ * rules of \`.me-doc\` and of a table's frame, taken from the editor's own sheet so there is one set. A page outside the editor sets its
+ * colours and sizes with \`DOC_TOKENS\` on its \`.me-doc\` element.
+ */
+export const DOC_CSS = EDITOR_CSS.split("\n").filter((l) => /^:where\(\.me-doc\)|^:where\(\.me-table-scroll\)/.test(l)).join("\n");
+export const DOC_TOKENS = { light: LIGHT + SIZES, dark: DARK };
+
 export function injectStyles(doc: Document = document): void {
   if (injected || doc.getElementById("me-styles")) return;
   injected = true;

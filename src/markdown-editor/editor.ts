@@ -243,7 +243,7 @@ export function createMarkdownEditor(opts: EditorOptions): MarkdownEditor {
   preview.className = "me-preview";
   preview.hidden = true;
   const page = document.createElement("div");
-  page.className = "me-page";
+  page.className = "me-page me-doc";
   preview.append(page);
   if (opts.toolbar !== false) el.append(bar);
   el.append(body);

@@ -90,3 +90,33 @@ describe("a table cell's text as its editor edits it", () => {
     expect(cellRegions("||")).toEqual([[1, 1]]);
   });
 });
+
+describe("a format key over links and lines", () => {
+  const run = async (doc: string, from: number, to = from, m = "**"): Promise<string> => {
+    const { toggleInline } = await import("../../src/markdown-editor/behaviors/format-toggle");
+    const { markdown, markdownLanguage } = await import("@codemirror/lang-markdown");
+    const { ensureSyntaxTree } = await import("@codemirror/language");
+    const { EXTENSIONS } = await import("../../src/markdown-editor/syntax");
+    let state = EditorState.create({ doc, selection: EditorSelection.range(from, to), extensions: markdown({ base: markdownLanguage, extensions: EXTENSIONS }) });
+    ensureSyntaxTree(state, doc.length, 5000);
+    const view = { get state() { return state; }, dispatch: (tr: { state: EditorState }) => void (state = tr.state) };
+    toggleInline(m)(view as never);
+    return state.doc.toString();
+  };
+  it("never cuts into a link: a selection ending in one takes it whole; the cursor in one formats the whole link", async () => {
+    expect(await run("see [[foreshortening]] now", 0, 10)).toBe("**see [[foreshortening]]** now");
+    expect(await run("[[a-b]] x", 3)).toBe("**[[a-b]]** x");
+    expect(await run("**[[a-b]]** x", 5)).toBe("[[a-b]] x");
+    expect(await run("go [site](https://x.example) on", 12)).toBe("go **[site](https://x.example)** on");
+  });
+  it("marks each selected line apart (lists' marks kept outside), and off again when all have them", async () => {
+    expect(await run("[[a]]\n[[b]]", 0, 11)).toBe("**[[a]]**\n**[[b]]**");
+    expect(await run("- one\n- two", 0, 11)).toBe("- **one**\n- **two**");
+    expect(await run("**one**\n**two**", 0, 15)).toBe("one\ntwo");
+  });
+  it("plain words: a word with the cursor in it, a selection, an empty pair", async () => {
+    expect(await run("good day", 2)).toBe("**good** day");
+    expect(await run("good day", 0, 4)).toBe("**good** day");
+    expect(await run("a  b", 2)).toBe("a ****  b".replace("**** ", "****"));
+  });
+});

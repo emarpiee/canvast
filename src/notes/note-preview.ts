@@ -1,5 +1,6 @@
 import { WIKI, encodeLinkPart, noteKindOf, textHtml } from "./note-file";
 import { renderMarkdown } from "../markdown-editor/render";
+import { DOC_CSS, DOC_TOKENS } from "../markdown-editor/style";
 import { cardContext } from "../assets/card";
 import { NO_META, fileMeta, splitFrontmatter, type NoteMeta } from "./frontmatter";
 import { NOTE_PAGE_PIXEL_W } from "../doc/model";
@@ -17,16 +18,15 @@ const PAGE_W = NOTE_PAGE_PIXEL_W / CARD_SCALE;
 const NEW_CARD_MAX_H = 4000;
 /** The longest page a card lays out (CSS px): a card showing the whole note stops there. */
 const PAGE_MAX_H = 16000;
+// (the page's look is the notes editor's own, DOC_CSS, the one set of rules its preview and table cells use; here only the page itself,
+// its colours as the editor's tokens, and what only a card has: pictures drawn as data, a video's ▶, a sound's ♪, the properties' badges)
 const CSS = `
-.page{box-sizing:border-box;overflow:hidden;padding:26px 30px;background:oklch(0.985 0.004 95);color:oklch(0.27 0.01 250);font:15px/1.45 system-ui,sans-serif;word-wrap:break-word}
-h1,h2,h3,h4,h5,h6{margin:.2em 0 .45em;line-height:1.2}h1{font-size:1.9em}h2{font-size:1.5em}h3{font-size:1.25em}h4,h5,h6{font-size:1.05em}
-p,ul,ol,blockquote,pre,table,figure{margin:0 0 .6em}ul,ol{padding-left:1.4em}
-blockquote{border-left:3px solid oklch(0.82 0.01 250);padding-left:.8em;color:oklch(0.45 0.01 250)}
-pre,code{font-family:ui-monospace,monospace;background:oklch(0.94 0.005 250);border-radius:4px}pre{padding:.5em .7em;white-space:pre-wrap}
-table{border-collapse:collapse}td,th{border:1px solid oklch(0.82 0.01 250);padding:.2em .45em}hr{border:0;border-top:1px solid oklch(0.82 0.01 250)}
-li:has(>input[type=checkbox]:first-child){list-style:none;margin-left:-1.2em}.media{position:relative;display:inline-block;max-width:100%}.media img{display:block;max-width:100%;height:auto;border-radius:4px}.is-video::after,.is-audio::after{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:2.4em;height:2.4em;border-radius:50%;background:oklch(0.2 0 0 / .6);color:#fff;font-size:1.4em;line-height:2.4em;text-align:center}.is-video::after{content:"▶"}.is-audio::after{content:"♪"}a{color:oklch(0.5 0.1 200)}.pic{display:inline-block;padding:.7em 1.1em;border-radius:4px;background:oklch(0.9 0.005 250);color:oklch(0.48 0.01 250);font-size:.85em}
-.props{display:flex;flex-wrap:wrap;gap:.35em;margin:0 0 .7em}.prop{padding:.1em .6em;border-radius:1em;background:oklch(0.92 0.01 250);color:oklch(0.4 0.01 250);font-size:.8em}.dark .prop{background:oklch(0.33 0.01 250);color:oklch(0.82 0.01 250)}
-.page.dark{background:oklch(0.23 0.01 250);color:oklch(0.9 0.005 250)}.dark blockquote{border-left-color:oklch(0.42 0.01 250);color:oklch(0.72 0.01 250)}.dark pre,.dark code{background:oklch(0.3 0.01 250)}.dark td,.dark th{border-color:oklch(0.4 0.01 250)}.dark a{color:oklch(0.76 0.1 200)}.dark .pic{background:oklch(0.32 0.01 250);color:oklch(0.75 0.01 250)}`;
+.page{box-sizing:border-box;overflow:hidden;padding:26px 30px;${DOC_TOKENS.light}background:var(--me-bg);color:var(--me-fg);font:15px/var(--me-line-height) var(--me-font);word-wrap:break-word}
+.page.dark{${DOC_TOKENS.dark}}
+${DOC_CSS}
+h1,h2,h3,h4,h5,h6{margin:.2em 0 .45em;line-height:1.2}p,ul,ol,blockquote,pre,figure{margin:0 0 .6em}ul,ol{padding-left:1.4em}
+.media{position:relative;display:inline-block;max-width:100%}.media img{display:block;max-width:100%;height:auto;border-radius:var(--me-radius)}.is-video::after,.is-audio::after{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:2.4em;height:2.4em;border-radius:50%;background:oklch(0.2 0 0 / .6);color:#fff;font-size:1.4em;line-height:2.4em;text-align:center}.is-video::after{content:"▶"}.is-audio::after{content:"♪"}.pic{display:inline-block;padding:.7em 1.1em;border-radius:var(--me-radius);background:var(--me-code-bg);color:var(--me-muted);font-size:.85em}
+.props{display:flex;flex-wrap:wrap;gap:.35em;margin:0 0 .7em}.prop{padding:.1em .6em;border-radius:1em;background:var(--me-code-bg);color:var(--me-muted);font-size:.8em}`;
 /** Light or dark paper (Settings > Notes > Preview look); a change is drawn by whoever shows the cards. */
 export type NoteLook = "light" | "dark";
 let look: NoteLook = "light";
@@ -150,7 +150,7 @@ export async function notePageHeight(name: string, text: string, width: number, 
   const host = document.createElement("div");
   host.style.cssText = "position:fixed;left:-10000px;top:0;visibility:hidden";
   const root = host.attachShadow({ mode: "open" });
-  root.innerHTML = `<style>${CSS}</style><div class="page${look === "dark" ? " dark" : ""}" style="width:${width}px">${await pageHtml(name, text, hash)}</div>`;
+  root.innerHTML = `<style>${CSS}</style><div class="page me-doc${look === "dark" ? " dark" : ""}" style="width:${width}px">${await pageHtml(name, text, hash)}</div>`;
   document.body.append(host);
   const h = (root.lastElementChild as HTMLElement).scrollHeight;
   host.remove();
@@ -165,7 +165,7 @@ export async function notePicture(name: string, text: string, w: number, h: numb
   const k = w / lw;
   const lh = Math.round(h / k);
   const html = await pageHtml(name, text, hash);
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${lw} ${lh}"><foreignObject width="${lw}" height="${lh}"><div xmlns="http://www.w3.org/1999/xhtml" class="page${look === "dark" ? " dark" : ""}" style="width:${lw}px;height:${lh}px"><style>${CSS}</style>${html}</div></foreignObject></svg>`;
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${lw} ${lh}"><foreignObject width="${lw}" height="${lh}"><div xmlns="http://www.w3.org/1999/xhtml" class="page me-doc${look === "dark" ? " dark" : ""}" style="width:${lw}px;height:${lh}px"><style>${CSS}</style>${html}</div></foreignObject></svg>`;
   const img = new Image();
   img.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
   await img.decode();

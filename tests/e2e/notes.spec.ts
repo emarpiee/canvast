@@ -182,10 +182,9 @@ test("a table cell is the note's own words: one selection, the note's keys, its 
   await p.keyboard.type("pen");
   await expect.poll(() => text(p)).toContain("| lines<br>- dip<br>- pen |");
   await expect(cell(1).locator(".cm-line")).toHaveCount(3);
-  await p.keyboard.press("Control+z");
-  await p.keyboard.press("Control+z");
-  await p.keyboard.press("Control+z");
-  await expect.poll(() => text(p)).toContain("| **Ink pen** | lines |");
+  // (typing joins into fewer undo steps: undone until the cell is back, never past the bold)
+  for (let i = 0; i < 6 && !(await text(p)).includes("| **Ink pen** | lines |"); i++) await p.keyboard.press("Control+z");
+  expect(await text(p)).toContain("| **Ink pen** | lines |");
   // A sort from a cell's menu, undone from a cell.
   await cell(0).click({ button: "right" });
   await p.locator(".pop-menu [role=menuitem]", { hasText: "Sort column (A → Z)" }).click();

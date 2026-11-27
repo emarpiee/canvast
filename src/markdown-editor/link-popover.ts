@@ -57,7 +57,8 @@ export function linkPopover(view: EditorView, opts: LinkPopoverOptions): { atCur
     const found = await opts.find(target);
     if (current !== target) return;
     box = document.createElement("div");
-    box.className = "me-link-pop";
+    // (on the page's top, outside the editor: `me` gives it the editor's colours and sizes, as a host sets them)
+    box.className = "me me-link-pop";
     box.setAttribute("role", "dialog");
     box.setAttribute("aria-label", found?.title ?? target);
     const head = document.createElement("div");

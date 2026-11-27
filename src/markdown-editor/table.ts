@@ -7,7 +7,7 @@ import { RangeSet, StateField, type EditorState, type Extension, type Range } fr
 import { Decoration, EditorView, WidgetType, type DecorationSet } from "@codemirror/view";
 import type { CellEditor, LiveContext } from "./live";
 import { mediaElement } from "./live";
-import { cellHtml, renderMarkdown } from "./render";
+import { WIDTHS_LINE, cellHtml, renderMarkdown } from "./render";
 import { cleanHtml } from "./clean";
 import { openPopover, type PopItem } from "./popover";
 
@@ -21,7 +21,7 @@ interface Model {
 }
 
 /** The comment after a table that keeps its column widths: `<!-- table-cols: 120,auto,80 -->`. */
-export const WIDTHS_LINE = /^<!--\s*table-cols:\s*([\d\s,auto]+?)\s*-->\s*$/;
+export { WIDTHS_LINE };
 
 /** A row's cells, split at the pipes that are not escaped or in code. */
 export function cellsOf(line: string): string[] {
@@ -423,7 +423,7 @@ class TableView {
       // (the cell holds its words in an element of their own, beside a heading cell's grips)
       const box = document.createElement(tag);
       const cell = document.createElement("div");
-      cell.className = "me-cell";
+      cell.className = "me-cell me-doc";
       box.append(cell);
       cell.dataset["r"] = String(row);
       cell.dataset["c"] = String(col);

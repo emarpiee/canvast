@@ -45,6 +45,9 @@ const MARKS = new Set(["EmphasisMark", "CodeMark", "LinkMark", "HeaderMark", "Qu
  * A table cell's words when its lines (written apart by `<br>`) hold blocks: a list, a task list, a quote or a callout, drawn as those
  * blocks; null for words alone (drawn in the line, as any cell).
  */
+/** The comment after a table that keeps its column widths: `<!-- table-cols: 120,auto,80 -->`. */
+export const WIDTHS_LINE = /^<!--\s*table-cols:\s*([\d\s,auto]+?)\s*-->\s*$/;
+
 export function cellHtml(raw: string, opts: RenderOptions = {}): string | null {
   const lines = raw.split(/<br\s*\/?>/i);
   if (!lines.some((l) => /^\s*(?:[-*+]\s|\d{1,9}[.)]\s|>)/.test(l))) return null;
@@ -308,7 +311,12 @@ export function renderMarkdown(md: string, opts: RenderOptions = {}): string {
     };
     const head = n.getChild("TableHeader");
     const body = n.getChildren("TableRow");
-    return `<table>${head ? `<thead>${row(head, "th")}</thead>` : ""}${body.length ? `<tbody>${body.map((r) => row(r, "td")).join("")}</tbody>` : ""}</table>`;
+    // (its column widths, kept in the comment after it, as the live table draws them; its frame as the live table's)
+    const next = n.nextSibling;
+    const w = next?.name === "CommentBlock" ? WIDTHS_LINE.exec(text(next.from, next.to).trim()) : null;
+    const widths = w ? w[1]!.split(",").map((x) => (/^\s*\d+\s*$/.test(x) ? `${Number(x)}px` : "")) : [];
+    const cols = widths.some(Boolean) ? `<colgroup>${widths.map((x) => (x ? `<col style="width:${x}">` : "<col>")).join("")}</colgroup>` : "";
+    return `<div class="me-table-scroll"><table${cols ? ' style="table-layout:fixed"' : ""}>${cols}${head ? `<thead>${row(head, "th")}</thead>` : ""}${body.length ? `<tbody>${body.map((r) => row(r, "td")).join("")}</tbody>` : ""}</table></div>`;
   };
 
   return blocks(tree.topNode);

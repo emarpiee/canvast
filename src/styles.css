@@ -2261,7 +2261,10 @@ body[data-viewing] #nav, body[data-viewing] .view-settings { display: none; }
 }
 @media (hover: none), (max-width: 640px) { .more-btn, .nav-more, .side-row .side-more { opacity: 1; } .more-btn, .nav-more, .side-more { width: 36px; height: 36px; } }
 /* The menu: one look and one place (floating, inside the window, over everything). */
-.pop-menu { position: fixed; z-index: 60; min-width: 190px; max-width: min(320px, calc(100vw - 16px)); display: grid; gap: 1px; padding: var(--s-2); background: var(--hud-bg); border: 1px solid var(--hud-border); border-radius: var(--r-lg); box-shadow: var(--hud-lift); backdrop-filter: blur(12px); }
+/* The one surface of what pops up over the page: the app's menus and the notes editor's link popover. */
+:is(.pop-menu, .me.me-link-pop) { background: var(--hud-bg); border: 1px solid var(--hud-border); border-radius: var(--r-lg); box-shadow: var(--hud-lift); backdrop-filter: blur(12px); }
+.me.me-link-pop { z-index: 60; }
+.pop-menu { position: fixed; z-index: 60; min-width: 190px; max-width: min(320px, calc(100vw - 16px)); display: grid; gap: 1px; padding: var(--s-2); }
 .pop-menu button { display: flex; align-items: center; gap: var(--s-6); width: 100%; min-height: var(--menu-h); padding: 0 var(--s-6); font: var(--font-control); color: inherit; text-align: left; background: transparent; border: 0; border-radius: var(--r-md); cursor: pointer; }
 .pop-menu button:hover:not(:disabled), .pop-menu button:focus-visible { background: var(--hud-hover); outline: 0; }
 /* A menu never grows past the window: it scrolls. A compact one has closer rows (a long list to choose from). */
