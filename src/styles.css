@@ -3631,7 +3631,7 @@ button.archive-crumb:hover { background: var(--hud-hover); color: var(--hud-fg);
 .sb-pane > .layers-panel { position: static; width: 100%; max-width: none; max-height: none; margin: 0; border: 0; border-radius: 0; box-shadow: none; background: none; backdrop-filter: none; animation: none; }
 .sb-pane > .layers-panel .panel-head [data-close] { display: none; }
 /* (the panels' buttons were a column at the view's right edge: they are the sidebars' tabs now) */
-#toolbar > .dock { display: none; }
+:root:not([data-shell="legacy"]) #toolbar > .dock { display: none; }
 /* The Library's folders and tags as a sidebar pane: the pane's width, its own scroll. */
 .sb-pane > .assets-side { flex: none; width: auto; overflow: visible; padding: var(--s-4) var(--s-4) var(--s-8); }
 /* The status bar: what the focused view says (its counts, zoom and whether it is saved), at the bottom right, as wide as what it says. */
@@ -3680,7 +3680,13 @@ button.archive-crumb:hover { background: var(--hud-hover); color: var(--hud-fg);
 .start-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .start-meta { color: var(--hud-muted); font: var(--font-meta); }
 /* (the ∞ pill and the Library button of the top left: the Files pane, the tabs and the ribbon took their place) */
-@media (min-width: 641px) { #nav .nav-pill, #view-switch > .view-switch { display: none; } }
+@media (min-width: 641px) { :root:not([data-shell="legacy"]) :is(#nav .nav-pill, #view-switch > .view-switch) { display: none; } }
+/* The tests' layout (tests/e2e/harness.ts sets data-shell="legacy"): the app as the specs were written, without the ribbon, the tabs and the
+   view header, with the top-left buttons; the sidebars still hold the panels. */
+:root[data-shell="legacy"] { --shell-l: var(--side-l); --shell-t: 0px; }
+:root[data-shell="legacy"] :is(#ribbon, .tabbar, .viewhead) { display: none; }
+:root[data-shell="legacy"] #sidebar-left { left: 0; }
+:root[data-shell="legacy"] #notices { right: auto; left: 50%; bottom: var(--s-10); transform: translateX(-50%); align-items: center; width: min(520px, calc(100vw - 2 * var(--edge))); }
 /* A phone or a narrow window keeps the whole width for the view: no ribbon, no sidebars (they come back as overlays, B39 S6). */
 @media (max-width: 900px) {
   :root, :root[data-left="open"], :root[data-right="open"] { --side-l: 0px; --side-r: 0px; }

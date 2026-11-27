@@ -94,11 +94,15 @@ export const test = base.extend<{ app: App }>({
     // where it could come before the last write of the page that is leaving and keep the old settings (Chromium), and a test's own settings,
     // written before a reload or cleared by Start from scratch, stay as they are. Only what is not set already.)
     await page.addInitScript(() => {
+      // (the specs lay the app out as they were written, before the workspace, B39: no ribbon or tabs, the top-left buttons; shell.spec.ts
+      // takes the attribute away to test the workspace itself)
+      if (!sessionStorage.getItem("harness.shell")) document.documentElement.dataset["shell"] = "legacy";
       try {
         if (sessionStorage.getItem("harness.barPlaces")) return;
         sessionStorage.setItem("harness.barPlaces", "1");
         const saved = JSON.parse(localStorage.getItem("canvast.settings") ?? "{}") as Record<string, unknown>;
-        const want: Record<string, unknown> = { "ui.barPlaces": 1, "ui.properties": "bar", "ui.groupNames": "bottom" };
+        // (the workspace, B39: the specs start with both sidebars hidden and a file opening in the panel, as written; shell.spec opens them)
+        const want: Record<string, unknown> = { "ui.barPlaces": 1, "ui.properties": "bar", "ui.groupNames": "bottom", "ui.sidebarLeft": false, "ui.sidebarRight": false, "notes.panelMode": "panel" };
         if (Object.keys(want).some((k) => !(k in saved))) localStorage.setItem("canvast.settings", JSON.stringify({ ...want, ...saved }));
       } catch { /* (no storage: the app's own places) */ }
     });

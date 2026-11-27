@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.63.27 — The tests' layout (2026-11-27)
+
+### For developers
+
+- The end-to-end specs lay the app out as they were written (B39): the harness sets `data-shell="legacy"` (no ribbon, tabs or view header; the top-left buttons, the panels' buttons and the notices where they were; the sidebars still hold the panels), both sidebars start hidden and a file opens in the panel. The workspace itself gets its own spec.
+
 ## 0.63.26 — Files in tabs, the Library pane (2026-11-27)
 
 - **Added:** a note, PDF or 3D model opened from a canvas takes the tab, as a canvas does (*Files on a canvas*: **Tab**, the new default; Panel and Window stay); Back returns, and closing the file closes its tab. The Library's folders, tags and searches are a pane of the left sidebar, shown with the Library (B39). ([The interface](README.md#the-interface))

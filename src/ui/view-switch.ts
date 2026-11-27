@@ -33,7 +33,8 @@ export function mountViewSwitch(root: HTMLElement, onSelect: (v: AppView) => voi
   const set = (v: AppView): void => {
     // The Settings button is a button of its own at the top right in every view (not one of the buttons of a bar).
     const gear = document.querySelector<HTMLElement>('button[data-view="settings"]');
-    const slot = document.querySelector<HTMLElement>('[data-ribbon-slot="settings"]') ?? root.querySelector<HTMLElement>(".view-settings"); // (the ribbon's, B39)
+    // (the ribbon's, B39; in the layout without the ribbon, the tests', it stays at the top right)
+    const slot = (document.documentElement.dataset["shell"] === "legacy" ? null : document.querySelector<HTMLElement>('[data-ribbon-slot="settings"]')) ?? root.querySelector<HTMLElement>(".view-settings");
     if (gear && slot && gear.parentElement !== slot) slot.append(gear);
     for (const b of document.querySelectorAll<HTMLElement>('[data-view="settings"]')) b.setAttribute("aria-pressed", String(v === "settings"));
     for (const t of tabs) {

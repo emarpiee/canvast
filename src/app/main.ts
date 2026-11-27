@@ -2409,7 +2409,7 @@ async function start(): Promise<void> {
   const markTab = mountViewSwitch(document.getElementById("view-switch")!, setView, PHOTOCRAFT_FEATURES.entry.view && photoCraft.available);
   // (the Pins window's button is the ribbon's, with its handler)
   const pinsButton = document.querySelector<HTMLElement>('[data-testid="reference-open"]');
-  if (pinsButton) document.querySelector('[data-ribbon-slot="top"]')?.append(pinsButton);
+  if (pinsButton && document.documentElement.dataset["shell"] !== "legacy") document.querySelector('[data-ribbon-slot="top"]')?.append(pinsButton);
   void followFrameSetting(settings);
   followScrolling();
   markTab("canvas");
