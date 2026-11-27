@@ -14,8 +14,8 @@ import { NO_META, richMeta, splitFrontmatter, underProps, wholeMarkdown, withFil
 import { fontFor } from "../text/fonts";
 import { chooseDialog, confirmDialog } from "./confirm";
 import { openLibraryPicker } from "./library-picker";
-import { mountNoteEditor } from "./note-editor";
-import type { AttachKind, NoteEditor, NoteHost, NoteItem } from "./note-editor";
+import { mountNoteEditor } from "../notes/editor-slot";
+import type { AttachKind, NoteEditor, NoteHost, NoteItem } from "../notes/editor-slot";
 
 // A note open in the notes editor: the same for the library's viewer and for the canvas's note panel. Whoever shows it gives a
 // `NotePlace` (how it imports files, shows another item, follows a new version); everything else (links, pictures, fonts,

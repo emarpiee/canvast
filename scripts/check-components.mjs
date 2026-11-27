@@ -13,6 +13,8 @@ const RULES = [
     owners: ["src/ui/more-menu.ts"],
     known: { "src/ui/navigator.ts": "the workspace list opens as a panel with a filter", "src/ui/assets-view.ts": "Place on: a chooser of canvases with a filter", "src/ui/board-filter.ts": "the one chooser of canvases with a filter, opened as a menu (a Pins window's title)" },
   },
+  // The notes editor's engine stays in its box (notes/editor-slot.ts): only its own module imports it, so it can be swapped whole (B37).
+  { name: "Notes editor engine", re: /from "suneditor/, owners: ["src/ui/note-editor.ts", "src/notes/note-markdown.ts"] },
   { name: "Menu rows", re: /role="menuitem"/, owners: ["src/ui/more-menu.ts"], known: { "src/ui/board-filter.ts": "the one chooser of canvases with a filter (Place on…, a Pins window's title)" } },
   { name: "Trees", re: /class="(tg|tree|tree-twist)["\s]/, owners: ["src/ui/tree.ts"] },
   { name: "Panels", re: /class="panel-(head|sub|body|foot)\b/, owners: ["src/ui/panel.ts"] },

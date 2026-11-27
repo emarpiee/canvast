@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.63.20 — The notes editor in a slot (2026-11-27)
+
+### For developers
+
+- The notes editor sits in a slot (B37): the app reaches it only through `src/notes/editor-slot.ts` (`NoteHost`, `NoteEditor`, `NoteEditorOptions`, and `mountNoteEditor` named on one line); SunEditor stays the editor, in `ui/note-editor.ts` and `notes/note-markdown.ts`, and `check:components` refuses it anywhere else. ([Source layout](README.md#source-layout))
+
 ## 0.63.19 — The new look's colours and type (2026-11-27)
 
 - **Changed:** the interface takes the new workspace look's colours, in light and dark: warm greys, flat panels split by hairlines, and an orange accent (the default theme colour; a theme colour of your own still sets it). Every name in the interface is in Inter, in three weights. ([Settings](README.md#settings))

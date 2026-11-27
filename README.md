@@ -2830,6 +2830,7 @@ src/
   storage/       IndexedDB, workspace repository, persistence, writer lease, ZIP, archives
   search/        boolean query parser and evaluator, canvas search keywords, recent and saved searches
   settings/      declared settings, scopes, rebindable shortcuts
+  notes/         note files, Markdown, properties and links, and the notes editor's slot
   commands/      command registry, palette providers, macros
   gen/           the pattern generators, a standalone module that imports nothing from the app: seeded random, geometry helpers, one pure function per pattern, an SVG writer
   colour-picker/ the colour picker, a standalone module that imports nothing from the app
@@ -2841,6 +2842,8 @@ docs/            reference notes, test logs, status
 ```
 
 The colour picker can be built alone with `npm run build:picker`, and the pattern generators with `npm run build:patterns` (a script with the global `CanvastPatterns`, an ES module, TypeScript declarations and a demo page in `dist-patterns/`; see [src/gen/README.md](src/gen/README.md) for the API). Both are made to be published as packages of their own.
+
+The notes editor sits in a slot: the app reaches it only through `src/notes/editor-slot.ts`, and the editor itself (SunEditor today) is one module behind it, so another editor goes in by changing one line; `npm run check:components` keeps SunEditor out of every other file.
 
 ---
 
