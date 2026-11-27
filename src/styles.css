@@ -3693,7 +3693,7 @@ body:is([data-view="assets"], .status-library) #statusbar.is-empty { display: fl
 body:is([data-view="assets"], .status-library) #statusbar > .hud-readout, body:not([data-view="assets"]):not(.status-library) #statusbar > .assets-statusbar { display: none; }
 #statusbar > .assets-statusbar { position: static; flex: 1; display: flex; flex-direction: row; align-items: center; min-width: 0; height: 100%; margin: 0; background: none; border: 0; pointer-events: auto; }
 #statusbar > .assets-statusbar > .hud-readout { order: 1; flex: 1; min-width: 0; overflow: hidden; }
-#statusbar > .assets-statusbar > .hud-controls { position: static; order: 2; margin: 0; padding: 0; gap: var(--s-1); background: none; border: 0; box-shadow: none; backdrop-filter: none; }
+#statusbar > .assets-statusbar > .hud-controls { position: static; order: 2; flex-direction: row; align-items: center; margin: 0; padding: 0; gap: var(--s-1); background: none; border: 0; box-shadow: none; backdrop-filter: none; }
 #statusbar > .assets-statusbar > .hud-controls > [hidden] { display: none; }
 #statusbar > .assets-statusbar > .hud-controls button { min-width: var(--row-btn); height: var(--row-btn); padding: 0 var(--s-2); }
 #statusbar .hud-readout { position: static; flex-direction: row; align-items: center; gap: var(--s-6); max-width: none; padding: 0; background: none; border: 0; border-radius: 0; box-shadow: none; backdrop-filter: none; font: inherit; color: inherit; }

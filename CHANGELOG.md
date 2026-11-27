@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.63.40 — The Library's view buttons in the status bar (2026-11-27)
+
+- **Fixed before release:** the Library's view buttons (columns, grid, list, size, reload) stand in a row in the status bar again, not in a column over the right sidebar (B39).
+
 ## 0.63.39 — Properties and Search panes, the bookmark button (2026-11-27)
 
 - **Added:** the Properties pane, first in the right sidebar: what is selected on the canvas as the Library's details say it (picture, name, kind and size, Show in Library, tags, fields, note), or the canvas itself; a locked hidden item shows only as one (B39). ([The interface](README.md#the-interface))
