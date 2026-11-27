@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.63.47 — Files from the Library open in the tab (2026-11-27)
+
+- **Changed:** a note, PDF, 3D model or ZIP opened from the Library takes the tab, as one opened from a canvas: its name on the tab and in the path, Back to the Library (*Files on a canvas*: Tab, the default; Panel and Window keep the Library's viewer). Pictures and videos keep the Library's viewer (B39). ([The interface](README.md#the-interface))
+
 ## 0.63.46 — The Library's bar as the reference (2026-11-27)
 
 - **Changed:** the Library's bar: one wide search box named after what is shown, what to show, the sort, and Import as its one orange button; Slideshow and the sort direction (*Reverse the order*, a command now) are in the view header's ⋯, with Exit hidden mode while it is on; the view header names the folder or tag shown (B39). ([The interface](README.md#the-interface))

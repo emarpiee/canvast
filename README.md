@@ -1399,7 +1399,7 @@ Keep the notes beside the picture they are about, and edit them there.
 
 | Feature | How |
 | --- | --- |
-| **Where it opens** | *Files on a canvas* (Settings > Notes): **Tab** (the default: the file takes the tab, Back returns), **Panel**, or **Window**, centred over the canvas until it is closed (a click beside it closes it, asking about unsaved changes) |
+| **Where it opens** | *Files on a canvas* (Settings > Notes): **Tab** (the default: the file takes the tab, Back returns; one opened from the Library does too, while pictures and videos keep the Library's viewer), **Panel**, or **Window**, centred over the canvas until it is closed (a click beside it closes it, asking about unsaved changes) |
 | **The panel** | A panel like Layers (it never folds): it floats, docks to a side (keeping its own width), its width and height can be dragged. ✕ or `Esc` closes it (the editor's own menus and dialogs close first) (asking about unsaved changes); the card shows the saved version at once |
 | **Undo** | Saving is no step of the canvas's undo: undo and redo on the canvas keep the saved version (they never bring an older one back) |
 | **Renaming** | The rename button in its header (or F2) renames the note with the library's rename dialog; the extension stays as it is, and `.note.html` counts as one extension there and in batch rename |

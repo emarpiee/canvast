@@ -2584,7 +2584,17 @@ async function start(): Promise<void> {
   markTab("canvas");
   markNav("canvas");
   /** A Library view in `root` (the Library view, and a Pins window's: ADR 0208, embedded, without its details panel). */
-  const libraryIn = (root: HTMLElement, embedded = false) => mountAssetsView(root, session, assets, () => setView("canvas"), notices, settings, libraryFonts, PHOTOCRAFT_FEATURES.entry.libraryItems && photoCraft.available ? (hash) => void photoCraft.editItem(hash) : undefined, { embedded });
+  const libraryIn = (root: HTMLElement, embedded = false) => mountAssetsView(root, session, assets, () => setView("canvas"), notices, settings, libraryFonts, PHOTOCRAFT_FEATURES.entry.libraryItems && photoCraft.available ? (hash) => void photoCraft.editItem(hash) : undefined, {
+    embedded,
+    // (a note, a PDF, a 3D model opened from the Library takes the tab, as from a canvas, B39: its name on the tab, Back to the Library)
+    ...(embedded || document.documentElement.dataset["shell"] === "legacy" ? {} : {
+      openInTab: (hash: string, name: string): boolean => {
+        if (settings.get("notes.panelMode") !== "tab" || !viewKindNamed(name)) return false;
+        void notePanel.open(hash);
+        return true;
+      },
+    }),
+  });
   const assetsView = libraryIn(assetsRoot);
   libraryScope = () => assetsView.scopeName();
   // (the Library's bar as the reference has it, B39: Import is its one primary button; the specs' layout keeps today's)

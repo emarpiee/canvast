@@ -52,6 +52,8 @@ const ZOOM_STEP = 1.25;
  * Library through `ctx` (its getters read the Library's own variables, its setters write them) and gives the Library what it returns.
  */
 export interface ViewerCtx {
+  /** A file of its own view opened from the Library goes to the workspace's tab instead (B39): true when it went there. */
+  readonly openInTab?: (hash: string, name: string) => boolean;
   anchor: string | null;
   readonly applyUi: () => void;
   readonly assets: AssetLibrary;
@@ -663,6 +665,7 @@ export function mountLibraryViewer(ctx: ViewerCtx) {
       return;
     }
     const e = ctx.entryOf(hash)!;
+    if (ctx.viewer.hidden && ctx.openInTab?.(hash, e.name)) return; // (opened, not stepped to from another item)
     if (!(await leaveNote())) return;
     const token = ++slideToken;
     const opening = ctx.viewer.hidden;

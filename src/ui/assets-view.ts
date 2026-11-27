@@ -331,7 +331,7 @@ function provideLibraryCommands(root: HTMLElement, name: string, make: () => Com
   byRoot.set(root, make);
 }
 
-export function mountAssetsView(root: HTMLElement, session: Session, assets: AssetLibrary, showCanvas: () => void, notices: { subscribe(fn: (text: string) => void): void }, settings: SettingsStore, /** The fonts of the library, loaded (the notes editor's font list). */ fonts: () => Promise<Array<{ hash: string; name: string; unusable: string }>> = async () => [], /** Edit in PhotoCraft (Settings > ArtCraft > PhotoCraft); absent where it is not offered. */ editInPhotoCraft?: (hash: string) => void, /** A second Library in a Pins window (ADR 0208): no details panel, no commands of its own (the main Library's are the app's), its keys only while it is in use. */ opts: { embedded?: boolean } = {}): AssetsView {
+export function mountAssetsView(root: HTMLElement, session: Session, assets: AssetLibrary, showCanvas: () => void, notices: { subscribe(fn: (text: string) => void): void }, settings: SettingsStore, /** The fonts of the library, loaded (the notes editor's font list). */ fonts: () => Promise<Array<{ hash: string; name: string; unusable: string }>> = async () => [], /** Edit in PhotoCraft (Settings > ArtCraft > PhotoCraft); absent where it is not offered. */ editInPhotoCraft?: (hash: string) => void, /** A second Library in a Pins window (ADR 0208): no details panel, no commands of its own (the main Library's are the app's), its keys only while it is in use. */ opts: { embedded?: boolean; /** A file of its own view, opened, goes to the workspace's tab (B39). */ openInTab?: (hash: string, name: string) => boolean } = {}): AssetsView {
   root.innerHTML = `
     <div class="assets-place-zone drop-zone" data-testid="assets-place-zone" hidden>${ICONS.mapPin}<span></span></div>
     <div class="assets-bar" role="toolbar" aria-label="Library">
@@ -1253,6 +1253,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
 
   // ---- viewer: in ui/library-viewer.ts (B34); what it reads of the Library goes through these getters (and setters where it writes)
   const vw = mountLibraryViewer({
+    ...(opts.openInTab ? { openInTab: opts.openInTab } : {}),
     get anchor() { return anchor; }, set anchor(v) { anchor = v; },
     get applyUi() { return applyUi; },
     get assets() { return assets; },
