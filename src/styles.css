@@ -3649,6 +3649,10 @@ button.archive-crumb:hover { background: var(--hud-hover); color: var(--hud-fg);
 .sb-pane > .asset-inspector { flex: none; min-height: 0; border: 0; border-radius: 0; background: none; padding: var(--s-8); }
 body:is([data-view="assets"], .status-library) .sb-pane > .props-pane, body:not([data-view="assets"]):not(.status-library) .sb-pane > .asset-inspector { display: none; }
 @media (min-width: 901px) { :root:not([data-shell="legacy"]) .library-view :is([data-action="details"], [data-grip="insp"]) { display: none; } }
+/* The Library's bar as the reference (B39): one wide search box, the list's choices, Import as its one primary button; the sort direction and
+   the slideshow are in the view header's ⋯ */
+:root:not([data-shell="legacy"]) .library-view .assets-bar :is([data-action="sort-dir"], [data-action="slideshow"], .assets-sep) { display: none; }
+:root:not([data-shell="legacy"]) .library-view :is(.assets-searchbox, .assets-search) { flex: 1 1 auto; max-width: none; }
 .props-pane { display: flex; flex-direction: column; gap: var(--s-4); padding: var(--s-8); }
 .props-pane-title { display: flex; align-items: center; gap: var(--s-4); margin: 0; overflow: hidden; color: var(--hud-fg); font: var(--weight-semibold) var(--text-lg)/1.3 var(--font-ui); text-overflow: ellipsis; white-space: nowrap; }
 .props-pane-sub, .props-pane-empty { margin: 0; color: var(--hud-muted); font: var(--font-meta); }

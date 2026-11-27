@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.63.46 — The Library's bar as the reference (2026-11-27)
+
+- **Changed:** the Library's bar: one wide search box named after what is shown, what to show, the sort, and Import as its one orange button; Slideshow and the sort direction (*Reverse the order*, a command now) are in the view header's ⋯, with Exit hidden mode while it is on; the view header names the folder or tag shown (B39). ([The interface](README.md#the-interface))
+
 ## 0.63.45 — A new tab's start page as the reference (2026-11-27)
 
 - **Changed:** a new tab's start page: canvast and a line under it, New canvas, New note, Open the Library and Find (the quick switcher) as rows in the middle of the view, then the recent canvases with when each was last changed (B39). ([The interface](README.md#the-interface))

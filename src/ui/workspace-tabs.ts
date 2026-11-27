@@ -90,7 +90,7 @@ export function mountTabs(strip: HTMLElement, head: HTMLElement, deps: TabsDeps)
       <nav class="view-path" aria-label="Where this is" data-testid="view-path">${d.path.map((p, i) => `<span class="view-crumb${i === d.path.length - 1 ? " is-here" : ""}">${esc(p)}</span>`).join(`<span class="view-sep" aria-hidden="true">/</span>`)}</nav>
       ${placeOf(t).kind === "file" || placeOf(t).kind === "library" ? `<button type="button" class="layer-btn view-split" data-command="tab.split" data-testid="view-split" aria-label="Open beside the canvas" title="Open beside the canvas (a split)">${ICONS.columns2}</button>` : ""}
       ${placeOf(t).kind === "canvas" ? `<button type="button" class="layer-btn view-bookmark" data-command="bookmark.add" data-testid="view-bookmark" aria-label="Bookmark this view" title="Bookmark this view">${ICONS.bookmark}</button>` : ""}
-      ${placeOf(t).kind === "canvas" ? `<button type="button" class="layer-btn view-more" data-tabs="menu" data-testid="view-more" aria-haspopup="menu" aria-expanded="false" aria-label="More for this view" title="More: views, pattern, background, information, names, Zen">${ICONS.ellipsis}</button>` : ""}`;
+      ${placeOf(t).kind === "canvas" || placeOf(t).kind === "library" ? `<button type="button" class="layer-btn view-more" data-tabs="menu" data-testid="view-more" aria-haspopup="menu" aria-expanded="false" aria-label="More for this view" title="More: views, pattern, background, information, names, Zen">${ICONS.ellipsis}</button>` : ""}`;
   };
 
   const showActive = (): void => {

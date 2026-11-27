@@ -122,7 +122,7 @@ import { mountAssetsView } from "../ui/assets-view";
 import { SETTINGS_TABS, mountSettingsView } from "../ui/settings-view";
 import { goHome, panStep, zoomByStep } from "../interaction/navigation";
 import { mountHintLine } from "../ui/hint-line";
-import { closeMoreMenu, openMoreMenu, setMenuAvoid } from "../ui/more-menu";
+import { closeMoreMenu, commandRows, openMoreMenu, setMenuAvoid } from "../ui/more-menu";
 import type { MenuItem } from "../ui/more-menu";
 import { ICONS } from "../ui/icons";
 import { mountContextBar } from "../ui/context-bar";
@@ -2247,6 +2247,8 @@ async function start(): Promise<void> {
   const assetsRoot = document.getElementById("assets-view")!;
   /** The right sidebar's pane before the Library took it for its details (shown again with the canvas). */
   let rightBeforeLibrary: string | null = null;
+  /** What the Library shows now, by name (its view header's path), once the Library is made. */
+  let libraryScope = (): string => "";
   /** The backdrop of Settings over the workspace: a click on it closes Settings, as its × does. */
   const settingsScrim = document.createElement("div");
   settingsScrim.className = "settings-scrim";
@@ -2416,7 +2418,10 @@ async function start(): Promise<void> {
   const startShow = mountStartPage(startPage, session);
   const describePlace = (place: Place): { title: string; icon: string; path: string[] } => {
     if (place.kind === "start") return { title: "New tab", icon: ICONS.plus, path: [] };
-    if (place.kind === "library") return { title: "Library", icon: ICONS.images, path: ["Library"] };
+    if (place.kind === "library") {
+      const where = libraryScope();
+      return { title: "Library", icon: ICONS.images, path: where && where !== "All items" ? ["Library", where] : ["Library"] };
+    }
     if (place.kind === "file") {
       const name = assetNames.map.get(place.hash) ?? "File";
       return { title: name.replace(/\.[^.]+$/, ""), icon: ICONS.fileText, path: ["Library", name] };
@@ -2453,6 +2458,11 @@ async function start(): Promise<void> {
     valid: (place) => place.kind !== "canvas" || !!session.tree?.boards.some((b) => b.canvases.some((c) => c.id === place.id)),
     storeKey: () => (session.tree ? `canvast.tabs.${session.tree.workspace.id}` : null),
     openMenu: (place, anchor) => {
+      if (place.kind === "library") {
+        // (the Library's rarer view actions: what its bar leaves out; Exit hidden mode only while it is on, as nothing else names it)
+        const rows = (): MenuItem[] => commandRows([["library.slideshowShown", { icon: ICONS.play }], ["library.reverseOrder", { icon: ICONS.arrowUpDown }], ["hidden.exit", { icon: ICONS.eyeClosed }]]).filter((r) => r.command !== "hidden.exit" || !r.disabled);
+        return openMoreMenu(anchor, rows(), "The Library", { keepOpen: true, refresh: rows });
+      }
       if (place.kind !== "canvas") return;
       openMoreMenu(anchor, canvasViewMenu(anchor), "This canvas view", { keepOpen: true, refresh: () => canvasViewMenu(anchor) });
     },
@@ -2576,6 +2586,9 @@ async function start(): Promise<void> {
   /** A Library view in `root` (the Library view, and a Pins window's: ADR 0208, embedded, without its details panel). */
   const libraryIn = (root: HTMLElement, embedded = false) => mountAssetsView(root, session, assets, () => setView("canvas"), notices, settings, libraryFonts, PHOTOCRAFT_FEATURES.entry.libraryItems && photoCraft.available ? (hash) => void photoCraft.editItem(hash) : undefined, { embedded });
   const assetsView = libraryIn(assetsRoot);
+  libraryScope = () => assetsView.scopeName();
+  // (the Library's bar as the reference has it, B39: Import is its one primary button; the specs' layout keeps today's)
+  if (document.documentElement.dataset["shell"] !== "legacy") for (const b of assetsRoot.querySelectorAll(".assets-import > .assets-btn")) b.classList.add("is-primary");
   // (the Library's status line and view buttons are the workspace's status bar's while the Library is in front, B39; the specs' layout keeps
   // them in the Library's column)
   const libraryStatus = assetsRoot.querySelector<HTMLElement>(".assets-statusbar");
@@ -2609,6 +2622,7 @@ async function start(): Promise<void> {
     // commands: go.library (a folder, tag or search chosen while the canvas shows)
     librarySide.addEventListener("click", (e) => {
       if (appView !== "assets" && document.documentElement.dataset["splitView"] !== "library" && (e.target as HTMLElement).closest(".side-item")) void pressCommand("go.library");
+      setTimeout(() => tabs.refresh()); // (the view header names the folder or tag chosen)
     });
   }
   // A font's card on a canvas: the viewer's sample sentence, on its ground (a ground that follows the theme is drawn again with it).

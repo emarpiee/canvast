@@ -123,6 +123,8 @@ export interface AssetsView {
   redrawNotes(): void;
   /** A Pins window's Library (embedded): the grid of the pictures of a folder ("folder:<id>") or of all ("all"); a card opens the viewer. */
   viewIn(scope: string): Promise<void>;
+  /** What the Library shows now, by name: All items, a folder's, a tag's (the workspace's view header names it). */
+  scopeName(): string;
 }
 
 /**
@@ -2133,6 +2135,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       };
     });
     const scopeName = scopeNameOf(tagCounts);
+    search.placeholder = scope === "all" ? "Search" : `Search ${scopeName}…`; // (the box searches what is shown)
     side.dataset["open"] = String(sideOpen);
     const html = `
       <button type="button" class="side-collapse" data-side-toggle aria-expanded="${sideOpen}">${ICONS.panelLeft}<span class="side-label">Library: ${esc(scopeName)}</span>${sideOpen ? ICONS.chevronUp : ICONS.chevronDown}</button>
@@ -4882,6 +4885,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     lib("library.import", "Import files", "Pictures, video, audio and other files", "edit", () => fileInput.click(), writable),
     lib("library.importFolder", "Import a folder", "With its subfolders", "edit", () => folderInput.click(), writable),
     lib("library.newNote", "New note", "A markdown note, opened to write in", "edit", () => newNote(), writable),
+    lib("library.reverseOrder", "Reverse the order", "The list sorted the other way round", "read", () => sortDirBtn.click()),
     lib("library.slideshowShown", "Slideshow", "The selected items, or everything listed", "edit", () => slideshow(), () => inLibrary() ?? (filtered().length ? null : "Nothing is listed.")),
     lib("library.search", "Search the library", "Files whose name, tags or words match, as the search box finds them", "read", async (o) => {
       const all = listing && !pagesNow() ? listing : await session.catalog?.list().catch(() => null);
@@ -5262,6 +5266,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       root.hidden = true;
       syncViewing();
     },
+    scopeName: () => scopeNameOf(),
     viewIn: async (to) => {
       if (vw.slideHash) vw.closeSlide();
       scope = to;
