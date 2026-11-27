@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.63.45 — A new tab's start page as the reference (2026-11-27)
+
+- **Changed:** a new tab's start page: canvast and a line under it, New canvas, New note, Open the Library and Find (the quick switcher) as rows in the middle of the view, then the recent canvases with when each was last changed (B39). ([The interface](README.md#the-interface))
+
 ## 0.63.44 — The specs' layout: panels over the canvas (2026-11-27)
 
 ### For developers

@@ -3738,9 +3738,16 @@ body:is([data-view="assets"], .status-library) #statusbar > .hud-readout, body:n
 /* A new tab's start page: over the view, under the tabs. */
 .start-page { position: fixed; z-index: 3; inset: var(--shell-t) var(--shell-r) var(--shell-b) var(--shell-l); overflow-y: auto; background: var(--theme-bg); }
 .start-page[hidden] { display: none; }
-.start-inner { max-width: 560px; margin: 12vh auto 0; padding: 0 var(--s-8); }
-.start-title { margin: 0 0 var(--s-8); font: var(--weight-semibold) var(--text-2xl) var(--font-ui); }
-.start-actions { display: flex; flex-wrap: wrap; gap: var(--s-4); }
+.start-page:not([hidden]) { display: grid; place-items: center; }
+.start-inner { width: min(400px, 100%); padding: var(--s-8); }
+.start-title { margin: 0; font: var(--weight-semibold) var(--text-2xl) var(--font-ui); color: var(--hud-fg); }
+.start-lede { margin: var(--s-2) 0 var(--s-12); color: var(--hud-muted); font: var(--font-control); }
+.start-actions { display: grid; gap: var(--s-4); }
+.start-action { display: flex; align-items: center; gap: var(--s-6); width: 100%; min-height: var(--list-h); padding: var(--s-4) var(--s-6); border: 1px solid var(--hud-border); border-radius: var(--r-sm); background: var(--card); color: var(--hud-fg); font: var(--font-control); text-align: left; cursor: pointer; }
+.start-action:hover { background: var(--hud-hover); }
+.start-action > svg { flex: none; width: var(--icon-md); height: var(--icon-md); color: var(--hud-muted); }
+.start-action > span { flex: 1; min-width: 0; }
+.start-action > kbd { padding: 0 var(--s-2); border: 1px solid var(--hud-border); border-radius: var(--r-sm); color: var(--hud-muted); font: var(--font-meta); }
 .start-head { margin: var(--s-14) 0 var(--s-4); font: var(--font-meta); color: var(--hud-muted); text-transform: uppercase; letter-spacing: 0.04em; }
 .start-list { margin: 0; padding: 0; list-style: none; display: grid; gap: var(--s-1); }
 .start-item { display: flex; align-items: center; gap: var(--s-4); width: 100%; min-height: var(--list-h); padding: 0 var(--s-4); font: var(--font-control); color: inherit; text-align: left; background: transparent; border: 0; border-radius: var(--r-sm); cursor: pointer; }
