@@ -2245,6 +2245,8 @@ async function start(): Promise<void> {
 
   // Top-level views. The canvas keeps its camera, selection and history while hidden.
   const assetsRoot = document.getElementById("assets-view")!;
+  /** The right sidebar's pane before the Library took it for its details (shown again with the canvas). */
+  let rightBeforeLibrary: string | null = null;
   const setView = (v: AppView): void => {
     // (the start page of a new tab covers the view: going to the canvas or the Library uncovers it, and the tab goes there)
     if (v === appView) {
@@ -2280,6 +2282,9 @@ async function start(): Promise<void> {
     // (the left sidebar shows the Library's folders with the Library, and the Files again with a canvas)
     if (v === "assets") sidebarLeft.show("library");
     else if (v === "canvas" && sidebarLeft.active === "library") sidebarLeft.show("files");
+    // (the right sidebar: the Library's details with the Library, the canvas's pane again with the canvas)
+    if (v === "assets" && sidebarRight.active !== "properties") (rightBeforeLibrary = sidebarRight.active), sidebarRight.show("properties");
+    else if (v === "canvas" && rightBeforeLibrary) sidebarRight.show(rightBeforeLibrary), (rightBeforeLibrary = null);
   };
   // The workspace (B39): the ribbon, a sidebar on each side, and the status bar, which takes the canvas's information line
   const startPage = document.getElementById("start-page")!;
@@ -2457,9 +2462,13 @@ async function start(): Promise<void> {
   const splitLibrary = (on: boolean): void => {
     document.body.classList.toggle("status-library", on); // (the status bar follows the view just shown)
     if (on === (root.dataset["splitView"] === "library")) return;
-    if (on) (root.dataset["splitView"] = "library"), assetsView.show();
-    else {
+    if (on) {
+      root.dataset["splitView"] = "library";
+      assetsView.show();
+      if (sidebarRight.active !== "properties") (rightBeforeLibrary = sidebarRight.active), sidebarRight.show("properties"); // (its details)
+    } else {
       delete root.dataset["splitView"];
+      if (rightBeforeLibrary && appView !== "assets") sidebarRight.show(rightBeforeLibrary), (rightBeforeLibrary = null);
       if (appView !== "assets") assetsView.hide();
     }
   };
@@ -2557,6 +2566,21 @@ async function start(): Promise<void> {
   // them in the Library's column)
   const libraryStatus = assetsRoot.querySelector<HTMLElement>(".assets-statusbar");
   if (libraryStatus && document.documentElement.dataset["shell"] !== "legacy") statusbar.append(libraryStatus);
+  // (the Library's details are the Properties pane's while the Library is in front, B39, so the Library keeps its whole width for its items,
+  // beside the canvas too; a narrow window, with no sidebars, keeps them in the Library as its sheet; the specs' layout keeps them there)
+  const libraryDetails = assetsRoot.querySelector<HTMLElement>(".asset-inspector");
+  if (libraryDetails && document.documentElement.dataset["shell"] !== "legacy") {
+    const home = { parent: libraryDetails.parentElement!, next: libraryDetails.nextSibling };
+    const wide = matchMedia("(min-width: 901px)");
+    const placeDetails = (): void => {
+      const pane = document.querySelector<HTMLElement>('#sidebar-right .sb-pane[data-pane="properties"]');
+      if (wide.matches && pane) pane.append(libraryDetails);
+      else home.parent.insertBefore(libraryDetails, home.next);
+    };
+    placeDetails();
+    // view-state: (where the Library's details are, by the window's width)
+    wide.addEventListener("change", placeDetails);
+  }
   // (with the Library beside the canvas, the status bar follows the one in use: a press in the Library shows its status, one elsewhere the canvas's)
   // view-state: (which view's status the status bar shows)
   document.addEventListener("pointerdown", (e) => {

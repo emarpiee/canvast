@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.63.42 — The Library's details in the Properties pane (2026-11-27)
+
+- **Changed:** the Library's details (Place, favourite, tags, folder, properties, where it is used) are in the right sidebar's Properties pane while the Library is in front, so the Library keeps its whole width for its items, beside the canvas too; the right sidebar shows that pane with the Library and the canvas's pane again with the canvas. A narrow window keeps them in the Library as before (B39). ([The interface](README.md#the-interface))
+
 ## 0.63.41 — The tool rail beside the sidebar (2026-11-27)
 
 - **Fixed before release:** the canvas's tool rail stood at the window's left edge, behind the ribbon and the left sidebar; it is at the canvas's left edge again (B39).
