@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.63.18 — Tests settled for the resize work (2026-11-27)
+
+### For developers
+
+- Tests: folder rows are pressed on their name in the organize spec (Pin and More sit over the name's end under the pointer); the every-kind snap test waits for a still selection box and checks a whole note's card by its side alone (its height follows its words).
+
 ## 0.63.17 — A small box resizes from its corners (2026-11-27)
 
 - **Fixed:** a press on a corner handle of a small box (a text a line high, anything under about 36 px on the screen) turned it instead of resizing it, for every kind of object: a resize handle now always resizes, and a press past the corner still turns. ([Keyboard and pointer reference](README.md#keyboard-and-pointer-reference))
