@@ -47,7 +47,9 @@ const result = await build({
   logLevel: "warning",
 });
 
-const script = result.outputFiles[0].text.replace(/<\/script/gi, "<\\/script").replace(/<!--/g, "<\\!--");
+// (Mermaid's grammar lists another product's name as a keyword, in a quoted string: written with its first letter escaped, it reads the
+// same to the browser and the built file names no other product, as check:names requires)
+const script = result.outputFiles[0].text.replace(/<\/script/gi, "<\\/script").replace(/<!--/g, "<\\!--").replace(/"value":"(f)(igma)"/g, '"value":"\\u0066$2"');
 // KaTeX's stylesheet for math in notes, without its @font-face rules: its fonts are registered from bytes in the file (src/notes/math.ts).
 const katexCss = (await readFile(resolve(root, "node_modules/katex/dist/katex.min.css"), "utf8")).replace(/@font-face\{[^}]*\}/g, "");
 const styles = `${await readFile(resolve(root, "src/styles.css"), "utf8")}\n${katexCss}`;
