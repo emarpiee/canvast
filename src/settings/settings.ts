@@ -241,6 +241,11 @@ export const SETTINGS = {
   "ui.properties": { scope: "device", default: "near", validate: oneOf("bar", "near"), effect: "immediate" } as Def<"bar" | "near">,
   "ui.names": { scope: "device", default: "all", validate: oneOf("all", "picked", "off"), effect: "immediate" } as Def<"all" | "picked" | "off">,
   "ui.zen": { scope: "device", default: false, validate: (v: unknown) => (typeof v === "boolean" ? v : undefined), effect: "immediate" } as Def<boolean>,
+  // The workspace (B39): whether each sidebar shows, and the pane it shows (per device, as a window's layout is)
+  "ui.sidebarLeft": { scope: "device", default: true, validate: bool, effect: "immediate" } as Def<boolean>,
+  "ui.sidebarRight": { scope: "device", default: true, validate: bool, effect: "immediate" } as Def<boolean>,
+  "ui.paneLeft": { scope: "device", default: "", validate: text(32), effect: "immediate" } as Def<string>,
+  "ui.paneRight": { scope: "device", default: "", validate: text(32), effect: "immediate" } as Def<string>,
   /** Every shortcut the person changed, as JSON: command id → keys (settings/keymap.ts). Empty: all as they were. */
   "keys.custom": { scope: "device", default: "{}", validate: (v: unknown) => { try { return typeof v === "string" && typeof JSON.parse(v) === "object" ? v : undefined; } catch { return undefined; } }, effect: "immediate" } as Def<string>,
   "key.zen": { scope: "device", default: "z", validate: letter, effect: "immediate" } as Def<string>,

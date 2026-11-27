@@ -343,7 +343,7 @@ html, body {
 
 #canvas-host {
   position: fixed;
-  inset: 0;
+  inset: 0 var(--shell-r) 0 var(--shell-l); /* (between the ribbon and sidebars, B39) */
 }
 
 /* A finger that drags a slider or a number's name must not scroll the bar or page under it: the drag is the control's (otherwise the browser takes it and cancels it) */
@@ -614,7 +614,7 @@ input[type="range"], .media-scrub, .tb-count[data-scrub] input, input[data-scrub
 .hud-save:hover { opacity: 1; text-decoration: underline; }
 .hud-save:focus-visible { outline: 2px solid var(--hud-accent); }
 
-#nav { position: fixed; left: var(--edge); top: var(--edge); z-index: var(--z-edge); display: flex; align-items: flex-start; gap: var(--s-4); pointer-events: none; }
+#nav { position: fixed; left: calc(var(--shell-l) + var(--edge)); top: var(--edge); z-index: var(--z-edge); display: flex; align-items: flex-start; gap: var(--s-4); pointer-events: none; }
 .nav { position: relative; pointer-events: auto; }
 /* The navigator pill (ADR 0079): the Canvas view's tab and the board/canvas switcher in one control, the first of the top bar. */
 .nav-pill { display: inline-flex; align-items: center; gap: var(--s-4); max-width: min(46vw, 400px); font: var(--weight-medium) var(--text-md) var(--font-ui); }
@@ -673,7 +673,7 @@ input[type="range"], .media-scrub, .tb-count[data-scrub] input, input[data-scrub
 .readonly-banner {
   position: fixed;
   top: 64px;
-  left: 50%;
+  left: calc(var(--shell-l) + (100vw - var(--shell-l) - var(--shell-r)) / 2);
   transform: translateX(-50%);
   pointer-events: auto;
   display: flex;
@@ -1009,11 +1009,11 @@ dialog.confirm .secret-field .prompt-input { padding-right: calc(var(--icon-xl) 
 .media-volume { width: 84px; }
 
 /* Settings view (ui/settings-view.ts). */
-#settings-view { position: fixed; inset: 0; z-index: 2; display: flex; flex-direction: column; padding: calc((var(--nav-bottom, var(--s-15)) + 2 * var(--near)) / var(--ui-scale, 1)) var(--s-8) 0; background: var(--theme-bg); font: var(--text-md)/1.4 var(--font-ui); }
+#settings-view { position: fixed; inset: 0 var(--shell-r) 0 var(--shell-l); z-index: 2; display: flex; flex-direction: column; padding: calc((var(--nav-bottom, var(--s-15)) + 2 * var(--near)) / var(--ui-scale, 1)) var(--s-8) 0; background: var(--theme-bg); font: var(--text-md)/1.4 var(--font-ui); }
 #settings-view[hidden] { display: none; }
 /* PhotoCraft's view (src/artcraft/photocraft/): the shared panel over the whole app, its frame filling the body */
 /* (as the Library and Settings: the whole window, opaque, its frame under the top bar; nothing of the canvas shows or reaches through) */
-.photocraft-view.layers-panel { position: fixed; inset: 0; z-index: var(--z-view); padding-top: calc((var(--nav-bottom, var(--s-15)) + var(--near)) / var(--ui-scale, 1)); border: 0; border-radius: 0; background: var(--theme-bg); backdrop-filter: none; overflow: hidden; }
+.photocraft-view.layers-panel { position: fixed; inset: 0 var(--shell-r) 0 var(--shell-l); z-index: var(--z-view); padding-top: calc((var(--nav-bottom, var(--s-15)) + var(--near)) / var(--ui-scale, 1)); border: 0; border-radius: 0; background: var(--theme-bg); backdrop-filter: none; overflow: hidden; }
 .photocraft-view .panel-body { display: flex; overflow: hidden; }
 .photocraft-frame { flex: 1 1 auto; width: 100%; height: 100%; border: 0; display: block; }
 .photocraft-status { margin: 0; padding: var(--s-2) var(--s-6); }
@@ -1119,7 +1119,7 @@ dialog.confirm .secret-field .prompt-input { padding-right: calc(var(--icon-xl) 
    Surfaces are quiet and lifted by one shadow; the accent marks only what is active; numbers are tabular; labels are sentence case. */
 #toolbar > .rail {
   position: fixed;
-  left: calc(var(--edge) / var(--ui-scale, 1));
+  left: calc((var(--shell-l) + var(--edge)) / var(--ui-scale, 1));
   /* At the top, just under the top-left controls (not floating in the middle of the left edge), so the room below it is the canvas's. */
   top: calc((var(--edge) + var(--bar-h) + var(--near)) / var(--ui-scale, 1)); /* the same gap under the Assets bar as the panels have under the top right bar */
   z-index: 3;
@@ -1178,7 +1178,7 @@ input[type="radio"]:checked::before { content: ""; width: var(--sp-3); height: v
 .set-preset:focus-visible { outline: 2px solid var(--hud-accent); outline-offset: 2px; }
 
 /* The dock: history, panels and import, at the top right. The options bar between it and the view tabs shows only what the tool offers. */
-#toolbar > .dock { position: fixed; top: calc(var(--edge) / var(--ui-scale, 1)); right: calc(var(--edge) / var(--ui-scale, 1)); z-index: 3; display: flex; gap: var(--s-4); padding: var(--pad); pointer-events: auto; background: var(--hud-bg); border: 1px solid var(--hud-border); border-radius: var(--r-lg); box-shadow: var(--hud-lift); backdrop-filter: blur(8px); }
+#toolbar > .dock { position: fixed; top: calc(var(--edge) / var(--ui-scale, 1)); right: calc((var(--shell-r) + var(--edge)) / var(--ui-scale, 1)); z-index: 3; display: flex; gap: var(--s-4); padding: var(--pad); pointer-events: auto; background: var(--hud-bg); border: 1px solid var(--hud-border); border-radius: var(--r-lg); box-shadow: var(--hud-lift); backdrop-filter: blur(8px); }
 .dock button { display: inline-flex; align-items: center; justify-content: center; min-width: 34px; height: 34px; padding: 0 var(--s-4); border: 0; border-radius: var(--r-md); background: transparent; color: inherit; cursor: pointer; }
 .dock button:hover:not(:disabled) { background: var(--hud-hover); }
 .dock button:disabled { opacity: 0.35; cursor: default; }
@@ -1223,13 +1223,13 @@ input[type="radio"]:checked::before { content: ""; width: var(--sp-3); height: v
 .pc-switch.has-close button[data-view] { border-right: 0; border-radius: var(--ctl-r) 0 0 var(--ctl-r); }
 .pc-switch .view-close { border-right: 1px solid var(--view-edge); border-radius: 0 var(--ctl-r) var(--ctl-r) 0; }
 .view-switch button:not([aria-selected="true"]):hover, .nav-pill:not([data-active="true"]) .nav-crumb:hover, .nav-pill .nav-name-btn:hover, .view-settings button:not([aria-pressed="true"]):hover { background: var(--view-tint-hover); }
-#nav { left: var(--edge); top: var(--edge); }
+#nav { left: calc(var(--shell-l) + var(--edge)); top: var(--edge); }
 /* The panels' buttons: a column on the right edge, as the tools' rail is on the left, under the Settings button in the corner (only the view
    buttons are in the top corners). The panels docked on the right open beside it; a short window scrolls it, clear of the bottom-right bar. */
 #toolbar > .dock > .tb-group { flex-direction: column; gap: var(--s-2); }
 #toolbar > .dock { flex-direction: column; gap: var(--s-2); top: calc((var(--edge) + var(--bar-h) + var(--near)) / var(--ui-scale, 1)); right: calc(var(--edge) / var(--ui-scale, 1)); max-height: calc(100dvh - (2 * var(--edge) + var(--bar-h) + 2 * var(--near) + var(--hud-bottom-h, var(--bar-h))) / var(--ui-scale, 1)); overflow-y: auto; scrollbar-width: none; }
 /* Settings: a button of its own in the top-right corner of every view. */
-.view-settings { position: fixed; pointer-events: auto; top: var(--edge); right: var(--edge); z-index: var(--z-edge); zoom: var(--ui-scale, 1); display: flex; gap: var(--s-4); }
+.view-settings { position: fixed; pointer-events: auto; top: var(--edge); right: calc(var(--shell-r) / var(--ui-scale, 1) + var(--edge)); z-index: var(--z-edge); zoom: var(--ui-scale, 1); display: flex; gap: var(--s-4); }
 /* The AI agent beside it (ADR 0205): shown while Settings > AI agents is on; its dot says whether one is connected. The bars keep clear of both. */
 .view-settings .agent-chip { position: relative; }
 .view-settings .agent-chip[hidden] { display: none; }
@@ -1276,7 +1276,7 @@ input[type="radio"]:checked::before { content: ""; width: var(--sp-3); height: v
 .panel-head { padding: var(--s-4) var(--s-4) var(--s-4) var(--s-6); min-height: 40px; }
 
 /* ---- Notices (ui/notices.ts): where the app speaks, seen at a glance --------------------------------------------- */
-#notices { position: fixed; left: 50%; bottom: var(--s-10); transform: translateX(-50%); z-index: 20; display: flex; flex-direction: column; gap: var(--near); align-items: center; width: min(520px, calc(100vw - 2 * var(--edge))); pointer-events: none; }
+#notices { position: fixed; right: calc(var(--shell-r) + var(--edge)); bottom: calc(var(--status-h) + var(--edge)); z-index: 20; display: flex; flex-direction: column; gap: var(--near); align-items: flex-end; width: min(360px, calc(100vw - 2 * var(--edge))); /* (bottom right, above the status bar, B39) */ pointer-events: none; }
 #notices[hidden] { display: none; }
 .notice { --tone: var(--hud-accent); pointer-events: auto; display: flex; align-items: center; gap: var(--s-6); width: fit-content; min-width: min(300px, 100%); max-width: 100%; padding: var(--s-4) var(--s-4) var(--s-4) var(--s-4); color: var(--hud-fg); background: var(--hud-bg); border: 1px solid var(--hud-border); border-radius: var(--r-lg); box-shadow: var(--hud-lift); backdrop-filter: blur(6px); font: var(--font-control); animation: notice-in var(--dur-base) var(--ease-out); }
 .notice.is-success { --tone: var(--hud-success); }
@@ -1315,7 +1315,7 @@ body.has-ctx-bar:not([data-view="assets"]) #notices { bottom: calc(2 * var(--s-1
 /* ---- Assets view (ui/assets-view.ts, ADR 0054) ------------------------------------------------------------------------
    One flat page under the view tabs: a library bar on the tabs' row, the library on the left, a gallery (or the viewer) in the middle
    and the details on the right. Cards carry the picture only; the rest appears on hover, focus and selection. */
-.library-view { position: fixed; inset: 0; z-index: 2; display: flex; flex-direction: column; padding: var(--edge) var(--edge) 0; background: var(--theme-bg); font: var(--text-md)/1.4 var(--font-ui); }
+.library-view { position: fixed; inset: 0 var(--shell-r) 0 var(--shell-l); z-index: 2; display: flex; flex-direction: column; padding: var(--edge) var(--edge) 0; background: var(--theme-bg); font: var(--text-md)/1.4 var(--font-ui); }
 .library-view[hidden] { display: none; }
 /* (a Library in a Pins window, ADR 0208: the same view, laid out in the window, without its details panels) */
 .library-view.is-embedded { position: relative; inset: auto; z-index: auto; height: 100%; padding: var(--s-4) var(--s-4) 0; box-sizing: border-box; }
@@ -2690,7 +2690,7 @@ dialog.rename-dialog { width: min(var(--dlg-l), calc(100vw - 2 * var(--edge))); 
 /* The bar is the bottom-most strip, the full width; the view controls float just above it at the right, as they always did. */
 .hud-bottom > .hud-readout { position: static; order: 2; min-width: 0; max-width: none; flex-direction: row; flex-wrap: wrap; align-items: center; gap: var(--s-1) var(--s-10); box-sizing: border-box; min-height: var(--status-h); padding: var(--status-pad) var(--edge); white-space: nowrap; overflow: hidden; border-width: 1px 0 0; border-radius: 0; box-shadow: none; }
 .hud-bottom > .hud-controls { position: static; order: 1; align-self: flex-end; margin: 0 var(--edge) var(--near); }
-.hint-float { position: fixed; z-index: var(--z-edge); left: var(--edge); right: calc(var(--edge) + var(--controls-w, 22rem) + var(--edge) + var(--near)); bottom: calc(var(--s-14) + var(--s-2)); font: var(--font-meta); color: var(--hud-muted); text-align: left; text-wrap: balance; text-shadow: 0 0 var(--sp-3) var(--canvas-bg), 0 0 var(--sp-6) var(--canvas-bg); pointer-events: none; }
+.hint-float { position: fixed; z-index: var(--z-edge); left: calc(var(--shell-l) + var(--edge)); right: calc(var(--shell-r) + var(--edge) + var(--controls-w, 22rem) + var(--edge) + var(--near)); bottom: calc(var(--s-14) + var(--s-2)); font: var(--font-meta); color: var(--hud-muted); text-align: left; text-wrap: balance; text-shadow: 0 0 var(--sp-3) var(--canvas-bg), 0 0 var(--sp-6) var(--canvas-bg); pointer-events: none; }
 .hint-float[hidden] { display: none; }
 /* A phone has no room beside the bottom right controls: the line takes the full width, above the Actions bar. */
 /* On a phone the bottom controls and the readout stack: the Actions bar stands above whatever height they have. */
@@ -3592,3 +3592,43 @@ button.archive-crumb:hover { background: var(--hud-hover); color: var(--hud-fg);
 /* ---- Reference windows (ADR 0207): a floating panel of the theme (its header, the Styles panel's chooser and search, its spacing),
    over every view; moved by the header, resized by the corner. Opaque, with no blur of what is behind: over a canvas drawn every frame,
    a backdrop blur is drawn again every frame. */
+
+/* ---- The workspace (B39): the ribbon at the left edge, a sidebar on each side, the status bar at the bottom right. What is between them
+   (the canvas, the Library, Settings) starts at --shell-l and ends at --shell-r: every bar anchored to the window's edges adds them. ---- */
+:root { --side-l: 0px; --side-r: 0px; --shell-l: calc(var(--ribbon-w) + var(--side-l)); --shell-r: var(--side-r); }
+:root[data-left="open"] { --side-l: var(--sidebar-w); }
+:root[data-right="open"] { --side-r: var(--sidebar-r-w); }
+#ribbon { position: fixed; z-index: var(--z-edge); left: 0; top: 0; bottom: 0; width: var(--ribbon-w); box-sizing: border-box; display: flex; flex-direction: column; justify-content: space-between; align-items: center; padding: var(--s-4) 0; background: var(--shell-bg); border-right: 1px solid var(--hud-border); }
+.ribbon-group { display: flex; flex-direction: column; align-items: center; gap: var(--s-2); }
+.ribbon-slot { display: contents; }
+#ribbon button { display: inline-flex; align-items: center; justify-content: center; width: var(--ctl); height: var(--ctl); padding: 0; color: var(--hud-muted); background: transparent; border: 0; border-radius: var(--ctl-r); cursor: pointer; }
+#ribbon button:hover, #ribbon button[aria-pressed="true"] { color: var(--hud-fg); background: var(--hud-hover); }
+#ribbon button svg { width: var(--icon-md); height: var(--icon-md); }
+.sidebar { position: fixed; z-index: var(--z-edge); top: 0; bottom: 0; box-sizing: border-box; display: flex; flex-direction: column; min-width: 0; background: var(--paper); }
+#sidebar-left { left: var(--ribbon-w); width: var(--sidebar-w); border-right: 1px solid var(--hud-border); }
+#sidebar-right { right: 0; width: var(--sidebar-r-w); border-left: 1px solid var(--hud-border); padding-bottom: var(--status-h); }
+:root:not([data-left="open"]) #sidebar-left, :root:not([data-right="open"]) #sidebar-right { display: none; }
+.sb-head { flex: none; display: flex; align-items: center; gap: var(--s-2); height: var(--tab-strip-h); box-sizing: border-box; padding: 0 var(--s-4); border-bottom: 1px solid var(--hud-border); background: var(--shell-bg); }
+.sb-tabs { flex: 1; min-width: 0; display: flex; gap: var(--s-1); overflow-x: auto; scrollbar-width: none; }
+.sb-tab { display: inline-flex; align-items: center; justify-content: center; flex: none; width: var(--ctl); height: var(--ctl); padding: 0; color: var(--hud-muted); background: transparent; border: 0; border-radius: var(--ctl-r); cursor: pointer; }
+.sb-tab:hover { color: var(--hud-fg); background: var(--hud-hover); }
+.sb-tab[aria-selected="true"] { color: var(--hud-fg); background: var(--row-active); }
+.sb-tab svg { width: var(--icon-md); height: var(--icon-md); }
+.sb-body { flex: 1; min-height: 0; overflow-y: auto; }
+.sb-pane[hidden] { display: none; }
+.sb-foot { flex: none; border-top: 1px solid var(--hud-border); padding: var(--s-4); }
+.sb-foot[hidden] { display: none; }
+/* The status bar: what the focused view says (its counts, zoom and whether it is saved), at the bottom right, as wide as what it says. */
+#statusbar { position: fixed; z-index: var(--z-edge); right: 0; bottom: 0; height: var(--status-h); box-sizing: border-box; display: flex; align-items: center; max-width: calc(100vw - var(--shell-l)); padding: 0 var(--s-4); background: var(--shell-bg); border-top: 1px solid var(--hud-border); border-left: 1px solid var(--hud-border); border-top-left-radius: var(--r-sm); color: var(--hud-muted); font: var(--font-meta); }
+#statusbar.is-empty { display: none; }
+#statusbar .hud-readout { position: static; flex-direction: row; align-items: center; gap: var(--s-6); max-width: none; padding: 0; background: none; border: 0; border-radius: 0; box-shadow: none; backdrop-filter: none; font: inherit; color: inherit; }
+#statusbar .hud-readout button { font: inherit; color: inherit; }
+/* A phone or a narrow window keeps the whole width for the view: no ribbon, no sidebars (they come back as overlays, B39 S6). */
+@media (max-width: 900px) {
+  :root, :root[data-left="open"], :root[data-right="open"] { --side-l: 0px; --side-r: 0px; }
+  :root .sidebar { display: none; }
+}
+@media (max-width: 640px) {
+  :root { --shell-l: 0px; }
+  #ribbon { display: none; }
+}

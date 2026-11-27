@@ -159,6 +159,8 @@ import type { ExportTarget } from "./export-render";
 import * as D from "../core/dyadic";
 import { translate } from "../doc/edit-ops";
 import { openExportDialog, exportAgain, setExportChoices, exportedBefore, exportPresetSummary, type ExportPreset } from "../ui/export-dialog";
+import { mountRibbon } from "../ui/ribbon";
+import { mountSidebar } from "../ui/sidebar";
 import { mountViewSwitch } from "../ui/view-switch";
 import { followFrameSetting, mountWindowRow } from "../ui/window-frame";
 import { followScrolling } from "../ui/scrollbars";
@@ -403,6 +405,9 @@ async function start(): Promise<void> {
       delete root.dataset["customBg"];
     }
     root.style.setProperty("--vivid", String(settings.get("ui.vivid") / 100));
+    // The workspace's sidebars (B39): shown or hidden, per device; the stylesheet gives the view the room between them
+    root.dataset["left"] = settings.get("ui.sidebarLeft") ? "open" : "closed";
+    root.dataset["right"] = settings.get("ui.sidebarRight") ? "open" : "closed";
     if (settings.get("ui.corners") === "sharp") root.dataset["corners"] = "sharp";
     else delete root.dataset["corners"]; // round is the default
     // Where the names of the Actions bar's groups show (under the buttons is the default)
@@ -2159,7 +2164,9 @@ async function start(): Promise<void> {
   const barBottoms = new Map<string, number>();
   const measureNav = (): void => {
     const root = document.documentElement.style;
-    root.setProperty("--nav-w", `${Math.ceil(navBox.getBoundingClientRect().right)}px`);
+    // (x positions from the canvas host's left edge: what uses them is placed in it, and it starts after the ribbon and sidebar, B39)
+    const hostLeft = host.getBoundingClientRect().left;
+    root.setProperty("--nav-w", `${Math.ceil(navBox.getBoundingClientRect().right - hostLeft)}px`);
     // The panels' buttons are a column at the right edge: the panels docked on the right open beside it (stylesheet: --dock-w).
     const dock = barBox.querySelector<HTMLElement>(".dock")?.getBoundingClientRect();
     root.setProperty("--dock-w", `${Math.ceil(dock ? dock.width : 0)}px`);
@@ -2178,7 +2185,7 @@ async function start(): Promise<void> {
     const navBottom = navBox.getBoundingClientRect().bottom;
     const dockH = dock?.height ?? 0;
     root.setProperty("--nav-bottom", `${Math.ceil(navBottom)}px`);
-    root.setProperty("--rail-right", `${Math.ceil(barBox.querySelector<HTMLElement>(".rail")?.getBoundingClientRect().right ?? 0)}px`);
+    root.setProperty("--rail-right", `${Math.ceil((barBox.querySelector<HTMLElement>(".rail")?.getBoundingClientRect().right ?? hostLeft) - hostLeft)}px`);
     root.setProperty("--dock-h", `${Math.ceil(dockH)}px`);
     const heightOf = (rows: HTMLElement[]): number => rows.reduce((t, r) => t + r.getBoundingClientRect().height, 0);
     let main: number;
@@ -2253,7 +2260,28 @@ async function start(): Promise<void> {
     // The Settings view is not remembered: a reload opens the canvas or the Assets view.
     if (v === "canvas" || v === "assets") settings.set("ui.view", v);
   };
+  // The workspace (B39): the ribbon, a sidebar on each side, and the status bar, which takes the canvas's information line
+  mountRibbon(document.getElementById("ribbon")!);
+  const sidebarLeft = mountSidebar(document.getElementById("sidebar-left")!, { side: "left", label: "Left sidebar", toggleCommand: "layout.leftSidebar", initial: settings.get("ui.paneLeft") || null, onShow: (id) => void settings.set("ui.paneLeft", id) });
+  const sidebarRight = mountSidebar(document.getElementById("sidebar-right")!, { side: "right", label: "Right sidebar", toggleCommand: "layout.rightSidebar", initial: settings.get("ui.paneRight") || null, onShow: (id) => void settings.set("ui.paneRight", id) });
+  settings.subscribe((key) => (key === "ui.sidebarLeft" || key === "ui.sidebarRight") && applyAppearance());
+  const sidebarCommand = (id: string, title: string, key: "ui.sidebarLeft" | "ui.sidebarRight"): Command => ({
+    id, group: "Layout", kind: "settings", title, hint: "Show it or hide it", risk: "edit", words: "sidebar panel pane toggle show hide",
+    why: () => null,
+    exec: () => (settings.set(key, !(settings.get(key) as boolean)), { ok: true }),
+  });
+  commands.setProvider("layout", () => [sidebarCommand("layout.leftSidebar", "Left sidebar", "ui.sidebarLeft"), sidebarCommand("layout.rightSidebar", "Right sidebar", "ui.sidebarRight")]);
+  const statusbar = document.getElementById("statusbar")!;
+  const canvasReadout = document.querySelector<HTMLElement>("#hud .hud-readout");
+  if (canvasReadout) {
+    statusbar.append(canvasReadout);
+    classWhen(statusbar, "is-empty", () => !!canvasReadout.hidden, [canvasReadout], ["hidden"]);
+  }
+  void sidebarLeft, void sidebarRight;
   const markTab = mountViewSwitch(document.getElementById("view-switch")!, setView, PHOTOCRAFT_FEATURES.entry.view && photoCraft.available);
+  // (the Pins window's button is the ribbon's, with its handler)
+  const pinsButton = document.querySelector<HTMLElement>('[data-testid="reference-open"]');
+  if (pinsButton) document.querySelector('[data-ribbon-slot="top"]')?.append(pinsButton);
   void followFrameSetting(settings);
   followScrolling();
   markTab("canvas");

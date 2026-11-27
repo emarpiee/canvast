@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.63.21 — The workspace frame: ribbon, sidebars, status bar (2026-11-27)
+
+- **Added:** the workspace frame (B39): a ribbon at the left edge (Library, new canvas, new note, the command palette, Pins; the shortcuts and Settings at the bottom), a sidebar on each side that holds panes and hides from its button or the palette (kept per device), and a status bar at the bottom right with the zoom, position and save state. The view sits between them. ([The interface](README.md#the-interface))
+- **Changed:** notices show at the bottom right, above the status bar. ([The interface](README.md#the-interface))
+
+### For developers
+
+- `ui/ribbon.ts` and `ui/sidebar.ts` (one sidebar for both sides: pane tabs, body, foot); settings `ui.sidebarLeft`, `ui.sidebarRight`, `ui.paneLeft`, `ui.paneRight`; commands `layout.leftSidebar`, `layout.rightSidebar`. What is anchored to the window's edges adds `--shell-l` and `--shell-r`; `--nav-w` and `--rail-right` are measured from the canvas host.
+
 ## 0.63.20 — The notes editor in a slot (2026-11-27)
 
 ### For developers
