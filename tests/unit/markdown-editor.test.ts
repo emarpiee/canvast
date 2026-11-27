@@ -50,3 +50,33 @@ describe("a table row's cells", () => {
     expect(at("a | b")).toEqual(["a", "b"]);
   });
 });
+
+describe("Turn into, with lines selected", () => {
+  const run = async (doc: string, name: string, from = 0, to = doc.length): Promise<string> => {
+    const { COMMANDS } = await import("../../src/markdown-editor/commands");
+    let state = EditorState.create({ doc, selection: EditorSelection.range(from, to) });
+    const view = { get state() { return state; }, dispatch: (tr: { state: EditorState }) => void (state = tr.state) };
+    (COMMANDS as Record<string, (v: unknown) => boolean>)[name]!(view);
+    return state.doc.toString();
+  };
+  it("keeps the words in every block (code, callout, math), and the block holds the whole lines", async () => {
+    expect(await run("let a = 1;\nlet b = 2;", "codeBlock", 2, 14)).toBe("```\nlet a = 1;\nlet b = 2;\n```");
+    expect(await run("Mind\nthe step", "callout")).toBe("> [!note]\n> Mind\n> the step");
+    expect(await run("x^2", "mathBlock")).toBe("$$\nx^2\n$$");
+    for (const name of ["paragraph", "heading1", "heading2", "heading3", "bulletList", "orderedList", "taskList", "quote"]) expect(await run("Ink\nPaper", name)).toMatch(/Ink[^]*Paper/);
+  });
+  it("makes a table of one row per line (cells apart by tabs), a list's marks and pipes taken care of", async () => {
+    expect(await run("- Ink\n- Paper | cheap", "table")).toBe("| Column 1 |\n| --- |\n| Ink |\n| Paper \\| cheap |");
+    expect(await run("a\t1\nb\t2", "table")).toBe("| Column 1 | Column 2 |\n| --- | --- |\n| a | 1 |\n| b | 2 |");
+  });
+});
+
+describe("a table cell's lines", () => {
+  it("draw a list, a task list or a callout as blocks; words alone stay words", async () => {
+    const { cellHtml } = await import("../../src/markdown-editor/render");
+    expect(cellHtml("- ink<br>- paper")).toBe("<ul><li>ink</li><li>paper</li></ul>");
+    expect(cellHtml("> [!tip] Hint<br>> dry first")).toContain('<div class="callout" data-callout="tip"><div class="callout-title">Hint</div>');
+    expect(cellHtml("one<br>two")).toBeNull();
+    expect(renderMarkdown("| a |\n| --- |\n| - x<br>- y |\n")).toContain("<td><ul><li>x</li><li>y</li></ul></td>");
+  });
+});

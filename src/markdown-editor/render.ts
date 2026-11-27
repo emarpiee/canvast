@@ -41,6 +41,16 @@ const entityText = (e: string): string => {
 const MARKS = new Set(["EmphasisMark", "CodeMark", "LinkMark", "HeaderMark", "QuoteMark", "ListMark", "StrikethroughMark", "HighlightMark", "TableDelimiter", "WikiMark", "TagMark", "CodeInfo", "LinkTitle", "LinkLabel", "URL"]);
 
 /** Render Markdown to HTML. */
+/**
+ * A table cell's words when its lines (written apart by `<br>`) hold blocks: a list, a task list, a quote or a callout, drawn as those
+ * blocks; null for words alone (drawn in the line, as any cell).
+ */
+export function cellHtml(raw: string, opts: RenderOptions = {}): string | null {
+  const lines = raw.split(/<br\s*\/?>/i);
+  if (!lines.some((l) => /^\s*(?:[-*+]\s|\d{1,9}[.)]\s|>)/.test(l))) return null;
+  return renderMarkdown(lines.map((l) => l.trim()).join("\n"), { ...opts, taskOffsets: false });
+}
+
 export function renderMarkdown(md: string, opts: RenderOptions = {}): string {
   const skip = opts.skipFrontmatter === false ? 0 : frontmatterLength(md);
   const src = skip ? md.slice(0, skip).replace(/[^\n]/g, "\n") + md.slice(skip) : md; // (blank lines in its place: offsets stay those of the source)
@@ -292,7 +302,7 @@ export function renderMarkdown(md: string, opts: RenderOptions = {}): string {
       for (let i = 0; i < count; i++) {
         const c = cells[i];
         const a = aligns[i] ? ` style="text-align:${aligns[i]}"` : "";
-        out += `<${tag}${a}>${c ? inline(c).trim() : ""}</${tag}>`;
+        out += `<${tag}${a}>${c ? cellHtml(text(c.from, c.to).trim(), opts) ?? inline(c).trim() : ""}</${tag}>`;
       }
       return `<tr>${out}</tr>`;
     };

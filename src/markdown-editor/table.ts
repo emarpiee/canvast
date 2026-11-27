@@ -7,7 +7,7 @@ import { RangeSet, StateField, type EditorState, type Extension, type Range } fr
 import { Decoration, EditorView, WidgetType, type DecorationSet } from "@codemirror/view";
 import type { CellEditor, LiveContext } from "./live";
 import { mediaElement } from "./live";
-import { renderMarkdown } from "./render";
+import { cellHtml, renderMarkdown } from "./render";
 import { cleanHtml } from "./clean";
 import { openPopover, type PopItem } from "./popover";
 
@@ -157,7 +157,9 @@ class TableView {
   }
   private drawCell(cell: HTMLElement, md: string): void {
     cell.dataset["md"] = md;
-    cell.innerHTML = md ? cleanHtml(renderMarkdown(md, { html: true })).replace(/^<p>|<\/p>$/g, "") : "";
+    // (a cell whose lines hold a list, a quote or a callout draws those blocks; words alone stay in the line)
+    const blocks = md ? cellHtml(md, { html: true }) : null;
+    cell.innerHTML = blocks !== null ? cleanHtml(blocks) : md ? cleanHtml(renderMarkdown(md, { html: true })).replace(/^<p>|<\/p>$/g, "") : "";
     for (const img of cell.querySelectorAll("img")) img.replaceWith(mediaElement(this.ctx, img.getAttribute("data-embed") ?? img.getAttribute("src") ?? "", img.alt, img.hasAttribute("data-embed")));
   }
   /** A change from the cell being edited is being written into the note. */

@@ -151,10 +151,10 @@ test("a table cell is the note's own words: one selection, the note's keys, its 
   const cell = (i: number) => page(p).locator(".me-table td .me-cell").nth(i);
   // Words selected above the table, then a cell pressed: the note's selection and its bar go, the cell's is the one selection.
   await page(p).locator(".cm-line", { hasText: "Above the table." }).dblclick();
-  await expect(page(p).locator(".me-selbar:visible")).toHaveCount(1);
+  await expect(note(p).locator(".me-selbar:visible")).toHaveCount(1);
   await cell(0).click();
   await expect(cell(0).locator(".cm-content")).toBeFocused();
-  await expect(page(p).locator(".me-selbar:visible")).toHaveCount(0);
+  await expect(note(p).locator(".me-selbar:visible")).toHaveCount(0);
   // Typed words are in the note at once (before leaving the cell); the note's keys work in it: Ctrl+B bolds (never the browser's key).
   await p.keyboard.press("End");
   await p.keyboard.type(" pen");
@@ -1197,6 +1197,38 @@ test("lists as notes apps write them: Enter adds the next item right below, numb
   await expect.poll(() => text(p)).toContain("- [x] plain");
 });
 
+test("lists in a callout and in a table cell are drawn as lists; Turn into keeps the selected words (code block, table: a row per line)", async ({ app }) => {
+  const p = app.page;
+  const FILE = "> [!tip] Kit\n> - ink\n> - paper\n\n| What | Notes |\n| --- | --- |\n| Kit | - ink<br>- paper |\n\nlet a = 1;\nlet b = 2;\n\nInk\nPaper\n";
+  await p.getByTestId("view-assets").click();
+  await p.getByTestId("assets-import-input").setInputFiles({ name: "kit.md", mimeType: "text/markdown", buffer: Buffer.from(FILE) });
+  await p.locator('[data-testid="asset-card"][title="kit.md"]').dblclick();
+  // In the callout: each item has its bullet, inside the card's padding.
+  const items = page(p).locator(".cm-line.me-callout.me-list-line");
+  await expect(items).toHaveCount(2);
+  await expect(items.first().locator(".me-bullet")).toHaveCount(1);
+  const card = (await items.first().boundingBox())!, bullet = (await items.first().locator(".me-bullet").boundingBox())!;
+  expect(bullet.x - card.x, "the bullet sits in the card, past its padding").toBeGreaterThan(8);
+  // In the table cell: a list.
+  await expect(page(p).locator(".me-table td .me-cell ul li")).toHaveText(["ink", "paper"]);
+  // Turn into Code block keeps the lines.
+  await page(p).locator(".cm-line", { hasText: "let a = 1;" }).click();
+  await p.keyboard.press("Home");
+  await p.keyboard.press("Shift+ArrowDown");
+  await p.keyboard.press("Shift+End");
+  await page(p).locator(".me-selbar .me-selbar-turn").click();
+  await page(p).locator('.me-selbar-item[data-me="codeBlock"]').click();
+  await expect.poll(() => text(p)).toContain("```\nlet a = 1;\nlet b = 2;\n```");
+  // Turn into Table: one row per line.
+  await page(p).locator(".cm-line", { hasText: /^Ink$/ }).click();
+  await p.keyboard.press("Home");
+  await p.keyboard.press("Shift+ArrowDown");
+  await p.keyboard.press("Shift+End");
+  await page(p).locator(".me-selbar .me-selbar-turn").click();
+  await page(p).locator('.me-selbar-item[data-me="table"]').click();
+  await expect.poll(() => text(p)).toContain("| Column 1 |\n| --- |\n| Ink |\n| Paper |");
+});
+
 test("callouts are cards (typed with [! and its list), a heading folds what is under it, and a table cell's menu acts on its row and column", async ({ app }) => {
   const p = app.page;
   const FILE = "# Folds\n\nUnder the heading.\n\n> [!warning] Mind\n> the step\n\n| a | b |\n| --- | --- |\n| 2 | x |\n| 1 | y |\n";
@@ -1208,8 +1240,8 @@ test("callouts are cards (typed with [! and its list), a heading folds what is u
   await page(p).locator(".me-table td .me-cell").first().click({ button: "right" });
   await p.locator(".pop-menu [role=menuitem]", { hasText: "Sort column (A → Z)" }).click();
   await expect.poll(() => text(p)).toContain("| 1 | y |\n| 2 | x |");
-  // A new callout: `[!` in a quote offers the types.
-  await page(p).click();
+  // A new callout: `[!` in a quote offers the types (a press on the heading: the middle of the note is the table).
+  await heading(p).click();
   await p.keyboard.press("Control+End");
   await p.keyboard.type("> [!");
   await choice(p, "Tip").click();

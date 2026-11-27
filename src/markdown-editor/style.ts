@@ -95,6 +95,7 @@ export const EDITOR_CSS = `
 :where(.me-table-add-row) { grid-column: 1; grid-row: 3; }
 :where(.me) .me-list-line { padding-left: var(--me-hang) !important; text-indent: calc(-1 * var(--me-hang)); }
 :where(.me) .me-list-line > * { text-indent: 0; }
+:where(.me-live) :is(.me-callout, .me-quote).me-list-line { padding-left: calc(14px + var(--me-hang)) !important; }
 /* folding */
 :where(.me) .me-foldable { position: relative; }
 :where(.me) .me-fold { position: absolute; left: -18px; top: 0.35em; display: inline-grid; place-items: center; width: 16px; height: 16px; border-radius: 4px; color: var(--me-faint); cursor: pointer; opacity: 0; transition: opacity 0.12s, transform 0.12s; text-indent: 0; }
@@ -125,6 +126,9 @@ export const EDITOR_CSS = `
 :where(.me-pop-item small) { color: var(--me-faint); }
 :where(.me-pop-sep) { height: 1px; margin: 4px 2px; background: var(--me-line); }
 /* table cells and columns */
+:where(.me-table) .me-cell :is(ul, ol) { margin: 0; padding-left: 1.4em; }
+:where(.me-table) .me-cell > :is(p, .callout):first-child { margin-top: 0; }
+:where(.me-table) .me-cell > :is(p, .callout):last-child { margin-bottom: 0; }
 :where(.me-table) .me-cell { outline: none; min-height: 1.4em; cursor: text; user-select: none; }
 :where(.me-table) .me-cell.is-editing { user-select: text; }
 :where(.me-table) .me-cell.is-editing .cm-editor { background: transparent; }
@@ -185,14 +189,14 @@ export const EDITOR_CSS = `
 :where(.me-preview) li.task > input { margin-right: 0.4em; cursor: pointer; }
 :where(.me-preview) li.done { color: var(--me-faint); text-decoration: line-through; }
 :where(.me-preview) hr { border: 0; border-top: 1px solid var(--me-line); }
-:where(.me-preview) .callout { --me-callout: var(--me-blue); margin: 0.8em 0; padding: 8px 14px; border: 1px solid color-mix(in oklch, var(--me-callout) 35%, transparent); border-radius: 8px; background: color-mix(in oklch, var(--me-callout) 8%, transparent); }
-:where(.me-preview) .callout-title { font-weight: 600; color: var(--me-callout); }
-:where(.me-preview) .callout > p { margin: 0.3em 0; }
-:where(.me-preview) .callout:is([data-callout="tip"], [data-callout="hint"], [data-callout="important"], [data-callout="success"], [data-callout="check"], [data-callout="done"]) { --me-callout: var(--me-green); }
-:where(.me-preview) .callout:is([data-callout="question"], [data-callout="help"], [data-callout="faq"], [data-callout="example"]) { --me-callout: var(--me-purple); }
-:where(.me-preview) .callout:is([data-callout="warning"], [data-callout="warn"], [data-callout="caution"], [data-callout="attention"]) { --me-callout: var(--me-yellow); }
-:where(.me-preview) .callout:is([data-callout="danger"], [data-callout="error"], [data-callout="bug"], [data-callout="failure"], [data-callout="fail"], [data-callout="missing"]) { --me-callout: var(--me-red); }
-:where(.me-preview) .callout:is([data-callout="quote"], [data-callout="cite"]) { --me-callout: var(--me-grey); }
+:where(.me-preview, .me-table) .callout { --me-callout: var(--me-blue); margin: 0.8em 0; padding: 8px 14px; border: 1px solid color-mix(in oklch, var(--me-callout) 35%, transparent); border-radius: 8px; background: color-mix(in oklch, var(--me-callout) 8%, transparent); }
+:where(.me-preview, .me-table) .callout-title { font-weight: 600; color: var(--me-callout); }
+:where(.me-preview, .me-table) .callout > p { margin: 0.3em 0; }
+:where(.me-preview, .me-table) .callout:is([data-callout="tip"], [data-callout="hint"], [data-callout="important"], [data-callout="success"], [data-callout="check"], [data-callout="done"]) { --me-callout: var(--me-green); }
+:where(.me-preview, .me-table) .callout:is([data-callout="question"], [data-callout="help"], [data-callout="faq"], [data-callout="example"]) { --me-callout: var(--me-purple); }
+:where(.me-preview, .me-table) .callout:is([data-callout="warning"], [data-callout="warn"], [data-callout="caution"], [data-callout="attention"]) { --me-callout: var(--me-yellow); }
+:where(.me-preview, .me-table) .callout:is([data-callout="danger"], [data-callout="error"], [data-callout="bug"], [data-callout="failure"], [data-callout="fail"], [data-callout="missing"]) { --me-callout: var(--me-red); }
+:where(.me-preview, .me-table) .callout:is([data-callout="quote"], [data-callout="cite"]) { --me-callout: var(--me-grey); }
 :where(.me-preview) .task-state { display: inline-block; width: 1em; height: 1em; margin-right: 0.3em; border: 1.5px solid var(--me-line); border-radius: 4px; vertical-align: text-bottom; }
 :where(.me-preview) .task-progress { background: linear-gradient(90deg, var(--me-accent) 50%, transparent 50%); border-color: var(--me-accent); }
 :where(.me-preview) li.cancelled { color: var(--me-faint); text-decoration: line-through; }

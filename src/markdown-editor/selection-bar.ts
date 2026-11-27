@@ -12,7 +12,7 @@ export interface SelectionBarOptions {
 }
 
 const INLINE: FormatName[] = ["bold", "italic", "strike", "highlight", "code", "link"];
-const TURN_INTO: FormatName[] = ["paragraph", "heading1", "heading2", "heading3", "bulletList", "orderedList", "taskList", "quote", "codeBlock"];
+const TURN_INTO: FormatName[] = ["paragraph", "heading1", "heading2", "heading3", "bulletList", "orderedList", "taskList", "quote", "callout", "codeBlock", "mathBlock", "table"];
 
 function bar(opts: SelectionBarOptions): (view: EditorView) => { dom: HTMLElement } {
   return (view) => {

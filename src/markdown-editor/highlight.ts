@@ -72,7 +72,8 @@ const hangingLists = ViewPlugin.fromClass(
           const line = view.state.doc.lineAt(pos);
           pos = line.to + 1;
           const m = LIST_LINE.exec(line.text);
-          if (m) out.push(Decoration.line({ class: "me-list-line", attributes: { style: `--me-hang: ${m[1]!.replace(/\t/g, "    ").length}ch` } }).range(line.from));
+          // (in a quote or a callout its marks are hidden and the card pads it: the hang is the list's own)
+          if (m) out.push(Decoration.line({ class: "me-list-line", attributes: { style: `--me-hang: ${m[1]!.replace(/^\s*(?:>\s?)+/, "").replace(/\t/g, "    ").length}ch` } }).range(line.from));
         }
       }
       return Decoration.set(out, true);

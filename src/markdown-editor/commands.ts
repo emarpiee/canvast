@@ -68,11 +68,35 @@ export function insertBlock(text: string, back = 0): Command {
     return true;
   };
 }
-export const codeBlock: Command = insertBlock("```\n\n```", 4);
-export const table: Command = insertBlock("| Column 1 | Column 2 |\n| --- | --- |\n|  |  |\n", 0);
+/**
+ * Turn into a block: with words selected, the whole lines they are on become the block's content (never lost); with none, the empty block
+ * at the cursor (`empty`). The result is selected, as Turn into leaves it.
+ */
+function blockOf(make: (lines: string[]) => string, empty: Command): Command {
+  return (view) => {
+    const { state } = view;
+    const r = state.selection.main;
+    if (r.empty) return empty(view);
+    const first = state.doc.lineAt(r.from), last = state.doc.lineAt(r.to);
+    const lines = state.sliceDoc(first.from, last.to).split("\n");
+    const insert = make(lines);
+    view.dispatch(state.update({ changes: { from: first.from, to: last.to, insert }, selection: EditorSelection.range(first.from, first.from + insert.length), scrollIntoView: true, userEvent: "input.format" }));
+    return true;
+  };
+}
+/** A line's own words: its quote, list or heading mark taken off. */
+const bare = (l: string): string => l.replace(LINE_MARK, "$1").trim();
+export const codeBlock: Command = blockOf((ls) => `\`\`\`\n${ls.join("\n")}\n\`\`\``, insertBlock("```\n\n```", 4));
+/** One row per selected line (cells apart by tabs, as a sheet copies them), under a heading row of Column 1, Column 2, …. */
+export const table: Command = blockOf((ls) => {
+  const rows = ls.filter((l) => l.trim()).map((l) => (/\t/.test(l) ? l.split("\t") : [bare(l)]).map((c) => c.trim().replace(/(?<!\\)\|/g, "\\|")));
+  const cols = Math.max(1, ...rows.map((r) => r.length));
+  const row = (cells: string[]): string => `| ${Array.from({ length: cols }, (_, i) => cells[i] ?? "").join(" | ")} |`;
+  return [row(Array.from({ length: cols }, (_, i) => `Column ${i + 1}`)), `| ${Array<string>(cols).fill("---").join(" | ")} |`, ...rows.map(row)].join("\n");
+}, insertBlock("| Column 1 | Column 2 |\n| --- | --- |\n|  |  |\n", 0));
 export const rule: Command = insertBlock("---\n", 0);
-export const callout: Command = insertBlock("> [!note]\n> ", 0);
-export const mathBlock: Command = insertBlock("$$\n\n$$", 3);
+export const callout: Command = blockOf((ls) => ["> [!note]", ...ls.map((l) => `> ${l.replace(/^\s*>\s?/, "")}`)].join("\n"), insertBlock("> [!note]\n> ", 0));
+export const mathBlock: Command = blockOf((ls) => `$$\n${ls.join("\n")}\n$$`, insertBlock("$$\n\n$$", 3));
 
 /** Every named command. */
 export const COMMANDS: Readonly<Record<FormatName, Command>> = {
