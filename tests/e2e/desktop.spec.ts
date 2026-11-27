@@ -1828,7 +1828,7 @@ test("a note saved in the notes editor is written over its own file (same name, 
     await page.evaluate(() => window.__canvastDebug.flushStorage());
     const file = files(ws).find((f) => f.startsWith("library/") && f.endsWith(".md"))!;
     await page.getByTestId("asset-card").dblclick();
-    await page.getByTestId("note-editor").locator(".sun-editor-editable h1").first().click();
+    await page.getByTestId("note-editor").locator(".cm-line.me-h1").first().click();
     await page.keyboard.press("End");
     await page.keyboard.type(" today");
     await page.keyboard.press("Control+s");
@@ -1841,7 +1841,7 @@ test("a note saved in the notes editor is written over its own file (same name, 
     await page.waitForTimeout(2000); // (a save a moment after the app's own writes)
     writeFileSync(join(ws, file), "---\ntags: [plans]\nowner: Ana\n---\n# Todo today\n\nAdded elsewhere.\n");
     await expect.poll(() => page.evaluate(() => window.__canvastDebug.assetListing().then((l) => l.entries.map((e) => [e.name, e.tags ?? [], e.fields ?? []]))), { timeout: 15_000 }).toEqual([["todo.md", ["plans"], [{ key: "owner", value: "Ana" }]]]);
-    await page.getByTestId("note-editor").locator(".sun-editor-editable h1").first().click();
+    await page.getByTestId("note-editor").locator(".cm-line.me-h1").first().click();
     await page.keyboard.press("End");
     // Closing the window with changes not saved asks first; Save them saves, then the window closes.
     await page.keyboard.type(" and tomorrow");
@@ -2206,32 +2206,31 @@ test("working copies no workspace names any more, untouched for a month, are rem
   }
 });
 
-test("a note's pictures are found by their files: pasted ones (the disk's name not the item's), one added from outside, a copy; written from the library's root; a note made rich text is a .note.html file", async () => {
+test("a note's pictures are found by their files: pasted ones (the disk's name not the item's), one added from outside, a copy; written from the library's root", async () => {
   const ws = tempDir("cv-note-pics-");
   const { app, page } = await launch(ws);
-  const words = page.getByTestId("note-editor").locator(".sun-editor-editable").first();
-  const shown = () => words.locator("img").evaluateAll((l) => l.map((i) => (i as HTMLImageElement).naturalWidth > 0));
+  const words = page.getByTestId("note-editor").locator(".cm-content").first();
+  const shown = () => words.locator(".me-media img").evaluateAll((l) => l.map((i) => (i as HTMLImageElement).naturalWidth > 0));
   const entry = (name: string) => page.locator(`[data-testid="asset-card"][title="${name}"]`).first();
   const png = (seed: number): Buffer => makePng(6, 4, () => [seed, 90, 40, 255]);
   await page.getByTestId("view-assets").click();
   await page.getByTestId("assets-import-input").setInputFiles({ name: "note.md", mimeType: "text/markdown", buffer: Buffer.from("# Note\n\nWords.\n") });
   await entry("note.md").dblclick();
-  await expect(words.locator("h1")).toHaveText("Note");
+  await expect(words.locator(".cm-line.me-h1")).toHaveText("Note");
   // Pasted, as from another program: one picture each, named as the disk cannot name them.
   const names = ["image.png", "image.png", "photo (1).png", "my cat.png"];
   for (const [i, name] of names.entries()) {
-    await words.locator("h1").click();
+    await words.locator(".cm-line.me-h1").click();
     await words.evaluate((el, [bytes, name]) => {
       const dt = new DataTransfer();
       dt.items.add(new File([new Uint8Array(bytes as number[])], name as string, { type: "image/png" }));
       el.dispatchEvent(new ClipboardEvent("paste", { clipboardData: dt, bubbles: true, cancelable: true }));
     }, [[...png(10 + i)], name] as const);
-    await expect(words.locator("img")).toHaveCount(i + 1);
+    await expect(words.locator(".me-media img")).toHaveCount(i + 1);
   }
-  await expect(words.locator(".se-file-figure")).toHaveCount(0); // (not also a link to the file)
   await page.keyboard.press("Control+s");
-  await expect(page.getByTestId("choose-dialog")).toHaveCount(0); // (a picture is no formatting to ask about)
-  await expect.poll(() => readFileSync(join(ws, "library/notes/note.md"), "utf8")).toContain("![](images/my_cat.png)");
+  await expect.poll(() => readFileSync(join(ws, "library/notes/note.md"), "utf8")).toContain("](images/my_cat.png)");
+  expect(readFileSync(join(ws, "library/notes/note.md"), "utf8"), "the heading stays a heading: a picture goes on a line of its own").toMatch(/^# Note\n\n!\[/);
   expect(files(ws).filter((f) => f.startsWith("library/images/"))).toHaveLength(4); // (each stored once)
   await page.getByTestId("slide-view").locator('[data-act="close"]').click();
   await entry("note.md").waitFor();
@@ -2250,15 +2249,6 @@ test("a note's pictures are found by their files: pasted ones (the disk's name n
   // (its picture may come in after it: an open note shows it when it does)
   await entry("out.md").dblclick();
   await expect.poll(shown, { timeout: 20_000 }).toEqual([true, true, true, true, true]);
-  // Made rich text: a file of that kind, in its place.
-  await words.locator("h1").click();
-  await page.getByTestId("note-editor").locator('.se-toolbar button[data-command="align"]').first().click();
-  await page.locator('.se-dropdown button[data-command="center"]').filter({ visible: true }).click();
-  await page.keyboard.press("Control+s");
-  await page.getByTestId("choose-dialog").getByRole("button", { name: "Save" }).click();
-  await expect.poll(() => files(ws).filter((f) => /out\./.test(f)), { timeout: 15_000, message: "the note saved as rich text" }).toEqual(["library/ext/out.note.html"]).catch(async (e: Error) => {
-    throw new Error(`${e.message}\nDialogs open: ${JSON.stringify(await page.locator("dialog[open]").allInnerTexts())}; bar says: ${await page.evaluate(() => document.querySelector(".hud-message, [role=status]")?.textContent ?? "")}`);
-  });
   await app.close();
 });
 
@@ -2284,8 +2274,8 @@ test("a file renamed outside the app keeps its place in notes: the links follow,
   expect(readFileSync(note, "utf8")).toContain("![[third.png]]");
   await page.getByTestId("view-assets").click();
   await page.locator('[data-testid="asset-card"][title="n.md"]').dblclick();
-  const words = page.getByTestId("note-editor").locator(".sun-editor-editable").first();
-  await expect.poll(() => words.locator("img").evaluateAll((l) => l.map((i) => (i as HTMLImageElement).naturalWidth > 0))).toEqual([true, true]);
+  const words = page.getByTestId("note-editor").locator(".cm-content").first();
+  await expect.poll(() => words.locator(".me-media img").evaluateAll((l) => l.map((i) => (i as HTMLImageElement).naturalWidth > 0))).toEqual([true, true]);
   await app.close();
 });
 
@@ -2845,8 +2835,8 @@ test("Keep file names (the default) with Sort files by kind off: names, places a
   ({ app, page } = await launch(ws, "userdata", true));
   await page.getByTestId("view-assets").click();
   await card("plain.md").dblclick();
-  const words = page.getByTestId("note-editor").locator(".sun-editor-editable").first();
-  await expect.poll(() => words.locator("img").evaluateAll((l) => l.map((i) => (i as HTMLImageElement).naturalWidth > 0))).toEqual([true]);
+  const words = page.getByTestId("note-editor").locator(".cm-content").first();
+  await expect.poll(() => words.locator(".me-media img").evaluateAll((l) => l.map((i) => (i as HTMLImageElement).naturalWidth > 0))).toEqual([true]);
   await page.getByTestId("slide-view").locator('[data-act="close"]').click();
   expect(files(lib)).toContain("Root Pic.PNG");
   expect(files(lib)).toContain("My Refs/sub dir/deep.png");

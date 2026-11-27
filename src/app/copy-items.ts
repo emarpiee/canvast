@@ -8,7 +8,7 @@ import { meta, type CatalogEntry } from "../assets/asset-catalog";
 import { clipboardFor, isPicture, isWords } from "../assets/clipboard-kinds";
 import { plural } from "../doc/plural";
 import { splitFrontmatter, wholeMarkdown } from "../notes/frontmatter";
-import { linksToWiki, noteKindOf, richNoteBody } from "../notes/note-file";
+import { noteKindOf } from "../notes/note-file";
 import { desktopBridge } from "../storage/desktop-bridge";
 import { confirmDialog } from "../ui/confirm";
 import { asPng, copyPlainText, writeSystemClipboard, type ClipboardFiles } from "./system-clipboard";
@@ -42,10 +42,8 @@ async function wordsOf(e: CatalogEntry, file: string): Promise<string> {
   const m = meta(e);
   const props = { tags: m.tags, note: m.note, fields: m.fields };
   const kind = noteKindOf(e.name);
-  if (kind === "txt") return file;
-  if (kind === "md") return wholeMarkdown("md", file, splitFrontmatter(file).body, props, []);
-  const { htmlMarkdown } = await import("../notes/note-markdown"); // (loaded when a rich text note is copied: it needs a page, not the unit tests' Node)
-  return wholeMarkdown("rich", "", linksToWiki(htmlMarkdown(richNoteBody(file))), props, []);
+  if (kind !== "md") return file;
+  return wholeMarkdown(file, splitFrontmatter(file).body, props, []);
 }
 
 /** A copy that takes a moment says so, and says when it can be pasted; one that fails says that, whatever went wrong. */

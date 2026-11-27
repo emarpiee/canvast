@@ -2259,7 +2259,7 @@ async function start(): Promise<void> {
   markTab("canvas");
   markNav("canvas");
   /** A Library view in `root` (the Library view, and a Pins window's: ADR 0208, embedded, without its details panel). */
-  const libraryIn = (root: HTMLElement, embedded = false) => mountAssetsView(root, session, assets, () => setView("canvas"), notices, settings, libraryFonts, PHOTOCRAFT_FEATURES.entry.libraryItems && photoCraft.available ? (hash) => void photoCraft.editItem(hash) : undefined, { embedded });
+  const libraryIn = (root: HTMLElement, embedded = false) => mountAssetsView(root, session, assets, () => setView("canvas"), notices, settings, PHOTOCRAFT_FEATURES.entry.libraryItems && photoCraft.available ? (hash) => void photoCraft.editItem(hash) : undefined, { embedded });
   const assetsView = libraryIn(assetsRoot);
   // A font's card on a canvas: the viewer's sample sentence, on its ground (a ground that follows the theme is drawn again with it).
   const fontCardsLook = (): void => {
@@ -2433,7 +2433,7 @@ async function start(): Promise<void> {
     e.preventDefault();
     pressCommand("pins.open", {}, "key");
   });
-  notePanelReady({ session, assets, settings, fonts: libraryFonts, importFiles: (files) => assetsView.importFiles(files), showInLibrary: (h) => (setView("assets"), void assetsView.reveal([h])), hidden: hiddenModeOn });
+  notePanelReady({ session, assets, settings, importFiles: (files) => assetsView.importFiles(files), showInLibrary: (h) => (setView("assets"), void assetsView.reveal([h])), hidden: hiddenModeOn });
   // Alt+Shift+Left and Alt+Shift+Right: previous and next view (ADR 0116), on the canvas. (Alt with an arrow alone pans, as ever.)
   window.addEventListener("keydown", (e) => {
     if (!e.altKey || !e.shiftKey || e.ctrlKey || e.metaKey || (e.key !== "ArrowLeft" && e.key !== "ArrowRight")) return;

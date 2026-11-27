@@ -59,7 +59,7 @@ test("notes-editor", async ({ scene: s }) => {
   await s.look({ theme: "light", hue: 210 });
   const { card } = await notes(s);
   await card(STUDY.name).dblclick();
-  await s.p.locator(".viewer-note .sun-editor-editable h1").first().waitFor();
+  await s.p.locator(".viewer-note .cm-line.me-h1").first().waitFor();
   await s.settle(800);
   await s.shot("notes-editor");
 });
@@ -93,7 +93,7 @@ test("notes-panel", async ({ scene: s }) => {
   const b = (await s.box([ids[1]!]))!;
   await s.tool("select");
   await s.p.mouse.dblclick(Math.round((b.minX + b.maxX) / 2), Math.round((b.minY + b.maxY) / 2));
-  await s.p.getByTestId("note-panel").locator(".sun-editor-editable h1").first().waitFor();
+  await s.p.getByTestId("note-panel").locator(".cm-line.me-h1").first().waitFor();
   await s.settle(600);
   await s.shot("notes-panel");
 });

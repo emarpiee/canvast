@@ -86,10 +86,7 @@ const KINDS: readonly FileViewKind[] = [
     marks: false,
     named: (name) => !!noteKindOf(name),
     claims: (f) => opensAsNote(f.name, f.blob),
-    words: async (blob, name) => {
-      const text = await blob.text();
-      return noteKindOf(name) === "rich" ? (new DOMParser().parseFromString(text, "text/html").body.textContent ?? "") : text;
-    },
+    words: (blob) => blob.text(),
     tooBig: tooBigForNote,
     open: (el, f, deps, place) => OpenNote.open(el, f.hash, f.name, f.blob, deps, place),
   },

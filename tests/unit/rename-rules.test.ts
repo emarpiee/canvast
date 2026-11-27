@@ -46,7 +46,7 @@ describe("batch rename rules (ADR 0085)", () => {
   });
 });
 
-describe("a rich text note's extension", () => {
+describe("the extension of an older version's rich text note", () => {
   it("is .note.html, whole", () => {
     expect(splitName("Plan.note.html")).toEqual({ stem: "Plan", ext: ".note.html" });
     expect(splitName("Plan.v2.note.HTML")).toEqual({ stem: "Plan.v2", ext: ".note.HTML" });

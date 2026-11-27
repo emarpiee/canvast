@@ -45,6 +45,6 @@ describe("library layout", () => {
   it("a card is its picture's shape; a note's is its picture's (the top of its page), however long the note", () => {
     expect(cardRatio({ name: "a.png", pixelW: 1600, pixelH: 900 })).toBeCloseTo(16 / 9);
     expect(cardRatio({ name: "tall.png", pixelW: 100, pixelH: 1000 })).toBe(0.4);
-    for (const name of ["long.md", "n.note.html", "t.txt"]) expect(cardRatio({ name, pixelW: 800, pixelH: 8000 }), name).toBe(NOTE_THUMB_RATIO);
+    for (const name of ["long.md", "t.txt"]) expect(cardRatio({ name, pixelW: 800, pixelH: 8000 }), name).toBe(NOTE_THUMB_RATIO);
   });
 });

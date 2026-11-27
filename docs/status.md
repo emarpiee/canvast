@@ -38,6 +38,13 @@ Unverified / Committed / Next bounded task**.
 | 5 | Creative editing, including **arrange selected items in a grid (A–Z, Z–A, by date, size, type), align and distribute** | **done** ([ADR 0036](adr/0036-arrange-align-distribute.md)) |
 | WF | Workspace folder and the desktop app ([ADR 0177](adr/0177-workspace-folder-desktop-app.md)): Electron shell, the workspace as a folder of files, encrypted hidden items, outside changes; Linux packages (AppImage with updates, `.deb`, `.rpm`, `.tar.gz`, x86_64 and aarch64) | **done** (v0.49.0; packages v0.50.33 to 0.50.35) |
 
+## v0.63.19: canvast's own Markdown editor (B37, branch feat/note-editor, 2026-11-28)
+
+- **Implemented:** [ADR 0209](adr/0209-markdown-editor.md): `src/markdown-editor/` (CodeMirror 6; live, source and preview; renderer, paste reading, code colours), `ui/note-editor.ts` on it; SunEditor and rich text notes removed.
+- **Tested:** typecheck and build here; `notes.spec` rewritten for the new editor, `desktop`, `contrast` and the notes shots updated, `markdown-editor.test.ts` added; runs on GitHub.
+- **Known failures:** none known yet. **Unverified:** everything in a browser until the GitHub run; README waits for the owner's go.
+- **Committed:** v0.63.19 on `feat/note-editor`.
+
 ## v0.61.4: reference windows (2026-11-21)
 
 - **Implemented:** reference windows ([ADR 0207](adr/0207-reference-windows.md)): gallery and saved boards, drop from the Library, the canvas and other apps, paste, copy, hidden rule, reopened windows.

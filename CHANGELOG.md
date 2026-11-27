@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.63.19 — canvast's own Markdown editor (2026-11-28)
+
+- **Changed:** notes are written in canvast's own Markdown editor, in place of the rich text editor: live mode shows a note as it reads while you write (its marks only where the cursor is, pictures, task boxes and tables drawn in place), source mode shows the Markdown as written, preview mode draws the page; Settings > Notes > Notes open in sets the default and each note's toolbar switches (Ctrl+E: preview and back). What is saved is exactly what was typed (B37). ([Notes](README.md#notes))
+- **Changed:** a page pasted into a note becomes Markdown (a notes app's front matter, embeds and pictures too); a web address or a `[[link]]` pasted over words makes them the link; pictures pasted, dropped or chosen go on a line of their own. ([Notes](README.md#notes))
+- **Removed:** rich text notes and the editor styles: a `.note.html` file is now a page of the library, not a note. ([Notes](README.md#notes))
+
+### Before you update
+
+- Rich text notes (`.note.html`) no longer open as notes: they stay in the library, with their name and folder, as pages. Fonts, colours, sizes and alignment in notes are gone with the rich text editor (Markdown has none).
+- Settings removed: Editor style in the library and on a canvas, Markdown shortcuts, and When a note's formatting does not fit its file.
+
+### For developers
+
+- `src/markdown-editor/`: a package like the colour picker (ADR 0209), on CodeMirror 6 and Lezer (bundled, MIT): `npm run check:markdown-editor` (CI) keeps it free of the app. `suneditor` is no longer a dependency; `note-markdown.ts` and the old markdown round-trip helpers of `note-file.ts` are gone.
+- Tests: `notes.spec` rewritten for the new editor; `markdown-editor.test.ts` (renderer, typed signs); desktop, contrast and notes shots follow the new selectors.
+
 ## 0.63.18 — Tests settled for the resize work (2026-11-27)
 
 ### For developers

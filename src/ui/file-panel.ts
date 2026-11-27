@@ -49,7 +49,6 @@ export function mountFilePanel(
     return true;
   };
   const place: ViewPlace = {
-    styleKey: "notes.panelStyle",
     root: () => el,
     importFiles: (files) => deps.importFiles(files),
     // A link to another note opens it here; to anything else, in the library.
@@ -99,7 +98,7 @@ export function mountFilePanel(
       // a note: the caret in its words at once, so the keys (Escape too) are the note's from the first one, not the canvas's behind it
       // (after the double-click that opened it has ended: its last release would take the focus back to the canvas)
       else setTimeout(() => {
-        const words = el.querySelector<HTMLElement>(".sun-editor-editable[contenteditable='true']");
+        const words = el.querySelector<HTMLElement>(".cm-content[contenteditable='true']");
         if (words && !el.contains(document.activeElement)) words.focus({ preventScroll: true });
       }, 50);
     } catch (err) {
@@ -109,7 +108,7 @@ export function mountFilePanel(
     }
     return true;
   };
-  /** The library's own rename dialog (one item: the name without its extension; `.note.html` stays whole), from the header. */
+  /** The library's own rename dialog (one item: the name without its extension), from the header. */
   const rename = async (): Promise<void> => {
     const n = note, k = kind;
     if (!n || !k || deps.session.readOnly) return;
@@ -138,8 +137,8 @@ export function mountFilePanel(
     });
   // view-state: Escape closes the file open on the canvas (as its × does), asking about unsaved changes. Heard first, before the editor,
   // which takes every Escape for itself: only a menu, list, dialog or find bar of its own (or of the app) that is open takes it instead.
-  // (only what opens over the words: never the toolbar, `.se-menu-list`, which is always there in the styles that show one)
-  const POPUPS = ".se-controller, .se-dropdown, .se-select-menu, .se-modal-show, .se-cmd-row, .pop-menu, dialog[open]";
+  // (only what opens over the words: the editor's suggestions and its find bar, a menu, a dialog)
+  const POPUPS = ".cm-tooltip-autocomplete, .cm-panel.cm-search, .pop-menu, dialog[open]";
   const showing = (q: Element): boolean => (q as HTMLElement).getClientRects().length > 0 && getComputedStyle(q).visibility !== "hidden";
   window.addEventListener("keydown", (e) => {
     if (e.key !== "Escape" || e.ctrlKey || e.altKey || e.metaKey || e.shiftKey || e.isComposing) return;

@@ -45,24 +45,28 @@ test("code in a note: every colour keeps 4.5:1 on a code block, and inline code 
   await p.getByTestId("view-assets").click();
   await p.getByTestId("assets-import-input").setInputFiles({ name: "code.md", mimeType: "text/markdown", buffer: Buffer.from("```python\ndef f(): pass\n```\n\nSome `code` here\n") });
   await p.locator('[data-testid="asset-card"][title="code.md"]').dblclick();
-  await expect(p.locator(".sun-editor-editable pre").first()).toBeVisible();
+  await expect(p.locator(".me-code-block").first()).toBeVisible();
   for (const theme of ["light", "dark"] as const) {
     await p.evaluate((t) => window.__canvastDebug.setSetting("ui.theme", t), theme);
     await p.waitForTimeout(100);
-    // (what a highlight paints cannot be read from the page: each colour is tried in a line of the block itself)
+    // (each colour tried in a code block's own look, beside the editor's words: nothing is written into the note)
     await p.evaluate(() => {
-      const pre = document.querySelector(".sun-editor-editable pre")!;
-      pre.querySelectorAll("[data-probe]").forEach((n) => n.remove());
+      const editor = document.querySelector(".me .cm-editor")!;
+      editor.querySelector("[data-probe-box]")?.remove();
+      const box = document.createElement("div");
+      box.className = "me-code-block";
+      box.dataset["probeBox"] = "";
       for (const g of ["keyword", "string", "comment", "number", "function", "tag"]) {
         const s = document.createElement("span");
-        s.dataset["probe"] = g;
-        s.style.color = `var(--code-${g})`;
+        s.className = `me-tok-${g}`;
         s.textContent = ` ${g}`;
-        pre.append(s);
+        box.append(s);
       }
+      editor.append(box);
     });
-    expect(await lowContrast(p, ".sun-editor-editable pre"), theme).toEqual([]);
-    expect(await lowContrast(p, ".sun-editor-editable p"), theme).toEqual([]);
+    expect(await lowContrast(p, "[data-probe-box]"), theme).toEqual([]);
+    expect(await lowContrast(p, ".me .me-code"), theme).toEqual([]);
+    expect(await lowContrast(p, ".me .cm-line:not(.me-code-block)"), theme).toEqual([]);
   }
 });
 

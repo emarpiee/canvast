@@ -48,8 +48,7 @@ describe("property types", () => {
   it("the whole note: properties as the panel has them over its words, as written where they are the same", () => {
     const file = '---\nstatus: "new"\ntype: Zettel\n---\nOld words\n';
     const meta = { tags: ["a"], note: "", fields: [{ key: "status", value: "new" }, { key: "type", value: "Zettel" }, { key: "cast", value: "Ana", items: ["Ana"] }] };
-    expect(wholeMarkdown("md", file, "# New words\n", meta, [])).toBe('---\nstatus: "new"\ntype: Zettel\ntags:\n  - a\ncast:\n  - Ana\n---\n# New words\n');
-    expect(wholeMarkdown("rich", "", "# R\n", { tags: [], note: "", fields: [{ key: "k", value: "v" }] }, [])).toBe("---\nk: v\n---\n# R\n");
+    expect(wholeMarkdown(file, "# New words\n", meta, [])).toBe('---\nstatus: "new"\ntype: Zettel\ntags:\n  - a\ncast:\n  - Ana\n---\n# New words\n');
   });
   it("the file: a list as a list, a checkbox unquoted, whatever else as before", () => {
     setPropTypes('{"cast":"list","done":"checkbox","word":"text"}');
@@ -71,7 +70,6 @@ describe("what a save changes by itself", () => {
     setAutoDates(off);
     const file = '---\ntitle:   "x"\n---\n\n# H\n';
     expect(stampNote("md", file, 1, now)).toBe(file);
-    expect(stampNote("rich", "<html></html>", 1, now)).toBe("<html></html>");
     expect(noteFileName("md", file, "n.md")).toBeNull();
   });
   it("the two times: modified in its place, created kept or added", () => {
@@ -79,7 +77,6 @@ describe("what a save changes by itself", () => {
     expect(stampNote("md", '---\nmodified: "old"\ntitle: T\ncreated: 2000\n---\nBody\n', 1, now)).toBe("---\nmodified: 2026-11-04T15:07\ntitle: T\ncreated: 2000\n---\nBody\n");
     expect(stampNote("md", "Body\n", new Date(2020, 0, 2, 3, 4).getTime(), now)).toBe("---\ncreated: 2020-01-02T03:04\nmodified: 2026-11-04T15:07\n---\nBody\n");
     expect(stampNote("txt", "Body", 1, now)).toBe("Body");
-    expect(stampNote("rich", "<html><head><title>t</title></head><body></body></html>", now, now)).toContain('<meta name="modified" content="2026-11-04T15:07">');
     expect(isAutoDate("md", "CREATED")).toBe(true);
     expect(isAutoKey("md", "title")).toBe(false);
     setAutoDates(off);
@@ -90,7 +87,7 @@ describe("what a save changes by itself", () => {
     expect(title("---\ntitle: By hand\n---\n```\n# not this\n```\n## Nor this\n# **My** [[a|Head]] #\n")).toBe("My Head");
     expect(title("---\ntitle: By hand\n---\nNo heading\n")).toBe("By hand");
     expect(stampNote("md", "No heading\n", 1, now)).toBe("No heading\n");
-    expect(firstHeading("rich", '<body><h1 class="x">A <b>B</b> &amp; C</h1></body>')).toBe("A B & C");
+    expect(firstHeading("text\n# A **B** & C\n")).toBe("A B & C");
     expect(isAutoKey("md", "Title")).toBe(true);
     expect(isAutoKey("txt", "Title")).toBe(false);
     setAutoDates(off);
@@ -127,7 +124,7 @@ describe("what a save changes by itself", () => {
     expect(name("# Other\n", "Same-2.md")).toBe("Other.md");
     expect(name(`# ${"x".repeat(400)}\n`)!.length).toBeLessThan(260);
     setAutoDates({ ...off, rename: true });
-    expect(noteFileName("rich", "<h1>Rich: one</h1>", "old.note.html")).toBe("Rich- one.note.html");
+    expect(noteFileName("md", "# Plan: one", "old.md")).toBe("Plan- one.md");
     expect(noteFileName("txt", "# Head", "old.txt")).toBeNull();
     setAutoDates(off);
   });

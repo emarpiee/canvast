@@ -48,22 +48,15 @@ const result = await build({
 });
 
 const script = result.outputFiles[0].text.replace(/<\/script/gi, "<\\/script").replace(/<!--/g, "<\\!--");
-// The notes editor's own styles (SunEditor: its interface and its contents), bundled with their @imports; its colours and fonts are the app's (the `canvast` theme in styles.css).
-const editorCss = await build({
-  stdin: { contents: ['css/editor', 'css/contents'].map((p) => `@import "suneditor/${p}";`).join("\n"), resolveDir: root, loader: "css" },
-  bundle: true,
-  minify: true,
-  write: false,
-  logLevel: "warning",
-});
-const styles = `${editorCss.outputFiles[0].text}\n${await readFile(resolve(root, "src/styles.css"), "utf8")}`;
+const styles = await readFile(resolve(root, "src/styles.css"), "utf8");
 const template = await readFile(resolve(root, "src/index.html"), "utf8");
 // Third-party notices travel inside the single file (Lucide icons are ISC, Inter is OFL-1.1).
 const pkgOf = async (name) => JSON.parse(await readFile(resolve(root, "node_modules", name, "package.json"), "utf8"));
 const licence = async (path) => (await readFile(resolve(root, "node_modules", path), "utf8")).replace(/--/g, "- -").trim();
 const lucide = await pkgOf("lucide-static");
 const inter = await pkgOf("@expo-google-fonts/inter");
-const sun = await pkgOf("suneditor");
+const cm = await pkgOf("@codemirror/view");
+const lezer = await pkgOf("@lezer/markdown");
 const pdfjs = await pkgOf("pdfjs-dist");
 const threejs = await pkgOf("three");
 // PhotoCraft's released web build (scripts/artcraft/photocraft/): an inert data block, read only when PhotoCraft is first opened.
@@ -72,7 +65,7 @@ const own = (await readFile(resolve(root, "LICENSE"), "utf8")).replace(/--/g, "-
 const notices =
   `<!--\ncanvast, copyright (C) 2026 emarpiee. Free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version. Source: https://github.com/emarpiee/canvast\n\n${own}\n-->\n<!--\nThird-party notices\n\nLucide icons (lucide-static ${lucide.version})\n${await licence("lucide-static/LICENSE")}\n\n` +
   `Inter Regular font (@expo-google-fonts/inter ${inter.version}, Inter_400Regular.ttf, unmodified)\n${await licence("@expo-google-fonts/inter/LICENSE_FONT")}\n\n` +
-  `SunEditor (suneditor ${sun.version}, the notes editor)\n${await licence("suneditor/LICENSE.txt")}\n\n` +
+  `CodeMirror (@codemirror/view ${cm.version} and its packages) and Lezer (@lezer/markdown ${lezer.version}), the notes editor's text view and Markdown reader\n${await licence("@codemirror/view/LICENSE")}\n\n` +
   `pdf.js (pdfjs-dist ${pdfjs.version}, draws PDFs), Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0\n\n` +
   `three.js (three ${threejs.version}, draws 3D models)\n${await licence("three/LICENSE")}\n` +
   (photocraft ? `\nPhotoCraft ${photocraft.version} (its released web build, unmodified; the photo editor opened from canvast), MIT OR Apache-2.0\n${photocraft.notice.replace(/--/g, "- -")}\n` : "") +

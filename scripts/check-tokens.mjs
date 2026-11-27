@@ -51,6 +51,9 @@ for (const f of await readdir(dir)) {
 }
 const pickerCss = await readFile(resolve(root, "src/colour-picker/style.ts"), "utf8");
 for (const m of pickerCss.matchAll(/--cp-[a-z-]+:\s*(#[0-9a-fA-F]{3,8}\b|rgba?\()/g)) found.notOklch.push(`colour-picker/style.ts:${lineOf(pickerCss, m.index)}: ${m[0]}`);
+// (the Markdown editor's defaults likewise)
+const editorCss = await readFile(resolve(root, "src/markdown-editor/style.ts"), "utf8");
+for (const m of editorCss.matchAll(/--me-[a-z-]+:\s*(#[0-9a-fA-F]{3,8}\b|rgba?\()/g)) found.notOklch.push(`markdown-editor/style.ts:${lineOf(editorCss, m.index)}: ${m[0]}`);
 // A button is a rounded square (--ctl-r, or --r-sm on a row); round is for chips, what is on them, and dots.
 for (const m of css.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
   if (/border-radius:\s*var\(--r-(pill|dot)\)/.test(m[2]) && /\bbutton\b|-btn\b|\.vbtn/.test(m[1]) && !/tag-chip|cs-chip|tag-cloud|hidden-bar|assets-filtered|::after|::before/.test(m[1])) found.offGrid.push(`${lineOf(css, m.index)}: ${m[1].trim()}: a round button`);

@@ -14,7 +14,6 @@
  * Instance-specific state (a video's pause position, an image's adjustments)
  * is not a setting: it lives in the object itself.
  */
-import type { NoteStyle } from "../notes/note-file";
 import { DOCK_PANEL_IDS } from "./panels";
 import { paintFromText } from "../doc/paint";
 import { validPropTypes } from "../notes/prop-types";
@@ -204,9 +203,7 @@ export const SETTINGS = {
   "notes.codeColours": { scope: "device", default: true, validate: bool, effect: "immediate" } as Def<boolean>,
   "notes.wrapSelection": { scope: "device", default: true, validate: bool, effect: "immediate" } as Def<boolean>,
   // (off: whatever changes what is typed by itself ships off)
-  "notes.typedMarks": { scope: "device", default: false, validate: bool, effect: "immediate" } as Def<boolean>,
   "notes.saveOnClose": { scope: "device", default: false, validate: bool, effect: "immediate" } as Def<boolean>,
-  "notes.saveAs": { scope: "workspace", default: "ask", validate: oneOf("ask", "file", "rich"), effect: "immediate" } as Def<"ask" | "file" | "rich">,
   "notes.cardShows": { scope: "workspace", default: "whole", validate: oneOf("part", "whole"), effect: "immediate" } as Def<"part" | "whole">,
   "library.propTypes": { scope: "workspace", default: "{}", validate: validPropTypes, effect: "immediate" } as Def<string>,
   "notes.autoDates": { scope: "workspace", default: false, validate: bool, effect: "immediate" } as Def<boolean>,
@@ -224,8 +221,7 @@ export const SETTINGS = {
   "notes.folder": { scope: "workspace", default: "Notes", validate: text(60), effect: "immediate" } as Def<string>,
   "notes.look": { scope: "device", default: "auto", validate: oneOf("auto", "light", "dark"), effect: "immediate" } as Def<"auto" | "light" | "dark">,
   "notes.panelMode": { scope: "device", default: "panel", validate: oneOf("panel", "window"), effect: "immediate" } as Def<"panel" | "window">,
-  "notes.panelStyle": { scope: "device", default: "document", validate: oneOf("document", "classic", "bottom", "balloon", "notion"), effect: "immediate" } as Def<NoteStyle>,
-  "notes.style": { scope: "device", default: "document", validate: oneOf("document", "classic", "bottom", "balloon", "notion"), effect: "immediate" } as Def<NoteStyle>,
+  "notes.editorMode": { scope: "device", default: "live", validate: oneOf("live", "source", "preview"), effect: "immediate" } as Def<"live" | "source" | "preview">,
   "assets.edgeWidth": { scope: "device", default: 15, validate: (v: unknown) => (Number.isInteger(v) && (v as number) >= 0 && (v as number) <= 40 ? (v as number) : undefined), effect: "immediate" } as Def<number>,
   "assets.playerHideSeconds": { scope: "device", default: 1.5, validate: (v: unknown) => (typeof v === "number" && v >= 0.5 && v <= 10 ? v : undefined), effect: "immediate" } as Def<number>,
   "assets.slideSeconds": { scope: "device", default: 5, validate: (v: unknown) => (Number.isInteger(v) && (v as number) >= 1 && (v as number) <= 120 ? (v as number) : undefined), effect: "immediate" } as Def<number>,

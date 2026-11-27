@@ -479,7 +479,7 @@ test("notes", async ({ scene: s }) => {
   const c: Pt = [Math.round((b.minX + b.maxX) / 2), Math.round((b.minY + b.maxY) / 2)];
   for (let i = 1; i <= 6; i++) { await r.move(1250 + (c[0] - 1250) * i / 6, 820 + (c[1] - 820) * i / 6); await r.snap(); }
   await s.p.mouse.dblclick(c[0], c[1]);
-  await s.p.getByTestId("note-panel").locator(".sun-editor-editable h1").first().waitFor();
+  await s.p.getByTestId("note-panel").locator(".cm-line.me-h1").first().waitFor();
   r.down = true; await r.snap({}, 400); r.down = false;
   await r.hold(4);
   r.save();

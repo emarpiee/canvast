@@ -38,6 +38,7 @@ jobs:
       - run: npm run check:name-rules
       - run: npm run check:components
       - run: npm run check:picker
+      - run: npm run check:markdown-editor
       - run: npm run check:patterns
       - run: npm run check:shots
       - run: npm run check:repro

@@ -68,6 +68,7 @@ export const RULES = [
   [/^src\/text\//, ["drawing"]],
   [/^src\/gen\//, ["drawing", "packages"]],
   [/^src\/colour-picker\//, ["packages", "drawing", "interface"]],
+  [/^src\/markdown-editor\//, ["library", "interface"]],
   // the interface
   [/^src\/(settings|commands|search)\//, ["interface", "library"]],
   [/^src\/ui\//, ["interface", "drawing"]],

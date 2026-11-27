@@ -65,18 +65,10 @@ describe("note properties (YAML frontmatter)", () => {
   });
 });
 
-describe("rich text notes' properties", () => {
-  it("are the head's <meta>, written and read back, the rest of the file as it was", async () => {
-    const { richNoteFile } = await import("../../src/notes/note-file");
-    const { richMeta, withRichMeta, fileMeta, withFileMeta } = await import("../../src/notes/frontmatter");
-    const file = richNoteFile("Plan", '<p style="text-align:center">Hi</p>');
-    expect(richMeta(file)).toBeNull();
+describe("notes' properties", () => {
+  it("are a markdown note's YAML, written and read back; a plain text note has none", async () => {
+    const { fileMeta, withFileMeta } = await import("../../src/notes/frontmatter");
     const meta = { tags: ["design", "to do"], note: 'A "plan" <b>', fields: [{ key: "author", value: "Ana & Bo" }] };
-    const out = withRichMeta(file, meta);
-    expect(richMeta(out)).toEqual(meta);
-    expect(out).toContain('<meta name="generator" content="canvast">');
-    expect(out).toContain('<p style="text-align:center">Hi</p>');
-    expect(richMeta(withRichMeta(out, { tags: [], note: "", fields: [] }))).toBeNull();
     expect(fileMeta("txt", "tags: x")).toBeNull();
     expect(withFileMeta("txt", "plain", meta)).toBe("plain");
     expect(fileMeta("md", withFileMeta("md", "# T\n", meta))).toEqual({ ...meta, inline: [] });
@@ -100,7 +92,7 @@ describe("#tags in a note's words", () => {
   });
 
   it("a save leaves the properties as the file writes them while their values stay the same", async () => {
-    const { fileMeta, withFileMeta, splitFrontmatter, withRichMeta } = await import("../../src/notes/frontmatter");
+    const { fileMeta, withFileMeta, splitFrontmatter } = await import("../../src/notes/frontmatter");
     const save = (t: string): string => withFileMeta("md", t, fileMeta("md", t)!);
     for (const file of [
       '---\naliases:\n  - "Smith, John"\n  - other\n---\nbody',
@@ -111,8 +103,6 @@ describe("#tags in a note's words", () => {
     expect(withFileMeta("md", '---\na: "1"\nb: "2"\n---\nx', { tags: [], note: "", fields: [{ key: "a", value: "1" }, { key: "b", value: "3" }] })).toBe('---\na: "1"\nb: 3\n---\nx');
     // A note that starts with a rule has no properties; its words stay its words.
     expect(splitFrontmatter("---\n\nFirst paragraph\n\n---\n\nSecond")).toEqual({ props: null, body: "---\n\nFirst paragraph\n\n---\n\nSecond" });
-    // A `$&` in a value is that text, in a rich text note's head too.
-    expect(withRichMeta("<html><head><title>T</title></head><body>B</body></html>", { tags: [], note: "cost $& and $' end", fields: [] })).toContain('content="cost $&amp; and $\' end"');
   });
 });
 
@@ -136,10 +126,9 @@ describe("blocks and pasted properties", () => {
     expect(writeProps(out)).toContain("  a: 1");
     expect(writeProps(out)).not.toContain("# a comment");
   });
-  it("puts pasted properties in a file with none, and in a rich text note's head", () => {
+  it("puts pasted properties in a file with none", () => {
     const pasted = parseProps(["kind: x"]);
     expect(withPastedProps("md", "# Words\n", pasted)).toBe("---\nkind: x\n---\n# Words\n");
-    expect(withPastedProps("rich", "<html><head><title>t</title></head><body></body></html>", pasted)).toContain('<meta name="kind" content="x">');
     expect(withPastedProps("txt", "words", pasted)).toBe("words");
   });
 });

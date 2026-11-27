@@ -329,7 +329,7 @@ function provideLibraryCommands(root: HTMLElement, name: string, make: () => Com
   byRoot.set(root, make);
 }
 
-export function mountAssetsView(root: HTMLElement, session: Session, assets: AssetLibrary, showCanvas: () => void, notices: { subscribe(fn: (text: string) => void): void }, settings: SettingsStore, /** The fonts of the library, loaded (the notes editor's font list). */ fonts: () => Promise<Array<{ hash: string; name: string; unusable: string }>> = async () => [], /** Edit in PhotoCraft (Settings > ArtCraft > PhotoCraft); absent where it is not offered. */ editInPhotoCraft?: (hash: string) => void, /** A second Library in a Pins window (ADR 0208): no details panel, no commands of its own (the main Library's are the app's), its keys only while it is in use. */ opts: { embedded?: boolean } = {}): AssetsView {
+export function mountAssetsView(root: HTMLElement, session: Session, assets: AssetLibrary, showCanvas: () => void, notices: { subscribe(fn: (text: string) => void): void }, settings: SettingsStore, /** Edit in PhotoCraft (Settings > ArtCraft > PhotoCraft); absent where it is not offered. */ editInPhotoCraft?: (hash: string) => void, /** A second Library in a Pins window (ADR 0208): no details panel, no commands of its own (the main Library's are the app's), its keys only while it is in use. */ opts: { embedded?: boolean } = {}): AssetsView {
   root.innerHTML = `
     <div class="assets-place-zone drop-zone" data-testid="assets-place-zone" hidden>${ICONS.mapPin}<span></span></div>
     <div class="assets-bar" role="toolbar" aria-label="Library">
@@ -1267,7 +1267,6 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     get film() { return film; },
     get filmOf() { return filmOf; }, set filmOf(v) { filmOf = v; },
     get filtered() { return filtered; },
-    get fonts() { return fonts; },
     get hiddenMode() { return hiddenMode; },
     get inspector() { return inspector; },
     get loadThumb() { return loadThumb; },
@@ -2310,7 +2309,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     keepDetails();
     // (in the order they were put in: `sortableSections`)
     const detail: Record<(typeof DETAIL_SECTIONS)[number], () => string> = {
-      file: () => `${e ? marksHtml(e) : ""}${e && noteKindOf(e.name) ? `<section class="asset-sec asset-file" data-testid="asset-file-info"><h3>A note</h3><p class="asset-note">Open it (double-click) to read and write it in the notes editor. Its file stays ${noteKindOf(e.name) === "rich" ? "a rich text note (HTML) that other apps open too" : "plain text other apps read"}. Tag it <em>template</em> to offer it in Insert ▸ Template of every note.</p></section>` : e && viewKindNamed(e.name) ? `<section class="asset-sec asset-file" data-testid="asset-file-info"><h3>${esc(describeFile(e.name, e.type).category)}</h3><p class="asset-note">Open it (double-click) to see it here. It is kept exactly as it is. If it cannot be read, its card is shown.</p></section>` : e && isCard(e) && !isFontFile(e) ? (() => { const d = describeFile(e.name, e.type); return `<section class="asset-sec asset-file" data-testid="asset-file-info"><h3>${isArtFile(e.name) ? "An art file" : "No preview for this file"}</h3><p class="asset-note">${isAutoCopy(e.name) ? `${AUTO_COPY_NOTE} ` : ""}${esc(d.category)} (${esc(d.chip)}). It is kept exactly as it is and shown as ${isArtFile(e.name) ? "the picture it keeps, when it keeps one" : "a card"}. ${esc(d.todo)}</p></section>`; })() : ""}`,
+      file: () => `${e ? marksHtml(e) : ""}${e && noteKindOf(e.name) ? `<section class="asset-sec asset-file" data-testid="asset-file-info"><h3>A note</h3><p class="asset-note">Open it (double-click) to read and write it in the notes editor. Its file stays plain text other apps read. Tag it <em>template</em> to offer it in the / menu of every note.</p></section>` : e && viewKindNamed(e.name) ? `<section class="asset-sec asset-file" data-testid="asset-file-info"><h3>${esc(describeFile(e.name, e.type).category)}</h3><p class="asset-note">Open it (double-click) to see it here. It is kept exactly as it is. If it cannot be read, its card is shown.</p></section>` : e && isCard(e) && !isFontFile(e) ? (() => { const d = describeFile(e.name, e.type); return `<section class="asset-sec asset-file" data-testid="asset-file-info"><h3>${isArtFile(e.name) ? "An art file" : "No preview for this file"}</h3><p class="asset-note">${isAutoCopy(e.name) ? `${AUTO_COPY_NOTE} ` : ""}${esc(d.category)} (${esc(d.chip)}). It is kept exactly as it is and shown as ${isArtFile(e.name) ? "the picture it keeps, when it keeps one" : "a card"}. ${esc(d.todo)}</p></section>`; })() : ""}`,
       organize: () => (e ? organizeHtml(e) : ""),
       notes: () => (e ? notesHtml(e) : ""),
       links: () => `<section class="asset-sec" data-testid="asset-backlinks" hidden><h3>Linked from <span class="layer-count" data-count></span></h3><ul class="asset-places"></ul></section><section class="asset-sec" data-testid="asset-outlinks" hidden><h3>Links <span class="layer-count" data-count></span></h3><ul class="asset-places"></ul></section>`,

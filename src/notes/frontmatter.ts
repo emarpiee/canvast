@@ -237,9 +237,8 @@ export function mergeProps(own: readonly Prop[], pasted: readonly Prop[]): Prop[
 }
 
 /** A note's file with properties pasted into it added to its own (`mergeProps`). */
-export function withPastedProps(kind: "md" | "txt" | "rich", file: string, pasted: readonly Prop[]): string {
+export function withPastedProps(kind: "md" | "txt", file: string, pasted: readonly Prop[]): string {
   if (!pasted.length || kind === "txt") return file;
-  if (kind === "rich") return withRichMeta(file, metaOfProps(mergeProps(propsOfMeta([], richMeta(file) ?? NO_META), pasted)));
   const { props, body } = splitFrontmatter(file);
   return withFrontmatter(body, mergeProps(props ?? [], pasted));
 }
@@ -247,50 +246,9 @@ export function withPastedProps(kind: "md" | "txt" | "rich", file: string, paste
 /** Whether two items' tags, notes and fields are the same. */
 export const sameMeta = (a: NoteMeta, b: NoteMeta): boolean => {
   const tags = (m: NoteMeta): string => [...new Set(m.tags.map((t) => t.toLowerCase()))].sort().join("\n");
-  // (a rich text note's head has no lists: an item's list and its joined words are the same)
   const fields = (m: NoteMeta): string => JSON.stringify(m.fields.map((f) => [f.key, f.value]));
   return a.note === b.note && tags(a) === tags(b) && fields(a) === fields(b);
 };
-
-// A rich text note (`.note.html`) keeps the same properties as `<meta>` in its head: `keywords` its tags, `description` its note, any
-// other name a field.
-const META = /<meta\s+name="([^"]*)"\s+content="([^"]*)"\s*\/?>\n?/gi;
-const NOT_PROPS = new Set(["generator", "viewport", "color-scheme"]);
-const unescapeAttr = (s: string): string => s.replace(/&quot;/g, '"').replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&amp;/g, "&");
-const escapeAttr = (s: string): string => s.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-
-/** A rich text note's properties, or null when its head has none. */
-export function richMeta(file: string): NoteMeta | null {
-  const head = /<head[^>]*>([\s\S]*?)<\/head>/i.exec(file)?.[1] ?? "";
-  const meta: NoteMeta = { tags: [], note: "", fields: [] };
-  let any = false;
-  for (const [, name, content] of head.matchAll(META)) {
-    const k = unescapeAttr(name!);
-    if (NOT_PROPS.has(k.toLowerCase())) continue;
-    any = true;
-    const v = unescapeAttr(content!);
-    if (k.toLowerCase() === "keywords") meta.tags = v.split(/,\s*/).filter(Boolean);
-    else if (k.toLowerCase() === NOTE_KEY) meta.note = v;
-    else meta.fields.push({ key: k, value: v });
-  }
-  return any ? meta : null;
-}
-
-/** The `<meta>` lines of a rich text note's head for these properties. */
-export const richMetaLines = (meta: NoteMeta): string =>
-  [
-    ...(meta.tags.length ? [`<meta name="keywords" content="${escapeAttr(meta.tags.join(", "))}">`] : []),
-    ...(meta.note ? [`<meta name="${NOTE_KEY}" content="${escapeAttr(meta.note)}">`] : []),
-    ...meta.fields.filter((f) => !NOT_PROPS.has(f.key.toLowerCase())).map((f) => `<meta name="${escapeAttr(f.key)}" content="${escapeAttr(f.value)}">`),
-  ].map((l) => `${l}\n`).join("");
-
-/** A rich text note with these properties in its head (its other `<meta>`, its title and its body as they were). */
-export function withRichMeta(file: string, meta: NoteMeta): string {
-  const m = /(<head[^>]*>)([\s\S]*?)(<\/head>)/i.exec(file);
-  if (!m) return file;
-  const kept = m[2]!.replace(META, (line, name: string) => (NOT_PROPS.has(unescapeAttr(name).toLowerCase()) ? line : ""));
-  return file.replace(m[0], () => `${m[1]}${kept.replace(/\n?$/, "\n")}${richMetaLines(meta)}${m[3]}`); // (a function: a `$&` in the words stays as it is)
-}
 
 /** No tags, no note, no fields. */
 export const NO_META: NoteMeta = { tags: [], note: "", fields: [] };
@@ -311,14 +269,10 @@ export function inlineTags(body: string): string[] {
 }
 
 /**
- * A note file's properties (markdown: its YAML, and the `#tags` in its words; rich text: its head's `<meta>`), or null when it has no
- * YAML (and for plain text). `inline`: a markdown note's `#tags`, also without YAML.
+ * A note file's properties (its YAML, and the `#tags` in its words), or null when it has no YAML (and for plain text). `inline`: a
+ * markdown note's `#tags`, also without YAML.
  */
-export function fileMeta(kind: "md" | "txt" | "rich", text: string): (NoteMeta & { inline: string[] }) | null {
-  if (kind === "rich") {
-    const m = richMeta(text);
-    return m && { ...m, inline: [] };
-  }
+export function fileMeta(kind: "md" | "txt", text: string): (NoteMeta & { inline: string[] }) | null {
   if (kind !== "md") return null;
   const { props, body } = splitFrontmatter(text);
   const inline = inlineTags(body);
@@ -328,7 +282,7 @@ export function fileMeta(kind: "md" | "txt" | "rich", text: string): (NoteMeta &
 }
 
 /** A markdown note's `#tags` (also when it has no YAML). */
-export const fileInlineTags = (kind: "md" | "txt" | "rich", text: string): string[] => (kind === "md" ? inlineTags(splitFrontmatter(text).body) : []);
+export const fileInlineTags = (kind: "md" | "txt", text: string): string[] => (kind === "md" ? inlineTags(splitFrontmatter(text).body) : []);
 
 /** A markdown note's new text (from the editor, without properties) under the properties its file has now. */
 export function underProps(file: string, body: string): string {
@@ -336,14 +290,13 @@ export function underProps(file: string, body: string): string {
 }
 
 /** The whole note as a markdown file: its words under its properties, as they are in the details panel. What is copied to take the note elsewhere. */
-export function wholeMarkdown(kind: "md" | "rich", file: string, words: string, meta: NoteMeta | null, pasted: readonly Prop[]): string {
-  const text = kind === "md" ? underProps(file, words) : withFrontmatter(words, propsOfMeta([], meta ?? NO_META));
-  return withPastedProps("md", kind === "md" && meta ? withFileMeta("md", text, meta) : text, pasted);
+export function wholeMarkdown(file: string, words: string, meta: NoteMeta | null, pasted: readonly Prop[]): string {
+  const text = underProps(file, words);
+  return withPastedProps("md", meta ? withFileMeta("md", text, meta) : text, pasted);
 }
 
 /** A note file with these properties written in (a plain text note is left as it is). */
-export function withFileMeta(kind: "md" | "txt" | "rich", text: string, meta: NoteMeta): string {
-  if (kind === "rich") return withRichMeta(text, meta);
+export function withFileMeta(kind: "md" | "txt", text: string, meta: NoteMeta): string {
   if (kind !== "md") return text;
   const { props, body } = splitFrontmatter(text);
   // (the tags written as #tags in its words stay there: the YAML lists the others)

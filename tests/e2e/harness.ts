@@ -402,7 +402,7 @@ export async function themeProblems(page: Page): Promise<string[]> {
       if (!shown(panel)) continue;
       const name = panel.getAttribute("aria-label") ?? (panel as HTMLElement).dataset["testid"] ?? panel.className;
       for (const el of panel.querySelectorAll("button, input, select, textarea")) {
-        if (!shown(el) || el.closest(".sun-editor, .viewer-note, [data-theme-free]")) continue;
+        if (!shown(el) || el.closest(".viewer-note, [data-theme-free]")) continue;
         const cs = getComputedStyle(el);
         for (const c of ["borderTopLeftRadius", "borderTopRightRadius", "borderBottomRightRadius", "borderBottomLeftRadius"] as const) {
           const v = cs[c];

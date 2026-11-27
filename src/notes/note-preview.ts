@@ -1,4 +1,5 @@
-import { WIKI, encodeLinkPart, noteKindOf, outsideCode, richNoteBody, textHtml } from "./note-file";
+import { WIKI, encodeLinkPart, noteKindOf, textHtml } from "./note-file";
+import { renderMarkdown } from "../markdown-editor/render";
 import { cardContext } from "../assets/card";
 import { NO_META, fileMeta, splitFrontmatter, type NoteMeta } from "./frontmatter";
 import { NOTE_PAGE_PIXEL_W } from "../doc/model";
@@ -101,17 +102,11 @@ async function pageHtml(name: string, text: string, hash?: string): Promise<stri
 /** The note's text as HTML that can be drawn in an image: its media as pictures in data (nothing loads there), no scripts or frames. */
 async function makePageHtml(name: string, text: string, badges: readonly string[], hash?: string): Promise<string> {
   const kind = noteKindOf(name);
-  const { markdownHtml } = await import("./note-markdown"); // (loaded when a preview is made: the editor needs a page, not the unit tests' Node)
-  // (Obsidian's `![[cat.png]]`: the picture it embeds)
-  const md = (t: string): string =>
-    outsideCode(splitFrontmatter(t).body, (s) =>
-      s
-        .replace(/!\[\[([^\[\]|\n]+?)(?:\|[^\[\]\n]*)?\]\]/g, (_m, n: string) => `![${n.trim()}](${WIKI}${encodeLinkPart(n.trim())})`)
-        // (a link between notes shows its words, as in the editor: `[[Plan|shown]]` → shown, `[[Folder/Plan]]` → Folder/Plan)
-        .replace(/\[\[([^\[\]|\n]+?)(?:\|([^\[\]\n]*))?\]\]/g, (_m, n: string, shown?: string) => (shown ?? n).trim()),
-    );
-  const html = kind === "md" ? markdownHtml(md(text)) : kind === "rich" ? richNoteBody(text) : textHtml(text);
+  // (an embed, `![[cat.png]]`, is the picture it names, found as a link to it is)
+  const html = kind === "md" ? renderMarkdown(splitFrontmatter(text).body, { html: true, embedSrc: (t) => `${WIKI}${encodeLinkPart(t)}` }) : textHtml(text);
   const doc = new DOMParser().parseFromString(`<body>${html}</body>`, "text/html");
+  // (a link between notes shows its words, as in the editor)
+  for (const a of doc.body.querySelectorAll("a[data-wiki]")) a.replaceWith(a.textContent ?? "");
   if (badges.length) {
     const row = doc.createElement("p");
     row.className = "props";

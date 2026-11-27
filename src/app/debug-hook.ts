@@ -203,7 +203,7 @@ export interface DebugHook {
   flushStorage(): Promise<void>;
   /** Organize the library as its panel does, with the library's undo: a new folder (`id`, `name`, parent id or ""), file an item (`hash`, folder id or "" for none), rename an item or a folder, undo, redo. */
   /** Each open note as markdown or text, and whether that keeps all of it (what Save asks about). */
-  notesAsText(): Array<{ name: string; text: string; keepsAll: boolean }>;
+  notesAsText(): Array<{ name: string; text: string }>;
   /** Whether a desktop backup's key file opens with a password here (the browser's scrypt): true, false, or the error it threw. */
   backupKeyOpens(keyText: string, password: string): Promise<boolean | string>;
   /** The desktop library mirror's kept state (its folders, the folders seen on disk), for a failing test to say. */

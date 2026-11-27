@@ -43,13 +43,11 @@ const KNOWN = [
   /^ws:\/\/127\.0\.0\.1:47380;?$/, // the page's policy: the one address it may connect to
   /^https:\/\/fsf\.org\/$/, // the GNU GPL text
   /^https:\/\/www\.gnu\.org\/licenses\/(why-not-lgpl\.html)?$/, // the GNU GPL text
-  // The notes editor (SunEditor): the text of its messages and credits, and the address it makes of a Vimeo link pasted as a video
-  // (an iframe, which the page's Content-Security-Policy never loads: default-src 'none').
   // PhotoCraft's NOTICE and licence texts in the notices comment (where its parts come from: text a person reads). Its own code carries
   // no address (scripts/artcraft/photocraft/package.mjs), and its frame keeps this page's policy: connect-src 'none'.
   /^https:\/\/github\.com\/(storytold|PolyMeilex|jslegers|LaurenzV)\/[\w./#-]*,?$/,
   /^http:\/\/www\.apache\.org\/licenses\/$/,
-  /^https:\/\/(katex\.org\/docs\/supported\.html|www\.mathjax\.org\/|suneditor\.com\/troubleshooting#\w+|github\.com\/JiHong88\/suneditor\/blob\/master\/guide\/external-libraries\.md|lucide\.dev|tabler\.io\/icons|player\.vimeo\.com\/video\/)$/,
+  /^https:\/\/(katex\.org\/docs\/supported\.html|www\.mathjax\.org\/|lucide\.dev|tabler\.io\/icons|player\.vimeo\.com\/video\/)$/,
 ];
 for (const m of html.matchAll(/(?:https?|wss?):\/\/[^\s"'`)<>]+/gi)) {
   if (!KNOWN.some((re) => re.test(m[0]))) problems.push(`unknown URL string (look at it, then add it to KNOWN if it is only text): ${m[0]}`);

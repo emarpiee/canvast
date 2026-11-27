@@ -118,7 +118,7 @@ describe("the other shared rules", () => {
     expect([w.YYYY, w.MM, w.DD, w.HH, w.mm, w.ss, w.h, w.A, w.MMM, w.ddd]).toEqual(["2026", "11", "04", "15", "07", "09", "3", "PM", "Nov", "Wed"]);
   });
   it("one key for a [[link]]; one encoder, and a link reads back whole", () => {
-    expect(["Plan.md", "plan.MARKDOWN", "plan.txt", "PLAN.note.html", "plan"].map(wikiKeyOf)).toEqual(["plan", "plan", "plan", "plan", "plan"]);
+    expect(["Plan.md", "plan.MARKDOWN", "plan.txt", "PLAN.note.html", "plan"].map(wikiKeyOf)).toEqual(["plan", "plan", "plan", "plan.note.html", "plan"]); // (a page is a file: named whole)
     expect(wikiKeyOf("cat.png")).toBe("cat.png");
     expect(wikiTarget("Dir/Plan.md#head")).toEqual({ name: "plan", dirs: ["dir"] });
     for (const part of ["Mix (RGB) One.png", "it's!*.md", "日本語 ファイル", "a b/c"]) expect(decodeURIComponent(encodeLinkPart(part))).toBe(part);

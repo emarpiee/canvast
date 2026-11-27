@@ -615,7 +615,7 @@ export class LibraryMirror {
       const id = meta(e).folderIds[0];
       const names = id && folderOk.has(id) ? folderPath(folders, id) : [];
       const tidyDir = libraryDir(names, e.type, e.name);
-      // (a sealed file's own is .bin; a note made rich text in its place, plan.md → plan.note.html, is a file of its new kind)
+      // (a sealed file's own is .bin; an item whose file kind changed in its place is a file of its new kind)
       const tidy = tidyName(e.name, rec.file && !sealed ? rec.file : null, e.type, !!noteKindOf(e.name));
       const tidyExt = tidy.ext;
       const tidyBase = tidy.base;

@@ -62,7 +62,6 @@ export interface ViewerCtx {
   readonly film: HTMLElement;
   filmOf: string[] | null;
   readonly filtered: () => string[];
-  readonly fonts: () => Promise<Array<{ hash: string; name: string; unusable: string; }>>;
   readonly hiddenMode: boolean;
   readonly inspector: HTMLElement;
   readonly loadThumb: (img: HTMLImageElement) => void;
@@ -99,7 +98,7 @@ export function mountLibraryViewer(ctx: ViewerCtx) {
   slideTile.className = "viewer-tile";
   slideTile.hidden = true;
   slideImg.after(slideTile);
-  // ---- notes: a markdown, plain text or rich text note opens in the notes editor in place of a picture (note-session.ts: the same as
+  // ---- notes: a markdown or plain text note opens in the notes editor in place of a picture (note-session.ts: the same as
   // the canvas's note panel; the library gives it its own import, its viewer and its selection)
   const noteBox = document.createElement("div");
   noteBox.className = "viewer-note";
@@ -109,7 +108,7 @@ export function mountLibraryViewer(ctx: ViewerCtx) {
   let note: OpenView | null = null;
   /** What the open view shows of an item, as a card: what Place puts on a canvas (the page or view in sight, not the first). */
   const cardInView = (hash: string): CardLook | undefined => (note?.hash === hash ? note.card?.() : undefined);
-  const noteDeps: ViewDeps = { session: ctx.session, assets: ctx.assets, settings: ctx.settings, fonts: ctx.fonts };
+  const noteDeps: ViewDeps = { session: ctx.session, assets: ctx.assets, settings: ctx.settings };
   const notePlace: ViewPlace = {
     importFiles: (files) => ctx.view.importFiles(files),
     show: (hash) => showSlide(hash),
@@ -155,7 +154,7 @@ export function mountLibraryViewer(ctx: ViewerCtx) {
   const paintLinks = (hash: string, cards: LinkCards): void => {
     const name = ctx.entryOf(hash)?.name ?? "";
     const kind = noteKindOf(name);
-    const isNote = kind === "md" || kind === "rich";
+    const isNote = kind === "md";
     const rowOf = (r: LinkRow): string => `<li><button type="button" class="asset-link-row assets-link" data-action="open-linked" data-hash="${r.hash}" title="Open “${esc(r.name)}”">${ICONS.fileIcon}<span class="asset-place-name">${esc(r.name)}${r.folder ? `<small class="asset-link-folder">${esc(r.folder)}</small>` : ""}</span></button></li>`;
     const fill = (testid: string, shown: boolean, count: number, list: string, rows: string[], empty: string): void => {
       const sec = ctx.inspector.querySelector<HTMLElement>(`[data-testid="${testid}"]`);
