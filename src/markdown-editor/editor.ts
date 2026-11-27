@@ -14,7 +14,7 @@ import { DEFAULT_ICONS, type IconName } from "./icons";
 import { livePreview, refresh } from "./live";
 import { renderMarkdown } from "./render";
 import { EXTENSIONS } from "./syntax";
-import { injectStyles } from "./style";
+import { CM_THEME, injectStyles } from "./style";
 
 export type EditorMode = "live" | "source" | "preview";
 
@@ -248,6 +248,7 @@ export function createMarkdownEditor(opts: EditorOptions): MarkdownEditor {
   const extensions: Extension[] = [
     history(),
     drawSelection(),
+    EditorView.theme(CM_THEME),
     EditorView.lineWrapping,
     search({ top: true }),
     placeholderExt(labels.placeholder),
@@ -437,6 +438,7 @@ export function createMarkdownEditor(opts: EditorOptions): MarkdownEditor {
 
   const applyMode = (): void => {
     el.classList.toggle("me-source", mode === "source");
+    el.classList.toggle("me-previewing", mode === "preview");
     view.dispatch({ effects: liveLayer.reconfigure(liveExt()) });
     const showPreview = mode === "preview";
     view.dom.hidden = showPreview;

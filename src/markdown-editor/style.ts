@@ -30,22 +30,7 @@ export const EDITOR_CSS = `
 :where(.me-btn:disabled) { opacity: 0.4; cursor: default; }
 :where(.me-body) { position: relative; flex: 1; min-height: 0; overflow: hidden; }
 :where(.me-body > .cm-editor) { height: 100%; }
-:where(.me .cm-editor) { background: var(--me-bg); color: var(--me-fg); }
-:where(.me .cm-editor.cm-focused) { outline: none; }
-:where(.me .cm-scroller) { font-family: var(--me-font); line-height: var(--me-line-height); padding: var(--me-pad) 0; }
-:where(.me .cm-content) { max-width: var(--me-width); margin: 0 auto; padding: 0 var(--me-pad); caret-color: var(--me-fg); }
-:where(.me .cm-cursor) { border-left-color: var(--me-fg); }
-:where(.me .cm-selectionBackground, .me .cm-focused .cm-selectionBackground, .me .cm-content ::selection) { background: var(--me-select) !important; }
-:where(.me .cm-activeLine) { background: transparent; }
-:where(.me .cm-panels) { background: var(--me-bg); color: var(--me-fg); border-color: var(--me-line); }
-:where(.me .cm-panel.cm-search) { padding: var(--me-gap); font-family: var(--me-font); }
-:where(.me .cm-panel input, .me .cm-panel button) { font: inherit; color: var(--me-fg); background: var(--me-code-bg); border: 1px solid var(--me-line); border-radius: var(--me-radius); }
-:where(.me .cm-searchMatch) { background: var(--me-mark-bg); }
-:where(.me .cm-tooltip) { background: var(--me-bg); color: var(--me-fg); border: 1px solid var(--me-line); border-radius: var(--me-radius); }
-:where(.me .cm-tooltip-autocomplete > ul > li) { padding: 2px var(--me-gap); }
-:where(.me .cm-tooltip-autocomplete > ul > li[aria-selected]) { background: var(--me-select); color: var(--me-fg); }
-:where(.me .cm-completionDetail) { color: var(--me-faint); font-style: normal; margin-left: var(--me-gap); }
-:where(.me-source .cm-scroller) { font-family: var(--me-mono); font-size: 0.92em; }
+.me.me-source .cm-editor .cm-scroller { font-family: var(--me-mono); font-size: 0.92em; } /* (above the editor theme's font) */
 /* live mode */
 :where(.me-live .me-h) { font-weight: 700; line-height: 1.3; }
 :where(.me-live .me-h1) { font-size: var(--me-h1); } :where(.me-live .me-h2) { font-size: var(--me-h2); } :where(.me-live .me-h3) { font-size: var(--me-h3); }
@@ -75,7 +60,7 @@ export const EDITOR_CSS = `
 :where(.me .me-tok-keyword) { color: var(--me-tok-keyword); } :where(.me .me-tok-string) { color: var(--me-tok-string); } :where(.me .me-tok-comment) { color: var(--me-tok-comment); font-style: italic; }
 :where(.me .me-tok-number) { color: var(--me-tok-number); } :where(.me .me-tok-function) { color: var(--me-tok-function); } :where(.me .me-tok-tag) { color: var(--me-tok-tag); }
 /* preview mode */
-:where(.me-preview) { position: absolute; inset: 0; overflow: auto; padding: var(--me-pad); line-height: var(--me-line-height); }
+:where(.me-preview) { position: absolute; inset: 0; overflow: auto; padding: var(--me-pad) 0; line-height: var(--me-line-height); background: var(--me-bg); color: var(--me-fg); }
 :where(.me-preview > .me-page) { max-width: var(--me-width); margin: 0 auto; padding: 0 var(--me-pad); }
 :where(.me-preview) :is(h1, h2, h3, h4, h5, h6) { line-height: 1.3; margin: 1em 0 0.4em; }
 :where(.me-preview) h1 { font-size: var(--me-h1); } :where(.me-preview) h2 { font-size: var(--me-h2); } :where(.me-preview) h3 { font-size: var(--me-h3); }
@@ -91,8 +76,32 @@ export const EDITOR_CSS = `
 :where(.me-preview) li.done { color: var(--me-faint); text-decoration: line-through; }
 :where(.me-preview) hr { border: 0; border-top: 1px solid var(--me-line); }
 :where(.me-preview) .tag { color: var(--me-tag-fg); background: var(--me-tag-bg); border-radius: 4px; padding: 0 3px; }
-:where(.me-plain .cm-scroller) { font-family: var(--me-mono); }
+.me.me-plain .cm-editor .cm-scroller { font-family: var(--me-mono); }
+/* (preview mode: CodeMirror's own sheet keeps its editor shown, hidden attribute or not) */
+.me.me-previewing .cm-editor { display: none !important; }
 `;
+
+/** The look of CodeMirror's own elements: given as an editor theme, which outranks CodeMirror's base sheet (a `:where` rule would not). */
+export const CM_THEME: Record<string, Record<string, string>> = {
+  "&": { backgroundColor: "var(--me-bg)", color: "var(--me-fg)", height: "100%" },
+  "&.cm-focused": { outline: "none" },
+  ".cm-scroller": { fontFamily: "var(--me-font)", lineHeight: "var(--me-line-height)", padding: "var(--me-pad) 0" },
+  ".cm-content": { maxWidth: "var(--me-width)", margin: "0 auto", padding: "0 var(--me-pad)", caretColor: "var(--me-fg)", width: "100%", boxSizing: "border-box" },
+  ".cm-line": { padding: "0" },
+  ".cm-cursor, .cm-dropCursor": { borderLeftColor: "var(--me-fg)" },
+  "&.cm-focused > .cm-scroller > .cm-selectionLayer .cm-selectionBackground, .cm-selectionBackground, .cm-content ::selection": { backgroundColor: "var(--me-select)" },
+  ".cm-activeLine": { backgroundColor: "transparent" },
+  ".cm-panels": { backgroundColor: "var(--me-bg)", color: "var(--me-fg)", borderColor: "var(--me-line)" },
+  ".cm-panels-top": { borderBottom: "1px solid var(--me-line)" },
+  ".cm-panel.cm-search": { padding: "var(--me-gap)", fontFamily: "var(--me-font)" },
+  ".cm-panel input, .cm-panel button": { font: "inherit", color: "var(--me-fg)", backgroundColor: "var(--me-code-bg)", backgroundImage: "none", border: "1px solid var(--me-line)", borderRadius: "var(--me-radius)" },
+  ".cm-searchMatch": { backgroundColor: "var(--me-mark-bg)" },
+  ".cm-tooltip": { backgroundColor: "var(--me-bg)", color: "var(--me-fg)", border: "1px solid var(--me-line)", borderRadius: "var(--me-radius)" },
+  ".cm-tooltip-autocomplete > ul > li": { padding: "2px var(--me-gap)" },
+  ".cm-tooltip-autocomplete > ul > li[aria-selected]": { backgroundColor: "var(--me-select)", color: "var(--me-fg)" },
+  ".cm-completionDetail": { color: "var(--me-faint)", fontStyle: "normal", marginLeft: "var(--me-gap)" },
+  ".cm-placeholder": { color: "var(--me-faint)" },
+};
 
 let injected = false;
 /** Add the stylesheet to the document once. */
