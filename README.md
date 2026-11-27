@@ -2436,7 +2436,7 @@ See what the app is doing: zoom, frame times and memory, with Information shown 
 
 ### Settings
 
-Open Settings with the gear button: it opens over the workspace, which stays in sight behind it (`Esc` or **Back to canvas** closes it). Each setting says what it is on one line; **More** under it has the whole explanation, and the search box finds words in both. Each says where it is kept, at the end of its row: *This device* or *This workspace*. On a wide screen a tab's cards sit in two columns. Settings can be reset one by one (the undo-arrow icon at the end of a row) or together. Every group has an icon in the list on the left, and the groups are indented under their heading. All of them travel in a workspace backup (see [Backups](#backups)).
+Open Settings with the gear button: it opens over the workspace, which stays in sight behind it (`Esc` or its **×** closes it). Each setting says what it is on one line; **More** under it has the whole explanation, and the search box finds words in both. Each says where it is kept, at the end of its row: *This device* or *This workspace*. On a wide screen a tab's cards sit in two columns. Settings can be reset one by one (the undo-arrow icon at the end of a row) or together. Every group has an icon in the list on the left, and the groups are indented under their heading. All of them travel in a workspace backup (see [Backups](#backups)).
 
 Make the app yours: theme, theme colour, density and the canvas.
 

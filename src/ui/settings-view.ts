@@ -115,13 +115,13 @@ function cardsOf(rows: readonly Row[]): Array<{ title: string; rows: Row[] }> {
 
 /** The tabs in the sidebar, in groups. */
 /** The icon of each tab (Screenshot shares the camera of the Screenshot button). */
-const TAB_ICON: Record<string, keyof typeof ICONS> = { drawing: "tabDrawing", navigation: "tabNavigation", shortcuts: "tabShortcuts", media: "tabMedia", library: "tabLibrary", notes: "tabNotes", saving: "tabSaving", screenshot: "camera", appearance: "tabAppearance", panels: "tabPanels", performance: "tabPerformance", storage: "tabStorage", sharing: "tabSharing", privacy: "tabPrivacy", agents: "tabAgents", about: "tabAbout", develop: "tabDevelop", photocraft: "photoCraft" };
+const TAB_ICON: Record<string, keyof typeof ICONS> = { drawing: "tabDrawing", navigation: "tabNavigation", shortcuts: "tabShortcuts", media: "tabMedia", library: "tabLibrary", notes: "tabNotes", saving: "tabSaving", screenshot: "camera", appearance: "tabAppearance", workspace: "panelLeft", panels: "tabPanels", performance: "tabPerformance", storage: "tabStorage", sharing: "tabSharing", privacy: "tabPrivacy", agents: "tabAgents", about: "tabAbout", develop: "tabDevelop", photocraft: "photoCraft" };
 
 const TAB_GROUPS: ReadonlyArray<readonly [title: string, ids: readonly string[]]> = [
   ["Working", ["drawing", "navigation", "shortcuts"]],
   ["Library", ["notes", "saving"]],
   ["Media", ["media", "screenshot"]],
-  ["Interface", ["appearance", "performance"]],
+  ["Interface", ["appearance", "workspace", "performance"]],
   // (ArtCraft's tools, each a tab: PhotoCraft today)
   ["ArtCraft", ["photocraft"]],
   ["App", ["storage", "sharing", "privacy", "agents", "about", "develop"]],
@@ -539,7 +539,7 @@ export function mountSettingsView(root: HTMLElement, settings: SettingsStore, ke
   }).join("");
   root.innerHTML = `<div class="set-head"><h1 class="set-title">Settings</h1>
     <div class="set-searchbox">${ICONS.search}<input type="search" class="set-search" data-testid="settings-search" placeholder="Search settings" aria-label="Search settings" title="Search settings (press / to start)" autocomplete="off" spellcheck="false"><button type="button" class="cs-clear" data-search-clear aria-label="Clear the search" title="Clear the search" hidden>${ICONS.x}</button></div>
-    <button type="button" class="set-done" data-done>Back to canvas</button></div>
+    <button type="button" class="layer-btn set-close" data-done data-testid="settings-close" aria-label="Close Settings" title="Close (Esc)">${ICONS.x}</button></div>
     <div class="set-body"><div class="set-tabs" role="tablist" aria-label="Settings" aria-orientation="vertical" data-view-state>${tabsHtml}</div><div class="set-panels">${panelsHtml}<p class="set-none" data-testid="settings-none" role="status" hidden></p></div></div>`;
 
   const tabs = [...root.querySelectorAll<HTMLButtonElement>('[role="tab"]')];

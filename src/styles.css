@@ -2725,7 +2725,7 @@ dialog.rename-dialog { width: min(var(--dlg-l), calc(100vw - 2 * var(--edge))); 
 /* ---- Settings, brought in line with the library and the details (ADR 0092): the same panels, rows, buttons and fields, from the tokens ---- */
 .set-head { align-items: center; }
 .set-title { font-size: var(--text-4xl); font-weight: var(--weight-semibold); }
-/* "Back to canvas" and Reset are the shared button (see .assets-btn). */
+/* Reset is the shared button (see .assets-btn). */
 .set-done, .set-reset { display: inline-flex; align-items: center; justify-content: center; gap: var(--s-4); min-height: var(--ctl); padding: 0 var(--s-6); font: var(--weight-medium) var(--text-md) var(--font-ui); color: inherit; background: var(--hud-bg); border: 1px solid var(--hud-border); border-radius: var(--r-md); cursor: pointer; }
 .set-done:hover, .set-reset:hover:not(:disabled) { background: var(--hud-hover); border-color: var(--hud-border); }
 .set-reset { height: auto; font-size: var(--text-md); }
@@ -3279,7 +3279,7 @@ dialog.reset-dialog h3 { margin: var(--s-6) 0 var(--s-4); font-size: var(--text-
 .action-row button { justify-self: stretch; }
 .action-row span { opacity: 0.8; font-size: var(--text-sm); }
 @media (max-width: 640px) { .action-row { grid-template-columns: 1fr; gap: var(--s-2); } }
-/* Settings: the buttons of the Storage and About cards look like the app's other buttons (the same as Reset every shortcut and Back to canvas). */
+/* Settings: the buttons of the Storage and About cards look like the app's other buttons (the same as Reset every shortcut). */
 #settings-view .action-row button, #settings-view .storage-actions button, #settings-view [data-persist] { display: inline-flex; align-items: center; justify-content: center; min-height: var(--ctl); padding: 0 var(--s-6); font: var(--weight-medium) var(--text-md) var(--font-ui); color: inherit; background: var(--hud-bg); border: 1px solid var(--hud-border); border-radius: var(--r-md); cursor: pointer; }
 #settings-view .action-row button[hidden], #settings-view .storage-actions button[hidden], #settings-view [data-persist][hidden] { display: none; }
 #settings-view .action-row button:hover:not(:disabled), #settings-view .storage-actions button:hover:not(:disabled), #settings-view [data-persist]:hover { background: var(--hud-hover); }

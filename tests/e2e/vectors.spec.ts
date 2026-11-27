@@ -1509,7 +1509,7 @@ test("the interface around the vector tools: the hint floats at the bottom (and 
   await p.getByTestId("view-settings").click();
   await p.getByRole("tab", { name: "Appearance" }).click();
   await p.locator('select[data-set="ui.hints"]').selectOption("off");
-  await p.getByRole("button", { name: /Back to canvas/ }).click();
+  await p.getByRole("button", { name: "Close Settings" }).click();
   await app.frame();
   await key(app, "u");
   await expect(hint).toBeHidden();

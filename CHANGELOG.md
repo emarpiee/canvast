@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.63.38 — Settings closes with ×; the app starts again (2026-11-27)
+
+- **Changed:** Settings closes with a **×** at its top right (or Esc), in place of *Back to canvas* (B39). ([Settings](README.md#settings))
+- **Fixed before release:** since 0.63.34 the app stopped part way through starting (the new *Workspace layout* tab of Settings had no place in its list), so the Library and Settings did not open and the desktop app did not start; the tab is in *Interface* now.
+
 ## 0.63.37 — The status bar along the bottom (2026-11-27)
 
 - **Changed:** the status bar is one strip along the whole bottom of the window, under the sidebars and the view, in every view: the canvas's information on a canvas, the Library's counts and view buttons in the Library, and with the Library beside the canvas, the one last clicked (B39). ([The interface](README.md#the-interface))

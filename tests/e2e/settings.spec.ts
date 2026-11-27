@@ -51,7 +51,7 @@ test("settings view: tabs, a row reaches the tools, reset, theme and reload (ADR
   const reset = panel.getByRole("button", { name: "Reset Pen to its default" });
   await expect(reset).toBeEnabled();
   expect(await p.evaluate(() => JSON.parse(localStorage.getItem("canvast.settings")!)["pen.kind"])).toBe("marker");
-  await panel.getByRole("button", { name: "Back to canvas" }).click();
+  await panel.getByRole("button", { name: "Close Settings" }).click();
   expect(await p.evaluate(() => window.__canvastDebug.appView())).toBe("canvas");
   await p.keyboard.press("p");
   await app.drag({ x: 400, y: 300 }, { x: 700, y: 360 }, 6);
@@ -66,13 +66,13 @@ test("settings view: tabs, a row reaches the tools, reset, theme and reload (ADR
   await panel.getByRole("tab", { name: "Appearance" }).click();
   await panel.getByLabel("Theme", { exact: true }).selectOption("dark");
   await expect(p.locator("html")).toHaveAttribute("data-theme", "dark");
-  await panel.getByRole("button", { name: "Back to canvas" }).click();
+  await panel.getByRole("button", { name: "Close Settings" }).click();
   await app.frame();
   const bg = async () => (await p.evaluate(() => window.__canvastDebug.pixelAt(6, 6))).join(",");
   const dark = await bg();
   await view.click();
   await panel.getByLabel("Theme", { exact: true }).selectOption("light");
-  await panel.getByRole("button", { name: "Back to canvas" }).click();
+  await panel.getByRole("button", { name: "Close Settings" }).click();
   await app.frame();
   expect(await bg(), "the canvas background follows the theme").not.toBe(dark);
   await view.click();
@@ -146,7 +146,7 @@ test("shortcuts: every key can be changed, to a key or a chord, with warnings; t
   await change("Pen").click();
   await p.mouse.click(5, 5); // the focus leaves the panel
   await expect(waiting).toHaveCount(0);
-  await panel.getByRole("button", { name: "Back to canvas" }).click();
+  await panel.getByRole("button", { name: "Close Settings" }).click();
   await expect(p.getByRole("radio", { name: "Pen" })).toHaveAttribute("title", "Pen (Y)");
   // The tool tooltips belong to the tool buttons only; the canvas (which also carries the current tool) has none.
   await expect(p.locator("#canvas")).not.toHaveAttribute("title", /.+/);
@@ -182,7 +182,7 @@ test("shortcuts: every key can be changed, to a key or a chord, with warnings; t
   await p.keyboard.press("?");
   await panel.getByRole("button", { name: "Reset every shortcut" }).click();
   await expect(panel.locator('[data-key-row="tool.pen"] kbd')).toHaveText("P");
-  await panel.getByRole("button", { name: "Back to canvas" }).click();
+  await panel.getByRole("button", { name: "Close Settings" }).click();
   await p.keyboard.press("v");
   await p.keyboard.press("p");
   expect(await tool()).toBe("pen");
