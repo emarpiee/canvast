@@ -1227,7 +1227,7 @@ input[type="radio"]:checked::before { content: ""; width: var(--sp-3); height: v
 /* The panels' buttons: a column on the right edge, as the tools' rail is on the left, under the Settings button in the corner (only the view
    buttons are in the top corners). The panels docked on the right open beside it; a short window scrolls it, clear of the bottom-right bar. */
 #toolbar > .dock > .tb-group { flex-direction: column; gap: var(--s-2); }
-#toolbar > .dock { flex-direction: column; gap: var(--s-2); top: calc((var(--edge) + var(--bar-h) + var(--near)) / var(--ui-scale, 1)); right: calc(var(--edge) / var(--ui-scale, 1)); max-height: calc(100dvh - (2 * var(--edge) + var(--bar-h) + 2 * var(--near) + var(--hud-bottom-h, var(--bar-h))) / var(--ui-scale, 1)); overflow-y: auto; scrollbar-width: none; }
+#toolbar > .dock { flex-direction: column; gap: var(--s-2); top: calc((var(--edge) + var(--bar-h) + var(--near)) / var(--ui-scale, 1)); right: calc((var(--shell-r) + var(--edge)) / var(--ui-scale, 1)); max-height: calc(100dvh - (2 * var(--edge) + var(--bar-h) + 2 * var(--near) + var(--hud-bottom-h, var(--bar-h))) / var(--ui-scale, 1)); overflow-y: auto; scrollbar-width: none; }
 /* Settings: a button of its own in the top-right corner of every view. */
 .view-settings { position: fixed; pointer-events: auto; top: calc(var(--shell-t) + var(--edge)); right: calc(var(--shell-r) / var(--ui-scale, 1) + var(--edge)); z-index: var(--z-edge); zoom: var(--ui-scale, 1); display: flex; gap: var(--s-4); }
 /* The AI agent beside it (ADR 0205): shown while Settings > AI agents is on; its dot says whether one is connected. The bars keep clear of both. */

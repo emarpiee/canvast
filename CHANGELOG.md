@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.63.30 — The panels' buttons beside the right sidebar (2026-11-27)
+
+- **Fixed before release:** with the panels' buttons shown (the layout the tests use), an open right sidebar no longer covers them (B39).
+
 ## 0.63.29 — Sidebar widths, sidebars over a narrow view (2026-11-27)
 
 - **Added:** a sidebar's inner edge drags it wider or narrower (left 200–480 px, right 220–480 px; the arrow keys, a double-click resets), kept on this device; in a narrow window a sidebar comes over the view from the tab strip's buttons and goes after a pick, a click outside or Esc (B39). ([The interface](README.md#the-interface))
