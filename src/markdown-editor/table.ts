@@ -203,11 +203,12 @@ class TableWidget extends WidgetType {
       range = keep;
     });
     const cellOf = (t: EventTarget | null): HTMLElement | null => (t instanceof Element ? t.closest<HTMLElement>(".me-cell") : null);
-    // view-state: (a press on a cell edits it; dragged on to other cells, or with Shift, it selects cells instead)
+    // view-state: (a press on a cell edits it; dragged on to other cells, or with Shift, it selects cells instead; presses in the cell being
+    // edited are its editor's own. Not ".cm-editor": the whole table is inside the note's editor, which is one too)
     // (mousedown, not pointerdown: only cancelling mousedown keeps the browser from starting a text selection of its own in the drawn table)
     table.addEventListener("mousedown", (e) => {
       const cell = cellOf(e.target);
-      if (!cell || e.button !== 0 || (e.target as HTMLElement).closest(".me-col-resize, .cm-editor")) return;
+      if (!cell || e.button !== 0 || (e.target as HTMLElement).closest(".me-col-resize, .me-cell.is-editing")) return;
       const r = Number(cell.dataset["r"]), c = Number(cell.dataset["c"]);
       if (e.shiftKey && (editing || range)) {
         e.preventDefault();
