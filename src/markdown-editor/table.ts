@@ -87,6 +87,38 @@ export function cellSpans(line: string): Array<[number, number]> {
 }
 
 /**
+ * Where each cell's text is on a row's line, as a cell's editor edits it: [from, to) with one space of padding left out each side (spaces
+ * typed at its ends stay its own), so what is typed goes back exactly.
+ */
+export function cellRegions(line: string): Array<[number, number]> {
+  const out: Array<[number, number]> = [];
+  const first = line.search(/[^\s>]/);
+  if (first < 0) return out;
+  const piped = line[first] === "|";
+  let start = piped ? first + 1 : first, code = false;
+  const push = (from: number, to: number): void => {
+    const a = line[from] === " " && from < to ? from + 1 : from;
+    const b = to > a && line[to - 1] === " " ? to - 1 : to;
+    out.push([a, Math.max(a, b)]);
+  };
+  for (let i = start; i < line.length; i++) {
+    const c = line[i]!;
+    if (c === "\\" && line[i + 1] === "|") i++;
+    else if (c === "`") code = !code;
+    else if (c === "|" && !code) {
+      push(start, i);
+      start = i + 1;
+    }
+  }
+  if (line.slice(start).trim() || !/(?<!\\)\|\s*$/.test(line)) push(start, line.length);
+  return out;
+}
+
+/** A cell's text in the file and in its editor: the editor's lines are the file's `<br>`. */
+const toEditor = (raw: string): string => raw.replace(/<br\s*\/?>/gi, "\n");
+const toFile = (text: string): string => text.replace(/\r?\n/g, "<br>");
+
+/**
  * One drawn table. It stays on the page while the note changes (`update`), so a cell being edited keeps its editor: the cell's editor is a
  * window onto that cell's words in the note, its every change written there at once (`ctx.cellEditor`), so the note keeps one document and
  * one history. The table's own actions (rows, columns, sort, widths) write the whole table back as one change.
@@ -127,7 +159,7 @@ class TableView {
           // (the cell's editor moves into the cell drawn again)
           cell.append(...(this.editingHost ? [...this.editingHost.childNodes] : []));
           this.editingHost = cell;
-          ed.ed.setText(this.mdAt(ed.row, ed.col));
+          ed.ed.setText(this.editorText(ed.row, ed.col));
           ed.ed.refocus();
         } else this.stopEditing();
       }
@@ -138,7 +170,7 @@ class TableView {
         const md = this.mdAt(r, c);
         // (the cell's own typing is in it already: its spaces at the ends, which the table's text trims, stay)
         if (this.editing?.row === r && this.editing.col === c) {
-          if (!this.writing) this.editing.ed.setText(md);
+          if (!this.writing) this.editing.ed.setText(this.editorText(r, c));
         } else if (this.cellAt(r, c)?.dataset["md"] !== md) this.drawCell(this.cellAt(r, c)!, md);
       }
     }
@@ -160,6 +192,8 @@ class TableView {
     // (a cell whose lines hold a list, a quote or a callout draws those blocks; words alone stay in the line)
     const blocks = md ? cellHtml(md, { html: true }) : null;
     cell.innerHTML = blocks !== null ? cleanHtml(blocks) : md ? cleanHtml(renderMarkdown(md, { html: true })).replace(/^<p>|<\/p>$/g, "") : "";
+    // (a wiki link that finds no note looks as it does in the note's words)
+    for (const link of cell.querySelectorAll<HTMLElement>("a[data-wiki]")) if (this.ctx.exists?.(link.dataset["wiki"]!) === false) link.classList.add("me-wikilink-broken");
     for (const img of cell.querySelectorAll("img")) img.replaceWith(mediaElement(this.ctx, img.getAttribute("data-embed") ?? img.getAttribute("src") ?? "", img.alt, img.hasAttribute("data-embed")));
   }
   /** A change from the cell being edited is being written into the note. */
@@ -167,13 +201,18 @@ class TableView {
   /** The element holding the cell's editor. */
   private editingHost: HTMLElement | null = null;
 
-  /** Where the cell's words are in the note now ([from, to)), or null when its row is short of it. */
+  /** Where the cell's text is in the note now ([from, to), cellRegions), or null when its row is short of it. */
   private spanOf(row: number, col: number): [number, number] | null {
     const doc = this.view.state.doc;
     const first = doc.lineAt(this.from).number;
     const line = doc.line(first + (row === 0 ? 0 : row + 1));
-    const span = cellSpans(line.text)[col];
+    const span = cellRegions(line.text)[col];
     return span ? [line.from + span[0], line.from + span[1]] : null;
+  }
+  /** The cell's text as its editor shows it. */
+  private editorText(row: number, col: number): string {
+    const span = this.spanOf(row, col);
+    return span ? toEditor(this.view.state.sliceDoc(...span)) : "";
   }
 
   /** Write the model back (one change: one undo step), then edit `next`. */
@@ -214,23 +253,26 @@ class TableView {
     cell.classList.add("is-editing");
     cell.parentElement!.classList.add("is-editing");
     this.editingHost = cell;
-    const ed = this.ctx.cellEditor(cell, this.view.state.sliceDoc(...this.spanOf(row, col)!), {
-      change: (changes, userEvent) => {
+    const ed = this.ctx.cellEditor(cell, this.editorText(row, col), {
+      change: (text, userEvent) => {
         const span = this.spanOf(row, col);
         if (!span) return;
-        const specs: { from: number; to: number; insert: string }[] = [];
-        changes.iterChanges((a, b, _c, _d, ins) => void specs.push({ from: span[0] + a, to: span[0] + b, insert: ins.toString() }));
-        // (an empty cell's words get a space each side, as tables are written)
-        const empty = span[0] === span[1];
-        const line = this.view.state.doc.lineAt(span[0]);
-        if (empty && specs.length) {
-          const before = this.view.state.sliceDoc(span[0] - 1, span[0]), after = this.view.state.sliceDoc(span[1], span[1] + 1);
-          if (before === "|") specs[0]!.insert = ` ${specs[0]!.insert}`;
-          if (after === "|" && line.to > span[1]) specs[specs.length - 1]!.insert += " ";
+        // (the cell's text written back over its place, as the smallest change: its lines as <br>)
+        const old = this.view.state.sliceDoc(...span);
+        let next = toFile(text);
+        if (old === next) return;
+        if (span[0] === span[1]) {
+          // (an empty cell written `||`: its words get a space each side, as tables are written)
+          if (this.view.state.sliceDoc(span[0] - 1, span[0]) === "|") next = ` ${next}`;
+          if (this.view.state.sliceDoc(span[1], span[1] + 1) === "|") next += " ";
         }
+        let a = 0;
+        while (a < old.length && a < next.length && old[a] === next[a]) a++;
+        let b = 0;
+        while (b < old.length - a && b < next.length - a && old[old.length - 1 - b] === next[next.length - 1 - b]) b++;
         this.writing = true;
         try {
-          this.view.dispatch({ changes: specs, userEvent });
+          this.view.dispatch({ changes: { from: span[0] + a, to: span[1] - b, insert: next.slice(a, next.length - b) }, userEvent });
         } finally {
           this.writing = false;
         }
@@ -330,13 +372,15 @@ class TableView {
     });
     const cellOf = (t: EventTarget | null): HTMLElement | null => (t instanceof Element ? t.closest<HTMLElement>(".me-cell") : null);
     // view-state: (a press on a cell edits it; dragged on to other cells, or with Shift, it selects cells instead; presses in the cell being
-    // edited are its editor's own. mousedown, not pointerdown: only that keeps the browser from a text selection of its own in the table)
+    // edited place its cursor. mousedown, not pointerdown: only that keeps the browser from a text selection of its own in the table)
     this.dom.addEventListener("mousedown", (e) => {
       const cell = cellOf(e.target);
-      if (!cell || e.button !== 0 || (e.target as HTMLElement).closest(".me-col-resize, .me-cell.is-editing")) return;
+      if (!cell || e.button !== 0 || (e.target as HTMLElement).closest(".me-col-resize")) return;
       const r = Number(cell.dataset["r"]), c = Number(cell.dataset["c"]);
-      e.preventDefault();
-      if (e.shiftKey && (this.editing || this.range)) {
+      // (in the cell being edited a press is its editor's, to place the cursor or select words; dragged out of it, it selects cells)
+      const inEditor = cell.classList.contains("is-editing");
+      if (!inEditor) e.preventDefault();
+      if (e.shiftKey && !inEditor && (this.editing || this.range)) {
         const from = this.range ? { r: this.range.r0, c: this.range.c0 } : { r: this.editing!.row, c: this.editing!.col };
         this.stopEditing();
         this.range = { r0: from.r, c0: from.c, r1: r, c1: c };
@@ -346,14 +390,16 @@ class TableView {
       }
       const start = { x: e.clientX, y: e.clientY };
       let dragged = false;
-      this.edit(r, c, start);
+      if (!inEditor) this.edit(r, c, start);
       const move = (ev: MouseEvent): void => {
         const over = cellOf(document.elementFromPoint(ev.clientX, ev.clientY));
-        if (!dragged && over === this.cellAt(r, c)) return void this.editing?.ed.extend({ x: ev.clientX, y: ev.clientY });
+        const same = !!over && Number(over.dataset["r"]) === r && Number(over.dataset["c"]) === c;
+        if (!dragged && (same || !over)) return void (!inEditor && same && this.editing?.ed.extend({ x: ev.clientX, y: ev.clientY }));
         if (!over) return;
         if (!dragged) {
           dragged = true;
           this.stopEditing();
+          getSelection()?.removeAllRanges();
         }
         this.range = { r0: r, c0: c, r1: Number(over.dataset["r"]), c1: Number(over.dataset["c"]) };
         this.paintRange();

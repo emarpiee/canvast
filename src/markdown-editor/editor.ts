@@ -21,6 +21,10 @@ import { livePreview, refresh, type CellEditor, type CellEvents, type LiveContex
 
 /** The toolbar formats that act on words (so on a table cell's too). */
 const INLINE_FORMATS = new Set(["bold", "italic", "strike", "highlight", "code", "link", "math"]);
+/** What a table cell's lines can be (what a cell draws as blocks): Turn into offers these there. */
+const CELL_BLOCKS: FormatName[] = ["paragraph", "bulletList", "orderedList", "taskList", "quote", "callout"];
+/** A list's line in a cell. */
+const CELL_LIST = /^\s*(?:[-*+]|\d{1,9}[.)])\s/;
 import { selectionBar } from "./selection-bar";
 import { renderMarkdown } from "./render";
 import { cleanHtml } from "./clean";
@@ -401,7 +405,7 @@ export function createMarkdownEditor(opts: EditorOptions): MarkdownEditor {
     // shortcut: no Vim keys in a table cell (its Escape and Enter move between cells); give cells Vim's modes if Vim users ask for them.
     if (opts.vim && !plain && !cell) out.unshift(Prec.highest(vim()));
     if (!plain) {
-      out.push(markdown({ base: markdownLanguage, extensions: EXTENSIONS, addKeymap: !cell }), markdownLook, selectionBar({ icons, labels: labels as unknown as Record<string, string>, turnInto: !cell }), autocompletion({ override: [complete], icons: false, activateOnTyping: true }));
+      out.push(markdown({ base: markdownLanguage, extensions: EXTENSIONS, addKeymap: !cell }), markdownLook, selectionBar({ icons, labels: labels as unknown as Record<string, string>, ...(cell ? { turnInto: CELL_BLOCKS } : {}) }), autocompletion({ override: [complete], icons: false, activateOnTyping: true }));
       if (host.codeSpans) out.push(codeColours(host.codeSpans));
     }
     return out;
@@ -446,8 +450,9 @@ export function createMarkdownEditor(opts: EditorOptions): MarkdownEditor {
           Prec.highest(keymap.of([
             { key: "Tab", run: () => (events.move("next"), true) },
             { key: "Shift-Tab", run: () => (events.move("prev"), true) },
-            { key: "Enter", run: () => (events.move("down"), true) },
-            { key: "Shift-Enter", run: (v) => (v.dispatch(v.state.replaceSelection("<br>"), { userEvent: "input" }), true) },
+            // (Enter on a list's line adds the next item, as in the note; elsewhere it goes down a row. Shift+Enter: a new line in the cell)
+            { key: "Enter", run: (v) => (CELL_LIST.test(v.state.doc.lineAt(v.state.selection.main.head).text) ? false : (events.move("down"), true)) },
+            { key: "Shift-Enter", run: (v) => (v.dispatch(v.state.replaceSelection("\n"), { scrollIntoView: true, userEvent: "input" }), true) },
             { key: "Escape", run: () => (events.move("out"), true) },
             { key: "Mod-z", preventDefault: true, run: () => (undo(view), true) },
             { key: "Mod-y", preventDefault: true, run: () => (redo(view), true) },
@@ -456,19 +461,19 @@ export function createMarkdownEditor(opts: EditorOptions): MarkdownEditor {
           ...editorSetup(true),
           mode === "live" ? livePreview({ ...liveCtx, inline: true }) : [],
           EditorView.theme({ ".cm-content": { padding: "0", maxWidth: "none" }, ".cm-scroller": { padding: "0" }, "&": { background: "transparent" } }),
-          // (a cell is one line of a table row: a typed or pasted | is written \|, a line break <br>)
+          // (a cell is in one line of a table row: a typed or pasted | is written \|; its own lines are the file's <br>)
           EditorState.transactionFilter.of((tr) => {
             if (!tr.docChanged || syncing) return tr;
             let fix = false;
-            tr.changes.iterChanges((_a, _b, _c, _d, ins) => void (fix ||= /(?<!\\)\||\n/.test(ins.toString())));
+            tr.changes.iterChanges((_a, _b, _c, _d, ins) => void (fix ||= /(?<!\\)\|/.test(ins.toString())));
             if (!fix) return tr;
             const specs: { from: number; to: number; insert: string }[] = [];
-            tr.changes.iterChanges((from, to, _c, _d, ins) => void specs.push({ from, to, insert: ins.toString().replace(/\r?\n/g, "<br>").replace(/(?<!\\)\|/g, "\\|") }));
+            tr.changes.iterChanges((from, to, _c, _d, ins) => void specs.push({ from, to, insert: ins.toString().replace(/(?<!\\)\|/g, "\\|") }));
             const changes = tr.startState.changes(specs);
             return { changes, selection: EditorSelection.cursor(changes.mapPos(tr.startState.selection.main.head, 1)), userEvent: tr.annotation(Transaction.userEvent) ?? "input" };
           }),
           EditorView.updateListener.of((u) => {
-            if (u.docChanged && !syncing) for (const tr of u.transactions) if (tr.docChanged) events.change(tr.changes, tr.annotation(Transaction.userEvent) ?? "input");
+            if (u.docChanged && !syncing) events.change(u.state.doc.toString(), u.transactions.map((t) => t.annotation(Transaction.userEvent)).find(Boolean) ?? "input");
             if (u.focusChanged) activeCell = u.view.hasFocus ? u.view : activeCell === u.view ? null : activeCell;
           }),
           EditorView.domEventHandlers({ blur: () => void setTimeout(() => !cellView.dom.isConnected || cellView.hasFocus || events.blur()) }),

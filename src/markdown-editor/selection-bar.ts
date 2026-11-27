@@ -7,8 +7,8 @@ import { COMMANDS, type FormatName } from "./commands";
 export interface SelectionBarOptions {
   icons: Readonly<Record<string, string>>;
   labels: Readonly<Record<string, string>>;
-  /** Offer Turn into (not in a table's cell, which holds words only). Default true. */
-  turnInto?: boolean;
+  /** What Turn into offers (a table cell: only what a cell can hold); false: no Turn into. Default: every block. */
+  turnInto?: readonly FormatName[] | false;
 }
 
 const INLINE: FormatName[] = ["bold", "italic", "strike", "highlight", "code", "link"];
@@ -39,7 +39,7 @@ function bar(opts: SelectionBarOptions): (view: EditorView) => { dom: HTMLElemen
     menu.setAttribute("role", "group");
     menu.setAttribute("aria-label", opts.labels["turnInto"] ?? "Turn into");
     menu.hidden = true;
-    for (const name of TURN_INTO) {
+    for (const name of opts.turnInto || TURN_INTO) {
       const item = btn(name, `${opts.icons[name] ?? ""}<span>${opts.labels[name] ?? name}</span>`, opts.labels[name] ?? name);
       item.className = "me-selbar-item";
       menu.append(item);

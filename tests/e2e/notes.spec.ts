@@ -172,7 +172,19 @@ test("a table cell is the note's own words: one selection, the note's keys, its 
   await expect.poll(() => text(p)).toContain("| **Ink pen** | lines |");
   await p.keyboard.press("Control+z");
   await expect.poll(() => text(p)).toContain("| Ink pen | lines |");
-  await p.keyboard.press("Control+Shift+z");
+  await p.keyboard.press("Control+y");
+  await expect.poll(() => text(p)).toContain("| **Ink pen** | lines |");
+  // Shift+Enter is a new line in the cell (the file keeps <br>, never shown); Enter on a list's line adds the next item.
+  await p.keyboard.press("End");
+  await p.keyboard.press("Shift+Enter");
+  await p.keyboard.type("- dip");
+  await p.keyboard.press("Enter");
+  await p.keyboard.type("pen");
+  await expect.poll(() => text(p)).toContain("| lines<br>- dip<br>- pen |");
+  await expect(cell(1).locator(".cm-line")).toHaveCount(3);
+  await p.keyboard.press("Control+z");
+  await p.keyboard.press("Control+z");
+  await p.keyboard.press("Control+z");
   await expect.poll(() => text(p)).toContain("| **Ink pen** | lines |");
   // A sort from a cell's menu, undone from a cell.
   await cell(0).click({ button: "right" });
@@ -1216,16 +1228,16 @@ test("lists in a callout and in a table cell are drawn as lists; Turn into keeps
   await p.keyboard.press("Home");
   await p.keyboard.press("Shift+ArrowDown");
   await p.keyboard.press("Shift+End");
-  await page(p).locator(".me-selbar .me-selbar-turn").click();
-  await page(p).locator('.me-selbar-item[data-me="codeBlock"]').click();
+  await note(p).locator(".me-selbar .me-selbar-turn").click();
+  await note(p).locator('.me-selbar-item[data-me="codeBlock"]').click();
   await expect.poll(() => text(p)).toContain("```\nlet a = 1;\nlet b = 2;\n```");
   // Turn into Table: one row per line.
   await page(p).locator(".cm-line", { hasText: /^Ink$/ }).click();
   await p.keyboard.press("Home");
   await p.keyboard.press("Shift+ArrowDown");
   await p.keyboard.press("Shift+End");
-  await page(p).locator(".me-selbar .me-selbar-turn").click();
-  await page(p).locator('.me-selbar-item[data-me="table"]').click();
+  await note(p).locator(".me-selbar .me-selbar-turn").click();
+  await note(p).locator('.me-selbar-item[data-me="table"]').click();
   await expect.poll(() => text(p)).toContain("| Column 1 |\n| --- |\n| Ink |\n| Paper |");
 });
 

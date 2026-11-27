@@ -80,3 +80,13 @@ describe("a table cell's lines", () => {
     expect(renderMarkdown("| a |\n| --- |\n| - x<br>- y |\n")).toContain("<td><ul><li>x</li><li>y</li></ul></td>");
   });
 });
+
+describe("a table cell's text as its editor edits it", () => {
+  it("leaves one space of padding out each side, keeps spaces typed at its ends, and an empty cell is a place", async () => {
+    const { cellRegions } = await import("../../src/markdown-editor/table");
+    const at = (line: string) => cellRegions(line).map(([a, b]) => line.slice(a, b));
+    expect(at("| Ink  | a<br>b |")).toEqual(["Ink ", "a<br>b"]);
+    expect(at("|  | x |")).toEqual(["", "x"]);
+    expect(cellRegions("||")).toEqual([[1, 1]]);
+  });
+});

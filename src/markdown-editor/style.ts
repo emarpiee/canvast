@@ -76,8 +76,8 @@ export const EDITOR_CSS = `
 :where(.me-table) { padding: 4px 0; cursor: default; }
 :where(.me-table-box) { position: relative; display: inline-grid; grid-template-columns: minmax(0, auto) 14px; grid-template-rows: 12px auto 14px; gap: 2px; max-width: 100%; vertical-align: top; }
 :where(.me-table-scroll) { grid-column: 1; grid-row: 2; overflow-x: auto; border: 1px solid var(--me-line); border-radius: 6px; }
-:where(.me-table) table, :where(.me-preview) table { border-collapse: collapse; margin: 0; }
-:where(.me-preview) table { margin: 4px 0; }
+:where(.me-table) table, :where(.me-preview, .me-cell) table { border-collapse: collapse; margin: 0; }
+:where(.me-preview, .me-cell) table { margin: 4px 0; }
 :where(.me-table, .me-preview) :is(th, td) { border: 1px solid var(--me-line); padding: 8px 12px; min-width: 6em; height: 2.4em; box-sizing: border-box; text-align: left; vertical-align: top; }
 :where(.me-table) tr:first-child > * { border-top: 0; } :where(.me-table) tr:last-child > * { border-bottom: 0; }
 :where(.me-table) tr > :first-child { border-left: 0; } :where(.me-table) tr > :last-child { border-right: 0; }
@@ -129,11 +129,15 @@ export const EDITOR_CSS = `
 :where(.me-table) .me-cell :is(ul, ol) { margin: 0; padding-left: 1.4em; }
 :where(.me-table) .me-cell > :is(p, .callout):first-child { margin-top: 0; }
 :where(.me-table) .me-cell > :is(p, .callout):last-child { margin-bottom: 0; }
+:where(.me-table) .me-cell.is-editing { --me-pad: 0; --me-width: none; }
+:where(.me-table) .me-cell.is-editing ::selection { background: transparent; }
+:where(.me-table) .me-cell a { text-decoration: underline; text-decoration-color: color-mix(in oklch, var(--me-accent) 40%, transparent); text-underline-offset: 2px; }
+:where(.me-table) .me-cell a.me-wikilink-broken { color: var(--me-faint); text-decoration-style: dashed; text-decoration-color: var(--me-faint); }
 :where(.me-table) .me-cell { outline: none; min-height: 1.4em; cursor: text; user-select: none; }
 :where(.me-table) .me-cell.is-editing { user-select: text; }
 :where(.me-table) .me-cell.is-editing .cm-editor { background: transparent; }
 :where(.me-table) :is(th, td).is-editing { box-shadow: inset 0 0 0 2px color-mix(in oklch, var(--me-accent) 60%, transparent); }
-:where(.me-table) .me-cell-selected { background: color-mix(in oklch, var(--me-accent) 18%, transparent); }
+:where(.me-table) .me-cell-selected { background: color-mix(in oklch, var(--me-accent) 14%, transparent); box-shadow: inset 0 0 0 1px color-mix(in oklch, var(--me-accent) 70%, transparent); }
 :where(.me-table:focus) { outline: none; }
 :where(.me-table) th { position: relative; }
 :where(.me-col-resize) { position: absolute; top: 0; right: -3px; bottom: 0; width: 6px; cursor: col-resize; z-index: 1; }
@@ -148,9 +152,9 @@ export const EDITOR_CSS = `
 :where(.me) .me-math { cursor: pointer; }
 :where(.me) .me-math-block { display: block; text-align: center; padding: 6px 0; overflow-x: auto; }
 :where(.me) .me-math-error { color: var(--me-red); font-family: var(--me-mono); font-size: 0.9em; }
-:where(.me) .me-diagram, :where(.me-preview) .me-diagram { display: block; text-align: center; padding: 8px 0; overflow-x: auto; cursor: pointer; }
-:where(.me) .me-diagram svg, :where(.me-preview) .me-diagram svg { max-width: 100%; height: auto; }
-:where(.me-preview) .math-block { display: block; text-align: center; margin: 0.6em 0; overflow-x: auto; }
+:where(.me) .me-diagram, :where(.me-preview, .me-cell) .me-diagram { display: block; text-align: center; padding: 8px 0; overflow-x: auto; cursor: pointer; }
+:where(.me) .me-diagram svg, :where(.me-preview, .me-cell) .me-diagram svg { max-width: 100%; height: auto; }
+:where(.me-preview, .me-cell) .math-block { display: block; text-align: center; margin: 0.6em 0; overflow-x: auto; }
 /* the link popover */
 :where(.me-link-pop) { position: fixed; z-index: 1000; display: flex; flex-direction: column; width: min(30rem, calc(100vw - 16px)); max-height: min(22rem, 60vh); background: var(--me-bg); color: var(--me-fg); border: 1px solid var(--me-line); border-radius: 8px; box-shadow: 0 10px 30px color-mix(in oklch, var(--me-fg) 22%, transparent); overflow: hidden; font-family: var(--me-font); }
 :where(.me-link-pop-head) { display: flex; align-items: center; gap: 8px; padding: 6px 10px; border-bottom: 1px solid var(--me-line); font-size: 13px; }
@@ -176,19 +180,19 @@ export const EDITOR_CSS = `
 /* preview mode */
 :where(.me-preview) { position: absolute; inset: 0; overflow: auto; padding: var(--me-pad) 0; line-height: var(--me-line-height); background: var(--me-bg); color: var(--me-fg); }
 :where(.me-preview > .me-page) { max-width: var(--me-width); margin: 0 auto; padding: 0 var(--me-pad); }
-:where(.me-preview) :is(h1, h2, h3, h4, h5, h6) { line-height: 1.3; margin: 1em 0 0.4em; }
-:where(.me-preview) h1 { font-size: var(--me-h1); } :where(.me-preview) h2 { font-size: var(--me-h2); } :where(.me-preview) h3 { font-size: var(--me-h3); }
-:where(.me-preview) a { color: var(--me-accent); cursor: pointer; }
-:where(.me-preview) code { font-family: var(--me-mono); font-size: 0.9em; background: var(--me-code-bg); border-radius: 3px; padding: 0 2px; }
-:where(.me-preview) pre { background: var(--me-code-bg); border-radius: var(--me-radius); padding: 10px 12px; overflow-x: auto; }
-:where(.me-preview) pre code { background: none; padding: 0; }
-:where(.me-preview) blockquote { border-left: 3px solid var(--me-line); margin: 0.6em 0; padding-left: 12px; color: var(--me-muted); }
-:where(.me-preview) mark { background: var(--me-mark-bg); color: var(--me-mark-fg); }
-:where(.me-preview) img, :where(.me-preview) video { max-width: 100%; height: auto; border-radius: var(--me-radius); }
-:where(.me-preview) li.task { list-style: none; margin-left: -1.3em; }
-:where(.me-preview) li.task > input { margin-right: 0.4em; cursor: pointer; }
-:where(.me-preview) li.done { color: var(--me-faint); text-decoration: line-through; }
-:where(.me-preview) hr { border: 0; border-top: 1px solid var(--me-line); }
+:where(.me-preview, .me-cell) :is(h1, h2, h3, h4, h5, h6) { line-height: 1.3; margin: 1em 0 0.4em; }
+:where(.me-preview, .me-cell) h1 { font-size: var(--me-h1); } :where(.me-preview, .me-cell) h2 { font-size: var(--me-h2); } :where(.me-preview, .me-cell) h3 { font-size: var(--me-h3); }
+:where(.me-preview, .me-cell) a { color: var(--me-accent); cursor: pointer; }
+:where(.me-preview, .me-cell) code { font-family: var(--me-mono); font-size: 0.9em; background: var(--me-code-bg); border-radius: 3px; padding: 0 2px; }
+:where(.me-preview, .me-cell) pre { background: var(--me-code-bg); border-radius: var(--me-radius); padding: 10px 12px; overflow-x: auto; }
+:where(.me-preview, .me-cell) pre code { background: none; padding: 0; }
+:where(.me-preview, .me-cell) blockquote { border-left: 3px solid var(--me-line); margin: 0.6em 0; padding-left: 12px; color: var(--me-muted); }
+:where(.me-preview, .me-cell) mark { background: var(--me-mark-bg); color: var(--me-mark-fg); }
+:where(.me-preview, .me-cell) img, :where(.me-preview, .me-cell) video { max-width: 100%; height: auto; border-radius: var(--me-radius); }
+:where(.me-preview, .me-cell) li.task { list-style: none; margin-left: -1.3em; }
+:where(.me-preview, .me-cell) li.task > input { margin-right: 0.4em; cursor: pointer; }
+:where(.me-preview, .me-cell) li.done { color: var(--me-faint); text-decoration: line-through; }
+:where(.me-preview, .me-cell) hr { border: 0; border-top: 1px solid var(--me-line); }
 :where(.me-preview, .me-table) .callout { --me-callout: var(--me-blue); margin: 0.8em 0; padding: 8px 14px; border: 1px solid color-mix(in oklch, var(--me-callout) 35%, transparent); border-radius: 8px; background: color-mix(in oklch, var(--me-callout) 8%, transparent); }
 :where(.me-preview, .me-table) .callout-title { font-weight: 600; color: var(--me-callout); }
 :where(.me-preview, .me-table) .callout > p { margin: 0.3em 0; }
@@ -197,14 +201,14 @@ export const EDITOR_CSS = `
 :where(.me-preview, .me-table) .callout:is([data-callout="warning"], [data-callout="warn"], [data-callout="caution"], [data-callout="attention"]) { --me-callout: var(--me-yellow); }
 :where(.me-preview, .me-table) .callout:is([data-callout="danger"], [data-callout="error"], [data-callout="bug"], [data-callout="failure"], [data-callout="fail"], [data-callout="missing"]) { --me-callout: var(--me-red); }
 :where(.me-preview, .me-table) .callout:is([data-callout="quote"], [data-callout="cite"]) { --me-callout: var(--me-grey); }
-:where(.me-preview) .task-state { display: inline-block; width: 1em; height: 1em; margin-right: 0.3em; border: 1.5px solid var(--me-line); border-radius: 4px; vertical-align: text-bottom; }
-:where(.me-preview) .task-progress { background: linear-gradient(90deg, var(--me-accent) 50%, transparent 50%); border-color: var(--me-accent); }
-:where(.me-preview) li.cancelled { color: var(--me-faint); text-decoration: line-through; }
-:where(.me-preview) mark[class^="hl-"] { color: inherit; }
-:where(.me-preview) .hl-red { background: color-mix(in oklch, var(--me-red) 30%, transparent); } :where(.me-preview) .hl-blue { background: color-mix(in oklch, var(--me-blue) 30%, transparent); }
-:where(.me-preview) .hl-green { background: color-mix(in oklch, var(--me-green) 30%, transparent); } :where(.me-preview) .hl-purple { background: color-mix(in oklch, var(--me-purple) 30%, transparent); }
-:where(.me-preview) .hl-gray { background: color-mix(in oklch, var(--me-grey) 30%, transparent); }
-:where(.me-preview) .tag { color: var(--me-tag-fg); background: var(--me-tag-bg); border-radius: 4px; padding: 0 3px; }
+:where(.me-preview, .me-cell) .task-state { display: inline-block; width: 1em; height: 1em; margin-right: 0.3em; border: 1.5px solid var(--me-line); border-radius: 4px; vertical-align: text-bottom; }
+:where(.me-preview, .me-cell) .task-progress { background: linear-gradient(90deg, var(--me-accent) 50%, transparent 50%); border-color: var(--me-accent); }
+:where(.me-preview, .me-cell) li.cancelled { color: var(--me-faint); text-decoration: line-through; }
+:where(.me-preview, .me-cell) mark[class^="hl-"] { color: inherit; }
+:where(.me-preview, .me-cell) .hl-red { background: color-mix(in oklch, var(--me-red) 30%, transparent); } :where(.me-preview, .me-cell) .hl-blue { background: color-mix(in oklch, var(--me-blue) 30%, transparent); }
+:where(.me-preview, .me-cell) .hl-green { background: color-mix(in oklch, var(--me-green) 30%, transparent); } :where(.me-preview, .me-cell) .hl-purple { background: color-mix(in oklch, var(--me-purple) 30%, transparent); }
+:where(.me-preview, .me-cell) .hl-gray { background: color-mix(in oklch, var(--me-grey) 30%, transparent); }
+:where(.me-preview, .me-cell) .tag { color: var(--me-tag-fg); background: var(--me-tag-bg); border-radius: 4px; padding: 0 3px; }
 .me.me-plain .cm-editor .cm-scroller { font-family: var(--me-mono); }
 /* (preview mode: CodeMirror's own sheet keeps its editor shown, hidden attribute or not) */
 .me.me-previewing .cm-editor { display: none !important; }

@@ -3,7 +3,7 @@
 // highlights show theirs only where the selection touches them. Elsewhere marks are hidden and pictures, task boxes, rules, callouts,
 // code cards and tables are drawn. Source mode is the same editor without this layer.
 import { syntaxTree } from "@codemirror/language";
-import { StateEffect, StateField, type ChangeSet, type EditorState, type Extension, type Range } from "@codemirror/state";
+import { StateEffect, StateField, type EditorState, type Extension, type Range } from "@codemirror/state";
 import { Decoration, EditorView, ViewPlugin, WidgetType, type DecorationSet, type ViewUpdate } from "@codemirror/view";
 import type { SyntaxNode } from "@lezer/common";
 import { toggleTask } from "./behaviors/task-toggle";
@@ -48,8 +48,8 @@ export interface LiveContext {
 /** What a table cell's editor reports. */
 export interface CellEvents {
   move(to: "next" | "prev" | "down" | "out"): void;
-  /** The cell's words changed (positions in the cell's text): written into the note at the cell's place. */
-  change(changes: ChangeSet, userEvent: string): void;
+  /** The cell's text changed (its lines are the file's <br>): written into the note at the cell's place. */
+  change(text: string, userEvent: string): void;
   blur(): void;
 }
 
