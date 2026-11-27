@@ -5,7 +5,7 @@ import { pathToFileURL } from "node:url";
 import { chromium, firefox, test } from "@playwright/test";
 import type { Browser, BrowserContext, Page } from "@playwright/test";
 import { buildDir } from "./build-dir";
-import { exportWith, expect, outlineShapes, importMode } from "./harness";
+import { exportWith, expect, outlineShapes, importMode, legacyShell } from "./harness";
 import { makePng } from "./png";
 
 /**
@@ -36,11 +36,13 @@ async function cleanMachine(browser: Browser): Promise<Clean> {
   await context.addInitScript(() => {
     document.addEventListener("securitypolicyviolation", (e) => ((window as unknown as { __csp: string[] }).__csp ??= []).push(`${e.violatedDirective} ${e.blockedURI}`));
   });
+  await context.addInitScript(legacyShell); // (the specs' layout, as harness.ts)
   const page = await context.newPage();
   page.on("console", (m) => m.type() === "error" && problems.push(`console ${m.text()}`));
   page.on("pageerror", (e) => problems.push(`error ${e}`));
   await page.goto(pathToFileURL(file).href + "#debug");
   await page.waitForFunction(() => typeof window.__canvastDebug !== "undefined");
+  await page.evaluate(() => (window.__canvastDebug.setSetting("ui.sidebarLeft", false), window.__canvastDebug.setSetting("ui.sidebarRight", false)));
   await page.evaluate(() => window.__canvastDebug.nextFrame());
   return { context, page, dir, problems };
 }

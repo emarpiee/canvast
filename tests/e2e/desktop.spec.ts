@@ -9,7 +9,7 @@ import { createHash, scryptSync } from "node:crypto";
 import { buildDir } from "./build-dir";
 import { makeFakeMp4 } from "./mp4";
 import { makePng } from "./png";
-import { importMode, settingsRowProblems } from "./harness";
+import { importMode, legacyShell, settingsRowProblems } from "./harness";
 import { makeLock } from "../../src/assets/hidden-lock";
 import { readZip, writeZip } from "../../src/storage/zip";
 
@@ -28,6 +28,11 @@ async function launch(workspace: string, device = "userdata", /** Most of these 
   page.on("request", (r) => requests.push(r.url()));
   await page.waitForFunction(() => typeof window.__canvastDebug !== "undefined", null, { timeout: 30_000 });
   await page.evaluate(() => (window.__canvastDebug.setSetting("ui.properties", "bar"), window.__canvastDebug.setSetting("ui.groupNames", "bottom"))); // (as every spec: harness.ts)
+  // (the specs' layout, as harness.ts: the window loaded before an init script could run, so once more with it, the sidebars hidden)
+  await page.evaluate(() => (window.__canvastDebug.setSetting("ui.sidebarLeft", false), window.__canvastDebug.setSetting("ui.sidebarRight", false), window.__canvastDebug.setSetting("notes.panelMode", "panel")));
+  await app.context().addInitScript(legacyShell);
+  await page.reload();
+  await page.waitForFunction(() => typeof window.__canvastDebug !== "undefined", null, { timeout: 30_000 });
   if (!keepFiles) await page.evaluate(() => (window.__canvastDebug.setSetting("library.keepFileNames", false), window.__canvastDebug.setSetting("library.sortFiles", true)));
   return { app, page, requests };
 }

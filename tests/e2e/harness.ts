@@ -78,6 +78,16 @@ export function distance(a: { x: number; y: number }, b: { x: number; y: number 
   return Math.hypot(a.x - b.x, a.y - b.y);
 }
 
+/**
+ * The specs lay the app out as they were written, before the workspace (B39): no ribbon or tabs, the top-left buttons (`data-shell="legacy"`,
+ * an init script). shell.spec.ts sets `harness.shell` to test the workspace itself. An init script can run before the page has its <html>:
+ * it is marked as soon as the parser adds it, before the app's script runs.
+ */
+export function legacyShell(): void {
+  const mark = (): boolean => !!document.documentElement && ((document.documentElement.dataset["shell"] = "legacy"), true);
+  if (!sessionStorage.getItem("harness.shell") && !mark()) new MutationObserver((_, o) => mark() && o.disconnect()).observe(document, { childList: true });
+}
+
 export const test = base.extend<{ app: App }>({
   app: async ({ page }, use) => {
     const externalRequests: string[] = [];
@@ -93,10 +103,8 @@ export const test = base.extend<{ app: App }>({
     // selection, the app's own place since 0.58.27. Before the app, on the page's first load only: storage is never read or written on a reload,
     // where it could come before the last write of the page that is leaving and keep the old settings (Chromium), and a test's own settings,
     // written before a reload or cleared by Start from scratch, stay as they are. Only what is not set already.)
+    await page.addInitScript(legacyShell);
     await page.addInitScript(() => {
-      // (the specs lay the app out as they were written, before the workspace, B39: no ribbon or tabs, the top-left buttons; shell.spec.ts
-      // takes the attribute away to test the workspace itself)
-      if (!sessionStorage.getItem("harness.shell")) document.documentElement.dataset["shell"] = "legacy";
       try {
         if (sessionStorage.getItem("harness.barPlaces")) return;
         sessionStorage.setItem("harness.barPlaces", "1");
