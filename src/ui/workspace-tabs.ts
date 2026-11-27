@@ -21,6 +21,8 @@ export interface TabsDeps {
   valid(place: Place): boolean;
   /** Where the tabs are kept on this device (per workspace), or null to keep nothing. */
   storeKey(): string | null;
+  /** Opens the view's ⋯ menu (a canvas's: what its small stack leaves out), from the view header's button. */
+  openMenu(place: Place, anchor: HTMLElement): void;
 }
 
 export interface Tabs {
@@ -82,7 +84,8 @@ export function mountTabs(strip: HTMLElement, head: HTMLElement, deps: TabsDeps)
     head.innerHTML = `
       <button type="button" class="layer-btn" data-tabs="back" data-testid="tab-back" aria-label="Back" title="Back"${t.at > 0 ? "" : " disabled"}>${ICONS.arrowLeft}</button>
       <button type="button" class="layer-btn is-forward" data-tabs="forward" data-testid="tab-forward" aria-label="Forward" title="Forward"${t.at < t.history.length - 1 ? "" : " disabled"}>${ICONS.arrowLeft}</button>
-      <nav class="view-path" aria-label="Where this is" data-testid="view-path">${d.path.map((p, i) => `<span class="view-crumb${i === d.path.length - 1 ? " is-here" : ""}">${esc(p)}</span>`).join(`<span class="view-sep" aria-hidden="true">/</span>`)}</nav>`;
+      <nav class="view-path" aria-label="Where this is" data-testid="view-path">${d.path.map((p, i) => `<span class="view-crumb${i === d.path.length - 1 ? " is-here" : ""}">${esc(p)}</span>`).join(`<span class="view-sep" aria-hidden="true">/</span>`)}</nav>
+      ${placeOf(t).kind === "canvas" ? `<button type="button" class="layer-btn view-more" data-tabs="menu" data-testid="view-more" aria-haspopup="menu" aria-expanded="false" aria-label="More for this view" title="More: views, pattern, background, information, names, Zen">${ICONS.ellipsis}</button>` : ""}`;
   };
 
   const showActive = (): void => {
@@ -174,10 +177,11 @@ export function mountTabs(strip: HTMLElement, head: HTMLElement, deps: TabsDeps)
     else if (what === "right") void pressCommand("layout.rightSidebar");
     else if (what === "back") api.back(); // view-state: (the tab's own history)
     else if (what === "forward") api.forward(); // view-state: (the tab's own history)
+    else if (what === "menu") deps.openMenu(api.active, t.closest<HTMLElement>("[data-tabs]")!); // (each row of the menu runs its command)
   };
   // commands: tab.new, tab.close, layout.leftSidebar, layout.rightSidebar (through onClick)
   strip.addEventListener("click", onClick);
-  // commands: (Back and Forward through onClick: view state)
+  // commands: (Back and Forward through onClick: view state; the ⋯ menu's rows run theirs)
   head.addEventListener("click", onClick);
   // commands: tab.close (a middle click on a tab)
   strip.addEventListener("auxclick", (e) => {

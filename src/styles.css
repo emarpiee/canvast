@@ -3681,6 +3681,12 @@ button.archive-crumb:hover { background: var(--hud-hover); color: var(--hud-fg);
 .start-meta { color: var(--hud-muted); font: var(--font-meta); }
 /* (the ∞ pill and the Library button of the top left: the Files pane, the tabs and the ribbon took their place) */
 @media (min-width: 641px) { :root:not([data-shell="legacy"]) :is(#nav .nav-pill, #view-switch > .view-switch) { display: none; } }
+/* The canvas view's small stack (B39): zoom in and out, fit the selection, fit all, home; the rest are in the view header's ⋯ menu */
+@media (min-width: 641px) {
+  :root:not([data-shell="legacy"]) .hud-controls :is([data-action="pattern"], [data-action="background"], [data-action="info"], [data-action="names"], [data-action="zen"], [data-action="cam-back"], [data-action="random-view"], [data-action="cam-fwd"], .hud-sep) { display: none; }
+  :root:not([data-shell="legacy"]) .hud-bottom > .hud-controls { flex-direction: column; }
+  :root:not([data-shell="legacy"]) .hud-controls [data-action="zoom-in"] { order: -1; }
+}
 /* The tests' layout (tests/e2e/harness.ts sets data-shell="legacy"): the app as the specs were written, without the ribbon, the tabs and the
    view header, with the top-left buttons; the sidebars still hold the panels. */
 :root[data-shell="legacy"] { --shell-l: var(--side-l); --shell-t: 0px; }

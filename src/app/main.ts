@@ -52,7 +52,7 @@ import { pdfCardShape } from "../assets/pdf-engine";
 import { setFontCardLook } from "../assets/adapters";
 import { fileActionsOf, openOriginalInTab } from "../ui/file-actions";
 import { FrameStats } from "./frame-stats";
-import { mountHud } from "./hud";
+import { canvasViewMenu, mountHud } from "./hud";
 import { installDebugHook } from "./debug-hook";
 import { EditorState, copyToolOptions } from "./editor-state";
 import type { LayoutCommand } from "./actions";
@@ -2371,6 +2371,10 @@ async function start(): Promise<void> {
     },
     valid: (place) => place.kind !== "canvas" || !!session.tree?.boards.some((b) => b.canvases.some((c) => c.id === place.id)),
     storeKey: () => (session.tree ? `canvast.tabs.${session.tree.workspace.id}` : null),
+    openMenu: (place, anchor) => {
+      if (place.kind !== "canvas") return;
+      openMoreMenu(anchor, canvasViewMenu(anchor), "This canvas view", { keepOpen: true, refresh: () => canvasViewMenu(anchor) });
+    },
   });
   /** The app moved to a view by another way than the tabs: the active tab follows. */
   function followView(v: "canvas" | "assets"): void {

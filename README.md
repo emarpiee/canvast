@@ -2380,11 +2380,12 @@ Open a panel from its tab in a sidebar: Layers, Adjust, Tags, Styles and Pattern
 | **Sidebars** | Left and right of the view | Each holds panes, a tab for each at its top, and hides from its button (or *Left sidebar*, *Right sidebar* in the palette). Whether each shows, and which pane, is kept on this device; a narrow window keeps the whole width for the view |
 | **Status bar** | Bottom right | The zoom (click to type one), where the view is, whether the work is saved, and the counts: as wide as what it says |
 | **View buttons** | Top left | Three sets apart: **Library**; the canvas (its icon goes to it, its name opens the board and canvas menu); **PhotoCraft** (its tab, and its **×** while it runs). **Settings** is the gear at the bottom of the ribbon |
+| **Zoom stack** | The canvas's right edge | Zoom in and out, fit the selection, fit everything, and home. The view header's **⋯** holds the rest: previous, next and random view, the canvas pattern, its background colour (and back to the app's own), the information shown, object names and Zen mode. On a phone these stay one row of buttons |
 | **Tool rail** | Left | Undo and Redo, the tools (Import after Note), then Screenshot and Search |
 | **Properties bar** | By the selection, or at the top (the whole top row is its own) | The options of the tool or of what is selected, as named chips just above what is selected, each showing its first value; a chip opens its options as a short form, one named option a row; the menus it opens (Outline, Paragraph and box, Font, Columns and rows) are forms too, with switches for what is on or off. They never stand under the bars on the edges: just past or beside the one in the way. With nothing selected, or another tool picked, the chips stand at the top. On a small window the chips scroll sideways |
 | **Actions bar** | Bottom | What can be done with the selection, in named groups (Objects, Files, Adjust, Edit shapes, Arrange, Attach, Selection, Find), always in that order, some of them menus (Align, Arrange, Shapes, Masks, Path tools, Sheets, Export, Initial state) that list only what applies. The names of its groups show over the buttons. When wider than the window it shows a fade and an arrow; the mouse wheel scrolls it sideways |
 | **Panels** | Sidebar panes | Layers, Adjust, Tags, Styles and Pattern are panes of the right sidebar, Bookmarks of the left: choose one by its tab. A panel opened another way (its command, Adjust on the Actions bar) shows its pane and opens the sidebar. A file's panel still floats over the canvas; *Reset the panel layout* puts it back |
-| **Zen mode** | `Z`, or the leaf button | Fades the bars and panels until the pointer is over them |
+| **Zen mode** | `Z`, or the view header's ⋯ | Fades the bars and panels until the pointer is over them |
 | **Screenshot** | The camera button | Saves the selection, or the whole view, to the library. Settings choose the format, quality, name, folder and tags, and whether to include the canvas pattern and the interface, a transparent background, and a copy on the clipboard |
 | **Hint line** | Bottom | What the tool does, and what each key does over a handle |
 | **Notices** | Bottom right, above the status bar | Report results, often with a *View* button that opens what was made. They fade after a time that fits their length (an error stays to be read), and stack at the bottom right, never over it |
@@ -2420,7 +2421,7 @@ Reach what fits the object under the pointer with a right click.
 
 ### The info bar
 
-The status bar at the bottom right shows the zoom, position and save state; the bottom-right buttons cycle the canvas pattern (grid and others) and the object names (always, when selected, hidden). *Information shown* (the ⓘ button) switches between simple, more and technical.
+The status bar at the bottom right shows the zoom, position and save state; the view header's **⋯** cycles the canvas pattern (grid and others) and the object names (always, when selected, hidden), and *Information shown* switches between simple, more and technical.
 
 See what the app is doing: zoom, frame times and memory, with Information shown set to Technical.
 

@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.63.28 — The canvas's zoom stack and ⋯ menu (2026-11-27)
+
+- **Changed:** the canvas keeps a small stack at its right edge (zoom in and out, fit the selection, fit everything, home); previous, next and random view, the canvas pattern, background colour, information shown, object names and Zen mode move to the view header's ⋯ menu, each still its command (B39). ([The interface](README.md#the-interface))
+
+### For developers
+
+- The specs' layout (`data-shell="legacy"`) is set before the page has its `<html>` too; the desktop and release specs get it (`legacyShell` in the harness).
+
 ## 0.63.27 — The tests' layout (2026-11-27)
 
 ### For developers

@@ -14,6 +14,14 @@ import { commands, pressCommand, runCommand } from "../commands/registry";
 import { markCommands } from "../commands/from-bars";
 import type { Command } from "../commands/types";
 import { classWhen } from "../ui/class-when";
+import { closeMoreMenu } from "../ui/more-menu";
+import type { MenuItem } from "../ui/more-menu";
+
+/**
+ * The canvas view's ⋯ menu (B39, the view header's): what the small stack on the canvas leaves out (the views, the pattern, the background,
+ * the information shown, the names, Zen), each row its command. Set by mountHud; empty before it.
+ */
+export let canvasViewMenu: (anchor: HTMLElement) => MenuItem[] = () => [];
 
 /** Simple: zoom and whether it is saved, in plain words. More: adds position, objects and how smoothly it runs. Technical: the numbers. Hidden: nothing. */
 export type InfoMode = "simple" | "more" | "technical" | "hidden";
@@ -336,6 +344,21 @@ export function mountHud(root: HTMLElement, view: ViewState, stats: FrameStats, 
       onInput: (hex) => void pressCommand("canvas.setBackground", { colour: hex.slice(0, 7).toLowerCase() }),
     });
   });
+  canvasViewMenu = (anchor) => {
+    const p = status.pattern(), m = status.itemNames(), mode = status.infoMode();
+    const nextP = PATTERNS[(PATTERNS.indexOf(p) + 1) % PATTERNS.length]!, nextM = NAMES[(NAMES.indexOf(m) + 1) % NAMES.length]!, nextI = MODES[(MODES.indexOf(mode) + 1) % MODES.length]!;
+    return [
+      { label: "Previous view", hint: "Alt+Shift+Left", icon: ICONS.cornerUpLeft, command: "view.back", disabled: !status.canCameraBack(), run: () => void pressCommand("view.back") },
+      { label: "Next view", hint: "Alt+Shift+Right", icon: ICONS.cornerUpRight, command: "view.forward", disabled: !status.canCameraForward(), run: () => void pressCommand("view.forward") },
+      { label: "Random empty view", hint: "Far from everything on the canvas", icon: ICONS.dice5, command: "view.random", run: () => void pressCommand("view.random") },
+      { sep: true, label: `Canvas pattern: ${PATTERN_LABEL[p]}`, hint: `Click for ${PATTERN_LABEL[nextP]}`, icon: PATTERN_ICON[p], command: "canvas.setPattern", run: () => void pressCommand("canvas.setPattern", { pattern: nextP }) },
+      { label: "Background colour…", hint: "The canvas's own colour", icon: ICONS.paintBucket, command: "canvas.setBackground", run: () => (closeMoreMenu(), openColourPopover(anchor, { name: "Canvas background colour", value: status.background() || hexOfCss(getComputedStyle(document.body).backgroundColor), onInput: (hex) => void pressCommand("canvas.setBackground", { colour: hex.slice(0, 7).toLowerCase() }) })) },
+      { label: "The app's own background", hint: "Back to the theme's colour", icon: ICONS.paintBucket, command: "canvas.setBackground", disabled: !status.background(), run: () => void pressCommand("canvas.setBackground", { colour: "" }) },
+      { label: `Information shown: ${MODE_LABEL[mode]}`, hint: `Click for ${MODE_LABEL[nextI]}`, icon: ICONS.info, command: "view.setInfo", run: () => void pressCommand("view.setInfo", { mode: nextI }) },
+      { label: `Object names: ${NAMES_LABEL[m]}`, hint: `Click for ${NAMES_LABEL[nextM]}`, icon: NAMES_ICON[m], command: "view.setNames", run: () => void pressCommand("view.setNames", { names: nextM }) },
+      { label: "Zen mode", hint: "Fade the bars and panels out (Z)", icon: ICONS.leaf, command: "view.zen", run: () => void pressCommand("view.zen") },
+    ];
+  };
   // The names button: its icon, what it does now and what the next click does.
   const namesButton = root.querySelector<HTMLElement>('[data-action="names"]')!;
   const applyNames = (): void => {
