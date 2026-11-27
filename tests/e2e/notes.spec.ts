@@ -140,6 +140,12 @@ test("New note makes a markdown note in the open folder and opens it to write in
   await p.keyboard.type("Paper");
   await p.keyboard.press("Escape");
   await expect.poll(() => text(p)).toContain("| Ink | Paper |");
+  // A bracket typed over a cell's selected words goes round them, as in the note's text.
+  await page(p).locator(".me-table td .me-cell").first().click();
+  await p.keyboard.press("Control+a");
+  await p.keyboard.type("(");
+  await p.keyboard.press("Escape");
+  await expect.poll(() => text(p)).toContain("| (Ink) | Paper |");
 });
 
 test("a note's properties (YAML, as notes apps write them) are its item's tags, note and fields, both ways", async ({ app }) => {

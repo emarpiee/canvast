@@ -30,6 +30,8 @@ export interface LiveContext {
   renderMath?: (tex: string, display: boolean) => string;
   /** A diagram (a ```mermaid block) as SVG; absent, it stays code. */
   renderDiagram?: (code: string) => Promise<string>;
+  /** A pair's sign typed over selected words goes round them (Settings). */
+  wrapSelection?: boolean;
   /** The format bar over words selected in a table's cell (it calls `pick` with a format's name); returns what closes it. */
   formatBar?: (at: DOMRect, pick: (name: string) => void) => () => void;
   /** Whether a wiki link's target reaches anything (undefined: not known). */

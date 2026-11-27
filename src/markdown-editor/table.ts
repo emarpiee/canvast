@@ -9,6 +9,7 @@ import { mediaElement } from "./live";
 import { renderMarkdown } from "./render";
 import { cleanHtml } from "./clean";
 import { openPopover, type PopItem } from "./popover";
+import { WRAP_PAIRS } from "./commands";
 
 type Align = "left" | "center" | "right" | "";
 interface Model {
@@ -113,26 +114,38 @@ class TableWidget extends WidgetType {
         if (!sel?.rangeCount || sel.isCollapsed || !cell.contains(sel.anchorNode) || !cell.contains(sel.focusNode) || !this.ctx.formatBar) return;
         const range = sel.getRangeAt(0);
         closeBar = this.ctx.formatBar(range.getBoundingClientRect(), (name) => {
-          const before = document.createRange();
-          before.setStart(cell, 0);
-          before.setEnd(range.startContainer, range.startOffset);
-          const from = before.toString().length, words = range.toString(), all = cell.textContent ?? "";
           const marks: Record<string, [string, string]> = { bold: ["**", "**"], italic: ["*", "*"], strike: ["~~", "~~"], highlight: ["==", "=="], code: ["`", "`"], link: ["[", "]()"] };
           const [a, b] = marks[name] ?? ["", ""];
-          const wrapped = all.slice(from, from + words.length);
-          const off = all.slice(from - a.length, from) === a && all.slice(from + words.length, from + words.length + b.length) === b;
-          cell.textContent = off ? all.slice(0, from - a.length) + wrapped + all.slice(from + words.length + b.length) : all.slice(0, from) + a + wrapped + b + all.slice(from + words.length);
-          const start = off ? from - a.length : from + a.length;
-          const text = cell.firstChild;
-          if (text) {
-            const r = document.createRange();
-            r.setStart(text, start);
-            r.setEnd(text, start + wrapped.length);
-            getSelection()?.removeAllRanges();
-            getSelection()?.addRange(r);
-          }
+          wrapIn(a, b, true);
         });
       };
+      /** The selected words of the cell put between `a` and `b` (or taken out of them, when `toggle` and they are there), still selected. */
+      const wrapIn = (a: string, b: string, toggle: boolean): boolean => {
+        const sel = getSelection();
+        if (!sel?.rangeCount || sel.isCollapsed || !cell.contains(sel.anchorNode) || !cell.contains(sel.focusNode)) return false;
+        const range = sel.getRangeAt(0);
+        const before = document.createRange();
+        before.setStart(cell, 0);
+        before.setEnd(range.startContainer, range.startOffset);
+        const from = before.toString().length, words = range.toString(), all = cell.textContent ?? "";
+        const off = toggle && all.slice(from - a.length, from) === a && all.slice(from + words.length, from + words.length + b.length) === b;
+        cell.textContent = off ? all.slice(0, from - a.length) + words + all.slice(from + words.length + b.length) : all.slice(0, from) + a + words + b + all.slice(from + words.length);
+        const start = off ? from - a.length : from + a.length;
+        const text = cell.firstChild;
+        if (text) {
+          const r = document.createRange();
+          r.setStart(text, start);
+          r.setEnd(text, start + words.length);
+          sel.removeAllRanges();
+          sel.addRange(r);
+        }
+        return true;
+      };
+      // A pair's sign typed over selected words goes round them, as in the note's text (a second `*` makes them bold).
+      cell.addEventListener("beforeinput", (e) => {
+        const close = e.inputType === "insertText" && e.data ? WRAP_PAIRS[e.data] : undefined;
+        if (close && this.ctx.wrapSelection !== false && wrapIn(e.data!, close, false)) e.preventDefault();
+      });
       cell.addEventListener("focus", () => {
         cell.dataset["editing"] = "1";
         cell.textContent = (cell.dataset["md"] ?? "").replace(/\\\|/g, "|");

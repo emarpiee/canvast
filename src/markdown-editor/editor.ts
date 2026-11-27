@@ -245,6 +245,7 @@ export function createMarkdownEditor(opts: EditorOptions): MarkdownEditor {
           ...(host.media ? { media: host.media.bind(host) } : {}),
           ...(host.wikiExists ? { exists: host.wikiExists.bind(host) } : {}),
           ...(host.renderMath ? { renderMath: host.renderMath.bind(host) } : {}),
+          wrapSelection: opts.wrapSelection !== false,
           formatBar: (at: DOMRect, pick: (name: string) => void) => floatingBar({ icons, labels: labels as unknown as Record<string, string> }, at, pick as never, el),
           ...(host.renderDiagram ? { renderDiagram: host.renderDiagram.bind(host) } : {}),
           taskLabel: labels.task, copyLabel: labels.copyCode, copiedLabel: labels.copied, languageLabel: labels.codeLanguage, addRowLabel: labels.addRow, addColumnLabel: labels.addColumn,
