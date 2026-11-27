@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.63.34 — Settings over the workspace, its layout switches (2026-11-27)
+
+- **Changed:** Settings opens as a box over the workspace, which stays in sight behind it (B39). ([Settings](README.md#settings))
+- **Added:** *Settings › Workspace layout*: show or hide the ribbon, the tab bar, the status bar and each sidebar, kept on this device (B39). ([Settings](README.md#settings))
+
 ## 0.63.33 — Drag a tab beside the canvas (2026-11-27)
 
 - **Added:** a file's or the Library's tab dragged down onto the right half of the view opens beside the canvas; the half lights while it is over it (B39). ([The interface](README.md#the-interface))

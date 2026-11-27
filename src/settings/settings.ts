@@ -244,6 +244,9 @@ export const SETTINGS = {
   // The workspace (B39): whether each sidebar shows, and the pane it shows (per device, as a window's layout is)
   "ui.sidebarLeft": { scope: "device", default: true, validate: bool, effect: "immediate" } as Def<boolean>,
   "ui.sidebarRight": { scope: "device", default: true, validate: bool, effect: "immediate" } as Def<boolean>,
+  "ui.showRibbon": { scope: "device", default: true, validate: bool, effect: "immediate" } as Def<boolean>,
+  "ui.showTabs": { scope: "device", default: true, validate: bool, effect: "immediate" } as Def<boolean>,
+  "ui.showStatus": { scope: "device", default: true, validate: bool, effect: "immediate" } as Def<boolean>,
   "ui.sidebarLeftW": { scope: "device", default: 260, validate: range(200, 480), effect: "immediate" } as Def<number>,
   "ui.sidebarRightW": { scope: "device", default: 280, validate: range(220, 480), effect: "immediate" } as Def<number>,
   "ui.paneLeft": { scope: "device", default: "", validate: text(32), effect: "immediate" } as Def<string>,

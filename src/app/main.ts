@@ -413,6 +413,10 @@ async function start(): Promise<void> {
     // The workspace's sidebars (B39): shown or hidden, per device; the stylesheet gives the view the room between them
     root.dataset["left"] = settings.get("ui.sidebarLeft") ? "open" : "closed";
     root.dataset["right"] = settings.get("ui.sidebarRight") ? "open" : "closed";
+    // (the workspace's parts that can be hidden: Settings > Workspace layout)
+    root.dataset["ribbon"] = settings.get("ui.showRibbon") ? "on" : "off";
+    root.dataset["tabs"] = settings.get("ui.showTabs") ? "on" : "off";
+    root.dataset["status"] = settings.get("ui.showStatus") ? "on" : "off";
     root.style.setProperty("--sidebar-w", `${settings.get("ui.sidebarLeftW")}px`);
     root.style.setProperty("--sidebar-r-w", `${settings.get("ui.sidebarRightW")}px`);
     if (settings.get("ui.corners") === "sharp") root.dataset["corners"] = "sharp";
@@ -2280,7 +2284,7 @@ async function start(): Promise<void> {
   mountRibbon(document.getElementById("ribbon")!);
   const sidebarLeft = mountSidebar(document.getElementById("sidebar-left")!, { side: "left", label: "Left sidebar", toggleCommand: "layout.leftSidebar", widthKey: "ui.sidebarLeftW", settings, initial: settings.get("ui.paneLeft") || null, onShow: (id) => void settings.set("ui.paneLeft", id) });
   const sidebarRight = mountSidebar(document.getElementById("sidebar-right")!, { side: "right", label: "Right sidebar", toggleCommand: "layout.rightSidebar", widthKey: "ui.sidebarRightW", settings, initial: settings.get("ui.paneRight") || null, onShow: (id) => void settings.set("ui.paneRight", id) });
-  settings.subscribe((key) => (key === "ui.sidebarLeft" || key === "ui.sidebarRight" || key === "ui.sidebarLeftW" || key === "ui.sidebarRightW") && applyAppearance());
+  settings.subscribe((key) => (key === "ui.sidebarLeft" || key === "ui.sidebarRight" || key === "ui.sidebarLeftW" || key === "ui.sidebarRightW" || key === "ui.showRibbon" || key === "ui.showTabs" || key === "ui.showStatus") && applyAppearance());
   const sidebarCommand = (id: string, title: string, key: "ui.sidebarLeft" | "ui.sidebarRight"): Command => ({
     id, group: "Layout", kind: "settings", title, hint: "Show it or hide it", risk: "edit", words: "sidebar panel pane toggle show hide",
     why: () => null,
