@@ -7,6 +7,7 @@ import { Decoration, EditorView, WidgetType, type DecorationSet } from "@codemir
 import type { LiveContext } from "./live";
 import { mediaElement } from "./live";
 import { renderMarkdown } from "./render";
+import { cleanHtml } from "./clean";
 import { openPopover, type PopItem } from "./popover";
 
 type Align = "left" | "center" | "right" | "";
@@ -86,7 +87,7 @@ class TableWidget extends WidgetType {
     const read = (cell: HTMLElement): string => (cell.dataset["editing"] ? (cell.textContent ?? "").replace(/\|/g, "\\|") : cell.dataset["md"] ?? "");
     const drawCell = (cell: HTMLElement, md: string): void => {
       cell.dataset["md"] = md;
-      cell.innerHTML = md ? renderMarkdown(md).replace(/^<p>|<\/p>$/g, "") : "";
+      cell.innerHTML = md ? cleanHtml(renderMarkdown(md, { html: true })).replace(/^<p>|<\/p>$/g, "") : "";
       for (const img of cell.querySelectorAll("img")) img.replaceWith(mediaElement(this.ctx, img.getAttribute("data-embed") ?? img.getAttribute("src") ?? "", img.alt, img.hasAttribute("data-embed")));
     };
     const rowCount = model.rows.length + 1;
@@ -103,11 +104,44 @@ class TableWidget extends WidgetType {
       if (model.aligns[col]) box.style.textAlign = model.aligns[col]!;
       drawCell(cell, md);
       // typing: (a cell shows its Markdown while it is edited, and writes it back when left)
+      // Words selected in the cell: the format bar over them, its marks written round them in the cell's Markdown.
+      let closeBar: (() => void) | null = null;
+      const onSelection = (): void => {
+        closeBar?.();
+        closeBar = null;
+        const sel = getSelection();
+        if (!sel?.rangeCount || sel.isCollapsed || !cell.contains(sel.anchorNode) || !cell.contains(sel.focusNode) || !this.ctx.formatBar) return;
+        const range = sel.getRangeAt(0);
+        closeBar = this.ctx.formatBar(range.getBoundingClientRect(), (name) => {
+          const before = document.createRange();
+          before.setStart(cell, 0);
+          before.setEnd(range.startContainer, range.startOffset);
+          const from = before.toString().length, words = range.toString(), all = cell.textContent ?? "";
+          const marks: Record<string, [string, string]> = { bold: ["**", "**"], italic: ["*", "*"], strike: ["~~", "~~"], highlight: ["==", "=="], code: ["`", "`"], link: ["[", "]()"] };
+          const [a, b] = marks[name] ?? ["", ""];
+          const wrapped = all.slice(from, from + words.length);
+          const off = all.slice(from - a.length, from) === a && all.slice(from + words.length, from + words.length + b.length) === b;
+          cell.textContent = off ? all.slice(0, from - a.length) + wrapped + all.slice(from + words.length + b.length) : all.slice(0, from) + a + wrapped + b + all.slice(from + words.length);
+          const start = off ? from - a.length : from + a.length;
+          const text = cell.firstChild;
+          if (text) {
+            const r = document.createRange();
+            r.setStart(text, start);
+            r.setEnd(text, start + wrapped.length);
+            getSelection()?.removeAllRanges();
+            getSelection()?.addRange(r);
+          }
+        });
+      };
       cell.addEventListener("focus", () => {
         cell.dataset["editing"] = "1";
         cell.textContent = (cell.dataset["md"] ?? "").replace(/\\\|/g, "|");
+        document.addEventListener("selectionchange", onSelection);
       });
       cell.addEventListener("blur", () => {
+        document.removeEventListener("selectionchange", onSelection);
+        closeBar?.();
+        closeBar = null;
         const md = read(cell);
         delete cell.dataset["editing"];
         set(row, col, md);
@@ -165,25 +199,25 @@ class TableWidget extends WidgetType {
       const sort = (dir: 1 | -1): void => void model.rows.sort((a, b) => dir * (a[col] ?? "").localeCompare(b[col] ?? "", undefined, { numeric: true, sensitivity: "base" }));
       const align = (a: Align): void => void (model.aligns[col] = a);
       return [
-        { label: L.rowAbove, disabled: row === 0, pick: () => (model.rows.splice(body, 0, blank()), commit({ row, col })) },
-        { label: L.rowBelow, pick: () => (model.rows.splice(body + 1, 0, blank()), commit({ row: row + 1, col })) },
-        { label: L.colBefore, pick: () => (eachRow((r) => r.splice(col, 0, "")), model.aligns.splice(col, 0, ""), model.widths.splice(col, 0, null), commit({ row, col })) },
-        { label: L.colAfter, pick: () => (eachRow((r) => r.splice(col + 1, 0, "")), model.aligns.splice(col + 1, 0, ""), model.widths.splice(col + 1, 0, null), commit({ row, col: col + 1 })) },
-        { label: L.rowUp, sep: true, disabled: body <= 0, pick: () => ([model.rows[body - 1], model.rows[body]] = [model.rows[body]!, model.rows[body - 1]!], commit({ row: row - 1, col })) },
-        { label: L.rowDown, disabled: row === 0 || body >= last, pick: () => ([model.rows[body + 1], model.rows[body]] = [model.rows[body]!, model.rows[body + 1]!], commit({ row: row + 1, col })) },
-        { label: L.colLeft, disabled: col === 0, pick: () => (swapCols(col, col - 1), commit({ row, col: col - 1 })) },
-        { label: L.colRight, disabled: col >= cols - 1, pick: () => (swapCols(col, col + 1), commit({ row, col: col + 1 })) },
-        { label: L.dupRow, sep: true, disabled: row === 0, pick: () => (model.rows.splice(body + 1, 0, [...model.rows[body]!]), commit({ row: row + 1, col })) },
-        { label: L.dupCol, pick: () => (eachRow((r) => r.splice(col + 1, 0, r[col] ?? "")), model.aligns.splice(col + 1, 0, model.aligns[col] ?? ""), model.widths.splice(col + 1, 0, model.widths[col] ?? null), commit({ row, col: col + 1 })) },
-        { label: L.alignLeft, sep: true, on: model.aligns[col] === "left", pick: () => (align(model.aligns[col] === "left" ? "" : "left"), commit()) },
-        { label: L.alignCenter, on: model.aligns[col] === "center", pick: () => (align(model.aligns[col] === "center" ? "" : "center"), commit()) },
-        { label: L.alignRight, on: model.aligns[col] === "right", pick: () => (align(model.aligns[col] === "right" ? "" : "right"), commit()) },
-        { label: L.sortUp, sep: true, disabled: model.rows.length < 2, pick: () => (sort(1), commit()) },
-        { label: L.sortDown, disabled: model.rows.length < 2, pick: () => (sort(-1), commit()) },
-        { label: L.delRow, sep: true, disabled: row === 0, pick: () => (model.rows.splice(body, 1), commit()) },
-        { label: L.delCol, disabled: cols <= 1, pick: () => (eachRow((r) => r.splice(col, 1)), model.aligns.splice(col, 1), model.widths.splice(col, 1), commit()) },
-        { label: L.copy, sep: true, pick: () => void navigator.clipboard?.writeText(writeTable(model)).catch(() => undefined) },
-        { label: L.duplicate, pick: () => view.dispatch({ changes: { from: this.from + this.source.length, insert: `\n\n${writeTable(model)}` }, userEvent: "input.table" }) },
+        { id: "table.rowAbove", label: L.rowAbove, disabled: row === 0, pick: () => (model.rows.splice(body, 0, blank()), commit({ row, col })) },
+        { id: "table.rowBelow", label: L.rowBelow, pick: () => (model.rows.splice(body + 1, 0, blank()), commit({ row: row + 1, col })) },
+        { id: "table.colBefore", label: L.colBefore, pick: () => (eachRow((r) => r.splice(col, 0, "")), model.aligns.splice(col, 0, ""), model.widths.splice(col, 0, null), commit({ row, col })) },
+        { id: "table.colAfter", label: L.colAfter, pick: () => (eachRow((r) => r.splice(col + 1, 0, "")), model.aligns.splice(col + 1, 0, ""), model.widths.splice(col + 1, 0, null), commit({ row, col: col + 1 })) },
+        { id: "table.rowUp", label: L.rowUp, sep: true, disabled: body <= 0, pick: () => ([model.rows[body - 1], model.rows[body]] = [model.rows[body]!, model.rows[body - 1]!], commit({ row: row - 1, col })) },
+        { id: "table.rowDown", label: L.rowDown, disabled: row === 0 || body >= last, pick: () => ([model.rows[body + 1], model.rows[body]] = [model.rows[body]!, model.rows[body + 1]!], commit({ row: row + 1, col })) },
+        { id: "table.colLeft", label: L.colLeft, disabled: col === 0, pick: () => (swapCols(col, col - 1), commit({ row, col: col - 1 })) },
+        { id: "table.colRight", label: L.colRight, disabled: col >= cols - 1, pick: () => (swapCols(col, col + 1), commit({ row, col: col + 1 })) },
+        { id: "table.dupRow", label: L.dupRow, sep: true, disabled: row === 0, pick: () => (model.rows.splice(body + 1, 0, [...model.rows[body]!]), commit({ row: row + 1, col })) },
+        { id: "table.dupCol", label: L.dupCol, pick: () => (eachRow((r) => r.splice(col + 1, 0, r[col] ?? "")), model.aligns.splice(col + 1, 0, model.aligns[col] ?? ""), model.widths.splice(col + 1, 0, model.widths[col] ?? null), commit({ row, col: col + 1 })) },
+        { id: "table.alignLeft", label: L.alignLeft, sep: true, on: model.aligns[col] === "left", pick: () => (align(model.aligns[col] === "left" ? "" : "left"), commit()) },
+        { id: "table.alignCenter", label: L.alignCenter, on: model.aligns[col] === "center", pick: () => (align(model.aligns[col] === "center" ? "" : "center"), commit()) },
+        { id: "table.alignRight", label: L.alignRight, on: model.aligns[col] === "right", pick: () => (align(model.aligns[col] === "right" ? "" : "right"), commit()) },
+        { id: "table.sortUp", label: L.sortUp, sep: true, disabled: model.rows.length < 2, pick: () => (sort(1), commit()) },
+        { id: "table.sortDown", label: L.sortDown, disabled: model.rows.length < 2, pick: () => (sort(-1), commit()) },
+        { id: "table.delRow", label: L.delRow, sep: true, disabled: row === 0, pick: () => (model.rows.splice(body, 1), commit()) },
+        { id: "table.delCol", label: L.delCol, disabled: cols <= 1, pick: () => (eachRow((r) => r.splice(col, 1)), model.aligns.splice(col, 1), model.widths.splice(col, 1), commit()) },
+        { id: "table.copy", label: L.copy, sep: true, pick: () => void navigator.clipboard?.writeText(writeTable(model)).catch(() => undefined) },
+        { id: "table.duplicate", label: L.duplicate, pick: () => view.dispatch({ changes: { from: this.from + this.source.length, insert: `\n\n${writeTable(model)}` }, userEvent: "input.table" }) },
       ];
     };
     const set = (row: number, col: number, md: string): void => {
@@ -231,34 +265,7 @@ class TableWidget extends WidgetType {
           commit();
         }, { once: true });
       });
-      const mover = document.createElement("span");
-      mover.className = "me-col-grip";
-      mover.contentEditable = "false";
-      mover.innerHTML = '<svg width="12" height="8" viewBox="0 0 12 8" fill="currentColor"><circle cx="2" cy="2" r="1"/><circle cx="6" cy="2" r="1"/><circle cx="10" cy="2" r="1"/><circle cx="2" cy="6" r="1"/><circle cx="6" cy="6" r="1"/><circle cx="10" cy="6" r="1"/></svg>';
-      mover.addEventListener("pointerdown", (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        mover.setPointerCapture(e.pointerId);
-        let to = c;
-        const move = (ev: PointerEvent): void => {
-          const cells = [...htr.cells];
-          to = cells.findIndex((h) => ev.clientX < h.getBoundingClientRect().right);
-          if (to < 0) to = cells.length - 1;
-          cells.forEach((h, i) => h.classList.toggle("me-drop-target", i === to && to !== c));
-        };
-        mover.addEventListener("pointermove", move);
-        mover.addEventListener("pointerup", () => {
-          mover.removeEventListener("pointermove", move);
-          for (const h of htr.cells) h.classList.remove("me-drop-target");
-          if (to === c) return;
-          const take = <T,>(list: T[]): void => void list.splice(to, 0, list.splice(c, 1)[0]!);
-          [model.head, ...model.rows].forEach(take);
-          take(model.aligns);
-          take(model.widths);
-          commit({ row: 0, col: to });
-        }, { once: true });
-      });
-      th.append(grip, mover);
+      th.append(grip);
     });
     const button = (cls: string, label: string, run: () => void): HTMLButtonElement => {
       const b = document.createElement("button");
@@ -336,7 +343,54 @@ class TableWidget extends WidgetType {
       grip.addEventListener("pointermove", move);
       grip.addEventListener("pointerup", up, { once: true });
     });
-    box.append(grip, scroll, addCol, addRow);
+    // A grip above the column under the pointer: dragged left or right, the column moves there.
+    const colGrip = document.createElement("span");
+    colGrip.className = "me-col-grip";
+    colGrip.setAttribute("aria-hidden", "true");
+    colGrip.innerHTML = '<svg width="12" height="8" viewBox="0 0 12 8" fill="currentColor"><circle cx="2" cy="2" r="1"/><circle cx="6" cy="2" r="1"/><circle cx="10" cy="2" r="1"/><circle cx="2" cy="6" r="1"/><circle cx="6" cy="6" r="1"/><circle cx="10" cy="6" r="1"/></svg>';
+    colGrip.hidden = true;
+    let gripCol = -1;
+    const placeColGrip = (c: number): void => {
+      const th = htr.cells[c];
+      gripCol = th ? c : -1;
+      colGrip.hidden = !th;
+      if (!th) return;
+      const r = th.getBoundingClientRect(), b = box.getBoundingClientRect();
+      colGrip.style.left = `${r.left - b.left}px`;
+      colGrip.style.width = `${r.width}px`;
+    };
+    // view-state: (shows the grip above the column under the pointer)
+    table.addEventListener("mousemove", (e) => {
+      const cell = (e.target as HTMLElement).closest<HTMLTableCellElement>("th, td");
+      if (cell) placeColGrip(cell.cellIndex);
+    });
+    colGrip.addEventListener("pointerdown", (e) => {
+      if (gripCol < 0) return;
+      e.preventDefault();
+      colGrip.setPointerCapture(e.pointerId);
+      colGrip.classList.add("is-dragging");
+      const from = gripCol;
+      let to = from;
+      const move = (ev: PointerEvent): void => {
+        const cells = [...htr.cells];
+        to = cells.findIndex((h) => ev.clientX < h.getBoundingClientRect().right);
+        if (to < 0) to = cells.length - 1;
+        cells.forEach((h, i) => h.classList.toggle("me-drop-target", i === to && to !== from));
+      };
+      colGrip.addEventListener("pointermove", move);
+      colGrip.addEventListener("pointerup", () => {
+        colGrip.removeEventListener("pointermove", move);
+        colGrip.classList.remove("is-dragging");
+        for (const h of htr.cells) h.classList.remove("me-drop-target");
+        if (to === from) return;
+        const take = <T,>(list: T[]): void => void list.splice(to, 0, list.splice(from, 1)[0]!);
+        [model.head, ...model.rows].forEach(take);
+        take(model.aligns);
+        take(model.widths);
+        commit({ row: 0, col: to });
+      }, { once: true });
+    });
+    box.append(grip, colGrip, scroll, addCol, addRow);
     wrap.append(box);
     const want = focusNext.get(view);
     if (want && want.at === this.from) {

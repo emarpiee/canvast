@@ -1,6 +1,8 @@
 // The package's one small list of choices (a table's actions, a code block's language, a highlight's colour): a group of buttons by what
 // opened it, closed by a choice, Escape or a press elsewhere. The arrows move between its buttons.
 export interface PopItem {
+  /** A fixed name of the choice (`cut`, `table.rowAbove`, `language.python`): a host that has commands runs it as one. */
+  id: string;
   label: string;
   detail?: string;
   /** A line before this item. */
@@ -14,6 +16,11 @@ export interface PopItem {
 
 let close: (() => void) | null = null;
 
+/** The page's own menu, when the host gives one: every list of choices opens there instead (one look and one set of keys in the app). */
+export type MenuHost = (at: DOMRect, items: readonly PopItem[], label: string) => void;
+let host: MenuHost | null = null;
+export const setMenuHost = (fn: MenuHost | null): void => void (host = fn);
+
 /** Close the open list, if any. */
 export const closePopover = (): void => close?.();
 
@@ -21,6 +28,7 @@ export const closePopover = (): void => close?.();
 export function openPopover(anchor: HTMLElement | DOMRect, items: readonly PopItem[], label: string): void {
   closePopover();
   const r = anchor instanceof HTMLElement ? anchor.getBoundingClientRect() : anchor;
+  if (host) return host(r, items, label);
   const box = document.createElement("div");
   box.className = "me-pop";
   box.setAttribute("role", "group");

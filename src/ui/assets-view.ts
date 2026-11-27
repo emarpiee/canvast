@@ -4294,7 +4294,8 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     mounted.get(items[0]!.id)?.el.querySelector<HTMLElement>(".asset-card")?.focus({ preventScroll: true });
   };
   root.addEventListener("keydown", (e) => {
-    if (e.key === "Escape" && (selected || picked.size)) {
+    // (Escape in the viewer is the viewer's: it closes, and what is selected stays selected)
+    if (e.key === "Escape" && (selected || picked.size) && viewer.hidden) {
       void select(null);
       e.stopPropagation();
     } else if (e.key === "F2" && !(e.target as HTMLElement).closest(TYPING) && (picked.size || selected)) {

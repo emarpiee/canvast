@@ -392,3 +392,72 @@ test("every slider of the panels follows a mouse drag to where it is let go: no 
   await expect(win.locator('[data-pins-look] input[type="range"]')).toBeVisible();
   expect(await sliderDragProblems(p, win.locator("[data-pins-look]")), "the Pins window's opacity").toEqual([]);
 });
+
+/**
+ * A right click at every point of what is shown (a grid over the window), each as its own event: the ones no part of the app answered,
+ * which would open the browser's own menu, by what was under the point. Menus it opens on the way are closed after.
+ */
+async function browserMenus(p: Page): Promise<string[]> {
+  const left = await p.evaluate(() => {
+    const out = new Set<string>();
+    const say = (el: Element): string => `${el.tagName.toLowerCase()}${el.id ? `#${el.id}` : ""}${typeof el.className === "string" && el.className.trim() ? `.${el.className.trim().split(/\s+/).slice(0, 3).join(".")}` : ""}${(el as HTMLElement).dataset?.["testid"] ? `[${(el as HTMLElement).dataset["testid"]}]` : ""}`;
+    for (let y = 6; y < innerHeight; y += 22) {
+      for (let x = 6; x < innerWidth; x += 22) {
+        const el = document.elementFromPoint(x, y);
+        if (!el || el.closest(".pop-menu")) continue;
+        const ev = new MouseEvent("contextmenu", { bubbles: true, cancelable: true, clientX: x, clientY: y, button: 2 });
+        el.dispatchEvent(ev);
+        if (!ev.defaultPrevented) out.add(say(el));
+      }
+    }
+    return [...out];
+  });
+  for (let i = 0; i < 3; i++) await p.keyboard.press("Escape");
+  return left;
+}
+
+test("no right click anywhere opens the browser's menu: the canvas, the Library, the details, an open note, the viewer, the note panel and Settings", async ({ app }) => {
+  const p = app.page;
+  await p.getByTestId("import-input").setInputFiles({ name: "b.png", mimeType: "image/png", buffer: blockyFixture() });
+  await expect.poll(() => p.evaluate(() => window.__canvastDebug.objects().length)).toBe(1);
+  expect(await browserMenus(p), "the canvas").toEqual([]);
+  await p.getByTestId("view-assets").click();
+  await p.getByTestId("assets-import-input").setInputFiles({ name: "n.md", mimeType: "text/markdown", buffer: Buffer.from("# Note\n\nWords and [[n]].\n\n| a | b |\n| --- | --- |\n| 1 | 2 |\n") });
+  await p.locator('[data-testid="asset-card"][title="n.md"]').click();
+  expect(await browserMenus(p), "the Library with an item's details").toEqual([]);
+  await p.locator('[data-testid="asset-card"][title="n.md"]').dblclick();
+  await expect(p.getByTestId("note-editor").locator(".cm-content")).toBeVisible();
+  expect(await browserMenus(p), "a note open in the viewer").toEqual([]);
+  await p.locator(".viewer-back").click();
+  await p.locator('[data-testid="asset-card"][title="b.png"]').dblclick();
+  expect(await browserMenus(p), "a picture in the viewer").toEqual([]);
+  await p.locator(".viewer-back").click();
+  await p.locator('[data-testid="asset-card"][title="n.md"]').click();
+  await p.getByTestId("asset-place").click();
+  await p.getByTestId("view-canvas").click();
+  await expect.poll(() => p.evaluate(() => window.__canvastDebug.objects().length)).toBe(2);
+  const b = await p.evaluate(() => { const d = window.__canvastDebug; return d.objectScreen(d.objects().at(-1)!.id)!.box; });
+  await p.mouse.dblclick((b.minX + b.maxX) / 2, (b.minY + b.maxY) / 2);
+  await expect(p.getByTestId("note-panel")).toBeVisible();
+  expect(await browserMenus(p), "the note panel on a canvas").toEqual([]);
+  await p.getByTestId("view-settings").click();
+  expect(await browserMenus(p), "Settings").toEqual([]);
+});
+
+test("the notes editor's menus and a text field's menu are the app's menu: an icon, a name and a short line on every row", async ({ app }) => {
+  const p = app.page;
+  await p.getByTestId("view-assets").click();
+  await p.getByTestId("assets-import-input").setInputFiles({ name: "m.md", mimeType: "text/markdown", buffer: Buffer.from("# Menus\n\nSome words here.\n\n```js\nlet a = 1;\n```\n\n| a | b |\n| --- | --- |\n| 1 | 2 |\n") });
+  await p.locator('[data-testid="asset-card"][title="m.md"]').dblclick();
+  const words = p.getByTestId("note-editor").locator(".cm-line", { hasText: "Some words here." });
+  await words.click({ button: "right" });
+  await menuIsWhole(p, "a note's words");
+  await p.getByTestId("note-editor").locator(".me-table td .me-cell").first().click({ button: "right" });
+  await menuIsWhole(p, "a note's table cell");
+  await p.getByTestId("note-editor").locator(".me-code-lang").click();
+  await menuIsWhole(p, "a code block's language");
+  await p.locator(".viewer-back").click();
+  await p.getByTestId("assets-search").click({ button: "right" });
+  await menuIsWhole(p, "a text field");
+  expect(app.consoleErrors).toEqual([]);
+});

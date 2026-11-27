@@ -10,3 +10,4 @@ export type { CodeSpan, CodeSpans } from "./code";
 export { DEFAULT_ICONS } from "./icons";
 export type { IconName } from "./icons";
 export { EDITOR_CSS, injectStyles } from "./style";
+export type { PopItem, MenuHost } from "./popover";

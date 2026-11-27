@@ -997,6 +997,16 @@ test("selected words: a sign typed over them goes round them as Markdown marks; 
   await expect.poll(() => text(p)).toContain("\n**fourth word here**");
   await p.keyboard.press("Control+b");
   await expect.poll(() => text(p)).toContain("\nfourth word here");
+  // With the cursor inside a word: the word takes the format, the cursor staying where it was; inside the format, it comes off.
+  await p.keyboard.press("Home");
+  await p.keyboard.press("ArrowRight");
+  await p.keyboard.press("ArrowRight");
+  await p.keyboard.press("Control+b");
+  await p.keyboard.type("X");
+  await expect.poll(() => text(p), "the cursor is where it was").toContain("**foXurth** word here");
+  await p.keyboard.press("Control+b");
+  await expect.poll(() => text(p)).toContain("\nfoXurth word here");
+  await p.keyboard.press("Backspace");
   await p.keyboard.press("End");
   await p.keyboard.type(" ");
   await p.keyboard.press("Control+i");
@@ -1047,6 +1057,11 @@ test("in the library's viewer the arrows go to the next note unless the cursor i
   await note(p).locator('[data-me="bold"]').focus();
   await p.keyboard.press("ArrowRight");
   await expect(heading(p)).toHaveText("Two");
+  // Escape in the words closes the viewer, as it does for a picture: the note stays selected, its details shown.
+  await heading(p).click();
+  await p.keyboard.press("Escape");
+  await expect(p.getByTestId("slide-view")).toBeHidden();
+  await expect(p.getByTestId("asset-inspector")).toContainText("two.md");
   expect(app.consoleErrors).toEqual([]);
 });
 

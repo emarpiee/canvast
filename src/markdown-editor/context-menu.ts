@@ -68,32 +68,32 @@ export function openContextMenu(view: EditorView, at: { x: number; y: number }, 
   const items: PopItem[] = [];
   const focusRun = (f: () => void) => () => (f(), view.focus());
   if (link) {
-    items.push({ label: link.wiki ? words.openNote : words.open, pick: () => follow(link.link, link.wiki) });
-    items.push({ label: words.copyLink, pick: () => void navigator.clipboard?.writeText(link.wiki ? `[[${link.link}]]` : link.link).catch(() => undefined) });
+    items.push({ id: "openLink", label: link.wiki ? words.openNote : words.open, pick: () => follow(link.link, link.wiki) });
+    items.push({ id: "copyLink", label: words.copyLink, pick: () => void navigator.clipboard?.writeText(link.wiki ? `[[${link.link}]]` : link.link).catch(() => undefined) });
   }
   if (!sel.empty) {
     const range = { from: sel.from, to: sel.to };
-    items.push({ label: words.highlight, detail: "Ctrl+Shift+H", sep: items.length > 0, pick: () => applyHighlight(view, "yellow", range) });
-    for (const c of HIGHLIGHTS.slice(1)) items.push({ label: `${words.highlightIn} ${words.colours[c] ?? c}`, pick: () => applyHighlight(view, c, range) });
-    items.push({ label: words.removeHighlight, pick: () => applyHighlight(view, "remove", range) });
+    items.push({ id: "highlight.yellow", label: words.highlight, detail: "Ctrl+Shift+H", sep: items.length > 0, pick: () => applyHighlight(view, "yellow", range) });
+    for (const c of HIGHLIGHTS.slice(1)) items.push({ id: `highlight.${c}`, label: `${words.highlightIn} ${words.colours[c] ?? c}`, pick: () => applyHighlight(view, c, range) });
+    items.push({ id: "highlight.remove", label: words.removeHighlight, pick: () => applyHighlight(view, "remove", range) });
   }
   const copy = (): void => void navigator.clipboard?.writeText(view.state.sliceDoc(sel.from, sel.to)).catch(() => undefined);
-  items.push({ label: words.cut, detail: "Ctrl+X", sep: items.length > 0, disabled: sel.empty, pick: focusRun(() => (copy(), view.dispatch({ changes: { from: sel.from, to: sel.to }, userEvent: "delete.cut" }))) });
-  items.push({ label: words.copy, detail: "Ctrl+C", disabled: sel.empty, pick: copy });
-  items.push({ label: words.paste, detail: "Ctrl+V", pick: () => void navigator.clipboard?.readText().then((t) => t && view.dispatch(view.state.replaceSelection(t), { userEvent: "input.paste" }), () => undefined).finally(() => view.focus()) });
+  items.push({ id: "cut", label: words.cut, detail: "Ctrl+X", sep: items.length > 0, disabled: sel.empty, pick: focusRun(() => (copy(), view.dispatch({ changes: { from: sel.from, to: sel.to }, userEvent: "delete.cut" }))) });
+  items.push({ id: "copy", label: words.copy, detail: "Ctrl+C", disabled: sel.empty, pick: copy });
+  items.push({ id: "paste", label: words.paste, detail: "Ctrl+V", pick: () => void navigator.clipboard?.readText().then((t) => t && view.dispatch(view.state.replaceSelection(t), { userEvent: "input.paste" }), () => undefined).finally(() => view.focus()) });
   // A callout: the block (its lines) made one, its type changed, or taken off.
   const line = state.doc.lineAt(sel.head);
   let head = line;
   while (head.number > 1 && /^\s*>/.test(head.text) && !CALLOUT_HEAD.test(head.text) && /^\s*>/.test(state.doc.line(head.number - 1).text)) head = state.doc.line(head.number - 1);
   const isCallout = CALLOUT_HEAD.test(head.text);
-  const chooseType = (put: (type: string) => void): void => openPopover(new DOMRect(at.x, at.y, 0, 0), callouts.map((c) => ({ label: c.charAt(0).toUpperCase() + c.slice(1), pick: () => put(c) })), words.calloutType);
+  const chooseType = (put: (type: string) => void): void => openPopover(new DOMRect(at.x, at.y, 0, 0), callouts.map((c) => ({ id: `callout.${c}`, label: c.charAt(0).toUpperCase() + c.slice(1), pick: () => put(c) })), words.calloutType);
   if (isCallout) {
-    items.push({ label: words.calloutType, sep: true, pick: () => setTimeout(() => chooseType((type) => {
+    items.push({ id: "calloutType", label: words.calloutType, sep: true, pick: () => setTimeout(() => chooseType((type) => {
       const m = CALLOUT_HEAD.exec(head.text)!;
       const from = head.from + m[1]!.length + 2;
       view.dispatch({ changes: { from, to: from + m[2]!.length, insert: type }, userEvent: "input.format" });
     })) });
-    items.push({ label: words.removeCallout, pick: () => {
+    items.push({ id: "removeCallout", label: words.removeCallout, pick: () => {
       const changes = [];
       const m = CALLOUT_HEAD.exec(head.text)!;
       changes.push({ from: head.from + m[1]!.length, to: head.from + m[0].length });
@@ -105,7 +105,7 @@ export function openContextMenu(view: EditorView, at: { x: number; y: number }, 
       view.dispatch({ changes, userEvent: "input.format" });
     } });
   } else if (line.text.trim()) {
-    items.push({ label: words.toCallout, sep: true, pick: () => setTimeout(() => chooseType((type) => {
+    items.push({ id: "toCallout", label: words.toCallout, sep: true, pick: () => setTimeout(() => chooseType((type) => {
       // (the paragraph round the cursor, quoted, under a title line)
       let a = line.number, b = line.number;
       while (a > 1 && state.doc.line(a - 1).text.trim()) a--;
@@ -118,8 +118,8 @@ export function openContextMenu(view: EditorView, at: { x: number; y: number }, 
       view.dispatch({ changes, userEvent: "input.format" });
     })) });
   }
-  items.push({ label: words.selectAll, detail: "Ctrl+A", sep: true, pick: focusRun(() => selectAll(view)) });
-  items.push({ label: words.undo, detail: "Ctrl+Z", sep: true, pick: focusRun(() => undo(view)) });
-  items.push({ label: words.redo, detail: "Ctrl+Shift+Z", pick: focusRun(() => redo(view)) });
+  items.push({ id: "selectAll", label: words.selectAll, detail: "Ctrl+A", sep: true, pick: focusRun(() => selectAll(view)) });
+  items.push({ id: "undo", label: words.undo, detail: "Ctrl+Z", sep: true, pick: focusRun(() => undo(view)) });
+  items.push({ id: "redo", label: words.redo, detail: "Ctrl+Shift+Z", pick: focusRun(() => redo(view)) });
   openPopover(new DOMRect(at.x, at.y, 0, 0), items, words.menu);
 }

@@ -1009,8 +1009,12 @@ export function mountLibraryViewer(ctx: ViewerCtx) {
         e.stopPropagation();
         return;
       }
+      // Escape the file did not use itself (its list, its find bar, a popover closed first) closes the viewer, from its words too, as it
+      // does for a picture: the selection stays, so its details stay.
+      if (e.key === "Escape") {
+        if (e.defaultPrevented) return;
+      } else if (typing || (e.target as HTMLElement).isContentEditable || (e.target as HTMLElement).closest('[contenteditable="true"]') || !/^(ArrowLeft|ArrowRight|i|I|f|F)$/.test(e.key) || e.ctrlKey || e.metaKey) return;
       // (with the cursor out of the words, as on a button of its toolbar, the viewer's own keys are still the viewer's)
-      if (typing || (e.target as HTMLElement).isContentEditable || (e.target as HTMLElement).closest('[contenteditable="true"]') || !/^(ArrowLeft|ArrowRight|i|I|f|F)$/.test(e.key) || e.ctrlKey || e.metaKey) return;
     }
     if (e.key === "Escape") {
       if (document.fullscreenElement) void document.exitFullscreen().catch(() => undefined);

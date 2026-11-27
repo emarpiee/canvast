@@ -30,6 +30,8 @@ export interface LiveContext {
   renderMath?: (tex: string, display: boolean) => string;
   /** A diagram (a ```mermaid block) as SVG; absent, it stays code. */
   renderDiagram?: (code: string) => Promise<string>;
+  /** The format bar over words selected in a table's cell (it calls `pick` with a format's name); returns what closes it. */
+  formatBar?: (at: DOMRect, pick: (name: string) => void) => () => void;
   /** Whether a wiki link's target reaches anything (undefined: not known). */
   exists?: (target: string) => boolean | undefined;
   /** Words for a picture's resize handle and the "no language" choice. */
@@ -378,7 +380,7 @@ class CodeFlair extends WidgetType {
         const from = line.from + fence[1]!.length + fence[2]!.length;
         view.dispatch({ changes: { from, to: line.to, insert: name }, userEvent: "input.language" });
       };
-      openPopover(lang, [{ label: this.ctx.plainLabel, on: !fence[3]!.trim(), pick: () => set("") }, ...this.ctx.languages.map((l) => ({ label: l, on: fence[3]!.trim() === l, pick: () => set(l) }))], this.ctx.languageLabel);
+      openPopover(lang, [{ id: "language.none", label: this.ctx.plainLabel, on: !fence[3]!.trim(), pick: () => set("") }, ...this.ctx.languages.map((l) => ({ id: `language.${l}`, label: l, on: fence[3]!.trim() === l, pick: () => set(l) }))], this.ctx.languageLabel);
     });
     // view-state: (copies the block's code to the clipboard; the note is unchanged)
     copy.addEventListener("click", () => {

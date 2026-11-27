@@ -74,8 +74,8 @@ export const EDITOR_CSS = `
 :where(.me-media) { display: inline-block; color: var(--me-faint); font-size: 0.9em; }
 :where(.me-media img, .me-media video) { display: block; max-width: 100%; height: auto; border-radius: var(--me-radius); }
 :where(.me-table) { padding: 4px 0; cursor: default; }
-:where(.me-table-box) { position: relative; display: inline-grid; grid-template-columns: minmax(0, auto) 14px; grid-template-rows: auto 14px; gap: 2px; max-width: 100%; vertical-align: top; }
-:where(.me-table-scroll) { grid-column: 1; grid-row: 1; overflow-x: auto; border: 1px solid var(--me-line); border-radius: 6px; }
+:where(.me-table-box) { position: relative; display: inline-grid; grid-template-columns: minmax(0, auto) 14px; grid-template-rows: 12px auto 14px; gap: 2px; max-width: 100%; vertical-align: top; }
+:where(.me-table-scroll) { grid-column: 1; grid-row: 2; overflow-x: auto; border: 1px solid var(--me-line); border-radius: 6px; }
 :where(.me-table) table, :where(.me-preview) table { border-collapse: collapse; margin: 0; }
 :where(.me-preview) table { margin: 4px 0; }
 :where(.me-table, .me-preview) :is(th, td) { border: 1px solid var(--me-line); padding: 8px 12px; min-width: 6em; height: 2.4em; box-sizing: border-box; text-align: left; vertical-align: top; }
@@ -87,13 +87,13 @@ export const EDITOR_CSS = `
 :where(.me-table-add) { display: grid; place-items: center; padding: 0; border: 0; border-radius: 4px; background: var(--me-code-bg); color: var(--me-faint); font: inherit; font-size: 11px; line-height: 1; cursor: pointer; opacity: 0; transition: opacity 0.12s; }
 :where(.me-table:hover) .me-table-add, :where(.me-table:focus-within) .me-table-add { opacity: 1; }
 :where(.me-table-add):hover { color: var(--me-fg); background: var(--me-line); }
-:where(.me-table-add-col) { grid-column: 2; grid-row: 1; }
+:where(.me-table-add-col) { grid-column: 2; grid-row: 2; }
 :where(.me-table-grip) { position: absolute; left: -14px; width: 12px; display: grid; place-items: center; border-radius: 4px; background: var(--me-code-bg); color: var(--me-faint); cursor: grab; opacity: 0; transition: opacity 0.12s; touch-action: none; }
 :where(.me-table:hover) .me-table-grip { opacity: 1; }
 :where(.me-table-grip[hidden]) { display: none; }
 :where(.me-table-grip.is-dragging) { cursor: grabbing; color: var(--me-fg); }
 :where(.me-table) tr.me-drop-target > * { box-shadow: inset 0 -2px 0 var(--me-accent); }
-:where(.me-table-add-row) { grid-column: 1; grid-row: 2; }
+:where(.me-table-add-row) { grid-column: 1; grid-row: 3; }
 :where(.me) .me-list-line { padding-left: var(--me-hang) !important; text-indent: calc(-1 * var(--me-hang)); }
 :where(.me) .me-list-line > * { text-indent: 0; }
 /* folding */
@@ -130,7 +130,9 @@ export const EDITOR_CSS = `
 :where(.me-table) th { position: relative; }
 :where(.me-col-resize) { position: absolute; top: 0; right: -3px; bottom: 0; width: 6px; cursor: col-resize; z-index: 1; }
 :where(.me-col-resize):hover { background: color-mix(in oklch, var(--me-accent) 40%, transparent); }
-:where(.me-col-grip) { position: absolute; top: -12px; left: 50%; transform: translateX(-50%); display: grid; place-items: center; width: 22px; height: 12px; border-radius: 4px; background: var(--me-code-bg); color: var(--me-faint); cursor: grab; opacity: 0; touch-action: none; }
+:where(.me-col-grip) { position: absolute; top: 0; height: 12px; display: grid; place-items: center; border-radius: 4px; background: var(--me-code-bg); color: var(--me-faint); cursor: grab; opacity: 0; transition: opacity 0.12s; touch-action: none; }
+:where(.me-col-grip[hidden]) { display: none; }
+:where(.me-col-grip.is-dragging) { cursor: grabbing; color: var(--me-fg); }
 :where(.me-table:hover) .me-col-grip { opacity: 1; }
 :where(.me-table) th.me-drop-target { box-shadow: inset -2px 0 0 var(--me-accent); }
 :where(.me-live) .me-code-lang.is-detected { border: 1px dashed var(--me-line); opacity: 0.85; }
@@ -153,6 +155,8 @@ export const EDITOR_CSS = `
 :where(.me-date) { flex-direction: row; align-items: center; gap: 6px; padding: 6px; min-width: 0; }
 :where(.me-date) input { font: inherit; color: var(--me-fg); background: var(--me-code-bg); border: 1px solid var(--me-line); border-radius: 4px; padding: 2px 6px; }
 /* the bar over selected words */
+:where(.me-blurred) .me-selbar { display: none; }
+:where(.me-selbar-floating) { position: fixed; z-index: 1000; background: var(--me-bg); border: 1px solid var(--me-line); border-radius: var(--me-radius); box-shadow: 0 6px 20px color-mix(in oklch, var(--me-fg) 18%, transparent); }
 :where(.me-selbar) { position: relative; display: flex; align-items: center; gap: 2px; padding: 3px; }
 :where(.me-selbar-turn) { padding: 0 8px; font-size: 0.85em; color: var(--me-fg); }
 :where(.me-selbar-menu) { position: absolute; top: 100%; left: 0; margin-top: 4px; display: flex; flex-direction: column; min-width: 12em; padding: 4px; background: var(--me-bg); border: 1px solid var(--me-line); border-radius: var(--me-radius); box-shadow: 0 6px 20px color-mix(in oklch, var(--me-fg) 18%, transparent); }

@@ -1,7 +1,7 @@
 // The bar over selected words: Turn into (text, headings, lists, quote, code block), the inline formats and a link. Shown while the editor
 // has the focus and words are selected, as a tooltip above them.
-import { StateEffect, StateField, type EditorState, type Extension } from "@codemirror/state";
-import { EditorView, showTooltip, type Tooltip } from "@codemirror/view";
+import { StateField, type EditorState, type Extension } from "@codemirror/state";
+import { EditorView, ViewPlugin, showTooltip, type Tooltip, type ViewUpdate } from "@codemirror/view";
 import { COMMANDS, type FormatName } from "./commands";
 
 export interface SelectionBarOptions {
@@ -9,7 +9,6 @@ export interface SelectionBarOptions {
   labels: Readonly<Record<string, string>>;
 }
 
-const focusEffect = StateEffect.define<boolean>();
 const INLINE: FormatName[] = ["bold", "italic", "strike", "highlight", "code", "link"];
 const TURN_INTO: FormatName[] = ["paragraph", "heading1", "heading2", "heading3", "bulletList", "orderedList", "taskList", "quote", "codeBlock"];
 
@@ -61,24 +60,61 @@ function bar(opts: SelectionBarOptions): (view: EditorView) => { dom: HTMLElemen
   };
 }
 
-/** The bar, as a tooltip over the main selection. */
+/** The bar, as a tooltip over the main selection: there whenever words are selected, hidden while the editor has not the focus (a class
+ *  set from the view itself, so the first selection after a note opens shows it at once). */
 export function selectionBar(opts: SelectionBarOptions): Extension {
   const create = bar(opts);
-  const tooltip = (state: EditorState, focused: boolean): Tooltip | null => {
+  const tooltip = (state: EditorState): Tooltip | null => {
     const r = state.selection.main;
-    if (r.empty || !focused) return null;
-    return { pos: r.from, end: r.to, above: true, arrow: false, create };
+    return r.empty ? null : { pos: r.from, end: r.to, above: true, arrow: false, create };
   };
-  const field = StateField.define<{ focused: boolean; tip: Tooltip | null }>({
-    create: (state) => ({ focused: false, tip: tooltip(state, false) }),
-    update(v, tr) {
-      let focused = v.focused;
-      for (const e of tr.effects) if (e.is(focusEffect)) focused = e.value;
-      if (!tr.selection && !tr.docChanged && focused === v.focused) return v;
-      return { focused, tip: tooltip(tr.state, focused) };
-    },
-    provide: (f) => showTooltip.compute([f], (s) => s.field(f).tip),
+  const field = StateField.define<Tooltip | null>({
+    create: tooltip,
+    update: (v, tr) => (tr.selection || tr.docChanged ? tooltip(tr.state) : v),
+    provide: (f) => showTooltip.from(f),
   });
-  return [field, EditorView.focusChangeEffect.of((_s, on) => focusEffect.of(on))];
+  const focusClass = ViewPlugin.fromClass(
+    class {
+      constructor(view: EditorView) {
+        view.dom.classList.toggle("me-blurred", !view.hasFocus);
+      }
+      update(u: ViewUpdate): void {
+        if (u.focusChanged) u.view.dom.classList.toggle("me-blurred", !u.view.hasFocus);
+      }
+    },
+  );
+  return [field, focusClass];
+}
+
+/**
+ * The same bar, floating over words selected outside the editor's text (a table's cell): the inline formats, each calling `pick` with its
+ * name. Returns what closes it.
+ */
+export function floatingBar(opts: SelectionBarOptions, at: DOMRect, pick: (name: FormatName) => void, parent: HTMLElement = document.body): () => void {
+  const dom = document.createElement("div");
+  dom.className = "me-selbar me-selbar-floating";
+  dom.setAttribute("role", "toolbar");
+  dom.setAttribute("aria-label", opts.labels["format"] ?? "Format");
+  for (const n of INLINE) {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "me-btn";
+    b.dataset["me"] = n;
+    b.title = opts.labels[n] ?? n;
+    b.setAttribute("aria-label", opts.labels[n] ?? n);
+    b.innerHTML = opts.icons[n] ?? n;
+    dom.append(b);
+  }
+  // view-state: (a press on the bar keeps the selection in the cell)
+  dom.addEventListener("mousedown", (e) => e.preventDefault());
+  // typing: (the bar's buttons write the cell's Markdown)
+  dom.addEventListener("click", (e) => {
+    const b = (e.target as HTMLElement).closest<HTMLElement>("[data-me]");
+    if (b) pick(b.dataset["me"] as FormatName);
+  });
+  parent.append(dom);
+  dom.style.left = `${Math.max(4, Math.min(at.left, innerWidth - dom.offsetWidth - 4))}px`;
+  dom.style.top = `${Math.max(4, at.top - dom.offsetHeight - 6)}px`;
+  return () => dom.remove();
 }
 

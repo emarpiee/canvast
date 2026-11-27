@@ -77,7 +77,7 @@ import { dimHits, revealHits, scrollReveal, type RevealWhy } from "../interactio
 import { ownerOf } from "../doc/belongs";
 import { syncScroll } from "../ui/bar";
 import { parseHex, rgbToOklch } from "../colour-picker/colour";
-import { canvasItems, mountContextMenu, showContextMenu } from "../ui/context-menu";
+import { canvasItems, installNoBrowserMenu, mountContextMenu, showContextMenu } from "../ui/context-menu";
 import { openBatchRename } from "../ui/batch-rename";
 import { HIDDEN_LOCKED, askCurrentPassword, forgetHiddenPassword, hiddenModeOn, hiddenRemembered, lockHidden, onHiddenRemembered } from "../ui/hidden-access";
 import { typeOfName } from "../storage/workspace-names";
@@ -2433,6 +2433,7 @@ async function start(): Promise<void> {
     e.preventDefault();
     pressCommand("pins.open", {}, "key");
   });
+  installNoBrowserMenu(commands); // (no right click anywhere opens the browser's own menu: a view's, the text menu on a field, or none)
   notePanelReady({ session, assets, settings, importFiles: (files) => assetsView.importFiles(files), showInLibrary: (h) => (setView("assets"), void assetsView.reveal([h])), hidden: hiddenModeOn });
   // Alt+Shift+Left and Alt+Shift+Right: previous and next view (ADR 0116), on the canvas. (Alt with an arrow alone pans, as ever.)
   window.addEventListener("keydown", (e) => {

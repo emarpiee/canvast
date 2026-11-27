@@ -12,14 +12,16 @@ import { COMMANDS, autoPair, hopMarker, reflowParagraph, renumberLists, tightLis
 import { foldAtCursor, folding, initialFolds } from "./fold";
 import { HIGHLIGHTS, applyHighlight, openContextMenu } from "./context-menu";
 import { linkPopover, type LinkTarget } from "./link-popover";
-import { closePopover, openPopover } from "./popover";
+import { closePopover, openPopover, setMenuHost, type MenuHost } from "./popover";
 import { vim } from "@replit/codemirror-vim";
 import { pastedMarkdown } from "./html-to-markdown";
 import { DEFAULT_ICONS, type IconName } from "./icons";
 import { markdownLook } from "./highlight";
 import { livePreview, refresh } from "./live";
-import { selectionBar } from "./selection-bar";
+import { floatingBar, selectionBar } from "./selection-bar";
 import { renderMarkdown } from "./render";
+import { cleanHtml } from "./clean";
+export { cleanHtml };
 import { EXTENSIONS } from "./syntax";
 import { CM_THEME, injectStyles } from "./style";
 
@@ -93,6 +95,8 @@ export interface EditorHost {
   createNote?(target: string): Promise<boolean>;
   /** `/Page`: a new note, opened. */
   newNote?(): void;
+  /** The page's own menu: every list of choices (the right-click menu, a table's, a code block's language) opens there. */
+  menu?: MenuHost;
 }
 
 export interface EditorLabels {
@@ -209,6 +213,7 @@ const isMac = typeof navigator !== "undefined" && /Mac|iP(hone|ad)/.test(navigat
 export function createMarkdownEditor(opts: EditorOptions): MarkdownEditor {
   if (opts.injectStyles !== false) injectStyles(opts.parent.ownerDocument);
   const host: EditorHost = opts.host ?? {};
+  if (host.menu) setMenuHost(host.menu);
   const labels: EditorLabels = { ...DEFAULT_LABELS, ...opts.labels };
   const icons = { ...DEFAULT_ICONS, ...opts.icons };
   const plain = !!opts.plain;
@@ -240,6 +245,7 @@ export function createMarkdownEditor(opts: EditorOptions): MarkdownEditor {
           ...(host.media ? { media: host.media.bind(host) } : {}),
           ...(host.wikiExists ? { exists: host.wikiExists.bind(host) } : {}),
           ...(host.renderMath ? { renderMath: host.renderMath.bind(host) } : {}),
+          formatBar: (at: DOMRect, pick: (name: string) => void) => floatingBar({ icons, labels: labels as unknown as Record<string, string> }, at, pick as never, el),
           ...(host.renderDiagram ? { renderDiagram: host.renderDiagram.bind(host) } : {}),
           taskLabel: labels.task, copyLabel: labels.copyCode, copiedLabel: labels.copied, languageLabel: labels.codeLanguage, addRowLabel: labels.addRow, addColumnLabel: labels.addColumn,
           tableLabel: labels.tableActions, languages: host.languages ?? LANGUAGES, resizeLabel: labels.resize, plainLabel: labels.plainText, detectedLabel: labels.detected,
@@ -759,15 +765,4 @@ export function createMarkdownEditor(opts: EditorOptions): MarkdownEditor {
   return self;
 }
 
-/** Rendered HTML made safe to show: no scripts, frames, forms or event attributes, no script addresses. */
-export function cleanHtml(html: string): string {
-  const doc = new DOMParser().parseFromString(`<body>${html}</body>`, "text/html");
-  for (const n of doc.body.querySelectorAll("script, style, iframe, frame, object, embed, link, meta, base, form, textarea, select, button")) n.remove();
-  for (const n of doc.body.querySelectorAll("*")) {
-    for (const a of [...n.attributes]) {
-      if (/^on/i.test(a.name) || (/^(href|src|xlink:href|action|formaction|srcdoc)$/i.test(a.name) && /^\s*(javascript|vbscript|data:text\/html)/i.test(a.value)) || a.name === "srcdoc") n.removeAttribute(a.name);
-    }
-    if (n.tagName === "INPUT" && (n as HTMLInputElement).type !== "checkbox") n.remove();
-  }
-  return doc.body.innerHTML;
-}
+

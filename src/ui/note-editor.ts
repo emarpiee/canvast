@@ -1,4 +1,8 @@
 import { ICONS } from "./icons";
+import { commands } from "../commands/registry";
+import { showContextMenu } from "./context-menu";
+import type { MenuItem } from "./more-menu";
+import type { PopItem } from "../markdown-editor";
 import { createMarkdownEditor, type EditorMode, type FollowedLink, type MarkdownEditor, type SlashItem } from "../markdown-editor";
 import { CODE_LANGUAGES, codeSpans, dropCode, paintCode } from "../notes/code-colours";
 import { renderMath } from "../notes/math";
@@ -105,6 +109,43 @@ async function renderDiagram(code: string): Promise<string> {
   mermaid.initialize({ startOnLoad: false, securityLevel: "strict", theme: document.documentElement.dataset["theme"] === "dark" || matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "default" });
   const { svg } = await mermaid.render(`me-diagram-${++diagramCount}`, code);
   return svg;
+}
+
+/**
+ * The notes editor's lists of choices (its right-click menu, a table's actions, a code block's language, a callout's type) in the app's one
+ * menu: each row has an icon and a short line, and runs a command (`note.<choice>`), which the registry lists while that menu is the last
+ * one opened (so an outside caller can run what the menu offers).
+ */
+let shownChoices: readonly PopItem[] = [];
+const CHOICE_LOOK: ReadonlyArray<readonly [RegExp, string, string]> = [
+  [/^openLink$/, ICONS.goToLink, "Go where it points"], [/^copyLink$/, ICONS.link, "Copy its address"],
+  [/^highlight\.remove$/, ICONS.circleSlash, "Take the highlight off"], [/^highlight\./, ICONS.highlighter, "Mark the words in this colour"],
+  [/^cut$/, ICONS.scissors, "Take the selected words out"], [/^copy$/, ICONS.copy, "Copy the selected words"], [/^paste$/, ICONS.clipboardPaste, "Put in what was copied"],
+  [/^toCallout$/, ICONS.speechBalloon, "Make the block a callout"], [/^calloutType$/, ICONS.speechBalloon, "Another kind of callout"], [/^removeCallout$/, ICONS.circleSlash, "Back to plain words"],
+  [/^callout\./, ICONS.speechBalloon, "A callout of this kind"], [/^selectAll$/, ICONS.selectAll, "Every word of the note"], [/^undo$/, ICONS.undo, "Take back the last change"], [/^redo$/, ICONS.redo, "Put back what was taken back"],
+  [/^table\.row(Above|Below)$/, ICONS.listPlus, "A new row here"], [/^table\.col(Before|After)$/, ICONS.columns3, "A new column here"],
+  [/^table\.row(Up|Down)$/, ICONS.arrowUpDown, "The row one place along"], [/^table\.col(Left|Right)$/, ICONS.arrowLeftRight, "The column one place along"],
+  [/^table\.dupRow$/, ICONS.copyPlus, "A copy of the row under it"], [/^table\.dupCol$/, ICONS.copyPlus, "A copy of the column beside it"],
+  [/^table\.alignLeft$/, ICONS.textAlignLeft, "Words to the left"], [/^table\.alignCenter$/, ICONS.textAlignCenter, "Words in the middle"], [/^table\.alignRight$/, ICONS.textAlignRight, "Words to the right"],
+  [/^table\.sortUp$/, ICONS.arrowDownAZ, "Rows in order of this column"], [/^table\.sortDown$/, ICONS.arrowDownZA, "Rows in reverse order"],
+  [/^table\.del(Row|Col)$/, ICONS.trash, "Take it out of the table"], [/^table\.copy$/, ICONS.clipboardCopy, "The table as Markdown text"], [/^table\.duplicate$/, ICONS.copyPlus, "A copy of the table under it"],
+  [/^language\.none$/, ICONS.fileCode, "No language: plain text"], [/^language\./, ICONS.fileCode, "Colour the code as this"],
+];
+const lookOf = (id: string): readonly [string, string] => {
+  const hit = CHOICE_LOOK.find(([re]) => re.test(id));
+  return hit ? [hit[1], hit[2]] : [ICONS.fileCode, "Choose it"];
+};
+commands.setProvider("note-editor", () =>
+  shownChoices.map((c) => ({ id: `note.${c.id}`, title: c.label, group: "Note", hint: lookOf(c.id)[1], icon: lookOf(c.id)[0], risk: "edit" as const, why: () => (c.disabled ? "Not available here" : null), exec: () => void c.pick() })),
+);
+/** The editor's menu host: its choices as the app's menu at a point. */
+function openChoices(at: DOMRect, items: readonly PopItem[], label: string): void {
+  shownChoices = items;
+  const rows: MenuItem[] = items.map((c) => {
+    const [icon, hint] = lookOf(c.id);
+    return { id: `note.${c.id}`, command: `note.${c.id}`, label: c.label, hint, icon, ...(c.sep ? { sep: true } : {}), ...(c.disabled ? { disabled: true } : {}), ...(c.on ? { checked: true } : {}), run: () => void commands.press(`note.${c.id}`) };
+  });
+  showContextMenu(at.left, at.bottom, rows, label);
 }
 
 /** The app's icons on the editor's toolbar (the same thing shows the same icon everywhere). */
@@ -223,6 +264,7 @@ export async function mountNoteEditor(el: HTMLElement, opts: { kind: Exclude<Not
       },
       createNote: async (target) => !!(await host.createNote(target.split("/").pop()!)),
       newNote: () => host.newNote(),
+      menu: openChoices,
       rendered: (page) => void (opts.codeColours !== false && paintCode(el, page)),
     },
   });

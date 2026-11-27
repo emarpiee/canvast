@@ -168,3 +168,65 @@ export function mountContextMenu(canvas: HTMLElement, registry: CommandRegistry,
     },
   });
 }
+
+// ---- No browser menu anywhere (the app's own, or none) ----
+
+/** The text field a right click or a menu acts on: the one under the pointer, else the one with the focus. */
+let fieldAt: HTMLElement | null = null;
+const fieldOf = (t: EventTarget | null): HTMLElement | null => (t instanceof Element ? t.closest<HTMLElement>("input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=color]):not([type=file]), textarea, [contenteditable='true']") : null);
+const editable = (f: HTMLElement): boolean => !(f as HTMLInputElement).readOnly && !(f as HTMLInputElement).disabled;
+/** What is selected in the field (a text box's own selection, or the page's in an editable element). */
+const selectedIn = (f: HTMLElement): string =>
+  f instanceof HTMLInputElement || f instanceof HTMLTextAreaElement ? f.value.slice(f.selectionStart ?? 0, f.selectionEnd ?? 0) : (getSelection()?.toString() ?? "");
+const inField = (run: (f: HTMLElement) => void) => (): void => {
+  const f = fieldAt ?? fieldOf(document.activeElement);
+  if (!f) return;
+  f.focus();
+  run(f);
+};
+
+/** The field's commands: Cut, Copy, Paste, Select all, Undo, Redo, on the field under the menu (or the focused one). */
+export function installFieldCommands(registry: CommandRegistry): void {
+  const field = (id: string, title: string, hint: string, icon: string, keys: string, run: (f: HTMLElement) => void, risk: "read" | "edit" = "edit") => ({ id, title, group: "Text", hint, icon, keys, risk, exec: inField(run) });
+  registry.setProvider("text-fields", () => [
+    field("text.cut", "Cut", "Take the selected words out", ICONS.scissors, "Ctrl+X", () => void document.execCommand("cut")),
+    field("text.copy", "Copy", "Copy the selected words", ICONS.copy, "Ctrl+C", (f) => void navigator.clipboard?.writeText(selectedIn(f)).catch(() => document.execCommand("copy")), "read"),
+    field("text.paste", "Paste", "Put in what was copied", ICONS.clipboardPaste, "Ctrl+V", () => void navigator.clipboard?.readText().then((t) => t && document.execCommand("insertText", false, t), () => undefined)),
+    field("text.selectAll", "Select all", "Every word of this field", ICONS.selectAll, "Ctrl+A", (f) => (f instanceof HTMLInputElement || f instanceof HTMLTextAreaElement ? f.select() : document.execCommand("selectAll")), "read"),
+    field("text.undo", "Undo", "Take back the last change here", ICONS.undo, "Ctrl+Z", () => void document.execCommand("undo")),
+    field("text.redo", "Redo", "Put back what was taken back", ICONS.redo, "Ctrl+Shift+Z", () => void document.execCommand("redo")),
+  ]);
+}
+
+/** A text field's menu rows (off what cannot be done now). */
+function fieldItems(f: HTMLElement): MenuItem[] {
+  const has = selectedIn(f).length > 0, can = editable(f);
+  const row = (command: string, label: string, hint: string, icon: string, disabled = false, sep = false): MenuItem => ({ command, label, hint, icon, disabled, sep, id: command, run: () => void commandsRef?.press(command) });
+  return [
+    row("text.cut", "Cut", "Take the selected words out", ICONS.scissors, !has || !can),
+    row("text.copy", "Copy", "Copy the selected words", ICONS.copy, !has),
+    row("text.paste", "Paste", "Put in what was copied", ICONS.clipboardPaste, !can),
+    row("text.selectAll", "Select all", "Every word of this field", ICONS.selectAll, false, true),
+    row("text.undo", "Undo", "Take back the last change here", ICONS.undo, !can, true),
+    row("text.redo", "Redo", "Put back what was taken back", ICONS.redo, !can),
+  ];
+}
+
+let commandsRef: CommandRegistry | null = null;
+/**
+ * The browser's own menu never opens: a right click that no view answered (the canvas, the Library, the Note editor bind their own) is
+ * the app's text menu on a text field, and nothing elsewhere. Heard last, on the document.
+ */
+export function installNoBrowserMenu(registry: CommandRegistry): void {
+  commandsRef = registry;
+  installFieldCommands(registry);
+  installMenuKeys();
+  // view-state: (opens the text menu, whose rows are commands; elsewhere only keeps the browser's menu shut)
+  document.addEventListener("contextmenu", (e) => {
+    if (e.defaultPrevented) return;
+    e.preventDefault();
+    const f = fieldOf(e.target);
+    fieldAt = f;
+    if (f) showContextMenu(e.clientX, e.clientY, fieldItems(f), "Text");
+  });
+}
