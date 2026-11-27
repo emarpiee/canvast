@@ -66,6 +66,23 @@ test("a markdown note opens in live mode with its library links, saves exactly w
   await expect(page(p).locator(".me-task")).toHaveCount(1);
   await expect(page(p).locator(".me-media img")).toHaveAttribute("src", /^blob:/);
   expect(await text(p), "nothing is rewritten by opening it").toBe(MD);
+  // A picture is drawn, never opened into its Markdown by the cursor; a click selects it: + sizes it, 0 takes the size off, Space shows it
+  // full size (Escape closes), Enter shows its Markdown to edit, the cursor leaving its line draws it again.
+  const pic = page(p).locator(".me-media").first();
+  await pic.locator("img").click();
+  await expect(pic).toHaveClass(/is-selected/);
+  await p.keyboard.press("+");
+  await expect.poll(() => text(p)).toMatch(/!\[[^\]]*\|\d+\]|!\[\[[^\]]*\|\d+\]\]/);
+  await p.keyboard.press("0");
+  await expect.poll(() => text(p)).toBe(MD);
+  await p.keyboard.press(" ");
+  await expect(p.locator(".me-lightbox img")).toBeVisible();
+  await p.keyboard.press("Escape");
+  await expect(p.locator(".me-lightbox")).toHaveCount(0);
+  await p.keyboard.press("Enter");
+  await expect(page(p).locator(".cm-line", { hasText: "cat.png" }).first()).toContainText("![");
+  await p.keyboard.press("Control+Home");
+  await expect(page(p).locator(".cm-line", { hasText: "![" })).toHaveCount(0);
 
   // Written to and saved (Ctrl+S): the same item, its file exactly what the editor holds.
   await endOf(p, heading(p));

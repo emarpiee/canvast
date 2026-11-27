@@ -7,6 +7,7 @@ import { StateEffect, StateField, type EditorState, type Extension, type Range }
 import { Decoration, EditorView, ViewPlugin, WidgetType, type DecorationSet, type ViewUpdate } from "@codemirror/view";
 import type { SyntaxNode } from "@lezer/common";
 import { toggleTask } from "./behaviors/task-toggle";
+import { pictureEdit, selectedPicture, setPictureEdit, setPictureWidth, viewPicture } from "./behaviors/picture-select";
 import { tableField } from "./table";
 import { openPopover } from "./popover";
 import { guessLanguage } from "./detect";
@@ -41,6 +42,10 @@ export interface LiveContext {
   exists?: (target: string) => boolean | undefined;
   /** Words for a picture's resize handle and the "no language" choice. */
   resizeLabel: string;
+  /** A picture's buttons: full size, edit its Markdown; and the full-size view's close button. */
+  zoomLabel: string;
+  editPictureLabel: string;
+  closeLabel: string;
   plainLabel: string;
   detectedLabel: string;
 }
@@ -110,21 +115,52 @@ export const touches = (state: EditorState, from: number, to: number): boolean =
 
 const hide = Decoration.replace({});
 
-/** A picture (or a file's name when it is not one) drawn where its Markdown is. */
+/** The widget each drawn picture is now (a picture kept on the page as its Markdown moves reads where it is from here). */
+const drawnAs = new WeakMap<HTMLElement, MediaWidget>();
+
+/**
+ * A picture (or a file's name when it is not one) drawn where its Markdown is, always (its Markdown shows only while it is edited: Enter,
+ * or the edit button). A click selects it (an outline); on it, a button opens it full size, one edits its Markdown, and the handle at its
+ * corner sets its width (behaviors/picture-select.ts has its keys).
+ */
 class MediaWidget extends WidgetType {
-  constructor(readonly link: string, readonly alt: string, readonly embed: boolean, readonly width: number | null, readonly ctx: LiveContext, readonly at?: { from: number; to: number }) {
+  constructor(readonly link: string, readonly alt: string, readonly embed: boolean, readonly width: number | null, readonly ctx: LiveContext, readonly at?: { from: number; to: number }, readonly selected = false) {
     super();
   }
   override eq(o: MediaWidget): boolean {
-    return o.link === this.link && o.alt === this.alt && o.embed === this.embed && o.width === this.width && o.at?.from === this.at?.from && o.at?.to === this.at?.to;
+    return o.link === this.link && o.alt === this.alt && o.embed === this.embed && o.width === this.width && o.at?.from === this.at?.from && o.at?.to === this.at?.to && o.selected === this.selected;
+  }
+  /** The same picture moved or (de)selected: kept as it is drawn, not loaded again. */
+  override updateDOM(dom: HTMLElement): boolean {
+    const was = drawnAs.get(dom);
+    if (!was || was.link !== this.link || was.embed !== this.embed || was.width !== this.width || was.alt !== this.alt) return false;
+    drawnAs.set(dom, this);
+    this.mark(dom);
+    return true;
+  }
+  private mark(box: HTMLElement): void {
+    box.classList.toggle("is-selected", this.selected);
+    if (this.at) box.dataset["from"] = String(this.at.from);
   }
   override toDOM(view?: EditorView): HTMLElement {
-    this.view = view ?? null;
     const box = document.createElement("span");
     box.className = "me-media";
     box.setAttribute(this.embed ? "data-embed" : "data-src", this.link);
+    drawnAs.set(box, this);
+    this.mark(box);
     const name = this.alt || decodeURIComponent(this.link.split(/[/\\]/).pop() ?? this.link);
     box.textContent = name;
+    const now = (): MediaWidget => drawnAs.get(box) ?? this;
+    if (view && this.at) {
+      // view-state: (a press on the picture selects it, as one piece of the note; a press on its buttons or handle is theirs)
+      box.addEventListener("mousedown", (e) => {
+        if (e.button !== 0 || (e.target as HTMLElement).closest(".me-media-tools, .me-resize")) return;
+        e.preventDefault();
+        const at = now().at!;
+        view.dispatch({ selection: { anchor: at.from, head: at.to }, effects: setPictureEdit.of(null) });
+        view.focus();
+      });
+    }
     void this.ctx.media?.(this.link, this.embed).then((got) => {
       if (!got || !box.isConnected) return;
       const kind = got.type.split("/")[0];
@@ -136,13 +172,39 @@ class MediaWidget extends WidgetType {
       el.src = got.url;
       if (this.width) el.style.width = `${this.width}px`;
       box.append(el);
-      if (kind === "image" && this.at && this.view) box.append(this.resizer(el as HTMLImageElement, this.view));
+      if (kind === "image" && this.at && view) box.append(this.tools(box, view, now), this.resizer(el as HTMLImageElement, view, now));
     });
     return box;
   }
-  private view: EditorView | null = null;
+  /** The buttons on a picture: full size, and edit its Markdown. */
+  private tools(box: HTMLElement, view: EditorView, now: () => MediaWidget): HTMLElement {
+    const bar = document.createElement("span");
+    bar.className = "me-media-tools";
+    const button = (cls: string, label: string, icon: string, run: () => void): HTMLButtonElement => {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.className = `me-btn ${cls}`;
+      b.title = label;
+      b.setAttribute("aria-label", label);
+      b.innerHTML = icon;
+      // view-state: (the button keeps the note's focus)
+      b.addEventListener("mousedown", (e) => (e.preventDefault(), e.stopPropagation()));
+      // view-state: (full size changes nothing in the note; edit shows the picture's Markdown with the cursor in it)
+      b.addEventListener("click", (e) => (e.stopPropagation(), run()));
+      return b;
+    };
+    bar.append(
+      button("me-media-zoom", this.ctx.zoomLabel, '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4M11 8v6M8 11h6"/></svg>', () => void viewPicture(view, now().at!.from, this.ctx.closeLabel)),
+      button("me-media-edit", this.ctx.editPictureLabel, '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m8 7-5 5 5 5M16 7l5 5-5 5M14 4l-4 16"/></svg>', () => {
+        const at = now().at!;
+        view.dispatch({ effects: setPictureEdit.of(at.from), selection: { anchor: at.to } });
+        view.focus();
+      }),
+    );
+    return bar;
+  }
   /** A handle at the picture's corner: dragged, the picture's width is written into its Markdown (`![alt|300](…)`, `![[cat.png|300]]`). */
-  private resizer(img: HTMLImageElement, view: EditorView): HTMLElement {
+  private resizer(img: HTMLImageElement, view: EditorView, now: () => MediaWidget): HTMLElement {
     const h = document.createElement("span");
     h.className = "me-resize";
     h.title = this.ctx.resizeLabel;
@@ -159,18 +221,11 @@ class MediaWidget extends WidgetType {
       h.addEventListener("pointermove", move);
       h.addEventListener("pointerup", () => {
         h.removeEventListener("pointermove", move);
-        const at = this.at!;
-        const src = view.state.sliceDoc(at.from, at.to);
-        const next = this.embed
-          ? src.replace(/^!\[\[([^\]|]+)(?:\|[^\]]*)?\]\]$/, `![[$1|${w}]]`)
-          : src.replace(/^!\[([^\]]*?)(?:\|\d+(?:x\d+)?)?\]/, `![$1|${w}]`);
-        if (next !== src) view.dispatch({ changes: { from: at.from, to: at.to, insert: next }, userEvent: "input.resize" });
+        const me = now();
+        setPictureWidth(view, { ...me.at!, embed: me.embed }, w);
       }, { once: true });
     });
     return h;
-  }
-  override updateDOM(): boolean {
-    return false;
   }
   override ignoreEvent(): boolean {
     return false;
@@ -451,10 +506,12 @@ function decorations(view: EditorView, ctx: LiveContext): DecorationSet {
     if (spaces) while (to < state.doc.length && /[ \t]/.test(state.sliceDoc(to, to + 1))) to++;
     if (to > from) out.push(hide.range(from, to));
   };
-  /** A picture: on the cursor's line its source shows with the picture after it; elsewhere the picture alone. */
-  const media = (n: SyntaxNode, w: MediaWidget): void => {
-    if (lineActive(n.from)) out.push(Decoration.widget({ widget: w, side: 1 }).range(n.to));
-    else out.push(Decoration.replace({ widget: w }).range(n.from, n.to));
+  /** A picture: drawn in place of its Markdown, always; while it is edited (Enter, or its edit button) its Markdown shows with it after. */
+  const editing = state.field(pictureEdit, false);
+  const picked = selectedPicture(state);
+  const media = (n: SyntaxNode, make: (selected: boolean) => MediaWidget): void => {
+    if (editing === n.from) out.push(Decoration.widget({ widget: make(false), side: 1 }).range(n.to));
+    else out.push(Decoration.replace({ widget: make(picked?.from === n.from && picked.to === n.to) }).range(n.from, n.to));
   };
   const seenQuotes = new Set<number>();
   const codeAt = (pos: number): boolean => {
@@ -520,7 +577,7 @@ function decorations(view: EditorView, ctx: LiveContext): DecorationSet {
             if (!url || !close) return false;
             const alt = state.sliceDoc(marks[0]!.to, close.from);
             const size = /^(.*?)\|(\d+)(?:x\d+)?$/.exec(alt);
-            media(n, new MediaWidget(text(url).replace(/^<|>$/g, ""), size ? size[1]! : alt, false, size ? Number(size[2]) : null, ctx, { from: n.from, to: n.to }));
+            media(n, (sel) => new MediaWidget(text(url).replace(/^<|>$/g, ""), size ? size[1]! : alt, false, size ? Number(size[2]) : null, ctx, { from: n.from, to: n.to }, sel));
             return false;
           }
           case "Embed": {
@@ -529,7 +586,7 @@ function decorations(view: EditorView, ctx: LiveContext): DecorationSet {
             const alias = n.getChild("WikiAlias");
             const a = alias ? text(alias).trim() : "";
             const size = /^\d+(?:x\d+)?$/.test(a) ? Number(a.split("x")[0]) : null;
-            media(n, new MediaWidget(text(target).trim(), size ? "" : a, true, size, ctx, { from: n.from, to: n.to }));
+            media(n, (sel) => new MediaWidget(text(target).trim(), size ? "" : a, true, size, ctx, { from: n.from, to: n.to }, sel));
             return false;
           }
           case "WikiLink": {

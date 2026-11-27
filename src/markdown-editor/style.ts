@@ -120,7 +120,15 @@ export const EDITOR_CSS = `
 :where(.me) .me-hl-gray { background: color-mix(in oklch, var(--me-grey) 30%, transparent); }
 :where(.me-media) { position: relative; }
 :where(.me-resize) { position: absolute; right: 4px; bottom: 4px; width: 12px; height: 12px; border-right: 2px solid var(--me-bg); border-bottom: 2px solid var(--me-bg); box-shadow: 1px 1px 0 var(--me-fg); cursor: nwse-resize; opacity: 0; touch-action: none; }
-:where(.me-media:hover) .me-resize { opacity: 1; }
+:where(.me-media:hover, .me-media.is-selected) .me-resize { opacity: 1; }
+:where(.me-media.is-selected) img { outline: 2px solid var(--me-accent); outline-offset: 2px; }
+:where(.me-media-tools) { position: absolute; top: 6px; right: 6px; display: flex; gap: 2px; padding: 2px; border-radius: var(--me-radius); background: color-mix(in oklch, var(--me-bg) 85%, transparent); opacity: 0; transition: opacity 0.12s; }
+:where(.me-media:hover, .me-media.is-selected) .me-media-tools { opacity: 1; }
+:where(.me-media-tools) .me-btn { min-width: 24px; height: 24px; color: var(--me-fg); }
+:where(.me-lightbox) { position: fixed; inset: 0; z-index: 1001; display: grid; place-items: center; overflow: hidden; background: color-mix(in oklch, black 82%, transparent); outline: none; }
+:where(.me-lightbox) img { max-width: 92vw; max-height: 92vh; object-fit: contain; cursor: zoom-in; user-select: none; }
+:where(.me-lightbox) img.is-full { max-width: none; max-height: none; cursor: grab; }
+:where(.me-lightbox-close) { position: absolute; top: 12px; right: 12px; color: white; font-size: 22px; }
 /* the package's lists of choices (popover.ts) */
 :where(.me-pop) { position: fixed; z-index: 1000; display: flex; flex-direction: column; min-width: 12em; max-height: min(24rem, 70vh); overflow: auto; padding: 4px; background: var(--me-bg); color: var(--me-fg); border: 1px solid var(--me-line); border-radius: var(--me-radius); box-shadow: 0 8px 24px color-mix(in oklch, var(--me-fg) 20%, transparent); font-family: var(--me-font); font-size: 13px; }
 :where(.me-pop-item) { display: flex; justify-content: space-between; gap: 12px; padding: 4px 8px; border: 0; border-radius: 4px; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }

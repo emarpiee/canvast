@@ -9,7 +9,7 @@ const files = async (d) => (await Promise.all((await readdir(d, { withFileTypes:
 let bad = 0;
 for (const f of await files(dir)) {
   const src = await readFile(f, "utf8");
-  for (const m of src.matchAll(/(?:from|import)\s*\(?\s*["']([^"']+)["']/g)) {
+  for (const m of src.matchAll(/(?<=^|[\s;}])(?:from|import)\s*\(?\s*["']([^"']+)["']/gm)) {
     const spec = m[1];
     const inside = spec.startsWith(".") && !relative(dir, resolve(dirname(f), spec)).startsWith("..");
     if (!inside && !/^@(codemirror|lezer)\/|^@replit\/codemirror-vim$/.test(spec)) {

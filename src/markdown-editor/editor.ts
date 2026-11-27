@@ -9,7 +9,7 @@ import { Compartment, EditorSelection, EditorState, Prec, Transaction, type Exte
 import { EditorView, drawSelection, keymap, placeholder as placeholderExt } from "@codemirror/view";
 import { codeColours, type CodeSpans } from "./code";
 import { COMMANDS, type FormatName } from "./commands";
-import { behaviorExtensions, hopMarker, insertBlockMarkdown, linkFollow, pasteRules, reflowParagraph, toggleCheckbox, toggleTask, type BehaviorId } from "./behaviors";
+import { behaviorExtensions, hopMarker, pictureSelect, insertBlockMarkdown, linkFollow, pasteRules, reflowParagraph, toggleCheckbox, toggleTask, type BehaviorId } from "./behaviors";
 import { foldAtCursor, folding, initialFolds } from "./fold";
 import { HIGHLIGHTS, openContextMenu } from "./context-menu";
 import { linkPopover, type LinkTarget } from "./link-popover";
@@ -113,7 +113,7 @@ export interface EditorLabels {
   bulletList: string; orderedList: string; taskList: string; toggleTask: string; quote: string; codeBlock: string; table: string; rule: string;
   picture: string; find: string; save: string; task: string; placeholder: string; toolbar: string; format: string; insert: string;
   turnInto: string; copyCode: string; copied: string; codeLanguage: string; addRow: string; addColumn: string;
-  heading4: string; callout: string; mathBlock: string; math: string; image: string; plainText: string; resize: string; tableActions: string;
+  heading4: string; callout: string; mathBlock: string; math: string; image: string; plainText: string; resize: string; zoomPicture: string; editPicture: string; tableActions: string;
   today: string; yesterday: string; tomorrow: string; now: string;
   rowAbove: string; rowBelow: string; colBefore: string; colAfter: string; rowUp: string; rowDown: string; colLeft: string; colRight: string;
   dupRow: string; dupCol: string; alignLeft: string; alignCenter: string; alignRight: string; sortUp: string; sortDown: string;
@@ -132,7 +132,7 @@ export const DEFAULT_LABELS: EditorLabels = {
   bulletList: "Bulleted list", orderedList: "Numbered list", taskList: "Task list", toggleTask: "Tick task", quote: "Quote", codeBlock: "Code block", table: "Table", rule: "Divider",
   picture: "Picture", find: "Find", save: "Save", task: "Done", placeholder: "Write, or press / for blocks", toolbar: "Formatting", format: "Format", insert: "Insert",
   turnInto: "Turn into", copyCode: "Copy code", copied: "Copied", codeLanguage: "Choose a language", addRow: "Add a row", addColumn: "Add a column",
-  heading4: "Heading 4", callout: "Callout", mathBlock: "Math block", math: "Math", image: "Image", plainText: "text", resize: "Drag to resize", tableActions: "Table",
+  heading4: "Heading 4", callout: "Callout", mathBlock: "Math block", math: "Math", image: "Image", plainText: "text", resize: "Drag to resize", zoomPicture: "View full size", editPicture: "Edit its Markdown", tableActions: "Table",
   today: "Today", yesterday: "Yesterday", tomorrow: "Tomorrow", now: "Now",
   rowAbove: "Add row above", rowBelow: "Add row below", colBefore: "Add column before", colAfter: "Add column after", rowUp: "Move row up", rowDown: "Move row down",
   colLeft: "Move column left", colRight: "Move column right", dupRow: "Duplicate row", dupCol: "Duplicate column", alignLeft: "Align left", alignCenter: "Align center",
@@ -259,7 +259,7 @@ export function createMarkdownEditor(opts: EditorOptions): MarkdownEditor {
     cellEditor: (parent: HTMLElement, text: string, events: CellEvents) => cellEditor(parent, text, events),
     ...(host.renderDiagram ? { renderDiagram: host.renderDiagram.bind(host) } : {}),
     taskLabel: labels.task, copyLabel: labels.copyCode, copiedLabel: labels.copied, languageLabel: labels.codeLanguage, addRowLabel: labels.addRow, addColumnLabel: labels.addColumn,
-    tableLabel: labels.tableActions, languages: host.languages ?? LANGUAGES, resizeLabel: labels.resize, plainLabel: labels.plainText, detectedLabel: labels.detected,
+    tableLabel: labels.tableActions, languages: host.languages ?? LANGUAGES, resizeLabel: labels.resize, zoomLabel: labels.zoomPicture, editPictureLabel: labels.editPicture, closeLabel: labels.close, plainLabel: labels.plainText, detectedLabel: labels.detected,
     tableWords: { rowAbove: labels.rowAbove, rowBelow: labels.rowBelow, colBefore: labels.colBefore, colAfter: labels.colAfter, rowUp: labels.rowUp, rowDown: labels.rowDown, colLeft: labels.colLeft, colRight: labels.colRight, dupRow: labels.dupRow, dupCol: labels.dupCol, alignLeft: labels.alignLeft, alignCenter: labels.alignCenter, alignRight: labels.alignRight, sortUp: labels.sortUp, sortDown: labels.sortDown, delRow: labels.delRow, delCol: labels.delCol, copy: labels.copyTable, duplicate: labels.duplicateTable },
   };
   const liveExt = (): Extension => (mode === "live" ? livePreview(liveCtx) : []);
@@ -431,7 +431,7 @@ export function createMarkdownEditor(opts: EditorOptions): MarkdownEditor {
       },
     }),
   ];
-  if (!plain) extensions.push(folding, liveLayer.of(liveExt()));
+  if (!plain) extensions.push(folding, liveLayer.of(liveExt()), ...(on("picture-select") ? [pictureSelect(labels.close, () => mode === "live")] : []));
 
   /** The table cell being edited, if any: the toolbar's formats act on it. */
   let activeCell: EditorView | null = null;
