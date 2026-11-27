@@ -5,7 +5,7 @@
      Lightness is fixed in each token below, so turning either dial never changes contrast (ADR 0052). */
   --hue: 70;
   --vivid: 0.2;
-  --theme-bg: oklch(0.955 calc(0.012 * var(--vivid)) var(--hue)); /* the app's own background: the views and dialogs (a colour chosen for the canvas does not tint them) */
+  --theme-bg: oklch(0.962 calc(0.029 * var(--vivid)) var(--hue)); /* the app's own background: the views and dialogs (a colour chosen for the canvas does not tint them) */
   --canvas-bg: var(--theme-bg);
   --canvas-grid: oklch(0.55 calc(0.02 * var(--vivid)) var(--hue));
   --canvas-axis: oklch(0.62 0.14 45); /* the origin axes: the brand's orange whatever the theme colour, like the dot in the logo */
@@ -31,26 +31,38 @@
   --text-found: color-mix(in oklch, var(--hud-accent) 35%, transparent);
   --text-chosen: color-mix(in oklch, var(--hud-accent) 28%, transparent);
   --canvas-guide: oklch(0.62 0.2 335); /* snap guides: one colour that stands out on any theme colour */
-  --hud-bg: oklch(0.99 calc(0.006 * var(--vivid)) var(--hue) / 0.92);
-  --paper: oklch(0.995 calc(0.004 * var(--vivid)) var(--hue)); /* an opaque surface: the notes editor's page and dialogs */
-  --hud-fg: oklch(0.25 calc(0.02 * var(--vivid)) var(--hue));
-  --hud-muted: oklch(0.46 calc(0.02 * var(--vivid)) var(--hue));
-  --hud-border: oklch(0.25 calc(0.02 * var(--vivid)) var(--hue) / 0.14);
+  --hud-bg: var(--card);
+  --paper: oklch(0.944 calc(0.037 * var(--vivid)) var(--hue)); /* an opaque surface: the notes editor's page and dialogs */
+  --hud-fg: oklch(0.249 calc(0.032 * var(--vivid)) var(--hue));
+  --hud-muted: oklch(0.437 calc(0.062 * var(--vivid)) var(--hue));
+  --hud-border: oklch(0.874 calc(0.067 * var(--vivid)) var(--hue));
   --hud-hover: oklch(0.5 calc(0.03 * var(--vivid)) var(--hue) / 0.14);
   --thumb-glint: oklch(1 0 0 / 0.55); /* the light passing over a thumbnail that is still loading */
   --font-thumb-filter: invert(0.85); /* a font's "Aa" thumbnail is light letters: dark on a light theme */
-  --hud-accent: oklch(0.52 calc(0.1 * var(--vivid)) var(--hue));
+  --hud-accent: oklch(0.617 calc(min(0.2, 0.71 * var(--vivid))) var(--hue));
   --hud-accent-fg: oklch(1 0 0);
-  --hud-accent-text: oklch(0.44 calc(0.1 * var(--vivid)) var(--hue)); /* accent as text or a small icon: stays readable on an accent tint and on a panel over a dark canvas */
+  --hud-accent-text: oklch(0.518 calc(min(0.18, 0.63 * var(--vivid))) var(--hue)); /* accent as text or a small icon: stays readable on an accent tint and on a panel over a dark canvas */
   /* Code in notes: 4.5:1 on a code block in each theme (tests/e2e/contrast.spec.ts). */
   --code-keyword: oklch(0.45 0.16 300); --code-string: oklch(0.43 0.12 150); --code-comment: oklch(0.46 0.03 260); --code-number: oklch(0.47 0.13 50); --code-function: oklch(0.44 0.13 250); --code-tag: oklch(0.46 0.16 20);
-  --hud-accent-hover: oklch(0.47 calc(0.1 * var(--vivid)) var(--hue)); /* a primary button under the pointer: further from its text */
+  --hud-accent-hover: oklch(0.57 calc(min(0.2, 0.71 * var(--vivid))) var(--hue)); /* a primary button under the pointer: further from its text */
   --hud-edge: oklch(0.25 calc(0.02 * var(--vivid)) var(--hue) / 0.55); /* the edge of a field, where the edge is what shows it: 3:1 */
-  --hud-danger: oklch(0.47 0.15 20);
+  --hud-danger: oklch(0.524 0.155 25);
   --hud-danger-fg: oklch(1 0 0);
   --hud-star: oklch(0.6 0.13 85);
-  --hud-success: oklch(0.5 0.13 150);
+  --hud-success: oklch(0.5 0.1 178);
   --hud-warning: oklch(0.52 0.11 80);
+  --shell-bg: oklch(0.923 calc(0.044 * var(--vivid)) var(--hue));
+  --card: oklch(1 0 0);
+  --button: oklch(0.905 calc(0.052 * var(--vivid)) var(--hue));
+  --row-active: oklch(0.878 calc(0.075 * var(--vivid)) var(--hue));
+  --hud-faint: oklch(0.554 calc(0.068 * var(--vivid)) var(--hue));
+  --hud-ghost: oklch(0.701 calc(0.07 * var(--vivid)) var(--hue));
+  --accent-wash: oklch(0.925 calc(min(0.03, 0.14 * var(--vivid))) var(--hue));
+  --hud-danger-bg: oklch(0.565 0.136 23);
+  --hud-info: oklch(0.5 0.14 267);
+  --hidden: oklch(0.55 0.14 299);
+  --hidden-wash: oklch(0.93 0.03 299);
+  --hidden-text: oklch(0.42 0.13 299);
   --logo-colour: var(--hud-accent);
   --scroll-size: 10px; --scroll-inset: var(--sp-2);
   --meta-label-w: 7.5rem;
@@ -85,7 +97,9 @@
   --dur-wait: calc(1400ms * var(--anim-speed)); /* one sweep of a "still loading" shimmer */
   --ease-out: cubic-bezier(0.2, 0, 0, 1);
   --ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
-  --font-ui: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-ui: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif; /* (Inter is built in: text/inter.ts) */
+  /* The workspace (B39): ribbon, sidebars, tab strip, view header, status bar */
+  --ribbon-w: 44px; --sidebar-w: 260px; --sidebar-r-w: 280px; --tab-h: 34px; --tab-strip-h: 40px; --view-header-h: 40px; --status-h: 24px; --pane-title-h: 36px;
   --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
   --r-2xs: 3px;
   --r-xs: 4px;
@@ -189,7 +203,7 @@
 /* Every colour of the interface is oklch: lightness is perceptual, so a step in L is the same step in both themes. */
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --theme-bg: oklch(0.2 calc(0.012 * var(--vivid)) var(--hue));
+    --theme-bg: oklch(0.222 calc(0.02 * var(--vivid)) var(--hue));
   --canvas-bg: var(--theme-bg);
     --canvas-grid: oklch(0.72 calc(0.025 * var(--vivid)) var(--hue));
     --canvas-axis: oklch(0.72 0.12 53);
@@ -205,25 +219,37 @@
     --canvas-danger: oklch(0.7 0.17 25);
     --canvas-danger-wash: oklch(0.7 0.17 25 / 0.2);
     --canvas-guide: oklch(0.75 0.17 338);
-    --hud-bg: oklch(0.25 calc(0.014 * var(--vivid)) var(--hue) / 0.92);
-    --paper: oklch(0.25 calc(0.014 * var(--vivid)) var(--hue));
-    --hud-fg: oklch(0.93 calc(0.014 * var(--vivid)) var(--hue));
-    --hud-muted: oklch(0.75 calc(0.014 * var(--vivid)) var(--hue));
-    --hud-border: oklch(0.93 calc(0.014 * var(--vivid)) var(--hue) / 0.14);
+    --hud-bg: var(--card);
+    --paper: oklch(0.258 calc(0.024 * var(--vivid)) var(--hue));
+    --hud-fg: oklch(0.935 calc(0.023 * var(--vivid)) var(--hue));
+    --hud-muted: oklch(0.749 calc(0.04 * var(--vivid)) var(--hue));
+    --hud-border: oklch(0.318 calc(0.03 * var(--vivid)) var(--hue));
     --hud-hover: oklch(0.75 calc(0.025 * var(--vivid)) var(--hue) / 0.16);
   --thumb-glint: oklch(1 0 0 / 0.06);
   --font-thumb-filter: none;
-    --hud-accent: oklch(0.78 calc(0.075 * var(--vivid)) var(--hue));
-    --hud-accent-fg: oklch(0.25 calc(0.04 * var(--vivid)) var(--hue));
-    --hud-accent-text: oklch(0.78 calc(0.075 * var(--vivid)) var(--hue));
+    --hud-accent: oklch(0.713 calc(min(0.2, 0.63 * var(--vivid))) var(--hue));
+    --hud-accent-fg: oklch(0.222 calc(0.02 * var(--vivid)) var(--hue));
+    --hud-accent-text: oklch(0.777 calc(min(0.16, 0.5 * var(--vivid))) var(--hue));
     --code-keyword: oklch(0.8 0.11 300); --code-string: oklch(0.82 0.12 150); --code-comment: oklch(0.72 0.03 260); --code-number: oklch(0.82 0.11 60); --code-function: oklch(0.8 0.1 240); --code-tag: oklch(0.78 0.12 15);
-    --hud-accent-hover: oklch(0.83 calc(0.075 * var(--vivid)) var(--hue));
+    --hud-accent-hover: oklch(0.76 calc(min(0.2, 0.63 * var(--vivid))) var(--hue));
     --hud-edge: oklch(0.93 calc(0.014 * var(--vivid)) var(--hue) / 0.45);
-    --hud-danger: oklch(0.74 0.14 20);
+    --hud-danger: oklch(0.693 0.127 21);
     --hud-danger-fg: oklch(0.2 0.02 20);
     --hud-star: oklch(0.8 0.14 85);
-    --hud-success: oklch(0.75 0.15 150);
-    --hud-warning: oklch(0.8 0.14 80);
+    --hud-success: oklch(0.688 0.095 178);
+    --hud-warning: oklch(0.751 0.13 80);
+    --shell-bg: oklch(0.24 calc(0.02 * var(--vivid)) var(--hue));
+    --card: oklch(0.278 calc(0.024 * var(--vivid)) var(--hue));
+    --button: oklch(0.298 calc(0.03 * var(--vivid)) var(--hue));
+    --row-active: oklch(0.341 calc(0.037 * var(--vivid)) var(--hue));
+    --hud-faint: oklch(0.604 calc(0.042 * var(--vivid)) var(--hue));
+    --hud-ghost: oklch(0.468 calc(0.035 * var(--vivid)) var(--hue));
+    --accent-wash: oklch(0.316 calc(min(0.03, 0.11 * var(--vivid))) var(--hue));
+    --hud-danger-bg: oklch(0.565 0.136 23);
+    --hud-info: oklch(0.661 0.126 267);
+    --hidden: oklch(0.697 0.125 299);
+    --hidden-wash: oklch(0.292 0.046 296);
+    --hidden-text: oklch(0.871 0.056 299);
     --logo-colour: var(--hud-fg);
     --hud-scrim: oklch(0.12 0.01 190 / 0.55);
     --hud-scrim-soft: oklch(0.12 0.01 190 / 0.25);
@@ -235,7 +261,7 @@
 :root[data-theme="light"] { color-scheme: light; }
 :root[data-theme="dark"] {
   color-scheme: dark;
-  --theme-bg: oklch(0.2 calc(0.012 * var(--vivid)) var(--hue));
+  --theme-bg: oklch(0.222 calc(0.02 * var(--vivid)) var(--hue));
   --canvas-bg: var(--theme-bg);
   --canvas-grid: oklch(0.72 calc(0.025 * var(--vivid)) var(--hue));
   --canvas-axis: oklch(0.72 0.12 53);
@@ -251,25 +277,37 @@
   --canvas-danger: oklch(0.7 0.17 25);
   --canvas-danger-wash: oklch(0.7 0.17 25 / 0.2);
   --canvas-guide: oklch(0.75 0.17 338);
-  --hud-bg: oklch(0.25 calc(0.014 * var(--vivid)) var(--hue) / 0.92);
-  --paper: oklch(0.25 calc(0.014 * var(--vivid)) var(--hue));
-  --hud-fg: oklch(0.93 calc(0.014 * var(--vivid)) var(--hue));
-  --hud-muted: oklch(0.75 calc(0.014 * var(--vivid)) var(--hue));
-  --hud-border: oklch(0.93 calc(0.014 * var(--vivid)) var(--hue) / 0.14);
+  --hud-bg: var(--card);
+  --paper: oklch(0.258 calc(0.024 * var(--vivid)) var(--hue));
+  --hud-fg: oklch(0.935 calc(0.023 * var(--vivid)) var(--hue));
+  --hud-muted: oklch(0.749 calc(0.04 * var(--vivid)) var(--hue));
+  --hud-border: oklch(0.318 calc(0.03 * var(--vivid)) var(--hue));
   --hud-hover: oklch(0.75 calc(0.025 * var(--vivid)) var(--hue) / 0.16);
   --thumb-glint: oklch(1 0 0 / 0.06);
   --font-thumb-filter: none;
-  --hud-accent: oklch(0.78 calc(0.075 * var(--vivid)) var(--hue));
-  --hud-accent-fg: oklch(0.25 calc(0.04 * var(--vivid)) var(--hue));
-  --hud-accent-text: oklch(0.78 calc(0.075 * var(--vivid)) var(--hue));
+  --hud-accent: oklch(0.713 calc(min(0.2, 0.63 * var(--vivid))) var(--hue));
+  --hud-accent-fg: oklch(0.222 calc(0.02 * var(--vivid)) var(--hue));
+  --hud-accent-text: oklch(0.777 calc(min(0.16, 0.5 * var(--vivid))) var(--hue));
   --code-keyword: oklch(0.8 0.11 300); --code-string: oklch(0.82 0.12 150); --code-comment: oklch(0.72 0.03 260); --code-number: oklch(0.82 0.11 60); --code-function: oklch(0.8 0.1 240); --code-tag: oklch(0.78 0.12 15);
-  --hud-accent-hover: oklch(0.83 calc(0.075 * var(--vivid)) var(--hue));
+  --hud-accent-hover: oklch(0.76 calc(min(0.2, 0.63 * var(--vivid))) var(--hue));
   --hud-edge: oklch(0.93 calc(0.014 * var(--vivid)) var(--hue) / 0.45);
-  --hud-danger: oklch(0.74 0.14 20);
+  --hud-danger: oklch(0.693 0.127 21);
   --hud-danger-fg: oklch(0.2 0.02 20);
   --hud-star: oklch(0.8 0.14 85);
-  --hud-success: oklch(0.75 0.15 150);
-  --hud-warning: oklch(0.8 0.14 80);
+  --hud-success: oklch(0.688 0.095 178);
+  --hud-warning: oklch(0.751 0.13 80);
+  --shell-bg: oklch(0.24 calc(0.02 * var(--vivid)) var(--hue));
+  --card: oklch(0.278 calc(0.024 * var(--vivid)) var(--hue));
+  --button: oklch(0.298 calc(0.03 * var(--vivid)) var(--hue));
+  --row-active: oklch(0.341 calc(0.037 * var(--vivid)) var(--hue));
+  --hud-faint: oklch(0.604 calc(0.042 * var(--vivid)) var(--hue));
+  --hud-ghost: oklch(0.468 calc(0.035 * var(--vivid)) var(--hue));
+  --accent-wash: oklch(0.316 calc(min(0.03, 0.11 * var(--vivid))) var(--hue));
+  --hud-danger-bg: oklch(0.565 0.136 23);
+  --hud-info: oklch(0.661 0.126 267);
+  --hidden: oklch(0.697 0.125 299);
+  --hidden-wash: oklch(0.292 0.046 296);
+  --hidden-text: oklch(0.871 0.056 299);
   --logo-colour: var(--hud-fg);
   --hud-scrim: oklch(0.12 0.01 190 / 0.55);
   --hud-scrim-soft: oklch(0.12 0.01 190 / 0.25);

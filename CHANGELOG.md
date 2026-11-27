@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.63.19 — The new look's colours and type (2026-11-27)
+
+- **Changed:** the interface takes the new workspace look's colours, in light and dark: warm greys, flat panels split by hairlines, and an orange accent (the default theme colour; a theme colour of your own still sets it). Every name in the interface is in Inter, in three weights. ([Settings](README.md#settings))
+
+### For developers
+
+- New tokens in `src/styles.css` for the workspace (B39): `--shell-bg`, `--card`, `--button`, `--row-active`, `--hud-faint`, `--hud-ghost`, `--accent-wash`, `--hud-danger-bg`, `--hud-info`, `--hidden`, `--hidden-wash`, `--hidden-text`, and the layout sizes `--ribbon-w`, `--sidebar-w`, `--sidebar-r-w`, `--tab-h`, `--tab-strip-h`, `--view-header-h`, `--status-h`, `--pane-title-h`. The default `ui.hue` is 50.
+
 ## 0.63.18 — Tests settled for the resize work (2026-11-27)
 
 ### For developers

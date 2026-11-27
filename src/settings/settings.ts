@@ -193,7 +193,7 @@ export const SETTINGS = {
   "key.navRight": { scope: "device", default: "d", validate: letter, effect: "immediate" } as Def<string>,
   "ui.frame": { scope: "device", default: "system", validate: oneOf("system", "off"), effect: "restart" } as Def<"system" | "off">,
   "ui.hueAdaptive": { scope: "device", default: false, validate: bool, effect: "immediate" } as Def<boolean>,
-  "ui.hue": { scope: "device", default: 70, validate: range(0, 360), effect: "immediate" } as Def<number>,
+  "ui.hue": { scope: "device", default: 50, validate: range(0, 360), effect: "immediate" } as Def<number>,
   "ui.vivid": { scope: "device", default: 20, validate: range(0, 150), effect: "immediate" } as Def<number>,
   "ui.pattern": { scope: "device", default: "grid", validate: oneOf("grid", "dots", "scale", "none"), effect: "immediate" } as Def<"grid" | "dots" | "scale" | "none">,
   /** The colour behind the canvas as #rrggbb; empty is the app's own (it follows the theme and the hue dials). */
