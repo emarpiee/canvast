@@ -61,6 +61,8 @@ const followed = new WeakSet<Session>();
 /** A note open in the notes editor. */
 export class OpenNote {
   readonly ownsKeys = true;
+  /** The place at the top of the note where the details panel shows its Properties when Settings say so (OpenView.propsSlot). */
+  readonly propsSlot = Object.assign(document.createElement("div"), { className: "note-props-slot" });
   private saving = false;
   private constructor(
     public hash: string,
@@ -81,7 +83,7 @@ export class OpenNote {
     const text = await blob.text();
     const note = new OpenNote(hash, kind, name, blob.type || "text/plain", null, wordsOf(kind, text), deps, place);
     const host = await note.host();
-    note.editor = await mountNoteEditor(el, { kind, text, mode: deps.settings.get("notes.editorMode"), wrapSelection: deps.settings.get("notes.wrapSelection"), codeColours: deps.settings.get("notes.codeColours"), host, title: titleOf(name), root: place.root?.() ?? null });
+    note.editor = await mountNoteEditor(el, { kind, text, mode: deps.settings.get("notes.editorMode"), wrapSelection: deps.settings.get("notes.wrapSelection"), codeColours: deps.settings.get("notes.codeColours"), host, title: titleOf(name), root: place.root?.() ?? null, top: note.propsSlot });
     open.add(note);
     await note.readWhole();
     if (!followed.has(deps.session)) {

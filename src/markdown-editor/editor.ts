@@ -5,8 +5,8 @@ import { defaultKeymap, history, historyKeymap, indentWithTab, redo, undo } from
 import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
 import { syntaxTree } from "@codemirror/language";
 import { openSearchPanel, search, searchKeymap } from "@codemirror/search";
-import { Compartment, EditorSelection, EditorState, Prec, Transaction, type Extension } from "@codemirror/state";
-import { EditorView, drawSelection, keymap, placeholder as placeholderExt } from "@codemirror/view";
+import { Compartment, EditorSelection, EditorState, Prec, StateEffect, StateField, Transaction, type Extension } from "@codemirror/state";
+import { Decoration, EditorView, WidgetType, drawSelection, keymap, placeholder as placeholderExt, type DecorationSet } from "@codemirror/view";
 import { codeColours, type CodeSpans } from "./code";
 import { COMMANDS, type FormatName } from "./commands";
 import { behaviorExtensions, hopMarker, pictureSelect, insertBlockMarkdown, linkFollow, pasteRules, reflowParagraph, toggleCheckbox, toggleTask, type BehaviorId } from "./behaviors";
@@ -170,6 +170,9 @@ export interface EditorOptions {
   icons?: Partial<Record<IconName, string>>;
   /** Show the toolbar. Default true. */
   toolbar?: boolean;
+  /** An element of the host's shown at the top of the note, above its first line, in every mode (a note's properties, as notes apps
+   *  show them): it is the host's, the editor only places it. */
+  top?: HTMLElement;
   /** Vim keys (normal, insert, visual modes). Default false. */
   vim?: boolean;
   /** Behaviours turned off by their id (behaviors/index.ts): every one is on unless set to false here. */
@@ -442,6 +445,7 @@ export function createMarkdownEditor(opts: EditorOptions): MarkdownEditor {
     }),
   ];
   if (!plain) extensions.push(folding, liveLayer.of(liveExt()));
+  if (opts.top) extensions.push(topBlock(opts.top));
 
   /** The table cell being edited, if any: the toolbar's formats act on it. */
   let activeCell: EditorView | null = null;
@@ -601,6 +605,7 @@ export function createMarkdownEditor(opts: EditorOptions): MarkdownEditor {
   // Preview mode: the text drawn as a page. A click on a link follows it; a click on a task's box ticks it in the text.
   const drawPreview = (): void => {
     page.innerHTML = cleanHtml(renderMarkdown(view.state.sliceDoc(), { html: true, taskOffsets: true, taskLabel: labels.task, wikiHref: () => "#" }));
+    if (opts.top) page.prepend(opts.top);
     for (const img of page.querySelectorAll<HTMLImageElement>("img")) {
       const embed = img.getAttribute("data-embed");
       const link = embed ?? img.getAttribute("src") ?? "";
@@ -706,6 +711,7 @@ export function createMarkdownEditor(opts: EditorOptions): MarkdownEditor {
     view.dom.hidden = showPreview;
     preview.hidden = !showPreview;
     if (showPreview) drawPreview();
+    else if (opts.top && !view.contentDOM.contains(opts.top)) view.dispatch({ effects: placeTop.of(null) });
     syncBar();
   };
   const setModeBy = (m: EditorMode): void => {
@@ -795,3 +801,33 @@ export function createMarkdownEditor(opts: EditorOptions): MarkdownEditor {
 }
 
 
+
+/** Places the host's top element again (after the preview had it). */
+const placeTop = StateEffect.define<null>();
+/** The host's element at the top of the note: a block before its first line (its own events, never the editor's). */
+function topBlock(el: HTMLElement): Extension {
+  class Top extends WidgetType {
+    constructor(readonly n: number) {
+      super();
+    }
+    override eq(o: Top): boolean {
+      return o.n === this.n;
+    }
+    override toDOM(): HTMLElement {
+      return el;
+    }
+    override ignoreEvent(): boolean {
+      return true;
+    }
+    override destroy(): void {
+      // (the element is the host's: kept for the next time it is placed)
+    }
+  }
+  let n = 0;
+  const make = (): DecorationSet => Decoration.set([Decoration.widget({ widget: new Top(n++), block: true, side: -1 }).range(0)]);
+  return StateField.define<DecorationSet>({
+    create: make,
+    update: (d, tr) => (tr.effects.some((e) => e.is(placeTop)) ? make() : d.map(tr.changes)),
+    provide: (f) => EditorView.decorations.from(f),
+  });
+}

@@ -206,6 +206,7 @@ One icon per function: two buttons that do different things never share an icon,
 | `rows-4` | Auto layout flow: justified rows (Properties bar) |
 | `columns-3-cog` | A grid's columns and rows (Properties bar) |
 | `layout-panel-left` | Layout styles: saved auto layouts (Properties bar menu, the Styles panel) |
+| `panel-top` | A note's properties shown at the top of the note (the switch on the details' Properties card) |
 | `gallery-vertical` | Auto layout flow: column |
 | `grid-3x2` | Auto layout flow: wrap |
 | `table-2` | Auto layout flow: grid |

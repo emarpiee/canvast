@@ -236,7 +236,7 @@ test("a table cell is the note's own words: one selection, the note's keys, its 
   // Escape leaves the table: the cursor is in the note after it.
   await cell(0).click();
   await p.keyboard.press("Escape");
-  await expect(page(p)).toBeFocused();
+  await expect(page(p).locator(".me-cell.is-editing")).toHaveCount(0);
   // A row's grip, clicked: the whole row is selected (as notes apps do); Delete takes it out; Ctrl+Z puts it back.
   await cell(2).hover();
   await page(p).locator(".me-table-grip").click();
@@ -294,6 +294,12 @@ test("a note's properties (YAML, as notes apps write them) are its item's tags, 
   expect(file).toMatch(/^---\ntags:\n  - design\n  - print\nauthor: Ana\ndescription: The cover plan\nnested:\n  a: 1\n---\n# Cover art/);
   expect(file).toMatch(/Text\. #urgent and #design/);
   await expect.poll(async () => (await entry())?.tags.sort()).toEqual(["design", "print", "urgent"]);
+  // Properties in the note (the switch on the details' Properties card): the same form at the top of the note, back in the details when off.
+  await p.getByTestId("asset-props-in-note").click();
+  await expect(page(p).locator(".note-props-slot [data-testid='asset-notes']")).toHaveCount(1);
+  await expect(p.getByTestId("asset-props-in-note")).toHaveAttribute("aria-pressed", "true");
+  await page(p).locator(".note-props-slot [data-testid='asset-props-in-note']").click();
+  await expect(page(p).locator(".note-props-slot [data-testid='asset-notes']")).toHaveCount(0);
 });
 
 test("[[links]] between notes: shown by their words, Ctrl+click opens the note, [[ offers the library's notes and canvases, kept as written", async ({ app }) => {
@@ -866,7 +872,7 @@ test("Settings > Notes: Save notes on close saves without asking; Notes open in 
   await expect.poll(() => text(p)).toBe("# Keep\n\nWords.\n## and/or");
   // Note styles: Rainbow headings and H1's size, in the editor at once (H2 a step smaller than H1).
   await p.evaluate(() => { window.__canvastDebug.setSetting("notes.style.headingColours", "rainbow"); window.__canvastDebug.setSetting("notes.style.h1Size", 2.4); });
-  await expect(page(p).locator(".me-t-h1").first()).toHaveCSS("color", "rgb(229, 72, 77)");
+  await expect(page(p).locator(".me-t-h1:not(.me-t-mark)").last()).toHaveCSS("color", "rgb(229, 72, 77)"); // (its words: the # keeps the marks' colour)
   const sizes = await page(p).evaluate(() => [".me-t-h1", ".me-t-h2"].map((s) => parseFloat(getComputedStyle(document.querySelector(s)!).fontSize)));
   expect(sizes[0]).toBeGreaterThan(sizes[1]!);
   // Closed with a change: saved, nothing asked.

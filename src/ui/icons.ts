@@ -182,6 +182,7 @@ import squareStackIcon from "lucide-static/icons/square-stack.svg";
 import blocksIcon from "lucide-static/icons/blocks.svg";
 import moveDiagonalIcon from "lucide-static/icons/move-diagonal.svg";
 import panelLeftIcon from "lucide-static/icons/panel-left.svg";
+import panelTopIcon from "lucide-static/icons/panel-top.svg";
 import shapesIcon from "lucide-static/icons/shapes.svg";
 import fileInputIcon from "lucide-static/icons/file-input.svg";
 import fileOutputIcon from "lucide-static/icons/file-output.svg";
@@ -490,6 +491,8 @@ export const ICONS = {
   blocks: clean(blocksIcon),
   moveDiagonal: clean(moveDiagonalIcon),
   panelLeft: clean(panelLeftIcon),
+  /** A note's properties shown at the top of the note (the details' Properties card). */
+  panelTop: clean(panelTopIcon),
   shapes: clean(shapesIcon),
   fileInput: clean(fileInputIcon),
   fileOutput: clean(fileOutputIcon),

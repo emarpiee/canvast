@@ -55,6 +55,8 @@ export interface OpenView {
   card?(): CardLook;
   /** Changes its list of bookmarks (it holds them while it is open). */
   changeMarks?: MarksChange;
+  /** A note's place at its top for its properties: the details panel puts its Properties there when Settings say so. */
+  readonly propsSlot?: HTMLElement;
 }
 
 export interface FileFacts {

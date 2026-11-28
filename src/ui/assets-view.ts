@@ -476,13 +476,46 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   markInspector();
   // view-state: (a details section whose parts are all hidden, or that has none, is marked `is-empty` and leaves no gap: the details panel is
   // a small tree, watched for what is shown or hidden in it, as its parts arrive one by one)
-  const markSections = (): void => { for (const sec of inspector.querySelectorAll<HTMLElement>(".asset-dsec")) sec.classList.toggle("is-empty", ![...sec.children].some((c) => !(c as HTMLElement).hidden)); };
+  const markSections = (): void => { for (const sec of pqa<HTMLElement>(".asset-dsec")) sec.classList.toggle("is-empty", ![...sec.children].some((c) => !(c as HTMLElement).hidden)); };
   new MutationObserver(markSections).observe(inspector, { subtree: true, childList: true, attributes: true, attributeFilter: ["hidden"] });
   // The Details fold stays open (or closed) as you left it when you go to another item; only you close it.
   let detailsOpen = false;
   // Read from the fold itself just before the panel is drawn again (its `toggle` event comes a task later, after a quick pick of another item has already replaced it).
+  // The details panel, and its Properties when they are shown at the top of the open note (Settings: notes.propertiesInNote): the
+  // section is the panel's own, moved there, so its listeners and look-ups reach it in both places (one form, not a copy).
+  const propsSlot = (): HTMLElement | null => (settings.get("notes.propertiesInNote") ? (vw.note?.propsSlot ?? null) : null);
+  const panelRoots = (): HTMLElement[] => {
+    const slot = propsSlot();
+    return slot?.isConnected && slot.firstElementChild ? [inspector, slot] : [inspector];
+  };
+  function pq<T extends Element>(sel: string): T | null {
+    for (const r of panelRoots()) {
+      const x = r.querySelector<T>(sel);
+      if (x) return x;
+    }
+    return null;
+  }
+  const pqa = <T extends Element>(sel: string): T[] => panelRoots().flatMap((r) => [...r.querySelectorAll<T>(sel)]);
+  const pcontains = (n: Node | null): boolean => panelRoots().some((r) => r.contains(n));
+  const panelListeners: Array<[string, EventListener]> = [];
+  const boundSlots = new WeakSet<HTMLElement>();
+  const onPanel = <K extends keyof HTMLElementEventMap>(type: K, fn: (e: HTMLElementEventMap[K]) => void): void => {
+    inspector.addEventListener(type, fn);
+    panelListeners.push([type, fn as EventListener]);
+  };
+  /** The Properties section into the open note's top, or back (an empty top), after each drawing of the details. */
+  const placeProps = (hash: string | null): void => {
+    const slot = vw.note?.propsSlot;
+    if (!slot) return;
+    const sec = settings.get("notes.propertiesInNote") && hash && vw.note?.hash === hash ? inspector.querySelector<HTMLElement>('[data-dsec="notes"]') : null;
+    if (sec && !boundSlots.has(slot)) {
+      boundSlots.add(slot);
+      for (const [type, fn] of panelListeners) slot.addEventListener(type, fn);
+    }
+    slot.replaceChildren(...(sec ? [sec] : []));
+  };
   const keepDetails = (): void => {
-    const d = inspector.querySelector<HTMLDetailsElement>("details[data-metadata]");
+    const d = pq<HTMLDetailsElement>("details[data-metadata]");
     if (d) detailsOpen = d.open;
   };
   const status = root.querySelector<HTMLElement>(".assets-status")!;
@@ -2272,16 +2305,17 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       inspector.dataset["hash"] = "";
       keepDetails();
       inspector.innerHTML = `<p class="asset-note asset-insp-empty" data-testid="inspector-empty">Select an item to see its details. Several selected: their tags and folder together.</p>`;
+      placeProps(null);
       return;
     }
     inspector.hidden = false;
     // Keep a half-typed tag (and its focus) when the inspector re-renders for the same asset.
-    const typing = inspector.dataset["hash"] === selected ? inspector.querySelector<HTMLInputElement>(".tag-input") : null;
+    const typing = inspector.dataset["hash"] === selected ? pq<HTMLInputElement>(".tag-input") : null;
     const draft = typing?.value ?? "";
     const hadFocus = !!typing && document.activeElement === typing;
     // The same for the note or a field being typed in: its text, caret and scroll stay.
     const act = document.activeElement;
-    const editing = inspector.dataset["hash"] === selected && act instanceof HTMLElement && inspector.contains(act) && act.dataset["prop"] ? (act as HTMLInputElement | HTMLTextAreaElement) : null;
+    const editing = inspector.dataset["hash"] === selected && act instanceof HTMLElement && pcontains(act) && act.dataset["prop"] ? (act as HTMLInputElement | HTMLTextAreaElement) : null;
     const kept = editing && { prop: editing.dataset["prop"]!, value: editing.value, start: editing.selectionStart, end: editing.selectionEnd, top: editing.scrollTop };
     const itemBox = inspector.dataset["hash"] === selected && act instanceof HTMLInputElement && act.classList.contains("field-item-input") ? { prop: act.closest<HTMLElement>(".field-list")!.dataset["prop"]!, value: act.value } : null;
     if (blankField !== selected) blankField = null; // (the new row of another item goes; this item's stays, also when it was added before the details had caught up with it)
@@ -2362,44 +2396,45 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
         ${e?.present ? `<button type="button" class="assets-btn" data-action="export" data-testid="asset-export" title="Save it as a .canvast archive, with its tags, notes and folder, to import into canvast">${ICONS.fileOutput}<span>Export</span></button>` : ""}
         ${e ? `<button type="button" class="assets-btn is-danger" data-action="${instances > 0 ? "delete-everywhere" : "delete"}" data-testid="asset-delete" title="${instances > 0 ? "Delete it from the library and from every canvas it is on" : "Delete it from the library"}"${ro}>${ICONS.trash2}<span>Delete…</span></button>` : ""}
       </div>`;
-    for (const h of inspector.querySelectorAll<HTMLElement>("[data-dsec] h3")) {
+    for (const h of pqa<HTMLElement>("[data-dsec] h3")) {
       h.draggable = true;
       h.tabIndex = 0;
       h.title = "Drag to move this section (or Alt+Up and Alt+Down on its name)";
     }
+    placeProps(e?.hash ?? null);
     if (e?.present && !isCard(e)) void fillMetadata(e.hash, e.type);
     // (where its file is, in the desktop app; a hidden item's name on disk is encrypted, and says nothing)
     if (e && desktopBridge() && !meta(e).hidden) {
       const hash = e.hash;
       void session.storage?.originals.fileOf(hash).then((path: string | null) => {
         if (!path || inspector.dataset["hash"] !== hash) return;
-        for (const el of inspector.querySelectorAll<HTMLElement>("[data-file-place]")) el.hidden = false;
-        inspector.querySelector<HTMLElement>("dd[data-file-place]")!.textContent = path;
+        for (const el of pqa<HTMLElement>("[data-file-place]")) el.hidden = false;
+        pq<HTMLElement>("dd[data-file-place]")!.textContent = path;
       }, () => undefined);
     }
     if (e) void vw.fillLinks(e.hash);
-    const prev = inspector.querySelector<HTMLImageElement>(".asset-preview img");
+    const prev = pq<HTMLImageElement>(".asset-preview img");
     if (prev) loadThumb(prev);
-    const sample = inspector.querySelector<HTMLElement>(".asset-preview .font-sample");
+    const sample = pq<HTMLElement>(".asset-preview .font-sample");
     if (sample && e) void showFont(sample, e.hash, async () => (await assets.record(e.hash))?.blob);
-    const tagInput = inspector.querySelector<HTMLInputElement>(".tag-input");
+    const tagInput = pq<HTMLInputElement>(".tag-input");
     if (tagInput && draft) tagInput.value = draft;
     if (tagInput && hadFocus) tagInput.focus();
     if (itemBox) {
-      const box = inspector.querySelector<HTMLInputElement>(`[data-prop="${itemBox.prop}"] .field-item-input`);
+      const box = pq<HTMLInputElement>(`[data-prop="${itemBox.prop}"] .field-item-input`);
       if (box) {
         box.value = itemBox.value;
         box.focus();
       }
     }
-    const back = kept && inspector.querySelector<HTMLInputElement | HTMLTextAreaElement>(`[data-prop="${kept.prop}"]`);
+    const back = kept && pq<HTMLInputElement | HTMLTextAreaElement>(`[data-prop="${kept.prop}"]`);
     if (kept && back) {
       back.value = kept.value;
       back.focus();
       back.setSelectionRange(kept.start, kept.end);
       back.scrollTop = kept.top;
     }
-    if (focusGrip !== null) inspector.querySelector<HTMLElement>(`.field-grip[data-index="${focusGrip}"]`)?.focus();
+    if (focusGrip !== null) pq<HTMLElement>(`.field-grip[data-index="${focusGrip}"]`)?.focus();
     focusGrip = null;
     // The viewer's favourite button follows the stored state.
     if (e && vw.slideHash === e.hash) viewer.querySelector<HTMLElement>('[data-act="favorite"]')!.setAttribute("aria-pressed", String(fav));
@@ -2414,7 +2449,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     if (video && rec.blob.size > 100 * 2 ** 20) return;
     const bytes = new Uint8Array(await (video ? rec.blob : rec.blob.slice(0, 2 * 2 ** 20)).arrayBuffer());
     const { rows } = await readMetadata(bytes, type);
-    const box = inspector.querySelector<HTMLElement>("[data-metadata]");
+    const box = pq<HTMLElement>("[data-metadata]");
     if (!box || inspector.dataset["hash"] !== hash || !rows.length) return;
     const groups = new Map<string, MetaRow[]>();
     for (const r of rows) (groups.get(r.group) ?? groups.set(r.group, []).get(r.group)!).push(r);
@@ -2737,7 +2772,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     ];
     return `
       <section class="asset-sec asset-notes" data-testid="asset-notes">
-        <h3>Properties</h3>
+        <h3>Properties${kind === "md" ? `<button type="button" class="layer-btn" data-action="props-in-note" data-testid="asset-props-in-note" aria-pressed="${settings.get("notes.propertiesInNote")}" aria-label="Show the properties in the note" title="Show them at the top of the note when it is open (as notes apps do), or here">${ICONS.panelTop}</button>` : ""}</h3>
         <label class="asset-note-label" for="asset-note-box">Description</label>
         <textarea id="asset-note-box" class="asset-note-box" data-prop="note" data-testid="asset-note" rows="4" maxlength="${MAX_NOTE}" placeholder="Anything about it, in plain text"${dis}>${esc(m.note)}</textarea>
         ${autoMissing.length ? `<ul class="asset-fields" data-testid="asset-auto-fields">${autoMissing.map((f, i) => fieldRowHtml(e, f, i, dis, true)).join("")}</ul>` : ""}
@@ -2769,7 +2804,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   const DRAG_EDGE = 32;
   const DRAG_STEP = 8;
   // A field is moved by dragging its grip (the order is stored), or with the Up and Down arrows on it.
-  inspector.addEventListener("pointerdown", (e) => {
+  onPanel("pointerdown", (e) => {
     const grip = (e.target as HTMLElement).closest<HTMLButtonElement>(".field-grip");
     const hash = inspector.dataset["hash"];
     if (!grip || grip.disabled || e.button !== 0 || !hash) return;
@@ -2800,7 +2835,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     window.addEventListener("pointerup", end);
     window.addEventListener("pointercancel", end);
   });
-  inspector.addEventListener("keydown", (e) => {
+  onPanel("keydown", (e) => {
     const grip = (e.target as HTMLElement).closest<HTMLButtonElement>(".field-grip");
     const hash = inspector.dataset["hash"];
     if (!grip || grip.disabled || !hash || (e.key !== "ArrowUp" && e.key !== "ArrowDown")) return;
@@ -2818,12 +2853,12 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
 
   /** The note and the fields as they are in the details now (typed but maybe not stored yet). */
   const notesNow = (): { note: string; fields: AssetField[] } => ({
-    note: inspector.querySelector<HTMLTextAreaElement>(".asset-note-box")?.value ?? "",
-    fields: [...inspector.querySelectorAll<HTMLElement>(".asset-field:not([data-auto-missing])")].map(fieldOfRow),
+    note: pq<HTMLTextAreaElement>(".asset-note-box")?.value ?? "",
+    fields: [...pqa<HTMLElement>(".asset-field:not([data-auto-missing])")].map(fieldOfRow),
   });
 
   /** A name's type, for every item with that name. Values stay as they are; those that do not fit say so. */
-  settings.subscribe((key) => AUTO_NOTE_SETTINGS.includes(key) && queueMicrotask(renderInspector));
+  settings.subscribe((key) => (AUTO_NOTE_SETTINGS.includes(key) || key === "notes.propertiesInNote") && queueMicrotask(renderInspector));
   const pinType = (key: string, type: PropType): void => {
     settings.set("library.propTypes", withPropType(settings.get("library.propTypes"), key, type));
     renderInspector();
@@ -3008,7 +3043,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       saveUi();
       renderInspector();
     },
-    headOf: (id) => inspector.querySelector<HTMLElement>(`[data-dsec="${id}"] h3`),
+    headOf: (id) => pq<HTMLElement>(`[data-dsec="${id}"] h3`),
   });
   // A double-click on its name renames it.
   /** Rename a tag on every item that has it: the one way to, from the sidebar and from the details. A name another tag has joins the two. */
@@ -3020,7 +3055,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     renderSide();
   };
   // view-state: (opens the rename dialog, which runs library.rename)
-  inspector.addEventListener("dblclick", (e) => {
+  onPanel("dblclick", (e) => {
     const target = e.target as HTMLElement;
     const chip = target.closest<HTMLElement>(".tag-chip[data-tag-label]");
     if (chip && !target.closest("button") && !session.readOnly) return void renameTagDialog(chip.dataset["tagLabel"]!);
@@ -3117,6 +3152,10 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
         })));
         break;
       }
+      case "props-in-note":
+        // (a setting of this device: every note's properties at its top, or in the details)
+        settings.set("notes.propertiesInNote", !c.pressed);
+        break;
       case "favorite": {
         // The button shows the stored state it would change; set the opposite explicitly.
         const on = !c.pressed;
@@ -3127,7 +3166,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
         // a new empty row under the others, its name field ready to type in (one at a time: + again goes back to it)
         blankField = hash;
         renderInspector();
-        const keys = inspector.querySelectorAll<HTMLInputElement>(".field-key");
+        const keys = pqa<HTMLInputElement>(".field-key");
         keys[keys.length - 1]?.focus();
         break;
       }
@@ -3315,6 +3354,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     "open-app": ["library.openApp", "Open in its app", "The file, in this computer's app for it", "confirm"],
     "show-file": ["library.showFile", "Show the file", "In this computer's file manager", "edit"],
     "add-mark": ["library.addBookmark", "Bookmark this page or view", "In the file's view", "edit"],
+    "props-in-note": ["library.propertiesInNote", "Properties in the note", "A note's properties at the top of the note, or in the details", "edit"],
   };
   /** The details' commands that show the person their own dialog first (ADR 0205: an agent's run is asked there, once). */
   const ASKS = new Set(["delete", "delete-all", "delete-everywhere"]);
@@ -3325,12 +3365,12 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     why: () => (!visible ? "This works in the Library." : session.readOnly && risk !== "read" && action !== "download" && action !== "show" ? REASON.readOnly : !selected ? REASON.noSelection : null),
     exec: (o) => {
       const hash = (o["hash"] as string | undefined) ?? selected!;
-      const anchor = inspector.querySelector<HTMLElement>(`[data-action="${action}"]`) ?? inspector;
+      const anchor = pq<HTMLElement>(`[data-action="${action}"]`) ?? inspector;
       const pressed = o["on"] === undefined ? anchor.getAttribute("aria-pressed") === "true" : o["on"] !== true;
       panelAct(action, { hash, group: (o["hashes"] as string[] | undefined) ?? [...picked], data: { ...anchor.dataset, ...((o["data"] as Record<string, string>) ?? {}) }, pressed, anchor });
     },
   })));
-  inspector.addEventListener("click", (e) => {
+  onPanel("click", (e) => {
     const b = (e.target as HTMLElement).closest<HTMLButtonElement>("button");
     if (!b || b.disabled || !selected) return;
     const hash = selected;
@@ -3345,7 +3385,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   /** Counts presses and clicks anywhere: a field that would take the focus back after a write first checks that none came in between. */
   let inputs = 0;
   for (const type of ["pointerdown", "keydown"] as const) window.addEventListener(type, () => void inputs++, { capture: true });
-  inspector.addEventListener("keydown", (e) => {
+  onPanel("keydown", (e) => {
     const input = e.target as HTMLInputElement;
     if (input.classList.contains("field-item-input")) {
       if (e.key === "Enter") {
@@ -3383,11 +3423,11 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       .organize((c) => c.updateMetaEach(group.map((hash) => ({ hash, change: { addTags: add } }))), `Added ${add.map((t) => `#${t.trim()}`).join(", ")}`)
       .then(() => {
         // back to the field for the next tag, unless something else was clicked or pressed meanwhile (the focus is not taken from it)
-        if (inputs === seq) inspector.querySelector<HTMLInputElement>(".tag-input")?.focus();
+        if (inputs === seq) pq<HTMLInputElement>(".tag-input")?.focus();
       });
   });
   // A property's value suggests what the others of that name say.
-  inspector.addEventListener("focusin", (e) => {
+  onPanel("focusin", (e) => {
     const box = e.target as HTMLElement;
     if (!box.matches?.("input[list='field-value-suggest']")) return;
     const key = box.closest(".asset-field")?.querySelector<HTMLInputElement>(".field-key")?.value.trim();
@@ -3410,25 +3450,25 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   };
   // A list's items are moved by dragging them.
   let draggedItem: HTMLElement | null = null;
-  inspector.addEventListener("dragstart", (e) => {
+  onPanel("dragstart", (e) => {
     draggedItem = (e.target as HTMLElement).closest?.<HTMLElement>(".field-item") ?? null;
     if (draggedItem) e.dataTransfer?.setData("text/plain", draggedItem.dataset["item"]!);
   });
-  inspector.addEventListener("dragover", (e) => {
+  onPanel("dragover", (e) => {
     const over = (e.target as HTMLElement).closest?.<HTMLElement>(".field-item");
     if (!draggedItem || !over || over === draggedItem || over.parentElement !== draggedItem.parentElement) return;
     e.preventDefault();
     const box = over.getBoundingClientRect();
     over.parentElement!.insertBefore(draggedItem, e.clientX < box.left + box.width / 2 ? over : over.nextElementSibling);
   });
-  inspector.addEventListener("dragend", () => {
+  onPanel("dragend", () => {
     const hash = inspector.dataset["hash"];
     if (draggedItem && hash) saveNotes(hash);
     draggedItem = null;
   });
   // A value that does not fit its type says so while it is typed.
   // typing: (the note's properties, written as they are typed)
-  inspector.addEventListener("input", (e) => {
+  onPanel("input", (e) => {
     const box = e.target as HTMLInputElement;
     // (a suggestion chosen is an item at once)
     if (box.classList.contains("field-item-input") && !(e as InputEvent).inputType && box.value) return addItem(box);
@@ -3449,7 +3489,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   };
   // (a date is typed part by part, each one a change: stored only when it is left)
   const isPicker = (box: HTMLInputElement): boolean => box.type === "date" || box.type === "datetime-local";
-  inspector.addEventListener("focusout", (e) => {
+  onPanel("focusout", (e) => {
     const box = e.target as HTMLInputElement;
     const hash = inspector.dataset["hash"];
     if (box.classList?.contains("field-item-input")) return addItem(box); // (words left in a list's box are an item)
@@ -3461,7 +3501,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     }, 0);
   });
   // typing: (the note's properties, written as they are typed)
-  inspector.addEventListener("change", (e) => {
+  onPanel("change", (e) => {
     const box = e.target as HTMLInputElement;
     if (box.classList.contains("field-item-input")) return;
     // the note or a field: stored when it is left (or Enter in a field)
@@ -4370,7 +4410,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   const panelGroups = (): MenuItem[][] =>
     PANEL_GROUPS.map((g) =>
       g.flatMap(([action, hint, icon, label]): MenuItem[] => {
-        const b = inspector.querySelector<HTMLButtonElement>(`[data-action="${action}"]`);
+        const b = pq<HTMLButtonElement>(`[data-action="${action}"]`);
         if (!b || b.hidden) return [];
         const text = label ?? (b.getAttribute("aria-label") || b.textContent?.trim() || action);
         return [{ id: action, label: text, hint, icon: b.querySelector("svg")?.outerHTML ?? icon, danger: b.classList.contains("is-danger"), disabled: b.disabled, command: PANEL_COMMANDS[action]?.[0] ?? "library.details", run: () => b.click() }]; // (the details' button, which runs its command)

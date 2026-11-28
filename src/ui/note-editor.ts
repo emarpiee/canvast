@@ -166,7 +166,7 @@ const NOTE_ICONS = {
 };
 
 /** Open a note in the notes editor inside `el`. Its links to library items show those items (pictures, videos, sounds); files added go into the library. */
-export async function mountNoteEditor(el: HTMLElement, opts: { kind: Exclude<NoteKind, "rich">; text: string; mode: EditorMode; host: NoteHost; /** A sign typed over selected words goes round them (Settings). */ wrapSelection?: boolean; /** Code blocks in a language are coloured (Settings). */ codeColours?: boolean; /** The note's name (no extension), for {{title}}. */ title: string; /** The whole place it is shown in (else the library's viewer). */ root?: HTMLElement | null }): Promise<NoteEditor> {
+export async function mountNoteEditor(el: HTMLElement, opts: { kind: Exclude<NoteKind, "rich">; text: string; mode: EditorMode; host: NoteHost; /** A sign typed over selected words goes round them (Settings). */ wrapSelection?: boolean; /** Code blocks in a language are coloured (Settings). */ codeColours?: boolean; /** The note's name (no extension), for {{title}}. */ title: string; /** The whole place it is shown in (else the library's viewer). */ root?: HTMLElement | null; /** Shown at the top of the note (its properties, from the details panel). */ top?: HTMLElement }): Promise<NoteEditor> {
   const { host } = opts;
   const md = opts.kind === "md";
   /** Each library item shown, by its link as written: its temporary address (let go when the note closes). */
@@ -224,6 +224,7 @@ export async function mountNoteEditor(el: HTMLElement, opts: { kind: Exclude<Not
     mode: opts.mode,
     plain: !md,
     vim: host.vim,
+    ...(md && opts.top ? { top: opts.top } : {}),
     icons: NOTE_ICONS,
     wrapSelection: opts.wrapSelection ?? true,
     injectStyles: true,
