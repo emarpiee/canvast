@@ -117,9 +117,15 @@ async function renderDiagram(code: string): Promise<string> {
  * one opened (so an outside caller can run what the menu offers).
  */
 let shownChoices: readonly PopItem[] = [];
+/** A highlight colour's dot for its menu row: the colour the notes editor gives it (its \`.me\` tokens are these app colours). */
+const HIGHLIGHT_DOT = (c: "red" | "orange" | "yellow" | "green" | "blue" | "purple"): string => {
+  const fill = { red: "var(--hud-danger)", orange: "color-mix(in oklch, var(--code-number) 60%, var(--hud-danger))", yellow: "var(--code-number)", green: "var(--hud-success)", blue: "var(--code-function)", purple: "var(--code-keyword)" }[c];
+  return `<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><circle cx="12" cy="12" r="7" style="fill:${fill}"/></svg>`;
+};
 const CHOICE_LOOK: ReadonlyArray<readonly [RegExp, string, string]> = [
   [/^openLink$/, ICONS.goToLink, "Go where it points"], [/^copyLink$/, ICONS.link, "Copy its address"],
-  [/^highlight\.remove$/, ICONS.circleSlash, "Take the highlight off"], [/^highlight\./, ICONS.highlighter, "Mark the words in this colour"],
+  [/^highlight\.remove$/, ICONS.circleSlash, "Take the highlight off"], [/^highlight\.default$/, ICONS.highlighter, "Mark the words (==words==)"],
+  ...(["red", "orange", "yellow", "green", "blue", "purple"] as const).map((c) => [new RegExp(`^highlight\\.${c}$`), HIGHLIGHT_DOT(c), "Mark the words in this colour"] as const),
   [/^cut$/, ICONS.scissors, "Take the selected words out"], [/^copy$/, ICONS.copy, "Copy the selected words"], [/^paste$/, ICONS.clipboardPaste, "Put in what was copied"],
   [/^toCallout$/, ICONS.speechBalloon, "Make the block a callout"], [/^calloutType$/, ICONS.speechBalloon, "Another kind of callout"], [/^removeCallout$/, ICONS.circleSlash, "Back to plain words"],
   [/^callout\./, ICONS.speechBalloon, "A callout of this kind"], [/^selectAll$/, ICONS.selectAll, "Every word of the note"], [/^undo$/, ICONS.undo, "Take back the last change"], [/^redo$/, ICONS.redo, "Put back what was taken back"],
@@ -154,7 +160,7 @@ const NOTE_ICONS = {
   live: ICONS.pencilLine, source: ICONS.fileCode, preview: ICONS.eye,
   bold: ICONS.bold, italic: ICONS.italic, strike: ICONS.strikethrough, highlight: ICONS.highlighter, link: ICONS.link,
   heading1: ICONS.heading1, heading2: ICONS.heading2, heading3: ICONS.heading3, bulletList: ICONS.list, orderedList: ICONS.listOrdered, taskList: ICONS.listChecks,
-  table: ICONS.grid3x3, rule: ICONS.minus, picture: ICONS.image, find: ICONS.search, save: ICONS.save,
+  table: ICONS.grid3x3, rule: ICONS.minus, picture: ICONS.image, find: ICONS.search, save: ICONS.save, clearFormat: ICONS.eraser, callout: ICONS.speechBalloon,
 };
 
 /** Open a note in the notes editor inside `el`. Its links to library items show those items (pictures, videos, sounds); files added go into the library. */

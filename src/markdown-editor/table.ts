@@ -196,7 +196,7 @@ class TableView {
     cell.innerHTML = blocks !== null ? cleanHtml(blocks) : md ? cleanHtml(renderMarkdown(md, { html: true })).replace(/^<p>|<\/p>$/g, "") : "";
     // (a wiki link that finds no note looks as it does in the note's words)
     for (const link of cell.querySelectorAll<HTMLElement>("a[data-wiki]")) if (this.ctx.exists?.(link.dataset["wiki"]!) === false) link.classList.add("me-wikilink-broken");
-    for (const img of cell.querySelectorAll("img")) img.replaceWith(mediaElement(this.ctx, img.getAttribute("data-embed") ?? img.getAttribute("src") ?? "", img.alt, img.hasAttribute("data-embed")));
+    for (const img of cell.querySelectorAll("img")) img.replaceWith(mediaElement(this.ctx, img.getAttribute("data-embed") ?? img.getAttribute("src") ?? "", img.alt, img.hasAttribute("data-embed"), Number(img.getAttribute("width")) || null));
   }
   /** A change from the cell being edited is being written into the note. */
   private writing = false;

@@ -122,7 +122,7 @@ export interface EditorLabels {
   open: string; openNote: string; copyLink: string; highlightIn: string; removeHighlight: string; cut: string; copy: string; paste: string;
   toCallout: string; calloutType: string; removeCallout: string; selectAll: string; undo: string; redo: string; menu: string;
   create: string; missing: string; close: string; detected: string;
-  yellow: string; orange: string; red: string; pink: string; purple: string; blue: string; green: string; gray: string;
+  default: string; yellow: string; orange: string; red: string; pink: string; purple: string; blue: string; green: string; gray: string; clearFormat: string;
 }
 
 export const DEFAULT_LABELS: EditorLabels = {
@@ -142,7 +142,7 @@ export const DEFAULT_LABELS: EditorLabels = {
   open: "Open link", openNote: "Open note", copyLink: "Copy link", highlightIn: "Highlight:", removeHighlight: "Remove highlight", cut: "Cut", copy: "Copy", paste: "Paste",
   toCallout: "Turn into callout…", calloutType: "Change callout type…", removeCallout: "Remove callout", selectAll: "Select all", undo: "Undo", redo: "Redo", menu: "Edit",
   create: "Create note", missing: "No note is named “{name}” yet.", close: "Close", detected: "detected",
-  yellow: "Yellow", orange: "Orange", red: "Red", pink: "Pink", purple: "Purple", blue: "Blue", green: "Green", gray: "Gray",
+  default: "Default", yellow: "Yellow", orange: "Orange", red: "Red", pink: "Pink", purple: "Purple", blue: "Blue", green: "Green", gray: "Gray", clearFormat: "Clear formatting",
 };
 
 /** The callout types `> [!` offers: its keyword, colour family and what it is for. */
@@ -407,6 +407,8 @@ export function createMarkdownEditor(opts: EditorOptions): MarkdownEditor {
     if (!plain) {
       out.push(markdown({ base: markdownLanguage, extensions: EXTENSIONS, addKeymap: !cell }), markdownLook, selectionBar({ icons, labels: labels as unknown as Record<string, string>, ...(cell ? { turnInto: CELL_BLOCKS } : {}) }), autocompletion({ override: [complete], icons: false, activateOnTyping: true }));
       if (host.codeSpans) out.push(codeColours(host.codeSpans));
+      // (pictures: in a table cell's editor too, so a picture in a cell is selected, sized and opened as in the note)
+      if (on("picture-select")) out.push(pictureSelect(labels.close, () => mode === "live"));
     }
     return out;
   };
@@ -431,7 +433,7 @@ export function createMarkdownEditor(opts: EditorOptions): MarkdownEditor {
       },
     }),
   ];
-  if (!plain) extensions.push(folding, liveLayer.of(liveExt()), ...(on("picture-select") ? [pictureSelect(labels.close, () => mode === "live")] : []));
+  if (!plain) extensions.push(folding, liveLayer.of(liveExt()));
 
   /** The table cell being edited, if any: the toolbar's formats act on it. */
   let activeCell: EditorView | null = null;

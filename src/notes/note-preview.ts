@@ -21,10 +21,10 @@ const PAGE_MAX_H = 16000;
 // (the page's look is the notes editor's own, DOC_CSS, the one set of rules its preview and table cells use; here only the page itself,
 // its colours as the editor's tokens, and what only a card has: pictures drawn as data, a video's ▶, a sound's ♪, the properties' badges)
 const CSS = `
-.page{box-sizing:border-box;overflow:hidden;padding:26px 30px;${DOC_TOKENS.light}background:var(--me-bg);color:var(--me-fg);font:15px/var(--me-line-height) var(--me-font);word-wrap:break-word}
+.page{box-sizing:border-box;overflow:hidden;padding:26px 30px;${DOC_TOKENS.light}--me-size:15px;background:var(--me-bg);color:var(--me-fg);font:var(--me-size)/var(--me-line-height) var(--me-font);word-wrap:break-word}
 .page.dark{${DOC_TOKENS.dark}}
 ${DOC_CSS}
-h1,h2,h3,h4,h5,h6{margin:.2em 0 .45em;line-height:1.2}p,ul,ol,blockquote,pre,figure{margin:0 0 .6em}ul,ol{padding-left:1.4em}
+ul,ol{padding-left:1.4em}
 .media{position:relative;display:inline-block;max-width:100%}.media img{display:block;max-width:100%;height:auto;border-radius:var(--me-radius)}.is-video::after,.is-audio::after{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:2.4em;height:2.4em;border-radius:50%;background:oklch(0.2 0 0 / .6);color:#fff;font-size:1.4em;line-height:2.4em;text-align:center}.is-video::after{content:"▶"}.is-audio::after{content:"♪"}.pic{display:inline-block;padding:.7em 1.1em;border-radius:var(--me-radius);background:var(--me-code-bg);color:var(--me-muted);font-size:.85em}
 .props{display:flex;flex-wrap:wrap;gap:.35em;margin:0 0 .7em}.prop{padding:.1em .6em;border-radius:1em;background:var(--me-code-bg);color:var(--me-muted);font-size:.8em}`;
 /** Light or dark paper (Settings > Notes > Preview look); a change is drawn by whoever shows the cards. */
@@ -56,8 +56,9 @@ let pictures: NotePictureSource | null = null;
 /** How the app finds the pictures of a note's links (main.ts): the preview has no library of its own. */
 export const setNotePictures = (fn: NotePictureSource): void => void (pictures = fn);
 
-/** A picture as data for the page, at most the page's width (twice, for a sharp card), and its size there. */
-async function pictureData(blob: Blob): Promise<{ url: string; w: number; h: number } | null> {
+/** A picture as data for the page, at most the page's width (twice, for a sharp card), and its size there: the width its link sets
+ *  (`![[cat.png|200]]`), as the editor draws it, else its own. */
+async function pictureData(blob: Blob, want: number | null): Promise<{ url: string; w: number; h: number } | null> {
   try {
     const bmp = await createImageBitmap(blob);
     const k = Math.min(1, (PAGE_W * 2) / bmp.width);
@@ -65,7 +66,7 @@ async function pictureData(blob: Blob): Promise<{ url: string; w: number; h: num
     c.width = Math.max(1, Math.round(bmp.width * k));
     c.height = Math.max(1, Math.round(bmp.height * k));
     c.getContext("2d")!.drawImage(bmp, 0, 0, c.width, c.height);
-    const shown = Math.min(PAGE_W - 60, bmp.width);
+    const shown = Math.min(PAGE_W - 60, want ?? bmp.width);
     const out = { url: c.toDataURL("image/webp", 0.82), w: shown, h: Math.round((shown * bmp.height) / bmp.width) };
     bmp.close();
     return out;
@@ -120,7 +121,7 @@ async function makePageHtml(name: string, text: string, badges: readonly string[
     const lost = src.startsWith("blob:") ? el.getAttribute("alt") : null;
     const asked = lost ? `${WIKI}${encodeLinkPart(lost)}` : src;
     const found = hash && pictures && asked && !(src.startsWith("blob:") && !lost) ? await pictures(hash, asked).catch(() => null) : null;
-    const data = found ? await pictureData(found.blob) : null;
+    const data = found ? await pictureData(found.blob, Number(el.getAttribute("width")) || null) : null;
     const box = doc.createElement("span");
     box.className = "pic";
     if (data) {

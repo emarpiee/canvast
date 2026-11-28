@@ -120,3 +120,10 @@ describe("a format key over links and lines", () => {
     expect(await run("a  b", 2)).toBe("a ****  b".replace("**** ", "****"));
   });
 });
+
+describe("Clear formatting", () => {
+  it("takes inline marks off and keeps the words and links", async () => {
+    const { stripMarks } = await import("../../src/markdown-editor/behaviors/clear-format");
+    expect(stripMarks('**bold** *it* ~~s~~ ==hl== <mark class="hl-red">red</mark> `c` [[Link]] [a](b) snake_case')).toBe("bold it s hl red c [[Link]] [a](b) snake_case");
+  });
+});

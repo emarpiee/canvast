@@ -3,7 +3,7 @@ export type IconName =
   | "live" | "source" | "preview"
   | "bold" | "italic" | "strike" | "highlight" | "code" | "link"
   | "heading1" | "heading2" | "heading3" | "bulletList" | "orderedList" | "taskList" | "quote" | "callout" | "codeBlock" | "mathBlock" | "table" | "rule"
-  | "picture" | "find" | "save";
+  | "picture" | "find" | "save" | "clearFormat";
 
 const svg = (body: string): string => `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${body}</svg>`;
 const heading = (n: number): string => svg(`<path d="M4 12h8M4 18V6M12 18V6"/><text x="15" y="19" font-size="10" font-weight="700" fill="currentColor" stroke="none">${n}</text>`);
@@ -27,6 +27,7 @@ export const DEFAULT_ICONS: Readonly<Record<IconName, string>> = {
   quote: svg('<path d="M3 21c3 0 7-1 7-8V5c0-1.2-.8-2-2-2H4c-1.2 0-2 .8-2 2v6c0 1.2.8 2 2 2h3c0 4-2 6-4 6Z"/><path d="M15 21c3 0 7-1 7-8V5c0-1.2-.8-2-2-2h-4c-1.2 0-2 .8-2 2v6c0 1.2.8 2 2 2h3c0 4-2 6-4 6Z"/>'),
   callout: svg('<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M12 8v4M12 16h.01"/>'),
   mathBlock: svg('<path d="M18 5H7l5 7-5 7h11"/>'),
+  clearFormat: svg('<path d="m7 21-4.3-4.3a1 1 0 0 1 0-1.4l9.6-9.6a1 1 0 0 1 1.4 0l5.6 5.6a1 1 0 0 1 0 1.4L13 21"/><path d="M22 21H7M5 11l9 9"/>'),
   codeBlock: svg('<rect x="3" y="3" width="18" height="18" rx="2"/><path d="m10 9-3 3 3 3M14 15l3-3-3-3"/>'),
   table: svg('<rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M3 15h18M12 3v18"/>'),
   rule: svg('<path d="M5 12h14"/>'),

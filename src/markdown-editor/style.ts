@@ -114,10 +114,6 @@ export const EDITOR_CSS = `
 :where(.me-live) .me-task-forwarded::after { content: ""; position: absolute; inset: 1px; background: var(--me-accent); mask: linear-gradient(#000 0 0) center / 60% 2px no-repeat, linear-gradient(45deg, transparent 50%, #000 50%) right 15% center / 40% 40% no-repeat; }
 :where(.me-live) .me-cancelled { color: var(--me-faint); text-decoration: line-through; }
 :where(.me-live) .me-wikilink-broken { color: var(--me-faint); text-decoration-style: dashed; text-decoration-color: var(--me-faint); }
-:where(.me) .me-hl-orange { background: color-mix(in oklch, var(--me-yellow) 40%, var(--me-red) 20%); } :where(.me) .me-hl-red { background: color-mix(in oklch, var(--me-red) 30%, transparent); }
-:where(.me) .me-hl-pink { background: color-mix(in oklch, var(--me-red) 18%, var(--me-purple) 14%); } :where(.me) .me-hl-purple { background: color-mix(in oklch, var(--me-purple) 30%, transparent); }
-:where(.me) .me-hl-blue { background: color-mix(in oklch, var(--me-blue) 30%, transparent); } :where(.me) .me-hl-green { background: color-mix(in oklch, var(--me-green) 30%, transparent); }
-:where(.me) .me-hl-gray { background: color-mix(in oklch, var(--me-grey) 30%, transparent); }
 :where(.me-media) { position: relative; }
 :where(.me-resize) { position: absolute; right: 4px; bottom: 4px; width: 12px; height: 12px; border-right: 2px solid var(--me-bg); border-bottom: 2px solid var(--me-bg); box-shadow: 1px 1px 0 var(--me-fg); cursor: nwse-resize; opacity: 0; touch-action: none; }
 :where(.me-media:hover, .me-media.is-selected) .me-resize { opacity: 1; }
@@ -192,7 +188,9 @@ export const EDITOR_CSS = `
 /* preview mode */
 :where(.me-preview) { position: absolute; inset: 0; overflow: auto; padding: var(--me-pad) 0; line-height: var(--me-line-height); background: var(--me-bg); color: var(--me-fg); }
 :where(.me-preview > .me-page) { max-width: var(--me-width); margin: 0 auto; padding: 0 var(--me-pad); }
-:where(.me-doc) :is(h1, h2, h3, h4, h5, h6) { line-height: 1.3; margin: 1em 0 0.4em; }
+:where(.me-doc) :is(h1, h2, h3, h4, h5, h6) { line-height: 1.3; }
+/* (a block's gap is one line, as a blank line between blocks is in the editor) */
+:where(.me-doc) > * { margin-top: 0; margin-bottom: calc(var(--me-size) * var(--me-line-height)); }
 :where(.me-doc) h1 { font-size: var(--me-h1); } :where(.me-doc) h2 { font-size: var(--me-h2); } :where(.me-doc) h3 { font-size: var(--me-h3); }
 :where(.me-doc) a { color: var(--me-accent); cursor: pointer; }
 :where(.me-doc) code { font-family: var(--me-mono); font-size: 0.9em; background: var(--me-code-bg); border-radius: 3px; padding: 0 2px; }
@@ -217,9 +215,14 @@ export const EDITOR_CSS = `
 :where(.me-doc) .task-progress { background: linear-gradient(90deg, var(--me-accent) 50%, transparent 50%); border-color: var(--me-accent); }
 :where(.me-doc) li.cancelled { color: var(--me-faint); text-decoration: line-through; }
 :where(.me-doc) mark[class^="hl-"] { color: inherit; }
-:where(.me-doc) .hl-red { background: color-mix(in oklch, var(--me-red) 30%, transparent); } :where(.me-doc) .hl-blue { background: color-mix(in oklch, var(--me-blue) 30%, transparent); }
-:where(.me-doc) .hl-green { background: color-mix(in oklch, var(--me-green) 30%, transparent); } :where(.me-doc) .hl-purple { background: color-mix(in oklch, var(--me-purple) 30%, transparent); }
-:where(.me-doc) .hl-gray { background: color-mix(in oklch, var(--me-grey) 30%, transparent); }
+:where(.me-doc) .hl-red, :where(.me) .me-hl-red { background: color-mix(in oklch, var(--me-red) 30%, transparent); }
+:where(.me-doc) .hl-orange, :where(.me) .me-hl-orange { background: color-mix(in oklch, var(--me-yellow) 40%, var(--me-red) 20%); }
+:where(.me-doc) .hl-yellow, :where(.me) .me-hl-yellow { background: color-mix(in oklch, var(--me-yellow) 38%, transparent); }
+:where(.me-doc) .hl-green, :where(.me) .me-hl-green { background: color-mix(in oklch, var(--me-green) 30%, transparent); }
+:where(.me-doc) .hl-blue, :where(.me) .me-hl-blue { background: color-mix(in oklch, var(--me-blue) 30%, transparent); }
+:where(.me-doc) .hl-purple, :where(.me) .me-hl-purple { background: color-mix(in oklch, var(--me-purple) 30%, transparent); }
+:where(.me-doc) .hl-pink, :where(.me) .me-hl-pink { background: color-mix(in oklch, var(--me-red) 18%, var(--me-purple) 14%); }
+:where(.me-doc) .hl-gray, :where(.me) .me-hl-gray { background: color-mix(in oklch, var(--me-grey) 30%, transparent); }
 :where(.me-doc) .tag { color: var(--me-tag-fg); background: var(--me-tag-bg); border-radius: 4px; padding: 0 3px; }
 .me.me-plain .cm-editor .cm-scroller { font-family: var(--me-mono); }
 /* (preview mode: CodeMirror's own sheet keeps its editor shown, hidden attribute or not) */

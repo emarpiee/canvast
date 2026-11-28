@@ -232,7 +232,7 @@ class MediaWidget extends WidgetType {
   }
 }
 /** A picture drawn for any widget's page (a table's cells). */
-export const mediaElement = (ctx: LiveContext, link: string, alt: string, embed: boolean): HTMLElement => new MediaWidget(link, alt, embed, null, ctx).toDOM();
+export const mediaElement = (ctx: LiveContext, link: string, alt: string, embed: boolean, width: number | null = null): HTMLElement => new MediaWidget(link, alt, embed, width, ctx).toDOM();
 
 /** A task's box: a click ticks it in the text. */
 class TaskWidget extends WidgetType {

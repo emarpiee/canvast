@@ -3,6 +3,9 @@
 import { StateField, type EditorState, type Extension } from "@codemirror/state";
 import { EditorView, ViewPlugin, showTooltip, type Tooltip, type ViewUpdate } from "@codemirror/view";
 import { COMMANDS, type FormatName } from "./commands";
+import { HIGHLIGHTS, highlightItems } from "./context-menu";
+import { clearFormat } from "./behaviors/clear-format";
+import { openPopover } from "./popover";
 
 export interface SelectionBarOptions {
   icons: Readonly<Record<string, string>>;
@@ -44,7 +47,8 @@ function bar(opts: SelectionBarOptions): (view: EditorView) => { dom: HTMLElemen
       item.className = "me-selbar-item";
       menu.append(item);
     }
-    dom.append(...(opts.turnInto === false ? [] : [turn]), ...INLINE.map((n) => btn(n, opts.icons[n] ?? n, opts.labels[n] ?? n)), menu);
+    const clear = btn("clearFormat", opts.icons["clearFormat"] ?? "", opts.labels["clearFormat"] ?? "Clear formatting");
+    dom.append(...(opts.turnInto === false ? [] : [turn]), ...INLINE.map((n) => btn(n, opts.icons[n] ?? n, opts.labels[n] ?? n)), clear, menu);
     // view-state: (a press on the bar keeps the selection in the text)
     dom.addEventListener("mousedown", (e) => e.preventDefault());
     // typing: (the bar's buttons write the note's Markdown; Turn into only opens its list)
@@ -55,6 +59,9 @@ function bar(opts: SelectionBarOptions): (view: EditorView) => { dom: HTMLElemen
       if (name === "turn") return void ((menu.hidden = !menu.hidden), turn.setAttribute("aria-expanded", String(!menu.hidden)));
       menu.hidden = true;
       turn.setAttribute("aria-expanded", "false");
+      // (Highlight: its colours, as notes apps offer them; Clear formatting: the words' marks off)
+      if (name === "highlight") return void openPopover(b, highlightItems(view, { highlight: opts.labels["highlight"] ?? "Highlight", removeHighlight: opts.labels["removeHighlight"] ?? "Remove highlight", colours: Object.fromEntries(HIGHLIGHTS.map((c) => [c, opts.labels[c] ?? c])) }), opts.labels["highlight"] ?? "Highlight");
+      if (name === "clearFormat") return void (clearFormat(view), view.focus());
       COMMANDS[name as FormatName]?.(view);
       view.focus();
     });

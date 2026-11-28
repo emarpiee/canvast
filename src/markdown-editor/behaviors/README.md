@@ -17,4 +17,5 @@ off by its id.
 | `reflow.ts` | Alt+Q joins a wrapped paragraph | notes apps | |
 | `link-follow.ts` | A click on a drawn link follows it, Ctrl+click anywhere | notes apps | notes.spec, [[links]] |
 | `picture-select.ts` | A picture is drawn, never opened into its Markdown by the cursor; a click or an arrow selects it; + − resize, 0 resets, Enter edits its Markdown, Tab its size, Space opens it full size (`../lightbox.ts`) | notes apps (2026) | notes.spec, pictures |
+| `clear-format.ts` | Clear formatting (the selection bar's last button) takes the selected words' inline marks off | notes apps | unit test |
 | `paste-rules.ts` | A link pasted over words makes them the link; pages to Markdown; pictures on lines of their own | canvast's first editor; notes apps | notes.spec, pasted notes |

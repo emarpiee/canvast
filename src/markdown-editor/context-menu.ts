@@ -12,7 +12,17 @@ export interface MenuWords {
 }
 
 /** The highlight colours: yellow is `==…==`, the others `<mark class="hl-…">`. */
-export const HIGHLIGHTS = ["yellow", "orange", "red", "pink", "purple", "blue", "green", "gray"] as const;
+/** The highlight colours (as notes apps offer them): the default is `==words==`, the others `<mark class="hl-red">`, each a colour of the
+ *  theme, so light and dark alike. */
+export const HIGHLIGHTS = ["default", "red", "orange", "yellow", "green", "blue", "purple"] as const;
+
+/** The highlight choices for a menu: each colour, then taking it off. */
+export function highlightItems(view: EditorView, words: { highlight: string; colours: Record<string, string>; removeHighlight: string }, range?: { from: number; to: number }): PopItem[] {
+  return [
+    ...HIGHLIGHTS.map((c): PopItem => ({ id: `highlight.${c}`, label: words.colours[c] ?? c, ...(c === "default" ? { detail: "Ctrl+Shift+H" } : {}), pick: () => applyHighlight(view, c, range) })),
+    { id: "highlight.remove", label: words.removeHighlight, sep: true, pick: () => applyHighlight(view, "remove", range) },
+  ];
+}
 
 /** Highlight the selection in a colour (or take a highlight off it). */
 export function applyHighlight(view: EditorView, colour: (typeof HIGHLIGHTS)[number] | "remove", range: { from: number; to: number } = view.state.selection.main): void {
@@ -34,8 +44,8 @@ export function applyHighlight(view: EditorView, colour: (typeof HIGHLIGHTS)[num
     to = existing.to;
   }
   const words = existing ? existing.inner : state.sliceDoc(from, to);
-  const insert = colour === "remove" ? words : colour === "yellow" ? `==${words}==` : `<mark class="hl-${colour}">${words}</mark>`;
-  const start = colour === "remove" || colour === "yellow" ? (colour === "yellow" ? from + 2 : from) : from + `<mark class="hl-${colour}">`.length;
+  const insert = colour === "remove" ? words : colour === "default" ? `==${words}==` : `<mark class="hl-${colour}">${words}</mark>`;
+  const start = colour === "remove" ? from : colour === "default" ? from + 2 : from + `<mark class="hl-${colour}">`.length;
   view.dispatch({ changes: { from, to, insert }, selection: { anchor: start, head: start + words.length }, userEvent: "input.format" });
   view.focus();
 }
@@ -73,9 +83,8 @@ export function openContextMenu(view: EditorView, at: { x: number; y: number }, 
   }
   if (!sel.empty) {
     const range = { from: sel.from, to: sel.to };
-    items.push({ id: "highlight.yellow", label: words.highlight, detail: "Ctrl+Shift+H", sep: items.length > 0, pick: () => applyHighlight(view, "yellow", range) });
-    for (const c of HIGHLIGHTS.slice(1)) items.push({ id: `highlight.${c}`, label: `${words.highlightIn} ${words.colours[c] ?? c}`, pick: () => applyHighlight(view, c, range) });
-    items.push({ id: "highlight.remove", label: words.removeHighlight, pick: () => applyHighlight(view, "remove", range) });
+    const hl = highlightItems(view, words, range).map((it) => (it.id === "highlight.remove" ? it : { ...it, label: it.id === "highlight.default" ? words.highlight : `${words.highlightIn} ${it.label}` }));
+    items.push({ ...hl[0]!, sep: items.length > 0 }, ...hl.slice(1).map((it) => ({ ...it, sep: false })));
   }
   const copy = (): void => void navigator.clipboard?.writeText(view.state.sliceDoc(sel.from, sel.to)).catch(() => undefined);
   items.push({ id: "cut", label: words.cut, detail: "Ctrl+X", sep: items.length > 0, disabled: sel.empty, pick: focusRun(() => (copy(), view.dispatch({ changes: { from: sel.from, to: sel.to }, userEvent: "delete.cut" }))) });
