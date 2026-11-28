@@ -430,7 +430,11 @@ class TableView {
       let dragged = false;
       if (!inEditor) this.edit(r, c, start);
       const move = (ev: MouseEvent): void => {
-        const over = cellOf(document.elementFromPoint(ev.clientX, ev.clientY));
+        // (the cell under the pointer by where the cells are: what floats over the table, the cell editor's bar, never hides one)
+        const over = [...this.table.querySelectorAll<HTMLElement>(".me-cell")].find((el) => {
+          const b = el.parentElement!.getBoundingClientRect();
+          return ev.clientX >= b.left && ev.clientX < b.right && ev.clientY >= b.top && ev.clientY < b.bottom;
+        });
         const same = !!over && Number(over.dataset["r"]) === r && Number(over.dataset["c"]) === c;
         if (!dragged && (same || !over)) return void (!inEditor && same && this.editing?.ed.extend({ x: ev.clientX, y: ev.clientY }));
         if (!over) return;

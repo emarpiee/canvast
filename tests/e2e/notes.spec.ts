@@ -649,7 +649,7 @@ test("a note copied from another notes app: its source, or the page it drew, sho
   await p.locator('[data-testid="asset-card"][title="to.md"]').dblclick();
   await expect(heading(p)).toBeVisible();
   const atEnd = async (): Promise<void> => {
-    await page(p).click();
+    await heading(p).click(); // (the note's words, not its middle: once tables are pasted, a press there edits a cell)
     await p.keyboard.press("Control+End");
   };
   await atEnd();

@@ -274,13 +274,17 @@ export function createMarkdownEditor(opts: EditorOptions): MarkdownEditor {
     if (wiki && host.links) {
       const open = wiki.text.indexOf("[[") + 2;
       const list = await host.links();
+      // (matched by what the name contains, as notes apps do: \`[[.png\` lists the pictures; names starting with it first, then the rest)
+      const q = wiki.text.slice(open).toLowerCase();
+      const hits = q ? list.filter((l) => l.target.toLowerCase().includes(q) || (l.label ?? "").toLowerCase().includes(q)) : list;
+      const starts = (l: (typeof list)[number]): number => (l.target.toLowerCase().startsWith(q) || (l.label ?? "").toLowerCase().startsWith(q) ? 0 : 1);
       return {
         from: wiki.from + open,
-        options: list.map((l): Completion => ({ label: l.target, displayLabel: l.label ?? l.target, ...(l.detail ? { detail: l.detail } : {}), apply: (view, _c, from, to) => {
+        filter: false,
+        options: [...hits].sort((x, y) => starts(x) - starts(y)).slice(0, 200).map((l): Completion => ({ label: l.target, displayLabel: l.label ?? l.target, ...(l.detail ? { detail: l.detail } : {}), apply: (view, _c, from, to) => {
           const close = view.state.sliceDoc(to, to + 2) === "]]" ? "" : "]]";
           view.dispatch({ changes: { from, to, insert: `${l.target}${close}` }, selection: { anchor: from + l.target.length + 2 } });
         } })),
-        validFor: /^[^\[\]\n|]*$/,
       };
     }
     const tag = cx.matchBefore(/(?:^|[\s(])#[\p{L}\p{N}_\-/]*$/u);

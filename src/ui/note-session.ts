@@ -367,6 +367,7 @@ export class OpenNote {
     if (this.pending) await this.pending.catch(() => false); // (a save on its way ends first: what it saved is no unsaved change)
     if (!this.dirty) return true;
     if (this.deps.settings.get("notes.saveOnClose")) return this.save(); // (Settings > Notes; not saved, it stays open)
+    let remember = false;
     const how = await chooseDialog({
       title: "Unsaved changes",
       lines: [`“${this.name}” has changes that are not saved.`],
@@ -375,7 +376,10 @@ export class OpenNote {
         { value: "drop", label: "Don't save", help: "The note stays as it was last saved." },
       ],
       confirmLabel: "Go on",
+      // (ticked with Save them: Settings > Notes > Save notes on close is on, and the question is not asked again)
+      remember: { label: "Don't ask again", set: (on) => void (remember = on) },
     });
+    if (how === "save" && remember) this.deps.settings.set("notes.saveOnClose", true);
     if (how === "drop") this.editor?.saved();
     return how === "save" ? this.save() : how === "drop";
   }
