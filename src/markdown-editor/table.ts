@@ -669,6 +669,7 @@ class TableView {
     // (the table framed, a bar on its right edge adds a column and one under it a row, as wide and tall as the table)
     const box = document.createElement("div");
     box.className = "me-table-box";
+    const mover = this.mover();
     const scroll = document.createElement("div");
     scroll.className = "me-table-scroll";
     scroll.append(table);
@@ -743,11 +744,22 @@ class TableView {
     table.addEventListener("mousemove", (e) => {
       const cell = (e.target as HTMLElement).closest<HTMLTableCellElement>("th, td");
       if (cell) placeColGrip(cell.cellIndex);
-      // (the column's grip shows while the pointer is on the heading row or on it)
-      colGrip.classList.toggle("is-near", !!cell && cell.tagName === "TH");
+      // (the column's grip shows while the pointer is on the heading row or on it; so does the table's move grip, beside the heading row)
+      const inHead = !!cell && cell.tagName === "TH";
+      colGrip.classList.toggle("is-near", inHead);
+      mover.classList.toggle("is-near", inHead);
+      if (inHead) {
+        const r = htr.getBoundingClientRect(), b = box.getBoundingClientRect();
+        mover.style.top = `${r.top - b.top + r.height / 2 - mover.offsetHeight / 2}px`;
+      }
     });
     // view-state: (the column's grip goes when the pointer leaves the heading row for anything but it)
-    table.addEventListener("mouseleave", (e) => void (!colGrip.contains(e.relatedTarget as Node) && colGrip.classList.remove("is-near")));
+    table.addEventListener("mouseleave", (e) => {
+      const to = e.relatedTarget as Node | null;
+      if (!colGrip.contains(to)) colGrip.classList.remove("is-near");
+      if (!mover.contains(to)) mover.classList.remove("is-near");
+    });
+    mover.addEventListener("mouseleave", (e) => void (!table.contains(e.relatedTarget as Node) && mover.classList.remove("is-near")));
     colGrip.addEventListener("pointerdown", (e) => {
       if (gripCol < 0) return;
       e.preventDefault();
@@ -774,7 +786,7 @@ class TableView {
         commit({ row: 0, col: to });
       }, { once: true });
     });
-    box.append(grip, colGrip, scroll, addCol, addRow, this.mover());
+    box.append(grip, colGrip, scroll, addCol, addRow, mover);
     this.dom.append(box);
   }
 }
