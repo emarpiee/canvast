@@ -15,8 +15,14 @@ test("every setting says what it is on one short line, the rest under its More; 
   }).map((r) => (r as HTMLElement).dataset["row"]));
   expect(cut).toEqual([]);
   await p.getByRole("tab", { name: "Notes", exact: true }).click();
-  const titles = await p.locator('[data-panel="notes"] .set-card > h3').allTextContents();
+  const titles = await p.locator('[data-panel="notes"] :is(.set-card > h3, .set-card > .set-card-head > h3)').allTextContents();
   expect(titles).toEqual(["Editor", "New notes", "Cards and previews", "Properties", "File names", "Links in notes", "Note styles"]);
+  // Note styles' Reset all: a style changed goes back with every other, after asking.
+  const h1 = p.locator('[data-row="notes.style.headingSizes"] select');
+  await h1.selectOption("same");
+  await p.getByTestId("note-styles-reset").click();
+  await p.getByTestId("confirm-ok").click();
+  await expect(h1).toHaveValue("steps");
   const row = p.locator('[data-row="notes.renameOnSave"]');
   await expect(row.locator(".set-more p")).toBeHidden();
   await row.locator(".set-more summary").click();

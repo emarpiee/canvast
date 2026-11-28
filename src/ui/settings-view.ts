@@ -514,7 +514,9 @@ export function mountSettingsView(root: HTMLElement, settings: SettingsStore, ke
               <div class="set-control">${controlHtml(r, id)}</div><span class="set-scope" title="Where this setting is kept">${scope}</span>
               <button type="button" class="set-reset" data-reset="${r.key}" aria-label="Reset ${esc(r.label)} to its default" title="Reset to the default">${ICONS.settingReset}</button></div>`;
     };
-    const cardHtml = (c: { title?: string; rows: readonly Row[] }): string => `<div class="set-card">${c.title ? `<h3>${esc(c.title)}</h3>` : ""}${c.title === "Note styles" ? noteSampleHtml() : ""}${c.rows.map(rowHtml).join("")}</div>`;
+    // (Note styles: a Reset all at the top right of its card, every style back to its own value at once)
+    const cardTitle = (title: string): string => (title === "Note styles" ? `<div class="set-card-head"><h3>${esc(title)}</h3><button type="button" class="set-reset" data-reset-styles data-testid="note-styles-reset" title="Every note style back to its own value">Reset all</button></div>` : `<h3>${esc(title)}</h3>`);
+    const cardHtml = (c: { title?: string; rows: readonly Row[] }): string => `<div class="set-card">${c.title ? cardTitle(c.title) : ""}${c.title === "Note styles" ? noteSampleHtml() : ""}${c.rows.map(rowHtml).join("")}</div>`;
     const body = t.rows
       ? cardsOf(t.rows)
           .filter((c) => !LAST_CARDS.has(c.title ?? ""))
@@ -888,6 +890,9 @@ export function mountSettingsView(root: HTMLElement, settings: SettingsStore, ke
       keymap.set(String(o["id"]), keys as string[]);
     }),
     setCmd("keys.reset", "Reset a command's keys", "Back to its own keys", "edit", [{ name: "id", type: "text", doc: "the command (a shortcut's id)", required: true }], (o) => void keymap.reset(String(o["id"]))),
+    setCmd("notes.resetStyles", "Reset every note style", "Settings > Notes > Note styles, all back to their own values", "edit", [], () => {
+      for (const key of Object.keys(SETTINGS) as SettingKey[]) if (key.startsWith("notes.style.")) settings.reset(key);
+    }),
     setCmd("keys.resetAll", "Reset every shortcut", "All back to their own keys", "edit", [], () => settings.reset("keys.custom" as SettingKey)),
     ...(["set", "remove", "lock", "newkey"] as const).map((action) => setCmd(`password.${action}`, { set: "Set a password", remove: "Remove a password", lock: "Lock now", newkey: "A new key" }[action], { set: "Of the hidden items or the workspace", remove: "Of the hidden items or the workspace", lock: "Nothing opens until the password is typed", newkey: "Encrypt again with a new key" }[action], action === "lock" ? "edit" : "refused", [KIND], (o) => void passwordCard(o["kind"] as "hidden" | "workspace", action), () => (backup ? null : "Not in this build."))),
     setCmd("settings.librarySplit", "Split the library's index", "Into more, smaller files", "edit", [{ name: "split", type: "choice", doc: "1, 2 or 3", required: true, choices: ["1", "2", "3"] }], (o) => void backup?.librarySplit?.set(Number(o["split"]) as 1 | 2 | 3).then(() => fillSplit()), () => (backup?.librarySplit ? null : "Not in this build.")),
@@ -926,7 +931,7 @@ export function mountSettingsView(root: HTMLElement, settings: SettingsStore, ke
   const all = [...SETTINGS_TABS.flatMap((t) => t.rows ?? []), ...(DESKTOP ? [DELETE_TO_ROW, TRASH_DAYS_ROW] : [])];
   /** Show the stored values in the controls (never while one is being typed into: only called on a change). */
   /** Each control of Settings and the command it runs (ADR 0205). */
-  const SETTINGS_CONTROLS: ReadonlyArray<readonly [string, string]> = [["[data-set]", "settings.set"], ["[data-colour]", "settings.set"], ["[data-adaptive]", "settings.set"], ["[data-preset]", "settings.set"], ["[data-reset]", "settings.reset"], ["[data-change-key]", "keys.set"], ["[data-key-remove]", "keys.set"], ["[data-key-yes]", "keys.set"], ["[data-key-reset]", "keys.reset"], ["[data-keys-reset-all]", "keys.resetAll"], ["[data-pw]", "password.set"], ["[data-library-split]", "settings.librarySplit"], ["[data-photocraft-reset]", "photocraft.resetPrefs"], ["[data-repair-links]", "notes.repairLinks"], ["[data-switch-workspace]", "workspace.switch"]];
+  const SETTINGS_CONTROLS: ReadonlyArray<readonly [string, string]> = [["[data-set]", "settings.set"], ["[data-colour]", "settings.set"], ["[data-adaptive]", "settings.set"], ["[data-preset]", "settings.set"], ["[data-reset]", "settings.reset"], ["[data-change-key]", "keys.set"], ["[data-key-remove]", "keys.set"], ["[data-key-yes]", "keys.set"], ["[data-key-reset]", "keys.reset"], ["[data-keys-reset-all]", "keys.resetAll"], ["[data-reset-styles]", "notes.resetStyles"], ["[data-pw]", "password.set"], ["[data-library-split]", "settings.librarySplit"], ["[data-photocraft-reset]", "photocraft.resetPrefs"], ["[data-repair-links]", "notes.repairLinks"], ["[data-switch-workspace]", "workspace.switch"]];
   const refresh = (): void => {
     markCommands(root, SETTINGS_CONTROLS);
     for (const b of root.querySelectorAll<HTMLElement>("[data-done], [data-key-no], [data-concealed-show], [data-about], [data-reload]")) b.dataset["viewState"] = "";
@@ -1030,6 +1035,8 @@ export function mountSettingsView(root: HTMLElement, settings: SettingsStore, ke
     if (t.closest("[data-key-no]")) return keyNote("Cancelled: nothing changed.");
     const reset = t.closest<HTMLElement>("[data-reset]");
     if (reset) return void pressCommand("settings.reset", { key: reset.dataset["reset"]! });
+    if (t.closest("[data-reset-styles]"))
+      return void confirmDialog({ title: "Reset every note style?", lines: ["Headings, colours, lists, tables and checkboxes all go back to their own values. Your notes are not changed."], confirmLabel: "Reset them", danger: false }).then((yes) => void (yes && pressCommand("notes.resetStyles")));
     if (t.closest("[data-reload]")) location.reload();
     if (t.closest<HTMLButtonElement>("[data-photocraft-reset]")) pressCommand("photocraft.resetPrefs");
     if (t.closest<HTMLButtonElement>("[data-repair-links]")) pressCommand("notes.repairLinks");

@@ -2671,6 +2671,7 @@ dialog.rename-dialog { width: min(var(--dlg-l), calc(100vw - 2 * var(--edge))); 
 .set-panels h2 { margin: 0; font-size: var(--text-xl); font-weight: var(--weight-semibold); }
 /* A card is a group of rows that belong together: its own frame and title, as in the details. */
 .set-card { padding: var(--s-6) var(--s-8); background: var(--hud-bg); border: 1px solid var(--hud-border); border-radius: var(--r-lg); }
+.set-card-head { display: flex; align-items: center; justify-content: space-between; gap: var(--s-6); margin-bottom: var(--s-4); } .set-card-head > h3 { margin: 0; font-size: var(--text-md); font-weight: var(--weight-semibold); color: var(--hud-muted); } /* (a card's title with its Reset all at the right) */
 .set-card > h3, .set-card > h4 { margin: 0 0 var(--s-4); font-size: var(--text-md); font-weight: var(--weight-semibold); color: var(--hud-muted); }
 .set-keys { display: grid; gap: var(--s-6); }
 .set-keys > p, .set-keys > h3 { margin: 0; }
