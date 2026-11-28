@@ -1679,6 +1679,7 @@ button.asset-preview { display: flex; align-items: center; justify-content: cent
 .viewer-head > .nav-pair { margin-inline: var(--s-4); }
 .viewer-crumb { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--text-sm); color: var(--hud-muted); }
 .viewer.no-bar > .viewer-head { position: absolute; inset: 0 0 auto 0; opacity: 0; transition: opacity var(--dur-fast) var(--ease-out); }
+.viewer.no-bar.is-note > .viewer-head { position: static; } /* (a note's own toolbar is at its top: the header keeps its row, faded, so shown again it never covers that toolbar) */
 .viewer.no-bar.is-near-top > .viewer-head, .viewer.no-bar > .viewer-head:focus-within { opacity: 1; }
 .viewer.no-bar > .viewer-head > .vbtn { opacity: 1; }
 .viewer-progress { position: absolute; left: 0; top: 0; height: 3px; width: 100%; background: var(--hud-accent); transform-origin: left; transform: scaleX(0); z-index: 1; }
@@ -3018,8 +3019,8 @@ input[data-scrub-input]:focus { cursor: text; }
 /* A Pins window's title: "Pins:" and what it shows, a button that opens the list to choose (cut short with … when long). */
 .pins-mark { display: inline-flex; flex: none; }
 .pins-mark svg { width: var(--icon-md); height: var(--icon-md); fill: currentColor; }
-.pins-panel .panel-head h2 { display: flex; align-items: center; gap: var(--s-4); min-width: 0; white-space: nowrap; }
-.pins-source { display: inline-flex; align-items: center; gap: var(--s-2); min-width: 0; height: var(--row-btn); padding: 0 var(--s-2); font: inherit; color: inherit; background: transparent; border: 0; border-radius: var(--ctl-r); cursor: pointer; }
+.pins-panel .panel-head h2 { display: flex; align-items: center; gap: var(--s-6); min-width: 0; white-space: nowrap; }
+.pins-source { display: inline-flex; align-items: center; gap: var(--s-4); min-width: 0; height: var(--row-btn); padding: 0 var(--s-2); font: inherit; color: inherit; background: transparent; border: 0; border-radius: var(--ctl-r); cursor: pointer; }
 .pins-source:hover, .pins-source[aria-expanded="true"] { background: var(--hud-hover); }
 .pins-source > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .pins-source svg { flex: none; width: var(--icon-sm); height: var(--icon-sm); }

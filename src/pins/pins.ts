@@ -411,7 +411,7 @@ export function mountPins(deps: PinsDeps): { open(source?: PinSource): void; ref
       ...(deps.float ? [{ label: "Float over other apps", icon: ICONS.floatOnTop, hint: "Live, in a window above every app", command: "pins.float", run: () => void pressCommand("pins.float", { window: id }) }] : []),
     ], "More"));
     document.body.append(el);
-    deps.dock.add(el, { id: `pins:${id}`, title: "Pins", side: "float", everywhere: true, width: canvasOf(source) ? 360 : 640, height: canvasOf(source) ? 300 : 480 });
+    deps.dock.add(el, { id: `pins:${id}`, title: "Pins", side: "float", everywhere: true, ownWidth: true, maxWidth: 1400, width: canvasOf(source) ? 360 : 640, height: canvasOf(source) ? 300 : 480 });
     pin.apply();
     void show(source);
   };
