@@ -886,8 +886,9 @@ test("auto layout: Shift+A puts the picked things on a sheet that lays them out 
   const w4 = (await boxOf(s4)).maxX - (await boxOf(s4)).minX;
   expect((await xs()).map(Math.round)).toEqual([400, Math.round(500 + w4), Math.round(580 + w4)]);
   expect(Math.round((await boxOf(sheet.id)).maxX), "the sheet grew by the shape and a gap").toBe(Math.round(640 + w4));
-  // taken away, the gap closes
-  await click(app, 490, 330);
+  // taken away, the gap closes (a click on it where the row put it: a small shape has no turning zone round it to take a click beside it)
+  const b4 = await boxOf(s4);
+  await click(app, Math.round((b4.minX + b4.maxX) / 2), Math.round((b4.minY + b4.maxY) / 2));
   expect(await selection(app)).toEqual([s4]);
   await key(app, "Delete");
   await app.frame();
