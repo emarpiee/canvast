@@ -888,8 +888,10 @@ export function mountLibraryViewer(ctx: ViewerCtx) {
   ctx.viewer.addEventListener("pointermove", (e) => {
     if (!ctx.viewer.classList.contains("no-bar")) return;
     const r = ctx.viewer.getBoundingClientRect();
-    ctx.viewer.classList.toggle("is-near-top", e.clientY - r.top < 90);
-    ctx.viewer.classList.toggle("is-near-bottom", r.bottom - e.clientY < 90);
+    // (as near as the header is tall, and a little: farther in, the pointer is on the picture or the note, not reaching for the controls)
+    const reach = (ctx.viewer.querySelector<HTMLElement>(".viewer-head")?.offsetHeight || 40) + 8;
+    ctx.viewer.classList.toggle("is-near-top", e.clientY - r.top < reach);
+    ctx.viewer.classList.toggle("is-near-bottom", r.bottom - e.clientY < reach);
   });
   ctx.viewer.addEventListener("pointerleave", () => ctx.viewer.classList.remove("is-near-top", "is-near-bottom"));
   const closeSlide = (): void => {

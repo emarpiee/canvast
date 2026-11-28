@@ -1684,6 +1684,10 @@ button.asset-preview { display: flex; align-items: center; justify-content: cent
 .viewer.no-bar > .viewer-head { position: absolute; inset: 0 0 auto 0; opacity: 0; transition: opacity var(--dur-fast) var(--ease-out); }
 .viewer.no-bar.is-near-top > .viewer-head, .viewer.no-bar > .viewer-head:focus-within { opacity: 1; }
 .viewer.no-bar > .viewer-head > .vbtn { opacity: 1; }
+/* A note's own toolbar is at its top: with the controls hidden its header waits at the bottom instead, shown as the pointer nears that edge (or rests on it). */
+.viewer.no-bar.is-note > .viewer-head { inset: auto 0 0 0; border-bottom: 0; border-top: var(--line-w) solid var(--hud-border); }
+.viewer.no-bar.is-note.is-near-top:not(.is-near-bottom) > .viewer-head:not(:focus-within) { opacity: 0; }
+.viewer.no-bar.is-note.is-near-bottom > .viewer-head, .viewer.no-bar > .viewer-head:hover { opacity: 1; }
 .viewer-progress { position: absolute; left: 0; top: 0; height: 3px; width: 100%; background: var(--hud-accent); transform-origin: left; transform: scaleX(0); z-index: 1; }
 .viewer-progress[hidden] { display: none; }
 .viewer-progress.is-running { animation: show-run var(--ms, 5000ms) linear forwards; }

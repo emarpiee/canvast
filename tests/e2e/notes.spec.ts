@@ -313,6 +313,16 @@ test("a note's properties (YAML, as notes apps write them) are its item's tags, 
   await expect(page(p).locator(".note-props-slot [data-testid='asset-notes']")).toHaveCount(1);
   await page(p).locator(".note-props-slot [data-testid='asset-props-in-note']").click();
   await expect(page(p).locator(".note-props-slot [data-testid='asset-notes']")).toHaveCount(0);
+  // Controls hidden: a note's header waits at the bottom (its toolbar is at the top), shown as the pointer nears that edge only.
+  await p.getByRole("button", { name: "Hide the controls" }).click();
+  const head = p.getByTestId("viewer-head"), vb = (await p.getByTestId("slide-view").boundingBox())!;
+  await p.mouse.move(vb.x + vb.width / 2, vb.y + 10);
+  await expect(head).toHaveCSS("opacity", "0");
+  await p.mouse.move(vb.x + vb.width / 2, vb.y + vb.height - 10);
+  await expect(head).toHaveCSS("opacity", "1");
+  expect((await head.boundingBox())!.y + (await head.boundingBox())!.height, "at the bottom edge").toBeGreaterThan(vb.y + vb.height - 2);
+  await p.mouse.move(vb.x + vb.width / 2, vb.y + vb.height - 120);
+  await expect(head, "farther in, the pointer is on the note").toHaveCSS("opacity", "0");
 });
 
 test("[[links]] between notes: shown by their words, Ctrl+click opens the note, [[ offers the library's notes and canvases, kept as written", async ({ app }) => {
