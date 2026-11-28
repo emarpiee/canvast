@@ -174,6 +174,10 @@ export interface EditorOptions {
   /** An element of the host's shown at the top of the note, above its first line, in every mode (a note's properties, as notes apps
    *  show them): it is the host's, the editor only places it. */
   top?: HTMLElement;
+  /** The keys that switch modes (CodeMirror's names): live or preview (default Mod-e), the source or live (default Mod-Shift-e). */
+  modeKeys?: { liveOrPreview?: string; source?: string };
+  /** How the host's bindings of those keys read, for the toolbar's tooltips ("Ctrl+E"). */
+  keyNames?: { liveOrPreview?: string; source?: string };
   /** Vim keys (normal, insert, visual modes). Default false. */
   vim?: boolean;
   /** Behaviours turned off by their id (behaviors/index.ts): every one is on unless set to false here. */
@@ -376,7 +380,6 @@ export function createMarkdownEditor(opts: EditorOptions): MarkdownEditor {
   const formatKeys = [
     { key: "Mod-b", run: COMMANDS.bold },
     { key: "Mod-i", run: COMMANDS.italic },
-    { key: "Mod-e", run: COMMANDS.code },
     { key: "Shift-Mod-s", run: COMMANDS.strike },
     { key: "Shift-Mod-h", run: COMMANDS.highlight },
     { key: "Shift-Mod-m", run: COMMANDS.math },
@@ -392,6 +395,9 @@ export function createMarkdownEditor(opts: EditorOptions): MarkdownEditor {
   ];
   const appKeys = keymap.of([
     { key: "Mod-s", preventDefault: true, run: () => (host.save?.(), true) },
+    // (live editing and preview, one then the other; the source, or back to live: as notes apps switch them; a host may rebind them)
+    { key: opts.modeKeys?.liveOrPreview ?? "Mod-e", preventDefault: true, run: () => (plain ? false : (setModeBy(mode === "preview" ? "live" : "preview"), true)) },
+    { key: opts.modeKeys?.source ?? "Mod-Shift-e", preventDefault: true, run: () => (plain ? false : (setModeBy(mode === "source" ? "live" : "source"), true)) },
     { key: "Mod-4", preventDefault: true, run: () => (plain ? false : (setModeBy("live"), true)) },
     { key: "Mod-5", preventDefault: true, run: () => (plain ? false : (setModeBy("source"), true)) },
     { key: "Mod-6", preventDefault: true, run: () => (plain ? false : (setModeBy("preview"), true)) },
@@ -655,7 +661,7 @@ export function createMarkdownEditor(opts: EditorOptions): MarkdownEditor {
   const btn = (name: string, icon: string, label: string, keys = ""): string =>
     `<button type="button" class="me-btn" data-me="${name}" aria-label="${esc(label)}" title="${esc(keys ? `${label} (${keys})` : label)}">${icon}</button>`;
   const mod = isMac ? "⌘" : "Ctrl+";
-  const KEYS: Partial<Record<string, string>> = { bold: `${mod}B`, italic: `${mod}I`, strike: `${mod}Shift+S`, highlight: `${mod}Shift+H`, code: `${mod}E`, link: `${mod}K`, taskList: `${mod}L`, find: `${mod}F`, save: `${mod}S`, live: `${mod}4`, source: `${mod}5`, preview: `${mod}6` };
+  const KEYS: Partial<Record<string, string>> = { bold: `${mod}B`, italic: `${mod}I`, strike: `${mod}Shift+S`, highlight: `${mod}Shift+H`, link: `${mod}K`, taskList: `${mod}L`, find: `${mod}F`, save: `${mod}S`, live: opts.keyNames?.liveOrPreview ?? `${mod}E`, source: opts.keyNames?.source ?? `${mod}Shift+E`, preview: opts.keyNames?.liveOrPreview ?? `${mod}E` };
   const drawBar = (): void => {
     const groups: string[] = [];
     if (!plain) {

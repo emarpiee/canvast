@@ -85,7 +85,7 @@ export function eventInit(combo: Combo, repeat = false): KeyboardEventInit {
 /** How a combo reads in the interface ("Ctrl+Shift+F"; a bare letter as itself). */
 export const displayCombo = (c: Combo): string => c.replace("ArrowLeft", "Left").replace("ArrowRight", "Right").replace("ArrowUp", "Up").replace("ArrowDown", "Down");
 
-export type KeyScope = "canvas" | "global";
+export type KeyScope = "canvas" | "global" | "note";
 
 export interface KeyCommand {
   readonly id: string;
@@ -95,7 +95,8 @@ export interface KeyCommand {
   readonly internal: readonly Combo[];
   /** What the command is bound to at first. */
   readonly defaults: readonly Combo[];
-  /** `canvas`: only on the canvas (the Library and Settings have their own keys); `global`: also in the Library. */
+  /** `canvas`: only on the canvas (the Library and Settings have their own keys); `global`: also in the Library; `note`: while the focus is
+   *  in a note (the notes editor), wherever it is open: its keys there are its own, the canvas's same keys stay the canvas's. */
   readonly scope: KeyScope;
 }
 
@@ -111,6 +112,7 @@ export const VIEW_GROUP = "View";
 export const FIND_GROUP = "Find and commands";
 export const EDIT_GROUP = "Editing";
 export const BOOKMARK_GROUP = "Bookmarks";
+export const NOTES_GROUP = "Notes";
 
 /** Every command that has a key, in the order Settings lists them. */
 export const KEY_COMMANDS: readonly KeyCommand[] = [
@@ -167,9 +169,14 @@ export const KEY_COMMANDS: readonly KeyCommand[] = [
   cmd("edit.back", "Send to back", EDIT_GROUP, "Ctrl+["),
   cmd("edit.flatten", "Flatten: text to paths, a boolean group to one path", EDIT_GROUP, "Ctrl+E"),
   cmd("edit.delete", "Delete the selection", EDIT_GROUP, ["Delete", "Backspace"]),
+  // (a note's keys listen for keys of their own, never pressed, so Ctrl+E stays Flatten's on the canvas while it is a note's in a note)
+  cmd("notes.liveOrPreview", "Notes: live editing or preview, one then the other", NOTES_GROUP, "Ctrl+Alt+Shift+F9", "Ctrl+E", "note"),
+  cmd("notes.source", "Notes: the source, or back to live editing", NOTES_GROUP, "Ctrl+Alt+Shift+F10", "Ctrl+Shift+E", "note"),
 ];
 
 const BY_ID = new Map(KEY_COMMANDS.map((c) => [c.id, c] as const));
+/** Whether two commands' keys can be pressed in one place: a note's and the canvas's never are (the global ones are in both). */
+export const scopesMeet = (a: KeyScope, b: KeyScope): boolean => !((a === "note" && b === "canvas") || (a === "canvas" && b === "note"));
 export const commandById = (id: string): KeyCommand | undefined => BY_ID.get(id);
 
 /** The tool and step commands, by the setting that held their letter before the keymap (moved over once). */
@@ -321,14 +328,16 @@ export class Keymap {
     return b ? displayCombo(b) : "";
   }
 
-  /** The commands `combo` is bound to now, apart from `except`. */
+  /** The commands `combo` is bound to now, apart from `except`, where they would meet it (a note's keys and the canvas's never do). */
   owners(combo: Combo, except?: string): KeyCommand[] {
-    return KEY_COMMANDS.filter((c) => c.id !== except && this.bindings(c.id).includes(combo));
+    const mine = except ? BY_ID.get(except)?.scope : undefined;
+    return KEY_COMMANDS.filter((c) => c.id !== except && this.bindings(c.id).includes(combo) && (mine === undefined || scopesMeet(mine, c.scope)));
   }
 
   /** What to do with a key press: leave it, swallow it, or let the handlers see `to` instead. */
   resolve(combo: Combo, scope: KeyScope | "none"): { kind: "pass" } | { kind: "swallow" } | { kind: "to"; combo: Combo } {
-    const allowed = (c: KeyCommand): boolean => scope === "canvas" || (scope === "global" && c.scope === "global");
+    // (a note's keys only in a note; there the app's global keys too; the canvas's everywhere on the canvas but in a note)
+    const allowed = (c: KeyCommand): boolean => (scope === "note" ? c.scope === "note" || c.scope === "global" : c.scope !== "note" && (scope === "canvas" || (scope === "global" && c.scope === "global")));
     const owner = KEY_COMMANDS.find((c) => allowed(c) && this.bindings(c.id).includes(combo));
     if (owner) return owner.internal.includes(combo) ? { kind: "pass" } : { kind: "to", combo: owner.internal[0]! };
     // an internal key of a command that has been given other keys no longer works
@@ -352,6 +361,7 @@ export function installKeymap(map: Keymap, win: Window = window): void {
   const scopeOf = (e: KeyboardEvent): KeyScope | "none" => {
     if (map.capturing) return "none";
     const t = e.target as HTMLElement | null;
+    if (t?.closest?.('[data-testid="note-editor"]')) return "note";
     const view = document.body.dataset["view"] ?? "canvas";
     const modified = e.ctrlKey || e.metaKey || e.altKey;
     const typing = !!t && (t.isContentEditable || /^(TEXTAREA|SELECT)$/.test(t.tagName) || (t.tagName === "INPUT" && !/^(range|checkbox|radio|button|color)$/.test((t as HTMLInputElement).type)));

@@ -1,4 +1,5 @@
 import { noteStyleVars } from "../notes/note-styles";
+import { setNoteKeyNames } from "../ui/note-editor";
 import { moodboardsToCanvases } from "../pins/migrate";
 import { createCanvasView } from "../canvas/canvas-view";
 import { LIBRARY_DRAG } from "../ui/assets-view";
@@ -301,6 +302,7 @@ async function start(): Promise<void> {
   // Every shortcut is a command of the keymap (ADR 0158): the layer that turns the keys the person chose into the keys the handlers hear goes in before any handler.
   const keymap = new Keymap(settings);
   installKeymap(keymap);
+  setNoteKeyNames(() => ({ liveOrPreview: keymap.display("notes.liveOrPreview"), source: keymap.display("notes.source") })); // (the notes toolbar's tooltips say the person's keys)
   // Developer tools (the panel, the diagnostics, the test hook): on for a session with #debug at the end of the address (the tests use
   // this), or always once switched on in Settings > Develop (applies after a reload). There is no separate debug build.
   const debug = location.hash.includes("debug") || settings.get("dev.tools");

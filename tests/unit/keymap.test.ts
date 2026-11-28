@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { KEY_COMMANDS, Keymap, comboOfEvent, eventInit, judge, normalizeCombo, parseCombo } from "../../src/settings/keymap";
+import { KEY_COMMANDS, Keymap, comboOfEvent, eventInit, judge, normalizeCombo, parseCombo, scopesMeet } from "../../src/settings/keymap";
 import { SettingsStore } from "../../src/settings/settings";
 
 function memory(initial: Record<string, string> = {}) {
@@ -33,10 +33,10 @@ describe("the commands", () => {
       expect(seen.get(k), `${c.id} and ${seen.get(k)} both listen for ${k}`).toBeUndefined();
       seen.set(k, c.id);
     }
-    const bound = new Map<string, string>();
-    for (const c of KEY_COMMANDS) for (const k of c.defaults) {
-      expect(bound.get(k), `${c.id} and ${bound.get(k)} are both bound to ${k}`).toBeUndefined();
-      bound.set(k, c.id);
+    // (bound to one key only where they never meet: Ctrl+E is Flatten on the canvas and a note's in a note)
+    for (const a of KEY_COMMANDS) for (const b of KEY_COMMANDS) {
+      if (a === b || !scopesMeet(a.scope, b.scope)) continue;
+      for (const k of a.defaults) expect(b.defaults.includes(k), `${a.id} and ${b.id} are both bound to ${k}`).toBe(false);
     }
   });
   it("start with F for the focus, not the Alt tap", () => {
@@ -99,5 +99,18 @@ describe("what to warn about", () => {
     expect(judge("F", "view.focus").level, "a bare key: not while typing").toBe("note");
     expect(judge("Ctrl+Shift+F", "find.library").level).toBe("ok");
     expect(judge("F8", "view.focus").level).toBe("ok");
+  });
+});
+
+describe("a note's keys", () => {
+  it("are a note's in a note and leave the canvas's same keys to the canvas; rebound, the old key does nothing in a note", () => {
+    const km = new Keymap(new SettingsStore(null));
+    expect(km.resolve("Ctrl+E", "note")).toEqual({ kind: "to", combo: "Ctrl+Alt+Shift+F9" });
+    expect(km.resolve("Ctrl+Shift+E", "note")).toEqual({ kind: "to", combo: "Ctrl+Alt+Shift+F10" });
+    expect(km.resolve("Ctrl+E", "canvas"), "Flatten's on the canvas").toEqual({ kind: "pass" });
+    km.set("notes.liveOrPreview", ["Ctrl+R"]);
+    expect(km.resolve("Ctrl+R", "note")).toEqual({ kind: "to", combo: "Ctrl+Alt+Shift+F9" });
+    expect(km.resolve("Ctrl+E", "note")).toEqual({ kind: "pass" });
+    expect(km.owners("Ctrl+E", "notes.liveOrPreview").map((c) => c.id), "no clash with Flatten: they never meet").toEqual([]);
   });
 });

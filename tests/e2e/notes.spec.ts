@@ -652,6 +652,18 @@ test("live, source and preview: a file is kept exactly as written; source shows 
   await expect(preview).toBeHidden();
   await p.keyboard.press("Control+6");
   await expect(preview).toBeVisible();
+  // Ctrl+E: preview and live editing, one then the other; Ctrl+Shift+E: the source and back (keys the person may rebind: Settings > Shortcuts).
+  const pressed = (m: string) => expect(note(p).locator(`[data-me="mode:${m}"]`)).toHaveAttribute("aria-pressed", "true");
+  await p.keyboard.press("Control+e");
+  await pressed("live");
+  await p.keyboard.press("Control+e");
+  await pressed("preview");
+  await p.keyboard.press("Control+e");
+  await pressed("live");
+  await p.keyboard.press("Control+Shift+E");
+  await pressed("source");
+  await p.keyboard.press("Control+Shift+E");
+  await pressed("live");
   await p.getByTestId("slide-view").locator('[data-act="close"]').click();
   await p.getByTestId("choose-dialog").getByLabel("Don't save").check();
   await p.getByTestId("choose-dialog").getByRole("button", { name: "Go on" }).click();

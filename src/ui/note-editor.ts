@@ -144,9 +144,23 @@ const lookOf = (id: string): readonly [string, string] => {
   const hit = CHOICE_LOOK.find(([re]) => re.test(id));
   return hit ? [hit[1], hit[2]] : [ICONS.fileCode, "Choose it"];
 };
-commands.setProvider("note-editor", () =>
-  shownChoices.map((c) => ({ id: `note.${c.id}`, title: c.label, group: "Note", hint: lookOf(c.id)[1], icon: lookOf(c.id)[0], risk: "edit" as const, why: () => (c.disabled ? "Not available here" : null), exec: () => void c.pick() })),
-);
+/** The notes editor last focused or opened (what the mode commands act on). */
+let activeEditor: MarkdownEditor | null = null;
+/** How the person's keys for the mode commands read (Settings > Shortcuts), set by the app: for the toolbar's tooltips. */
+let keyNames: () => { liveOrPreview?: string; source?: string } = () => ({});
+export const setNoteKeyNames = (fn: typeof keyNames): void => void (keyNames = fn);
+/** Live editing or preview, one then the other; the source or back to live (the commands behind Ctrl+E and Ctrl+Shift+E). */
+const switchMode = (to: "liveOrPreview" | "source"): void => {
+  const ed = activeEditor;
+  if (!ed) return;
+  ed.setMode(to === "source" ? (ed.mode === "source" ? "live" : "source") : ed.mode === "preview" ? "live" : "preview");
+};
+const noNote = (): string | null => (activeEditor?.el.isConnected ? null : "Open a note first.");
+commands.setProvider("note-editor", () => [
+  ...shownChoices.map((c) => ({ id: `note.${c.id}`, title: c.label, group: "Note", hint: lookOf(c.id)[1], icon: lookOf(c.id)[0], risk: "edit" as const, why: () => (c.disabled ? "Not available here" : null), exec: () => void c.pick() })),
+  { id: "notes.liveOrPreview", title: "Live editing or preview", group: "Note", hint: "The open note, one then the other", icon: ICONS.eye, risk: "read" as const, why: noNote, exec: () => void switchMode("liveOrPreview") },
+  { id: "notes.source", title: "Source or live editing", group: "Note", hint: "The open note's Markdown as written, or back", icon: ICONS.fileCode, risk: "read" as const, why: noNote, exec: () => void switchMode("source") },
+]);
 /** The editor's menu host: its choices as the app's menu at a point. */
 function openChoices(at: DOMRect, items: readonly PopItem[], label: string): void {
   shownChoices = items;
@@ -224,6 +238,9 @@ export async function mountNoteEditor(el: HTMLElement, opts: { kind: Exclude<Not
     mode: opts.mode,
     plain: !md,
     vim: host.vim,
+    keyNames: keyNames(),
+    // (the keys the keymap sends a binding on as: the person's own keys for these are set in Settings > Shortcuts)
+    modeKeys: { liveOrPreview: "Ctrl-Alt-Shift-F9", source: "Ctrl-Alt-Shift-F10" },
     ...(md && opts.top ? { top: opts.top } : {}),
     icons: NOTE_ICONS,
     wrapSelection: opts.wrapSelection ?? true,
@@ -280,6 +297,9 @@ export async function mountNoteEditor(el: HTMLElement, opts: { kind: Exclude<Not
     },
   });
   editor.el.dataset["testid"] = "note-editor";
+  activeEditor = editor;
+  // view-state: (which note the mode commands act on: the one last worked in)
+  editor.el.addEventListener("focusin", () => void (activeEditor = editor));
 
   // The keyboard's Save and Find while the person is at the note, wherever the focus went in it (a toolbar button): never on to the canvas or the library behind it.
   const root = opts.root ?? el.closest<HTMLElement>('[data-testid="slide-view"]') ?? el;
@@ -290,6 +310,12 @@ export async function mountNoteEditor(el: HTMLElement, opts: { kind: Exclude<Not
   };
   window.addEventListener("pointerdown", pressed, true);
   const keys = (e: KeyboardEvent): void => {
+    // (the mode keys, as the keymap sends them on (settings/keymap.ts), with the focus elsewhere in the note, the preview's page: the same commands as in its words)
+    if (atNote && root.isConnected && !editor.view.hasFocus && e.ctrlKey && e.altKey && e.shiftKey && (e.key === "F9" || e.key === "F10")) {
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      return void commands.press(e.key === "F10" ? "notes.source" : "notes.liveOrPreview");
+    }
     if (!atNote || e.altKey || !(e.ctrlKey || e.metaKey) || !root.isConnected || root.hidden || document.querySelector("dialog[open]")) return;
     if (editor.view.hasFocus) return; // (the editor's own keys)
     const t = e.target as HTMLElement | null;
