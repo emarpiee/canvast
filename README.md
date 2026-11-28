@@ -1728,7 +1728,7 @@ Go anywhere on one canvas: the showcase's Solar System at home.
 | --- | --- |
 | Zoom | The wheel, a trackpad pinch, `+` and `−` (`Shift` for a 4× step), or the on-screen buttons. The point under the pointer (or between your fingers) stays where it is |
 | Pan | The middle button, `Space`+drag, the Hand tool (`H`), two fingers, `Shift`+wheel or the arrow keys |
-| Pan while dragging objects | Near an edge of the view it pans too, the nearer the edge the faster, and what is dragged stays in view; only what is bigger than the view, or was already past its edge, goes beyond it. **Pan at the edge while dragging** (Settings > Navigation) turns this off, and **Edge panning speed** sets how fast |
+| Pan while dragging objects | With the pointer near an edge of the view the view pans too, the nearer the edge the faster, and keeps panning while the pointer rests there; what you drag follows the pointer. **Pan while dragging** (Settings > Navigation) turns this off, and **Panning speed while dragging** sets how fast |
 | Go back to the start | `0`, `Home` or the house button |
 | Walk back and forth | *Previous view* and *Next view* (`Alt+Shift+←`, `Alt+Shift+→`) go through where you have been; the dice button takes you to a random empty place |
 | Jump to a level | Click the zoom in the info bar and type it (`3000`, `2^-500`, `10^900`). One jump can travel up to 2^50 levels |

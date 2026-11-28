@@ -715,57 +715,52 @@ test("resize with side handles: corners and sides follow the pointer; Shift keep
   expect(app.consoleErrors).toEqual([]);
 });
 
-test("dragging objects to an edge of the view pans it while the pointer rests there; the objects stay in view; its switch turns it off", async ({ app }) => {
+test("panning while dragging goes by the pointer: near an edge of the view it pans while the pointer rests there; the object past the edge with the pointer away pans nothing; its switch turns it off", async ({ app }) => {
   const p = app.page;
   await p.getByTestId("view-assets").click();
-  await p.getByTestId("assets-import-input").setInputFiles({ name: "o.png", mimeType: "image/png", buffer: makePng(120, 80, () => [200, 60, 40, 255]) });
+  await p.getByTestId("assets-import-input").setInputFiles({ name: "o.png", mimeType: "image/png", buffer: makePng(240, 80, () => [200, 60, 40, 255]) });
   await p.locator('[data-testid="asset-card"][title="o.png"]').click();
   await p.getByTestId("asset-place").click();
   await p.getByTestId("view-canvas").click();
   await expect.poll(() => p.evaluate(() => window.__canvastDebug.objects().length)).toBe(1);
   const box = () => p.evaluate(() => { const d = window.__canvastDebug; return d.objectScreen(d.objects()[0]!.id)!.box; });
   const centerX = () => p.evaluate(() => window.__canvastDebug.camera().cx);
-  const drag = async (hold: number): Promise<{ at: number; moved: boolean }> => {
+  const width = await p.evaluate(() => document.querySelector("canvas")!.getBoundingClientRect().width);
+  /** Grab the object `from` its left (0) to its right (1), drag the pointer to `toX`, rest `hold` ms: did the view move, and where is its right side. */
+  const drag = async (from: number, toX: number, hold: number): Promise<{ moved: boolean; right: number }> => {
     const b = await box();
-    const x = (b.minX + b.maxX) / 2;
+    const x = b.minX + (b.maxX - b.minX) * from;
     const y = (b.minY + b.maxY) / 2;
     const c0 = await centerX();
     await p.mouse.click(x, y); // (selected)
     await p.mouse.move(x, y);
     await p.mouse.down();
-    const width = await p.evaluate(() => window.__canvastDebug.camera() && document.querySelector("canvas")!.getBoundingClientRect().width);
-    await p.mouse.move(width - 2, y, { steps: 6 });
+    await p.mouse.move(toX, y, { steps: 6 });
     await p.waitForTimeout(hold); // (the pointer rests)
     const moved = (await centerX()) !== c0;
+    const right = (await box()).maxX;
     await p.mouse.up();
-    const after = await box();
-    return { at: after.maxX, moved };
+    return { moved, right };
   };
-  const width = await p.evaluate(() => document.querySelector("canvas")!.getBoundingClientRect().width);
-  // Toward a panel docked on the left: past where it ends, to the edge of the view.
-  await p.getByRole("button", { name: /Bookmarks/ }).first().click();
-  await expect(p.getByTestId("bookmarks-panel").or(p.locator(".bookmarks-panel")).first()).toBeVisible();
-  const b0 = await box();
-  await p.mouse.click((b0.minX + b0.maxX) / 2, (b0.minY + b0.maxY) / 2);
-  await p.mouse.move((b0.minX + b0.maxX) / 2, (b0.minY + b0.maxY) / 2);
-  await p.mouse.down();
-  await p.mouse.move(2, (b0.minY + b0.maxY) / 2, { steps: 6 });
-  await p.mouse.up();
-  await expect.poll(async () => (await box()).minX, "as far as the view's edge").toBeLessThan(10);
-  const panned = await drag(700);
-  expect(panned.moved, "the view moved").toBe(true);
-  expect(panned.at, "the whole object is in view").toBeLessThanOrEqual(width + 1);
+  // Grabbed at its left side, dragged so its right side goes past the edge with the pointer far from it: no pan, it follows the pointer.
+  const past = await drag(0.05, width - 150, 600);
+  expect(past.moved, "the pointer is away from the edge: no pan").toBe(false);
+  expect(past.right, "it follows the pointer past the edge").toBeGreaterThan(width);
+  await p.keyboard.press("f"); // (in view again)
+  await p.waitForTimeout(600);
+  // The pointer near the edge: the view pans while it rests there.
+  const near = await drag(0.5, width - 4, 700);
+  expect(near.moved, "the view moved").toBe(true);
   // Off by its switch.
   await p.getByTestId("view-settings").click();
   await p.getByRole("tab", { name: "Navigation", exact: true }).click();
   await p.locator('[data-set="nav.edgePanOn"]').click({ force: true });
   await p.getByTestId("view-canvas").click();
-  await p.keyboard.press("f"); // (the object in view again)
+  await p.keyboard.press("f");
   await expect.poll(() => p.evaluate(() => { const d = window.__canvastDebug; return !!d.objectScreen(d.objects()[0]!.id); })).toBe(true);
   await p.waitForTimeout(600);
-  const still = await drag(500);
+  const still = await drag(0.5, width - 4, 500);
   expect(still.moved, "the view stayed").toBe(false);
-  expect(still.at, "off: it follows the pointer past the edge").toBeGreaterThan(width);
 });
 
 test("Alt held as a drag starts carries a copy; the original stays; F still focuses (ADR 0063)", async ({ app }) => {

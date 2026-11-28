@@ -2,8 +2,8 @@ import { panBy } from "../core/camera";
 import type { ScreenPoint } from "../core/camera";
 import type { ViewState } from "../app/view-state";
 
-// Edge panning: while something is dragged near an edge of the view, the view moves that way by itself. The nearer the edge, the faster, as in other
-// canvas apps. Any drag worked out from world positions can use it (`EdgePan`); the speed is `edgePanStep`, pure.
+// Panning while dragging: while something is dragged with the pointer near an edge of the view, the view moves that way by itself. The nearer the
+// edge, the faster, as in other canvas apps. Any drag worked out from world positions can use it (`EdgePan`); the speed is `edgePanStep`, pure.
 
 /** How far in from an edge of the view it starts, CSS px. */
 export const EDGE_PAN_ZONE_PX = 48;
