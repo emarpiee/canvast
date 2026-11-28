@@ -258,6 +258,7 @@ export const EDITOR_CSS = `
 /* (a block's gap is one line, as a blank line between blocks is in the editor) */
 :where(.me-doc) > * { margin-top: 0; margin-bottom: calc(var(--me-size) * var(--me-line-height)); }
 :where(.me-doc) h1 { font-size: var(--me-h1); color: var(--me-h1-fg, inherit); } :where(.me-doc) h2 { font-size: var(--me-h2); color: var(--me-h2-fg, inherit); } :where(.me-doc) h3 { font-size: var(--me-h3); color: var(--me-h3-fg, inherit); }
+:where(.me-doc) h4 { font-size: var(--me-h4); color: var(--me-h4-fg, inherit); } :where(.me-doc) h5 { font-size: var(--me-h5); color: var(--me-h5-fg, inherit); } :where(.me-doc) h6 { font-size: var(--me-h6); color: var(--me-h6-fg, inherit); } /* (every heading of a drawn page takes the note styles, as live editing does: H4 to H6 had neither size nor colour here) */
 :where(.me-doc) a { color: var(--me-link-fg, var(--me-accent)); cursor: pointer; }
 :where(.me-doc) a[data-wiki] { color: var(--me-wikilink-fg, var(--me-link-fg, var(--me-accent))); }
 :where(.me-doc) strong { font-weight: var(--me-strong-weight, 700); color: var(--me-strong-fg, inherit); }

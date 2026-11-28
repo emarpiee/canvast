@@ -1510,7 +1510,7 @@ button.asset-preview { display: flex; align-items: center; justify-content: cent
 .asset-notes > .assets-btn[data-action="field-add"] { margin-top: var(--s-4); }
 
 /* The viewer: the original large, the details beside it (they can be hidden), the controls below (they can be hidden). */
-.viewer { --under-viewer-buttons: calc(2 * var(--edge) + var(--ctl)); position: absolute; inset: 0; display: flex; flex-direction: column; min-height: 0; overflow: hidden; border-radius: var(--r-lg); background: var(--v-stage); color: var(--v-fg); outline: none; }
+.viewer { --under-viewer-buttons: 0px; /* (the header row holds them now: nothing floats over the page) */ position: absolute; inset: 0; display: flex; flex-direction: column; min-height: 0; overflow: hidden; border-radius: var(--r-lg); background: var(--v-stage); color: var(--v-fg); outline: none; }
 .viewer[hidden] { display: none; }
 .viewer-stage { flex: 1; min-height: 0; display: flex; overflow: auto; padding: var(--s-8); }
 .viewer figure:not(:where(.viewer-note *)) { margin: 0; width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; gap: var(--s-6); }
@@ -1649,7 +1649,18 @@ button.asset-preview { display: flex; align-items: center; justify-content: cent
 .viewer-note .me { flex: 1; min-height: 0; }
 .viewer.is-note .viewer-stage { display: flex; padding-top: var(--under-viewer-buttons); background: var(--paper); } /* (under the viewer's Back and Details buttons, the same room above and below them, in every density) */
 .viewer.is-note .viewer-stage > figure:not(:where(.viewer-note *)), .viewer.is-note .viewer-edge, .viewer.is-note .viewer-ground { display: none; }
-.viewer.is-note :is(.vbtn.viewer-back, .vbtn.viewer-details, .vbtn.viewer-hide) { color: var(--hud-fg); background: var(--paper); border-color: var(--hud-border); } /* (on a file's page, the page's theme: the stage's dark pill is for pictures) */
+/* The viewer's header (every kind): Library, back and forward, folder / name, then hide the controls and the details. In the theme's
+   colours, one row in the viewer's flow (nothing floats over the picture or the page); with the controls hidden it shows near the top. */
+.viewer-head { flex: none; display: flex; align-items: center; gap: var(--s-4); min-height: var(--bar-h); padding: 0 var(--s-6); background: var(--hud-bg); color: var(--hud-fg); border-bottom: 1px solid var(--hud-border); z-index: var(--z-item-bar); }
+.viewer-head > .vbtn.viewer-back, .viewer-head > .vbtn.viewer-hide, .viewer-head > .vbtn.viewer-details { position: static; color: var(--hud-fg); background: transparent; border-color: transparent; }
+.viewer-head > .vbtn.viewer-back { width: auto; gap: var(--s-2); padding: 0 var(--s-4); }
+.viewer-head > .vbtn:is(.viewer-back, .viewer-hide, .viewer-details):hover:not(:disabled) { color: var(--hud-fg); background: var(--hud-hover); }
+.viewer-head > .vbtn.viewer-details[aria-pressed="true"] { box-shadow: inset 0 0 0 2px var(--hud-accent); }
+.viewer-head > .nav-pair { display: inline-flex; gap: var(--s-1); }
+.viewer-crumb { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--text-sm); color: var(--hud-muted); }
+.viewer.no-bar > .viewer-head { position: absolute; inset: 0 0 auto 0; opacity: 0; transition: opacity var(--dur-fast) var(--ease-out); }
+.viewer.no-bar.is-near-top > .viewer-head, .viewer.no-bar > .viewer-head:focus-within { opacity: 1; }
+.viewer.no-bar > .viewer-head > .vbtn { opacity: 1; }
 .viewer-progress { position: absolute; left: 0; top: 0; height: 3px; width: 100%; background: var(--hud-accent); transform-origin: left; transform: scaleX(0); z-index: 1; }
 .viewer-progress[hidden] { display: none; }
 .viewer-progress.is-running { animation: show-run var(--ms, 5000ms) linear forwards; }

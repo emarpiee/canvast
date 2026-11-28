@@ -203,3 +203,10 @@ describe("footnotes, as notes apps write them", () => {
     expect(big).toContain("<p>After.</p>");
   });
 });
+
+describe("a drawn page takes every note style", () => {
+  it("each heading, H1 to H6, has its size and colour (the preview, cards and the Settings sample)", async () => {
+    const { DOC_CSS } = await import("../../src/markdown-editor/style");
+    for (let n = 1; n <= 6; n++) expect(DOC_CSS, `h${n}`).toContain(`:where(.me-doc) h${n} { font-size: var(--me-h${n}); color: var(--me-h${n}-fg, inherit); }`);
+  });
+});

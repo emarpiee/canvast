@@ -54,6 +54,8 @@ const ZOOM_STEP = 1.25;
 export interface ViewerCtx {
   /** Its back and forward history's place ("viewer"); none for a Pins window's viewer. */
   readonly navPlace?: string | undefined;
+  /** The name of the folder an item is filed in (none: not filed), for the viewer's header. */
+  readonly folderNameOf?: (hash: string) => string | null;
   anchor: string | null;
   readonly applyUi: () => void;
   readonly assets: AssetLibrary;
@@ -686,6 +688,13 @@ export function mountLibraryViewer(ctx: ViewerCtx) {
     resetZoom();
     slideHash = hash;
     history?.visit(hash);
+    // (its place and name in the header: the folder it is filed in, then its name)
+    const crumb = ctx.viewer.querySelector<HTMLElement>(".viewer-crumb");
+    if (crumb) {
+      const folder = ctx.folderNameOf?.(hash);
+      crumb.textContent = folder ? `${folder} / ${e.name}` : e.name;
+      crumb.title = crumb.textContent;
+    }
     ctx.body.classList.add("is-viewing");
     ctx.root.classList.add("is-viewing");
     ctx.viewer.hidden = false;

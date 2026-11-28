@@ -383,9 +383,9 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
         <button type="button" class="assets-to-top" data-action="to-top" data-testid="assets-to-top" title="Back to top (Home)" hidden>${ICONS.arrowUpToLine}Back to top</button>
         </div>
         <div class="viewer" data-testid="slide-view" role="region" aria-label="Viewer" tabindex="-1" hidden>
-          <button type="button" class="vbtn viewer-back" data-act="close" aria-label="Back to the library" title="Back to the library (Esc)">${ICONS.images}</button>${opts.embedded ? "" : navButtonsHtml("viewer")}
+          <div class="viewer-head" data-testid="viewer-head"><button type="button" class="vbtn viewer-back" data-act="close" aria-label="Back to the library" title="Back to the library (Esc)">${ICONS.images}<span>Library</span></button>${opts.embedded ? "" : navButtonsHtml("viewer")}<span class="viewer-crumb" data-testid="viewer-crumb"></span>
           <button type="button" class="vbtn viewer-hide" data-act="bar" aria-label="Hide the controls" title="Hide the controls (F)">${ICONS.chevronsDown}</button>
-          <button type="button" class="vbtn viewer-details" data-act="details" aria-pressed="true" aria-label="Details panel" title="Show or hide the details (I)">${ICONS.info}</button>
+          <button type="button" class="vbtn viewer-details" data-act="details" aria-pressed="true" aria-label="Details panel" title="Show or hide the details (I)">${ICONS.info}</button></div>
           <div class="viewer-stage"><div class="viewer-picture-tools"><button type="button" class="vbtn viewer-grey" data-act="grey" data-testid="viewer-grey" aria-pressed="false" aria-label="See it in greyscale" title="See it in greyscale, for now: the file stays as it is">${ICONS.eclipse}</button><button type="button" class="vbtn viewer-sample" data-act="sample" data-testid="viewer-sample" aria-label="Sample text" title="Sample text">${ICONS.wholeWord}</button><button type="button" class="vbtn viewer-ground" data-act="ground" aria-label="Background of see-through pictures" title="Background of see-through pictures">${ICONS.sunMoon}</button></div><span class="viewer-progress" hidden></span><div class="viewer-edge is-prev" data-edge="prev" aria-hidden="true"></div><div class="viewer-edge is-next" data-edge="next" aria-hidden="true"></div>
             <figure><div class="viewer-checker" hidden><i></i></div><canvas class="viewer-vec" hidden></canvas><img alt="" draggable="false"><video hidden></video><canvas class="viewer-gif" hidden></canvas><figcaption></figcaption></figure></div>
           <div class="viewer-bar" role="toolbar" aria-label="Viewer controls">
@@ -1300,6 +1300,10 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   // ---- viewer: in ui/library-viewer.ts (B34); what it reads of the Library goes through these getters (and setters where it writes)
   const vw = mountLibraryViewer({
     navPlace: opts.embedded ? undefined : "viewer", // (a Pins window's viewer keeps no history: the Library's does)
+    folderNameOf: (h: string) => {
+      const e = entryOf(h), id = e ? meta(e).folderIds[0] : undefined;
+      return id && listing ? folderPath(listing.folders, id).join(" › ") : null;
+    },
     get anchor() { return anchor; }, set anchor(v) { anchor = v; },
     get applyUi() { return applyUi; },
     get assets() { return assets; },
