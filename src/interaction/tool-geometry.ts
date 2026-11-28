@@ -1,3 +1,4 @@
+import { frameIsSmall } from "../render/selection-frame";
 import type { EditorState } from "../app/editor-state";
 import { TURN, cosSin } from "../core/angle";
 import type { ScreenPoint, WorldPoint } from "../core/camera";
@@ -23,6 +24,7 @@ export const ROTATE_ZONE_PX = 36;
 
 /** Whether a press at `s` turns the selection: on the rotate handle, or just outside a corner of the box (beyond its resize handle). */
 export function inRotateZone(s: ScreenPoint, frame: SelectionFrame, handle: readonly [number, number]): boolean {
+  if (frameIsSmall(frame)) return false; // (a small box only resizes: SMALL_GIZMO_PX)
   if (Math.hypot(s.x - handle[0], s.y - handle[1]) <= HANDLE_SIZE_PX) return true;
   // A press on a resize handle resizes, whatever the box's size: on a small one a corner's handle is within reach of the next corner and on
   // the box's edge, not inside it (a text a line high turned instead). The reach is the resize's own (a side handle is only its square).

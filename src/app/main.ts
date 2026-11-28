@@ -1120,6 +1120,8 @@ async function start(): Promise<void> {
       pickAt,
     });
     // (a pinned view lists nothing under a finger held still: it opens its short menu there, the one of a right click)
+    // (a pinned view arranges only: move, size, turn; a double-click opens or edits nothing there, whatever it is on)
+    if (!main) own = { ...own, noDoubleClick: true };
     if (!main) own = { ...own, revealList: (at, _pick, o) => {
       if (!o.touch) return false;
       const r = el.getBoundingClientRect();

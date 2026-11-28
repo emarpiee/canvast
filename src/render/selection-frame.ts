@@ -83,6 +83,15 @@ export function selectionFrame(selected: readonly ProjectedObject[], aligned = f
   return { angle, corners, centre: rot((minX + maxX) / 2, (minY + maxY) / 2, c, s) };
 }
 
+/** A box this small on the screen (its longer side, px) offers only its resize handles: no turning and no shape handles (a corner's
+ *  radius, a star's ratio), which would crowd it and take the presses meant to resize it. */
+export const SMALL_GIZMO_PX = 48; // (both its sides: a line of text, long and low, still turns)
+/** Whether a selection box is that small on the screen. */
+export function frameIsSmall(f: SelectionFrame): boolean {
+  const [c0, c1, , c3] = f.corners;
+  return Math.max(Math.hypot(c1![0] - c0![0], c1![1] - c0![1]), Math.hypot(c3![0] - c0![0], c3![1] - c0![1])) < SMALL_GIZMO_PX;
+}
+
 /** Distance of the rotate handle from the middle of the box's top edge (px). */
 export const ROTATE_HANDLE_OFFSET = 26;
 /** The rotate handle is kept below this many px from the top of the view (the toolbar is there) and inside it. */

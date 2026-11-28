@@ -1,3 +1,4 @@
+import { SMALL_GIZMO_PX } from "../render/selection-frame";
 import { balloonHandlePoints, type BalloonPart } from "../doc/balloon-geometry";
 import { linkHandlePoints } from "../doc/balloon-link";
 import type { PathObject, TextObject } from "../doc/model";
@@ -447,6 +448,8 @@ export function shapeHandles(po: ProjectedObject, expanded: boolean, editor: { g
     return { main: null, corners: [], centre: null, ratio: null, count: null, balloon };
   }
   if (po.obj.kind === "text") return po.cover ? null : pathTextHandles(po);
+  // (a shape this small on the screen shows only its box's resize handles: SMALL_GIZMO_PX)
+  if (Math.max(po.box.maxX - po.box.minX, po.box.maxY - po.box.minY) < SMALL_GIZMO_PX) return null;
   return cornerHandles(po, expanded, [...(gradientHandles(po, editor.gradientFocus)?.pts ?? []), ...editor.drawnHandles.map(([x, y]) => ({ x, y }))]);
 }
 

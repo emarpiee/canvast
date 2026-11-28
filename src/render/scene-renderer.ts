@@ -26,7 +26,7 @@ import { LABEL_FONT } from "./item-label";
 import type { ItemLabel } from "./item-label";
 import { cropOf, hasShadow, isNeutral } from "../doc/adjust";
 import { drawAdjusted, drawBackdrop } from "./adjust-shape";
-import { itemCorners, rotateHandleAt, selectionFrame } from "./selection-frame";
+import { frameIsSmall, itemCorners, rotateHandleAt, selectionFrame } from "./selection-frame";
 
 export interface SceneTheme {
   selection: string;
@@ -904,7 +904,8 @@ function drawSelection(
     for (let i = 1; i < 4; i++) ctx.lineTo(frame.corners[i]![0], frame.corners[i]![1]);
     ctx.closePath();
     ctx.stroke();
-    editor.selectionBoxOnScreen = { frame, handle, rotatable: canRotate(visible, editor) };
+    const turnable = canRotate(visible, editor) && !frameIsSmall(frame); // (a small box only resizes)
+    editor.selectionBoxOnScreen = { frame, handle, rotatable: turnable };
     ctx.fillStyle = theme.handleFill;
     ctx.lineWidth = 1.25;
     const handles: Array<[number, number]> = [...frame.corners.map((c) => [c[0], c[1]] as [number, number])];
@@ -925,7 +926,7 @@ function drawSelection(
         ctx.fillRect(x - h / 2, y - h / 2, h, h);
         ctx.strokeRect(x - h / 2, y - h / 2, h, h);
       }
-    if (canRotate(visible, editor)) {
+    if (turnable) {
       const top: Pt = [(frame.corners[0][0] + frame.corners[1][0]) / 2, (frame.corners[0][1] + frame.corners[1][1]) / 2];
       ctx.beginPath();
       ctx.moveTo(handle[0], handle[1]);

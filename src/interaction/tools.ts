@@ -168,6 +168,8 @@ type Gesture =
 const MIN_TEXT_BOX_PX = 24;
 
 export interface ToolHooks {
+  /** A view that only arranges (a pinned canvas): a double-click there does nothing, whatever is under it (editing is the main canvas's). */
+  noDoubleClick?: boolean;
   /** Shift+A: auto layout (ADR 0186) on or off for the picked sheets, or a new sheet that lays out the picked things. */
   autoLayout(): void;
   /** Open the text editor on `target`, or on a new text object at `at` (a click: as wide as its words; a box dragged out: `box.widthPx` wide, `at` its top-left corner). */
@@ -2776,6 +2778,7 @@ export function attachTools(
   let lastNodeAdd = -Infinity;
   const NODE_ADD_DOUBLE_MS = 500;
   const onDoubleClick = (e: MouseEvent): void => {
+    if (hooks.noDoubleClick) return void e.preventDefault();
     if (performance.now() - editor.fingerListAt < 1500) return; // (the lift of a long press is not the second click of a double-click)
     if (effectiveTool() === "path" && editor.pathDraft) {
       // The two presses of the double-click each placed a node on the same spot: keep one, and end the path.
