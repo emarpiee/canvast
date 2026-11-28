@@ -27,11 +27,15 @@ export { WIDTHS_LINE };
 export function cellsOf(line: string): string[] {
   const s = line.trim().replace(/^\|/, "").replace(/(?<!\\)\|$/, "");
   const out: string[] = [];
-  let cur = "", code = false;
+  let cur = "", code = false, wiki = false;
   for (let i = 0; i < s.length; i++) {
     const c = s[i]!;
+    // (a bar inside code or a [[link]] is no cell's edge: a link written unescaped by another app stays one cell, written back escaped)
     if (c === "\\" && s[i + 1] === "|") (cur += "\\|"), i++;
     else if (c === "`") (code = !code), (cur += c);
+    else if (c === "[" && s[i + 1] === "[") (wiki = true), (cur += "[["), i++;
+    else if (c === "]" && s[i + 1] === "]") (wiki = false), (cur += "]]"), i++;
+    else if (c === "|" && wiki) cur += "\\|";
     else if (c === "|" && !code) out.push(cur.trim()), (cur = "");
     else cur += c;
   }
@@ -73,11 +77,14 @@ export function cellSpans(line: string): Array<[number, number]> {
     if (a === b) a = b = Math.min(from + (line[from] === " " ? 1 : 0), to);
     out.push([a, b]);
   };
+  let wiki = false;
   for (let i = start; i < line.length; i++) {
     const c = line[i]!;
     if (c === "\\" && line[i + 1] === "|") i++;
     else if (c === "`") code = !code;
-    else if (c === "|" && !code) {
+    else if (c === "[" && line[i + 1] === "[") (wiki = true), i++;
+    else if (c === "]" && line[i + 1] === "]") (wiki = false), i++;
+    else if (c === "|" && !code && !wiki) {
       push(start, i);
       start = i + 1;
     }
@@ -101,11 +108,14 @@ export function cellRegions(line: string): Array<[number, number]> {
     const b = to > a && line[to - 1] === " " ? to - 1 : to;
     out.push([a, Math.max(a, b)]);
   };
+  let wiki = false;
   for (let i = start; i < line.length; i++) {
     const c = line[i]!;
     if (c === "\\" && line[i + 1] === "|") i++;
     else if (c === "`") code = !code;
-    else if (c === "|" && !code) {
+    else if (c === "[" && line[i + 1] === "[") (wiki = true), i++;
+    else if (c === "]" && line[i + 1] === "]") (wiki = false), i++;
+    else if (c === "|" && !code && !wiki) {
       push(start, i);
       start = i + 1;
     }

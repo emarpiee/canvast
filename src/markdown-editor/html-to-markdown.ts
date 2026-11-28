@@ -220,6 +220,14 @@ const STRUCTURE = /<(h[1-6]|ul|ol|li|table|blockquote|pre|strong|b|em|i|a|img|de
  * chat) or the HTML has no structure, else the HTML read as Markdown.
  */
 export function pastedMarkdown(text: string, html: string): string {
-  if (!html || !STRUCTURE.test(html) || MD_BLOCK.test(text) || MD_INLINE.test(text)) return text;
-  return htmlToMarkdown(html) || text;
+  if (!html || !STRUCTURE.test(html) || MD_BLOCK.test(text) || MD_INLINE.test(text)) return escapeTablePipes(text);
+  return escapeTablePipes(htmlToMarkdown(html) || text);
+}
+
+/**
+ * A table row's `[[link|words]]` and `![[picture|200]]` with their bar written \\| (as notes apps write them in a table): unescaped, the
+ * bar ends the cell and the row gets a column too many. Lines that are no table row are left as they are.
+ */
+export function escapeTablePipes(md: string): string {
+  return md.replace(/^[ \t]*\|.*\|[ \t]*$/gm, (row) => row.replace(/\[\[[^\]\n]*\]\]/g, (link) => link.replace(/(?<!\\)\|/g, "\\|")));
 }

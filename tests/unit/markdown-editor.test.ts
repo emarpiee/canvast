@@ -164,3 +164,15 @@ describe("a table's escaped bar", () => {
     expect(readAlt("cat\\|200")).toMatchObject({ alt: "cat", width: 200 });
   });
 });
+
+describe("a table pasted from another app", () => {
+  it("keeps a piped link in one cell: its bar written \\| when pasted, and read so when the table is", async () => {
+    const { escapeTablePipes } = await import("../../src/markdown-editor/html-to-markdown");
+    const { parseTable, writeTable } = await import("../../src/markdown-editor/table");
+    const pasted = "| A | B | C |\n| --- | --- | --- |\n| [[x-y|Vanishing]] | words | ![[p.png|120]] |\nnot a row [[a|b]]";
+    expect(escapeTablePipes(pasted)).toBe("| A | B | C |\n| --- | --- | --- |\n| [[x-y\\|Vanishing]] | words | ![[p.png\\|120]] |\nnot a row [[a|b]]");
+    const t = parseTable("| A | B |\n| --- | --- |\n| [[x|y]] | z |");
+    expect(t.rows[0]).toEqual(["[[x\\|y]]", "z"]);
+    expect(writeTable(t)).toContain("| [[x\\|y]] | z |");
+  });
+});
