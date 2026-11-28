@@ -718,7 +718,7 @@ test("resize with side handles: corners and sides follow the pointer; Shift keep
 test("panning while dragging goes by the pointer: near an edge of the view it pans while the pointer rests there; the object past the edge with the pointer away pans nothing; its switch turns it off", async ({ app }) => {
   const p = app.page;
   await p.getByTestId("view-assets").click();
-  await p.getByTestId("assets-import-input").setInputFiles({ name: "o.png", mimeType: "image/png", buffer: makePng(240, 80, () => [200, 60, 40, 255]) });
+  await p.getByTestId("assets-import-input").setInputFiles({ name: "o.png", mimeType: "image/png", buffer: makePng(480, 80, () => [200, 60, 40, 255]) });
   await p.locator('[data-testid="asset-card"][title="o.png"]').click();
   await p.getByTestId("asset-place").click();
   await p.getByTestId("view-canvas").click();
@@ -742,8 +742,9 @@ test("panning while dragging goes by the pointer: near an edge of the view it pa
     await p.mouse.up();
     return { moved, right };
   };
-  // Grabbed at its left side, dragged so its right side goes past the edge with the pointer far from it: no pan, it follows the pointer.
-  const past = await drag(0.05, width - 150, 600);
+  // Grabbed near its left side (clear of the side handle), dragged so its right side goes past the edge with the pointer far from it: no
+  // pan, it follows the pointer.
+  const past = await drag(0.2, width - 200, 600);
   expect(past.moved, "the pointer is away from the edge: no pan").toBe(false);
   expect(past.right, "it follows the pointer past the edge").toBeGreaterThan(width);
   await p.keyboard.press("f"); // (in view again)

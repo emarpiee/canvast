@@ -210,6 +210,7 @@ export const EDITOR_CSS = `
 :where(.me .me-tok-number) { color: var(--me-tok-number); } :where(.me .me-tok-function) { color: var(--me-tok-function); } :where(.me .me-tok-tag) { color: var(--me-tok-tag); }
 /* preview mode */
 :where(.me-preview) { position: absolute; inset: 0; overflow: auto; padding: var(--me-pad) 0; line-height: var(--me-line-height); background: var(--me-bg); color: var(--me-fg); }
+:where(.me-preview):focus { outline: none; }
 :where(.me-preview > .me-page) { max-width: var(--me-width); margin: 0 auto; padding: 0 var(--me-pad); }
 :where(.me-doc) :is(h1, h2, h3, h4, h5, h6) { line-height: 1.3; }
 /* (a block's gap is one line, as a blank line between blocks is in the editor) */

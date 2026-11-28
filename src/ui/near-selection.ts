@@ -29,7 +29,7 @@ export interface Rect { left: number; top: number; right: number; bottom: number
 
 /** The bars on the edges (the top-left bar, the tool rail, the buttons and panels at the right, the Actions bar, the view controls): drawn over what floats by the selection, so that keeps off them. */
 // (the note panel or window too: a file open beside the canvas is drawn over it, as the edge bars are)
-const EDGE_BARS = "#nav > *, .rail, .view-settings, .dock, #side-panels > *, #side-panels-left > *, .ctx-wrap, .hud-controls, .hud-readout, .hud-dev, .note-dock"; // (all on the edge layer, drawn over what follows the selection)
+const EDGE_BARS = "#nav > *, .rail, .view-settings, .dock, #side-panels > *, #side-panels-left > *, .ctx-wrap, .hud-controls, .hud-readout, .hud-dev, .hud-debug, .note-dock"; // (all on the edge layer, drawn over what follows the selection)
 
 /** The edge bars shown now, as boxes relative to `host` in the interface's px; `self` (and what holds it or is in it) left out. */
 export function edgeBarsIn(host: HTMLElement, self: HTMLElement): Rect[] {

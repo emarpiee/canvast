@@ -252,6 +252,7 @@ export function createMarkdownEditor(opts: EditorOptions): MarkdownEditor {
   const preview = document.createElement("div");
   preview.className = "me-preview";
   preview.hidden = true;
+  preview.tabIndex = -1; // (focusable: in preview mode the note's keys are pressed there)
   const page = document.createElement("div");
   page.className = "me-page me-doc";
   preview.append(page);
@@ -716,7 +717,9 @@ export function createMarkdownEditor(opts: EditorOptions): MarkdownEditor {
     mode = m;
     applyMode();
     opts.onMode?.(m);
+    // (the focus stays in the note: the words, or the preview's page, so its keys go on working, a mode key pressed again too)
     if (m !== "preview") view.focus();
+    else preview.focus({ preventScroll: true });
   };
 
   // Ctrl+4 and Ctrl+5 from preview mode, where the text (and its keys) are hidden.

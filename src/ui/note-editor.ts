@@ -311,12 +311,14 @@ export async function mountNoteEditor(el: HTMLElement, opts: { kind: Exclude<Not
   window.addEventListener("pointerdown", pressed, true);
   const keys = (e: KeyboardEvent): void => {
     // (the mode keys, as the keymap sends them on (settings/keymap.ts), with the focus elsewhere in the note, the preview's page: the same commands as in its words)
-    if (atNote && root.isConnected && !editor.view.hasFocus && e.ctrlKey && e.altKey && e.shiftKey && (e.key === "F9" || e.key === "F10")) {
+    // (at the note: pressed in it last, or the focus in it now, as after a mode key: no click needed)
+    const here = atNote || (e.target instanceof Node && root.contains(e.target));
+    if (here && root.isConnected && !editor.view.hasFocus && e.ctrlKey && e.altKey && e.shiftKey && (e.key === "F9" || e.key === "F10")) {
       e.preventDefault();
       e.stopImmediatePropagation();
       return void commands.press(e.key === "F10" ? "notes.source" : "notes.liveOrPreview");
     }
-    if (!atNote || e.altKey || !(e.ctrlKey || e.metaKey) || !root.isConnected || root.hidden || document.querySelector("dialog[open]")) return;
+    if (!here || e.altKey || !(e.ctrlKey || e.metaKey) || !root.isConnected || root.hidden || document.querySelector("dialog[open]")) return;
     if (editor.view.hasFocus) return; // (the editor's own keys)
     const t = e.target as HTMLElement | null;
     const typing = !!t && (t.isContentEditable || /^(TEXTAREA|SELECT|INPUT)$/.test(t.tagName));
@@ -333,9 +335,11 @@ export async function mountNoteEditor(el: HTMLElement, opts: { kind: Exclude<Not
       e.preventDefault();
       e.stopImmediatePropagation();
       void host.save();
-    } else if (e.code === "KeyF" && editor.mode !== "preview") {
+    } else if (e.code === "KeyF") {
+      // (the note's own find, never the library's or the canvas's behind it; in preview the words to find in are live editing's)
       e.preventDefault();
       e.stopImmediatePropagation();
+      if (editor.mode === "preview") editor.setMode("live");
       editor.find();
     }
   };
