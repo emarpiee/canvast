@@ -481,6 +481,7 @@ class TableView {
       e.stopPropagation();
       this.stopEditing();
       handle.setPointerCapture(e.pointerId);
+      handle.classList.add("is-dragging");
       const view = this.view;
       const line = document.createElement("div");
       line.className = "me-table-drop";
@@ -502,6 +503,7 @@ class TableView {
       handle.addEventListener("pointermove", move);
       handle.addEventListener("pointerup", () => {
         handle.removeEventListener("pointermove", move);
+        handle.classList.remove("is-dragging");
         line.remove();
         if (at === null) return;
         const doc = view.state.doc;
@@ -689,7 +691,11 @@ class TableView {
     tbody.addEventListener("mousemove", (e) => {
       const tr = (e.target as HTMLElement).closest("tr");
       if (tr) placeGrip(bodyRows().indexOf(tr as HTMLTableRowElement));
+      grip.classList.add("is-near");
     });
+    // view-state: (the row's grip shows while the pointer is on the rows or on it)
+    tbody.addEventListener("mouseleave", (e) => void (!grip.contains(e.relatedTarget as Node) && grip.classList.remove("is-near")));
+    grip.addEventListener("mouseleave", (e) => void (!tbody.contains(e.relatedTarget as Node) && grip.classList.remove("is-near")));
     grip.hidden = true;
     grip.addEventListener("pointerdown", (e) => {
       if (gripRow < 0) return;
@@ -737,7 +743,11 @@ class TableView {
     table.addEventListener("mousemove", (e) => {
       const cell = (e.target as HTMLElement).closest<HTMLTableCellElement>("th, td");
       if (cell) placeColGrip(cell.cellIndex);
+      // (the column's grip shows while the pointer is on the heading row or on it)
+      colGrip.classList.toggle("is-near", !!cell && cell.tagName === "TH");
     });
+    // view-state: (the column's grip goes when the pointer leaves the heading row for anything but it)
+    table.addEventListener("mouseleave", (e) => void (!colGrip.contains(e.relatedTarget as Node) && colGrip.classList.remove("is-near")));
     colGrip.addEventListener("pointerdown", (e) => {
       if (gripCol < 0) return;
       e.preventDefault();

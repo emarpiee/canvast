@@ -92,14 +92,15 @@ export const EDITOR_CSS = `
 :where(.me-table-scroll) tr > td:first-child { background: var(--me-col-bg, var(--me-td-bg, transparent)); }
 :where(.me-table) :is(th, td) { outline: none; cursor: text; }
 :where(.me-table-add) { display: grid; place-items: center; padding: 0; border: 0; border-radius: 4px; background: var(--me-code-bg); color: var(--me-faint); font: inherit; font-size: 11px; line-height: 1; cursor: pointer; opacity: 0; transition: opacity 0.12s; }
-:where(.me-table:hover) .me-table-add, :where(.me-table:focus-within) .me-table-add { opacity: 1; }
+/* (each handle shows only where it is: a bar when the pointer is on it, a grip by the row or column under the pointer) */
+:where(.me-table-add):is(:hover, :focus-visible) { opacity: 1; }
 :where(.me-table-add):hover { color: var(--me-fg); background: var(--me-line); }
 :where(.me-table-add-col) { grid-column: 2; grid-row: 2; }
 :where(.me-table-move) { position: absolute; left: -14px; top: 0; width: 12px; height: 12px; display: grid; place-items: center; border-radius: 4px; background: var(--me-code-bg); color: var(--me-faint); cursor: grab; opacity: 0; transition: opacity 0.12s; touch-action: none; z-index: 1; }
-:where(.me-table:hover) .me-table-move { opacity: 1; }
+:where(.me-table-move):hover, :where(.me-table-move.is-dragging) { opacity: 1; }
 :where(.me-table-drop) { position: fixed; z-index: 1000; height: 2px; border-radius: 1px; background: var(--me-accent); pointer-events: none; }
 :where(.me-table-grip) { position: absolute; left: -14px; width: 12px; display: grid; place-items: center; border-radius: 4px; background: var(--me-code-bg); color: var(--me-faint); cursor: grab; opacity: 0; transition: opacity 0.12s; touch-action: none; }
-:where(.me-table:hover) .me-table-grip { opacity: 1; }
+:where(.me-table-grip):is(:hover, .is-near, .is-dragging) { opacity: 1; }
 :where(.me-table-grip[hidden]) { display: none; }
 :where(.me-table-grip.is-dragging) { cursor: grabbing; color: var(--me-fg); }
 :where(.me-table) tr.me-drop-target > * { box-shadow: inset 0 -2px 0 var(--me-accent); }
@@ -163,7 +164,7 @@ export const EDITOR_CSS = `
 :where(.me-col-grip) { position: absolute; top: 0; height: 12px; display: grid; place-items: center; border-radius: 4px; background: var(--me-code-bg); color: var(--me-faint); cursor: grab; opacity: 0; transition: opacity 0.12s; touch-action: none; }
 :where(.me-col-grip[hidden]) { display: none; }
 :where(.me-col-grip.is-dragging) { cursor: grabbing; color: var(--me-fg); }
-:where(.me-table:hover) .me-col-grip { opacity: 1; }
+:where(.me-col-grip):is(:hover, .is-near, .is-dragging) { opacity: 1; }
 :where(.me-table) th.me-drop-target { box-shadow: inset -2px 0 0 var(--me-accent); }
 :where(.me-live) .me-code-lang.is-detected { border: 1px dashed var(--me-line); opacity: 0.85; }
 /* math and diagrams */
