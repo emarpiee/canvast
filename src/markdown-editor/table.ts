@@ -1,6 +1,7 @@
 // Tables in live mode: a table is drawn as a table whose cells are edited in place (Tab and Shift+Tab move between them, Enter goes down a
 // row, adding one at the end, Escape leaves the table), with buttons that add a row or a column. The Markdown stays the one truth: an edited
 // cell writes the whole table back as one change (one undo step). The cursor never lands in the raw pipes; source mode edits those.
+import { dragBlock } from "./behaviors/block-drag";
 import { redo, undo } from "@codemirror/commands";
 import { syntaxTree } from "@codemirror/language";
 import { RangeSet, StateField, type EditorState, type Extension, type Range } from "@codemirror/state";
@@ -495,47 +496,10 @@ class TableView {
     handle.title = this.ctx.moveTableLabel;
     handle.setAttribute("aria-label", this.ctx.moveTableLabel);
     handle.innerHTML = '<svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor"><circle cx="3" cy="3" r="1.1"/><circle cx="9" cy="3" r="1.1"/><circle cx="3" cy="9" r="1.1"/><circle cx="9" cy="9" r="1.1"/><circle cx="6" cy="6" r="1.1"/></svg>';
+    // view-state: (moves the whole table in the note: one change of the file; the same drag as every block's grip)
     handle.addEventListener("pointerdown", (e) => {
-      e.preventDefault();
-      e.stopPropagation();
       this.stopEditing();
-      handle.setPointerCapture(e.pointerId);
-      handle.classList.add("is-dragging");
-      const view = this.view;
-      const line = document.createElement("div");
-      line.className = "me-table-drop";
-      line.style.background = getComputedStyle(view.dom).getPropertyValue("--me-accent"); // (on the page's top, outside the editor's tokens)
-      document.body.append(line);
-      let at: number | null = null;
-      const end = (): number => this.from + this.source.length;
-      const move = (ev: PointerEvent): void => {
-        const pos = view.posAtCoords({ x: ev.clientX, y: ev.clientY });
-        // (not on the table itself, nor right at its edges: nowhere it would move)
-        at = pos === null || (pos >= this.from - 1 && pos <= end() + 1) ? null : pos;
-        line.hidden = at === null;
-        if (at === null) return;
-        const c = view.coordsAtPos(at) ?? view.coordsAtPos(view.state.doc.lineAt(at).from);
-        const content = view.contentDOM.getBoundingClientRect();
-        if (!c) return void (line.hidden = true);
-        Object.assign(line.style, { left: `${content.left}px`, width: `${content.width}px`, top: `${c.top - 2}px` });
-      };
-      handle.addEventListener("pointermove", move);
-      handle.addEventListener("pointerup", () => {
-        handle.removeEventListener("pointermove", move);
-        handle.classList.remove("is-dragging");
-        line.remove();
-        if (at === null) return;
-        const doc = view.state.doc;
-        const from = this.from, to = Math.min(doc.length, end() + (doc.sliceString(end(), end() + 1) === "\n" ? 1 : 0));
-        const table = doc.sliceString(this.from, end());
-        const before = doc.sliceString(Math.max(0, at - 2), at), after = doc.sliceString(at, at + 2);
-        const lead = at === 0 ? "" : before.endsWith("\n\n") ? "" : before.endsWith("\n") ? "\n" : "\n\n";
-        const trail = at === doc.length ? "\n" : after.startsWith("\n\n") ? "" : after.startsWith("\n") ? "\n" : "\n\n";
-        const insert = `${lead}${table}${trail}`;
-        const changes = view.state.changes([{ from, to }, { from: at, insert }]);
-        view.dispatch({ changes, selection: { anchor: changes.mapPos(at, 1) }, scrollIntoView: true, userEvent: "move.table" });
-        view.focus();
-      }, { once: true });
+      dragBlock(this.view, handle, e, () => ({ from: this.from, to: this.from + this.source.length, item: false }));
     });
     return handle;
   }

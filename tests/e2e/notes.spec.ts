@@ -1279,7 +1279,7 @@ test("Escape closes a note open on a canvas, in the panel and in the window: the
   await expect(p.getByTestId("note-panel")).toBeHidden();
 });
 
-test("lists as notes apps write them: Enter adds the next item right below, numbers follow a moved line, Ctrl+L makes and ticks a task, Alt+Up moves a line", async ({ app }) => {
+test("lists as notes apps write them: Enter adds the next item right below, numbers follow a moved line, Ctrl+L makes and ticks a task, Alt+Up moves a line; every block is dragged by its grip", async ({ app }) => {
   const p = app.page;
   await p.getByTestId("view-assets").click();
   await p.getByTestId("assets-import-input").setInputFiles({ name: "lists.md", mimeType: "text/markdown", buffer: Buffer.from("# Lists\n\n1. one\n\n2. two\n3. three\n\nplain\n") });
@@ -1300,6 +1300,20 @@ test("lists as notes apps write them: Enter adds the next item right below, numb
   await expect.poll(() => text(p)).toContain("- [ ] plain");
   await p.keyboard.press("Control+l");
   await expect.poll(() => text(p)).toContain("- [x] plain");
+  // Every block is dragged by its grip (on hover, at its left): the task goes above the heading, a blank line after it; one undo puts it back.
+  const before = await text(p);
+  const task = page(p).locator(".cm-line", { hasText: "plain" });
+  await task.hover();
+  const grip = note(p).locator(".me-block-grip");
+  await expect(grip).toBeVisible();
+  const g = (await grip.boundingBox())!, h = (await heading(p).boundingBox())!;
+  await p.mouse.move(g.x + g.width / 2, g.y + g.height / 2);
+  await p.mouse.down();
+  await p.mouse.move(h.x + 20, h.y + 3, { steps: 5 });
+  await p.mouse.up();
+  await expect.poll(() => text(p)).toMatch(/^- \[x\] plain\n\n# Lists\n/);
+  await p.keyboard.press("Control+z");
+  await expect.poll(() => text(p)).toBe(before);
 });
 
 test("lists in a callout and in a table cell are drawn as lists; Turn into keeps the selected words (code block, table: a row per line)", async ({ app }) => {

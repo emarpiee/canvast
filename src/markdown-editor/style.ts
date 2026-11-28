@@ -105,6 +105,9 @@ export const EDITOR_CSS = `
 :where(.me-table-add-col) { grid-column: 2; grid-row: 2; }
 :where(.me-table-move) { position: absolute; left: -14px; top: 0; width: 12px; height: 18px; display: grid; place-items: center; border-radius: 4px; background: var(--me-code-bg); color: var(--me-faint); cursor: grab; opacity: 0; transition: opacity 0.12s; touch-action: none; z-index: 1; }
 :where(.me-table-move):is(:hover, .is-near, .is-dragging) { opacity: 1; }
+:where(.me-block-grip) { position: absolute; z-index: 1; width: 14px; height: 14px; display: grid; place-items: center; border-radius: 4px; color: var(--me-faint); cursor: grab; touch-action: none; }
+:where(.me-block-grip):is(:hover, .is-dragging) { background: var(--me-code-bg); color: var(--me-muted); }
+:where(.me-block-grip)[hidden] { display: none; }
 :where(.me-table-drop) { position: fixed; z-index: 1000; height: 2px; border-radius: 1px; background: var(--me-accent); pointer-events: none; }
 :where(.me-table-grip) { position: absolute; left: -14px; width: 12px; display: grid; place-items: center; border-radius: 4px; background: var(--me-code-bg); color: var(--me-faint); cursor: grab; opacity: 0; transition: opacity 0.12s; touch-action: none; }
 :where(.me-table-grip):is(:hover, .is-near, .is-dragging) { opacity: 1; }

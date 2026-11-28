@@ -18,6 +18,7 @@ export { linkFollow } from "./link-follow";
 export { insertBlockMarkdown, pasteRules, type PasteHost } from "./paste-rules";
 export { pictureSelect } from "./picture-select";
 export { clearFormat, stripMarks } from "./clear-format";
+export { blockHandle, dragBlock } from "./block-drag";
 
 /** Every behaviour: its id (for `behaviors` in the editor's options), what it does and where it comes from. */
 export const BEHAVIORS = [
@@ -32,6 +33,7 @@ export const BEHAVIORS = [
   { id: "reflow", does: "Alt+Q joins a wrapped paragraph", from: "notes apps" },
   { id: "link-follow", does: "A click on a drawn link follows it", from: "notes apps" },
   { id: "picture-select", does: "A picture is drawn, never opened by the cursor; a click selects it, + − 0 size it, Enter or Tab edits it, Space shows it full size", from: "notes apps (2026)" },
+  { id: "block-drag", does: "Every block has a grip at its left on hover: dragged, the block moves between two others (the table's grip too)", from: "canvast's first editor; block editors" },
   { id: "clear-format", does: "Clear formatting takes the selected words' inline marks off", from: "notes apps" },
   { id: "paste-rules", does: "A link pasted over words makes them the link; pages become Markdown; pictures on lines of their own", from: "canvast's first editor; notes apps" },
 ] as const;
