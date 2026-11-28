@@ -16,7 +16,7 @@ export interface FilePanelDeps extends ViewDeps {
   /** Hidden items are listed (hidden mode, kept on outside the library). */
   hidden(): boolean;
   /** The library's details panel of this file shown in `host` (null: back in the library): AssetsView.detailsIn. */
-  details?(host: HTMLElement | null, hash?: string, view?: OpenView): Promise<void>;
+  details?(host: HTMLElement | null, hash?: string, view?: { readonly hash: string; goToText?(text: string): boolean; show?(hash: string): Promise<unknown> }): Promise<void>;
 }
 
 /**
@@ -71,7 +71,9 @@ export function mountFilePanel(
     const side = el.querySelector<HTMLElement>(".file-panel-details");
     el.querySelector("[data-details]")?.setAttribute("aria-pressed", String(on));
     if (side) side.hidden = !on;
-    void deps.details?.(on && side && note ? side : null, note?.hash, note ?? undefined);
+    const n = note;
+    // (what the details open, a linked item, opens here: in this panel or window, a step of its history)
+    void deps.details?.(on && side && n ? side : null, n?.hash, n ? { hash: n.hash, goToText: (t) => n.goToText?.(t) ?? false, show: (h) => place.show(h) } : undefined);
   };
   /** Close the file open (`end`: the panel or window is closed, its back and forward history with it; else another file takes its place). */
   const shut = (end = true): void => {

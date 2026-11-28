@@ -126,7 +126,7 @@ export interface AssetsView {
    * The details panel of one item shown in `host` (a file open on a canvas: its panel's Properties), the panel itself moved there, not a
    * copy; `view` is that open file, for what the details go to in it (a footnote). `null`: the panel goes back to the library.
    */
-  detailsIn(host: HTMLElement | null, hash?: string, view?: { readonly hash: string; goToText?(text: string): boolean }): Promise<void>;
+  detailsIn(host: HTMLElement | null, hash?: string, view?: { readonly hash: string; goToText?(text: string): boolean; show?(hash: string): Promise<unknown> }): Promise<void>;
   /** A Pins window's Library (embedded): the grid of the pictures of a folder ("folder:<id>") or of all ("all"); a card opens the viewer. */
   viewIn(scope: string): Promise<void>;
 }
@@ -477,7 +477,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   const inspector = root.querySelector<HTMLElement>(".asset-inspector")!;
   const inspectorHome = { parent: inspector.parentElement!, next: inspector.nextSibling };
   /** The file open on a canvas whose panel holds the details now (detailsIn), else null. */
-  let elsewhere: { readonly hash: string; goToText?(text: string): boolean } | null = null;
+  let elsewhere: { readonly hash: string; goToText?(text: string): boolean; show?(hash: string): Promise<unknown> } | null = null;
   // view-state: (the body says whether the details panel shows, `has-inspector`, for its rules: a class, kept with the panel's own
   // hidden attribute whatever shows or hides it, where a selector asking the body about the panel restyled the whole grid at each change)
   const markInspector = (): void => void body.classList.toggle("has-inspector", !inspector.hidden);
@@ -3273,7 +3273,9 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
         void renameAssetsDialog(filtered().filter((h) => picked.has(h)));
         break;
       case "open-linked":
-        void vw.showSlide(c.data["hash"]!);
+        // (beside a file on a canvas, a linked item opens there, in its panel or window: never in the library's viewer, out of sight)
+        if (elsewhere?.show) void elsewhere.show(c.data["hash"]!);
+        else void vw.showSlide(c.data["hash"]!);
         break;
       case "open-tab":
         void openOriginalInTab(assets, hash);
