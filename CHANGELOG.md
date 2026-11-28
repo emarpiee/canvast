@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.63.20 — Card titles in capitals (2026-11-29)
+
+- **Changed:** every card's title is in capitals, in one rule for the whole app: the Settings cards, the cards beside a file (Properties, Description, Tags, Folder, Linked from, Links, Footnotes…), the library's sidebar sections, the tags panel, the workspace menu and the styles tabs. ([The interface, settings and keys](README.md#the-interface-settings-and-keys))
+
+### For developers
+
+- Tests: the viewer's fade test reads the header's opacity (Back sits in it now), not Back's own.
+
 ## 0.63.19 — canvast's own Markdown editor (2026-11-28)
 
 - **Changed:** notes are written in canvast's own Markdown editor, in place of the rich text editor: live mode shows a note as it reads while you write (its marks only where the cursor is, pictures, task boxes and tables drawn in place), source mode shows the Markdown as written, preview mode draws the page; Settings > Notes > Notes open in sets the default and each note's toolbar switches (Ctrl+E: preview and back). What is saved is exactly what was typed (B37). ([Notes](README.md#notes))

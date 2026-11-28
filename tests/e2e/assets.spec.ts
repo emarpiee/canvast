@@ -1279,10 +1279,9 @@ test("gallery viewer: the view tabs, the workspace menu and the Settings button 
   };
   await pointerAt(300);
   await pointerAt(20); // near the top edge: they come back
-  await expect(back).toHaveCSS("opacity", "1");
-  await expect(details).toHaveCSS("opacity", "1");
+  await expect(viewer.locator(".viewer-head"), "the header, Back and Details in it, back near the top").toHaveCSS("opacity", "1");
   await pointerAt(400);
-  await expect(back).toHaveCSS("opacity", "0");
+  await expect(viewer.locator(".viewer-head")).toHaveCSS("opacity", "0");
   // A narrow window (the phone layout): the viewer starts at the top, no room is kept for the tabs it hides.
   const size = p.viewportSize()!;
   await p.setViewportSize({ width: 547, height: 1000 });

@@ -2674,6 +2674,8 @@ dialog.rename-dialog { width: min(var(--dlg-l), calc(100vw - 2 * var(--edge))); 
 .set-card { padding: var(--s-6) var(--s-8); background: var(--hud-bg); border: 1px solid var(--hud-border); border-radius: var(--r-lg); }
 .set-card-head { display: flex; align-items: center; justify-content: space-between; gap: var(--s-6); margin-bottom: var(--s-4); } .set-card-head > h3 { margin: 0; font-size: var(--text-md); font-weight: var(--weight-semibold); color: var(--hud-muted); } /* (a card's title with its Reset all at the right) */
 .set-card > h3, .set-card > h4 { margin: 0 0 var(--s-4); font-size: var(--text-md); font-weight: var(--weight-semibold); color: var(--hud-muted); }
+/* Every card's title is in capitals, one rule for the app (settings cards, the details cards, the sidebar's sections, the tags panel, the workspace menu, the styles tabs). */
+:is(.set-card > h3, .set-card > h4, .set-card-head > h3, .asset-sec h3, .asset-note-label, .side-head h2, .side-sec-toggle h2, .tags-panel h3, .nav-ws h3, .styles-tab-head h3) { text-transform: uppercase; letter-spacing: 0.04em; }
 .set-keys { display: grid; gap: var(--s-6); }
 .set-keys > p, .set-keys > h3 { margin: 0; }
 .set-keys h3.set-sub { font-size: var(--text-xl); margin-top: var(--s-6); }
