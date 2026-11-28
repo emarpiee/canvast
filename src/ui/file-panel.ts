@@ -14,6 +14,8 @@ export interface FilePanelDeps extends ViewDeps {
   showInLibrary(hash: string): void;
   /** Hidden items are listed (hidden mode, kept on outside the library). */
   hidden(): boolean;
+  /** The library's details panel of this file shown in `host` (null: back in the library): AssetsView.detailsIn. */
+  details?(host: HTMLElement | null, hash?: string, view?: OpenView): Promise<void>;
 }
 
 /**
@@ -36,7 +38,17 @@ export function mountFilePanel(
   let name = "";
   let hiddenOpen = false; // (the file open is a hidden item)
   const label = (k: FileViewKind): string => k.noun[0]!.toUpperCase() + k.noun.slice(1);
+  /** The details of the file open, at the right of its view (its header's Properties button). */
+  let detailsShown = false;
+  const showDetails = (on: boolean): void => {
+    detailsShown = on;
+    const side = el.querySelector<HTMLElement>(".file-panel-details");
+    el.querySelector("[data-details]")?.setAttribute("aria-pressed", String(on));
+    if (side) side.hidden = !on;
+    void deps.details?.(on && side && note ? side : null, note?.hash, note ?? undefined);
+  };
   const shut = (): void => {
+    if (detailsShown) void deps.details?.(null); // (back in the library; shown again for the next file opened here)
     note?.close(true);
     note = null;
     hiddenOpen = false;
@@ -80,13 +92,15 @@ export function mountFilePanel(
     const name0 = (await deps.session.catalog?.entry(hash).catch(() => undefined))?.name ?? rec.name;
     kind = k;
     name = name0;
-    const tools = deps.session.readOnly ? "" : `<button type="button" class="layer-btn" data-rename aria-label="Rename this ${k.noun}" title="Rename this ${k.noun} (F2)">${ICONS.textCursorInput}</button>`;
-    el.innerHTML = panelHtml({ title: esc(name0), tools, body: `<div class="viewer-note"${k.id === "note" ? ' data-testid="note-editor"' : ""}><div></div></div>` });
+    const tools = (deps.details ? `<button type="button" class="layer-btn" data-details aria-pressed="false" aria-label="Properties" title="Its properties: the library's details of this ${k.noun}">${ICONS.panelRight}</button>` : "")
+      + (deps.session.readOnly ? "" : `<button type="button" class="layer-btn" data-rename aria-label="Rename this ${k.noun}" title="Rename this ${k.noun} (F2)">${ICONS.textCursorInput}</button>`);
+    el.innerHTML = panelHtml({ title: esc(name0), tools, body: `<div class="viewer-note"${k.id === "note" ? ' data-testid="note-editor"' : ""}><div></div></div><aside class="file-panel-details" data-testid="file-panel-details" hidden></aside>` });
     el.setAttribute("aria-label", `${label(k)}: ${name0}`);
     el.querySelector(".panel-head h2")?.setAttribute("title", name0);
     // view-state: (closes the panel)
     el.querySelector("[data-close]")!.addEventListener("click", () => void leave());
     el.querySelector("[data-rename]")?.addEventListener("click", () => void rename()); // view-state: (opens the rename dialog of this file)
+    el.querySelector("[data-details]")?.addEventListener("click", () => showDetails(!detailsShown)); // view-state: (shows or hides its details beside it)
     el.hidden = false;
     try {
       opening = hash;
@@ -94,6 +108,7 @@ export function mountFilePanel(
       note = await k.open(el.querySelector<HTMLElement>(".viewer-note > div")!, { hash, name: name0, blob: rec.blob }, deps, { ...place, ...card }).finally(() => void (opening = ""));
       // (Escape pressed while it was still opening, its words already shown: it closes now)
       if (escaped) return void (await leave()), true;
+      if (detailsShown) showDetails(true); // (another file opened here: its own details)
       if (k.id !== "note") el.querySelector<HTMLElement>(".viewer-note [tabindex]")?.focus({ preventScroll: true });
       // a note: the caret in its words at once, so the keys (Escape too) are the note's from the first one, not the canvas's behind it
       // (after the double-click that opened it has ended: its last release would take the focus back to the canvas)

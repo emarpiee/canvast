@@ -1632,6 +1632,11 @@ button.asset-preview { display: flex; align-items: center; justify-content: cent
 .note-window.is-empty { display: none; }
 .note-window > .note-dock { width: min(60rem, calc(100vw - var(--sp-8))); max-height: calc(100dvh - var(--sp-8)); box-shadow: var(--hud-lift); }
 .note-dock > .panel-body { flex: 1; min-height: 0; display: flex; padding: 0; overflow: hidden; }
+.note-dock > .panel-body > .viewer-note { flex: 1; min-width: 0; }
+.file-panel-details { display: flex; min-height: 0; border-left: 1px solid var(--hud-border); } /* (the library's details of the open file, at its right: its header's Properties) */
+.file-panel-details[hidden] { display: none; }
+.asset-inspector.is-elsewhere { border: 0; border-radius: 0; overflow-y: auto; }
+.asset-inspector.is-elsewhere .asset-preview-box { display: none; } /* (the file is open beside it) */
 /* A note open in the viewer: the notes editor fills the stage; the picture's own tools are not shown. */
 .viewer-note { flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; }
 .viewer-note > div { flex: 1; min-height: 0; display: flex; flex-direction: column; }

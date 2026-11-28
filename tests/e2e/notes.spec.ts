@@ -471,6 +471,13 @@ test("a note on a canvas opens in the note panel (a double-click, or Edit note):
   await p.locator('[data-rn="one"]').fill("plan");
   await p.getByTestId("rename-ok").click();
   await expect(p.getByTestId("note-panel").locator(".panel-head h2")).toHaveText("plan.md");
+  // Its header's Properties: the library's details of this note at its right (its name, no preview: the note is open beside it); again, gone.
+  const details = p.getByTestId("note-panel").getByTestId("file-panel-details");
+  await p.getByTestId("note-panel").locator("[data-details]").click();
+  await expect(details.locator(".asset-insp-head h2")).toHaveText("plan.md");
+  await expect(details.getByTestId("asset-preview")).toBeHidden();
+  await p.getByTestId("note-panel").locator("[data-details]").click();
+  await expect(details).toBeHidden();
   // The saves are no steps of the canvas's undo: Undo takes back the placing (never back to the old version), Redo places the saved note.
   const saved = await placed();
   await p.evaluate(() => (document.activeElement as HTMLElement | null)?.blur()); // (the keys go to the canvas, not the editor)

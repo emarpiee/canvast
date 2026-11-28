@@ -121,6 +121,11 @@ export interface AssetsView {
   importFiles(files: File[], here?: boolean): Promise<string[]>;
   /** Draw the notes' cards again (the preview look changed). */
   redrawNotes(): void;
+  /**
+   * The details panel of one item shown in `host` (a file open on a canvas: its panel's Properties), the panel itself moved there, not a
+   * copy; `view` is that open file, for what the details go to in it (a footnote). `null`: the panel goes back to the library.
+   */
+  detailsIn(host: HTMLElement | null, hash?: string, view?: { readonly hash: string; goToText?(text: string): boolean }): Promise<void>;
   /** A Pins window's Library (embedded): the grid of the pictures of a folder ("folder:<id>") or of all ("all"); a card opens the viewer. */
   viewIn(scope: string): Promise<void>;
 }
@@ -469,6 +474,9 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     tile: (name) => fileTile({ name, type: "" }),
   });
   const inspector = root.querySelector<HTMLElement>(".asset-inspector")!;
+  const inspectorHome = { parent: inspector.parentElement!, next: inspector.nextSibling };
+  /** The file open on a canvas whose panel holds the details now (detailsIn), else null. */
+  let elsewhere: { readonly hash: string; goToText?(text: string): boolean } | null = null;
   // view-state: (the body says whether the details panel shows, `has-inspector`, for its rules: a class, kept with the panel's own
   // hidden attribute whatever shows or hides it, where a selector asking the body about the panel restyled the whole grid at each change)
   const markInspector = (): void => void body.classList.toggle("has-inspector", !inspector.hidden);
@@ -3177,7 +3185,8 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
         // (a footnote of the open note: its words, in the editor; a note not open opens first)
         const hash = inspector.dataset["hash"], label = c.data["fn"]!;
         if (!hash) break;
-        if (vw.note?.hash === hash) vw.note.goToText?.(`[^${label}]:`);
+        if (elsewhere?.hash === hash) elsewhere.goToText?.(`[^${label}]:`);
+        else if (vw.note?.hash === hash) vw.note.goToText?.(`[^${label}]:`);
         else void vw.showSlide(hash).then(() => window.setTimeout(() => vw.note?.goToText?.(`[^${label}]:`), 300));
         break;
       }
@@ -5260,7 +5269,28 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     thumbsHeld: () => thumbUrls.size,
     // ("drawn" holds the filtering too: it is said apart)
     lastOpen: () => (laps.length ? `library read and drawn in ${Math.round(lapTotal)} ms: ${[...laps].sort((a, b) => b[1] - a[1]).slice(0, 4).map(([n, ms]) => `${n} ${Math.round(ms)}`).join(" · ")}` : ""),
+    async detailsIn(host, hash, view) {
+      if (!host || !hash) {
+        if (!elsewhere) return;
+        elsewhere = null;
+        inspector.classList.remove("is-elsewhere");
+        inspectorHome.parent.insertBefore(inspector, inspectorHome.next);
+        return renderInspector();
+      }
+      await ensure([hash]);
+      if (!entryOf(hash)) await refresh().then(() => ensure([hash]));
+      picked.clear();
+      picked.add(hash);
+      selected = anchor = hash;
+      places = await session.assetPlaces(hash).catch(() => []);
+      elsewhere = view ?? null;
+      inspector.classList.add("is-elsewhere");
+      host.append(inspector);
+      markPicked();
+      renderInspector();
+    },
     show() {
+      if (elsewhere) void this.detailsIn(null); // (the details back in the library, where it is opened)
       visible = true;
       pump();
       vw.labelGround();

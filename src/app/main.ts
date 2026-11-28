@@ -2448,7 +2448,7 @@ async function start(): Promise<void> {
     pressCommand("pins.open", {}, "key");
   });
   installNoBrowserMenu(commands); // (no right click anywhere opens the browser's own menu: a view's, the text menu on a field, or none)
-  notePanelReady({ session, assets, settings, importFiles: (files) => assetsView.importFiles(files), showInLibrary: (h) => (setView("assets"), void assetsView.reveal([h])), hidden: hiddenModeOn });
+  notePanelReady({ session, assets, settings, importFiles: (files) => assetsView.importFiles(files), showInLibrary: (h) => (setView("assets"), void assetsView.reveal([h])), hidden: hiddenModeOn, details: (host, hash, v) => assetsView.detailsIn(host, hash, v) });
   // Alt+Shift+Left and Alt+Shift+Right: previous and next view (ADR 0116), on the canvas. (Alt with an arrow alone pans, as ever.)
   window.addEventListener("keydown", (e) => {
     if (!e.altKey || !e.shiftKey || e.ctrlKey || e.metaKey || (e.key !== "ArrowLeft" && e.key !== "ArrowRight")) return;
