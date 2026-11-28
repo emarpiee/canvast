@@ -3510,6 +3510,8 @@ button.archive-crumb:hover { background: var(--hud-hover); color: var(--hud-fg);
 .props-near { position: absolute; z-index: var(--z-item-bar); display: flex; align-items: center; max-width: calc(100% - 2 * var(--edge)); }
 /* (on a small window the chips by the selection scroll sideways, with the cue at the end that has more, as the Actions bar does) */
 .props-near > .props-row { min-width: 0; overflow-x: auto; scrollbar-width: none; }
+.props-lift { display: inline-grid; place-items: center; align-self: stretch; padding: 0 var(--s-2); color: var(--hud-muted); cursor: ns-resize; touch-action: none; opacity: 0.5; } /* (its grip: up or down only, the room between the chips and the selection) */
+.props-lift:hover { opacity: 1; color: var(--hud-fg); }
 .props-near > .props-row::-webkit-scrollbar { display: none; }
 .props-near[hidden] { display: none; }
 

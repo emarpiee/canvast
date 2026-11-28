@@ -19,7 +19,7 @@ export type PropertiesPlace = "bar" | "near";
 /** The chip of the colours of a selection of several shapes. */
 const COLOURS = "colours";
 
-export function mountPropertiesLayout(root: HTMLElement, canvasHost: HTMLElement, editor: EditorState, pb: PropertiesBar, place: () => PropertiesPlace): { refresh(): void; follow(): void } {
+export function mountPropertiesLayout(root: HTMLElement, canvasHost: HTMLElement, editor: EditorState, pb: PropertiesBar, place: () => PropertiesPlace, /** The room between the chips and the selection (px; Settings keep it). */ gap: { get(): number; set(px: number): void } = { get: () => 0, set: () => undefined }): { refresh(): void; follow(): void } {
   const { bar, row, colours } = pb;
   const home = bar.parentElement!;
   // Where the bar waits, unseen, while it is shown as chips: in the same root (so it is still found there), hidden.
@@ -39,7 +39,26 @@ export function mountPropertiesLayout(root: HTMLElement, canvasHost: HTMLElement
   // (the chips by the selection in a row of their own: the names shown on hover float in a layer beside it, as the Actions bar's: ADR 0197)
   const nearRow = document.createElement("div");
   nearRow.className = "props-row";
-  near.append(nearRow);
+  // A grip at the chips' left: dragged up or down only, it sets how far above the selection they stand (0, the least, by default).
+  const lift = document.createElement("span");
+  lift.className = "props-lift";
+  lift.title = "Drag up or down: the room between the chips and the selection";
+  lift.setAttribute("aria-hidden", "true");
+  lift.innerHTML = '<svg width="8" height="14" viewBox="0 0 8 14" fill="currentColor"><circle cx="2" cy="3" r="1"/><circle cx="6" cy="3" r="1"/><circle cx="2" cy="7" r="1"/><circle cx="6" cy="7" r="1"/><circle cx="2" cy="11" r="1"/><circle cx="6" cy="11" r="1"/></svg>';
+  // view-state: (where the chips stand above the selection; the room is kept as a setting)
+  lift.addEventListener("pointerdown", (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    lift.setPointerCapture(e.pointerId);
+    const y0 = e.clientY, g0 = gap.get();
+    const move = (ev: PointerEvent): void => {
+      gap.set(Math.round(Math.max(0, Math.min(240, g0 + (y0 - ev.clientY)))));
+      settle();
+    };
+    lift.addEventListener("pointermove", move);
+    lift.addEventListener("pointerup", () => lift.removeEventListener("pointermove", move), { once: true });
+  });
+  near.append(lift, nearRow);
   top.row.classList.add("props-row");
   const names = [hoverNames(nearRow, near), hoverNames(top.row, top.el)];
   // (every control gets a name of its own, seen when the bar is laid out as a form in a popover)
@@ -149,7 +168,7 @@ export function mountPropertiesLayout(root: HTMLElement, canvasHost: HTMLElement
     syncScroll(top.row);
     if (beside) syncScroll(nearRow); // (a small window: the chips by the selection scroll sideways, as the Actions bar)
     if (beside) {
-      placeAbove(near, box!); // (the rotate handle stays free; the format bar of words being typed stands the same way)
+      placeAbove(near, box!, gap.get()); // (the rotate handle stays free; the format bar of words being typed stands the same way; its grip adds room)
     }
     if (popped !== null) {
       if (popped !== COLOURS) arrangeForm(row); // (what shows may have changed: the lines between kinds follow)

@@ -7,7 +7,7 @@ import { syntaxTree } from "@codemirror/language";
 import { openSearchPanel, search, searchKeymap } from "@codemirror/search";
 import { findBar } from "./search-panel";
 import { Compartment, EditorSelection, EditorState, Prec, StateEffect, StateField, Transaction, type Extension } from "@codemirror/state";
-import { Decoration, EditorView, WidgetType, drawSelection, keymap, placeholder as placeholderExt, type DecorationSet } from "@codemirror/view";
+import { Decoration, EditorView, WidgetType, drawSelection, highlightActiveLine, keymap, placeholder as placeholderExt, type DecorationSet } from "@codemirror/view";
 import { codeColours, type CodeSpans } from "./code";
 import { COMMANDS, type FormatName } from "./commands";
 import { behaviorExtensions, hopMarker, pictureSelect, insertBlockMarkdown, linkFollow, pasteRules, reflowParagraph, toggleCheckbox, toggleTask, type BehaviorId } from "./behaviors";
@@ -452,7 +452,8 @@ export function createMarkdownEditor(opts: EditorOptions): MarkdownEditor {
       },
     }),
   ];
-  if (!plain) extensions.push(folding, liveLayer.of(liveExt()));
+  // (the line the cursor is in, tinted while the note has the focus: where you are, as the first notes editor showed it; not on hover)
+  if (!plain) extensions.push(folding, liveLayer.of(liveExt()), highlightActiveLine());
   if (opts.top) extensions.push(topBlock(opts.top));
 
   /** The table cell being edited, if any: the toolbar's formats act on it. */

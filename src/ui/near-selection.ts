@@ -94,9 +94,9 @@ export function boxOfElementIn(host: HTMLElement, el: HTMLElement): ScreenBox {
  * Put a bar that belongs to what is being worked on just above it (below when there is no room), clear of its rotate handle, inside the
  * room: the Properties chips by the selection and the format bar of the words being typed, one rule (ADR 0198).
  */
-export function placeAbove(el: HTMLElement, b: ScreenBox): void {
+export function placeAbove(el: HTMLElement, b: ScreenBox, /** More room between it and the selection (px): the chips' own grip sets it. */ extra = 0): void {
   const host = el.offsetParent instanceof HTMLElement ? el.offsetParent : el.parentElement;
-  const at = placeBy(b, el.offsetWidth, el.offsetHeight, "above", clearOfHandles(6), 6, host ? edgeBarsIn(host, el) : []);
+  const at = placeBy(b, el.offsetWidth, el.offsetHeight, "above", clearOfHandles(6) + extra, 6, host ? edgeBarsIn(host, el) : []);
   const [l, t] = [`${Math.round(at.left)}px`, `${Math.round(at.top)}px`];
   if (el.style.left !== l) el.style.left = l;
   if (el.style.top !== t) el.style.top = t;

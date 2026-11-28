@@ -1610,7 +1610,7 @@ async function start(): Promise<void> {
   });
   // How the Properties bar shows (ADR 0198): the bar at the top, or value chips just above the selection.
   const PROPS_WHERE = { bar: "in the bar above", near: "under Look just above the selection" } as const;
-  const propsLayout = mountPropertiesLayout(document.getElementById("toolbar")!, host, editor, propsBar, () => settings.get("ui.properties"));
+  const propsLayout = mountPropertiesLayout(document.getElementById("toolbar")!, host, editor, propsBar, () => settings.get("ui.properties"), { get: () => settings.get("ui.chipsGap"), set: (px) => settings.set("ui.chipsGap", px) });
   propsFollow = propsLayout.follow;
   const placeProps = (): void => {
     setPropsWhere(PROPS_WHERE[settings.get("ui.properties")]);

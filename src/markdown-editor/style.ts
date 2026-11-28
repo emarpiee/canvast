@@ -164,7 +164,7 @@ export const EDITOR_CSS = `
 :where(.me-table) .me-cell { outline: none; min-height: 1.4em; cursor: text; user-select: none; }
 :where(.me-table) .me-cell.is-editing { user-select: text; }
 :where(.me-table) .me-cell.is-editing .cm-editor { background: transparent; }
-:where(.me-table) :is(th, td).is-editing { box-shadow: inset 0 0 0 2px color-mix(in oklch, var(--me-accent) 60%, transparent); }
+:where(.me-table) :is(th, td).is-editing { background: color-mix(in oklch, var(--me-accent) 6%, transparent); box-shadow: inset 0 0 0 2px color-mix(in oklch, var(--me-accent) 60%, transparent); }
 :where(.me-table) .me-cell-selected { background: color-mix(in oklch, var(--me-accent) 12%, transparent); }
 :where(.me-table) .me-table-scroll { position: relative; }
 :where(.me-cell-range) { position: absolute; border: 2px solid color-mix(in oklch, var(--me-accent) 75%, transparent); border-radius: 4px; pointer-events: none; box-sizing: border-box; }
@@ -271,9 +271,11 @@ export const CM_THEME: Record<string, Record<string, string>> = {
   ".cm-scroller": { fontFamily: "var(--me-font)", lineHeight: "var(--me-line-height)", padding: "var(--me-pad) 0" },
   ".cm-content": { maxWidth: "var(--me-width)", margin: "0 auto", padding: "0 var(--me-pad)", caretColor: "var(--me-fg)", width: "100%", boxSizing: "border-box" },
   ".cm-line": { padding: "0" },
+  // (the line the cursor is in, tinted only while the note has the focus)
+  ".cm-activeLine": { backgroundColor: "transparent" },
+  "&.cm-focused .cm-activeLine": { backgroundColor: "color-mix(in oklch, var(--me-accent) 6%, transparent)", borderRadius: "4px" },
   ".cm-cursor, .cm-dropCursor": { borderLeftColor: "var(--me-fg)" },
   "&.cm-focused > .cm-scroller > .cm-selectionLayer .cm-selectionBackground, .cm-selectionBackground, .cm-content ::selection": { backgroundColor: "var(--me-select)" },
-  ".cm-activeLine": { backgroundColor: "transparent" },
   ".cm-panels": { backgroundColor: "var(--me-bg)", color: "var(--me-fg)", borderColor: "var(--me-line)" },
   ".cm-panels-top": { borderBottom: "1px solid var(--me-line)" },
   ".cm-panel.me-find": { padding: "var(--me-gap)", fontFamily: "var(--me-font)" },

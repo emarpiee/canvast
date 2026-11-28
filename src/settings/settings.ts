@@ -226,6 +226,7 @@ export const SETTINGS = {
   "notes.vim": { scope: "device", default: false, validate: bool, effect: "immediate" } as Def<boolean>,
   // Note styles (Settings > Notes): what the note's words, links, tables and headings look like in the editor, its preview and its card;
   // a colour left empty is the theme's.
+  "ui.chipsGap": { scope: "device", default: 0, validate: range(0, 240), effect: "immediate" } as Def<number>,
   "notes.propertiesInNote": { scope: "device", default: false, validate: bool, effect: "immediate" } as Def<boolean>,
   "notes.style.boldWeight": { scope: "device", default: 700, validate: range(500, 900), effect: "immediate" } as Def<number>,
   "notes.style.headingColours": { scope: "device", default: "own", validate: oneOf("own", "rainbow"), effect: "immediate" } as Def<"own" | "rainbow">,
