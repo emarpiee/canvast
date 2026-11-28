@@ -89,7 +89,7 @@ let noteSample = "";
 const noteSampleHtml = (): string => {
   if (!noteSample) {
     injectStyles(); // (the page's look, before any note was opened)
-    noteSample = `<div class="me set-note-sample" data-testid="note-style-sample" aria-label="A sample note in these styles"><div class="me-doc">${renderMarkdown(NOTE_SAMPLE)}</div></div>`;
+    noteSample = `<div class="me set-note-sample" data-testid="note-style-sample" inert aria-hidden="true"><div class="me-doc">${renderMarkdown(NOTE_SAMPLE)}</div></div>`;
   }
   return noteSample;
 };

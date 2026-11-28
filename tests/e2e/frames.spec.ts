@@ -815,6 +815,13 @@ test("rotate an image and a text: drawn turned, picked turned, exact pixels deep
   await p.getByTestId("import-input").setInputFiles({ name: "blocks.png", mimeType: "image/png", buffer: blockyFixture() });
   await p.waitForFunction(() => window.__canvastDebug.objects().length === 1);
   const id = (await p.evaluate(() => window.__canvastDebug.objectFrames()))[0]!.id;
+  // (zoomed in till it is big on the screen: a small one offers only its resize handles, no turning)
+  for (let i = 0; i < 12; i++) {
+    const sb = (await p.evaluate((o) => window.__canvastDebug.objectScreen(o), id))!.box;
+    if (Math.max(sb.maxX - sb.minX, sb.maxY - sb.minY) >= 96) break;
+    await p.keyboard.press("=");
+    await app.frame();
+  }
   await p.mouse.click(640, 400);
   await app.frame();
   const flat = (await boxOf(app, id))!;
