@@ -87,6 +87,7 @@ export interface CellEditor {
 
 /** The words of a table's actions. */
 export interface TableWords {
+  rowGroup: string; colGroup: string; alignGroup: string; sortGroup: string; turnGroup: string; deleteTable: string;
   rowAbove: string; rowBelow: string; colBefore: string; colAfter: string; rowUp: string; rowDown: string; colLeft: string; colRight: string;
   dupRow: string; dupCol: string; alignLeft: string; alignCenter: string; alignRight: string; sortUp: string; sortDown: string;
   delRow: string; delCol: string; copy: string; duplicate: string; toList: string; toNumbered: string; toTasks: string; toLines: string;

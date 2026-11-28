@@ -2277,6 +2277,7 @@ body[data-viewing] #nav, body[data-viewing] .view-settings { display: none; }
 /* The one surface of what pops up over the page: the app's menus and the notes editor's link popover. */
 :is(.pop-menu, .me.me-link-pop) { background: var(--hud-bg); border: 1px solid var(--hud-border); border-radius: var(--r-lg); box-shadow: var(--hud-lift); backdrop-filter: blur(12px); }
 .me.me-link-pop { z-index: 60; }
+.menu-sub-mark { display: inline-flex; margin-left: auto; padding-left: var(--s-6); transform: rotate(-90deg); color: var(--hud-muted); } /* (a row that opens a group beside it) */
 .pop-menu { position: fixed; z-index: 60; min-width: 190px; max-width: min(320px, calc(100vw - 16px)); display: grid; gap: 1px; padding: var(--s-2); }
 .pop-menu button { display: flex; align-items: center; gap: var(--s-6); width: 100%; min-height: var(--menu-h); padding: 0 var(--s-6); font: var(--font-control); color: inherit; text-align: left; background: transparent; border: 0; border-radius: var(--r-md); cursor: pointer; }
 .pop-menu button:hover:not(:disabled), .pop-menu button:focus-visible { background: var(--hud-hover); outline: 0; }

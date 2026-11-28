@@ -564,35 +564,29 @@ class TableView {
       const words = (md: string): string => md.replace(/!?\[\[([^\]|]*)\|?([^\]]*)\]\]/g, (_m, t: string, a: string) => a || t).replace(/!?\[([^\]]*)\]\([^)]*\)/g, "$1").replace(/[*_~=`#>]|<br\s*\/?>/g, "").trim();
       const sort = (dir: 1 | -1): void => void model.rows.sort((a, b) => dir * words(a[col] ?? "").localeCompare(words(b[col] ?? ""), undefined, { numeric: true, sensitivity: "base" }));
       const align = (a: Align): void => void (model.aligns[col] = a);
+      // (grouped: each kind of action a submenu, as notes apps do; the whole table's at the end, Delete table last, in red)
+      const group = (id: string, label: string, sub: PopItem[], sep = false): PopItem => ({ id, label, sub, ...(sep ? { sep: true } : {}), pick: () => undefined });
       return [
-        { id: "table.rowAbove", label: L.rowAbove, disabled: row === 0, pick: () => (model.rows.splice(body, 0, blank()), commit({ row, col })) },
-        { id: "table.rowBelow", label: L.rowBelow, pick: () => (model.rows.splice(body + 1, 0, blank()), commit({ row: row + 1, col })) },
-        { id: "table.colBefore", label: L.colBefore, pick: () => (eachRow((r) => r.splice(col, 0, "")), model.aligns.splice(col, 0, ""), model.widths.splice(col, 0, null), commit({ row, col })) },
-        { id: "table.colAfter", label: L.colAfter, pick: () => (eachRow((r) => r.splice(col + 1, 0, "")), model.aligns.splice(col + 1, 0, ""), model.widths.splice(col + 1, 0, null), commit({ row, col: col + 1 })) },
-        { id: "table.rowUp", label: L.rowUp, sep: true, disabled: body <= 0, pick: () => ([model.rows[body - 1], model.rows[body]] = [model.rows[body]!, model.rows[body - 1]!], commit({ row: row - 1, col })) },
-        { id: "table.rowDown", label: L.rowDown, disabled: row === 0 || body >= last, pick: () => ([model.rows[body + 1], model.rows[body]] = [model.rows[body]!, model.rows[body + 1]!], commit({ row: row + 1, col })) },
-        { id: "table.colLeft", label: L.colLeft, disabled: col === 0, pick: () => (swapCols(col, col - 1), commit({ row, col: col - 1 })) },
-        { id: "table.colRight", label: L.colRight, disabled: col >= cols - 1, pick: () => (swapCols(col, col + 1), commit({ row, col: col + 1 })) },
-        { id: "table.dupRow", label: L.dupRow, sep: true, disabled: row === 0, pick: () => (model.rows.splice(body + 1, 0, [...model.rows[body]!]), commit({ row: row + 1, col })) },
-        { id: "table.dupCol", label: L.dupCol, pick: () => (eachRow((r) => r.splice(col + 1, 0, r[col] ?? "")), model.aligns.splice(col + 1, 0, model.aligns[col] ?? ""), model.widths.splice(col + 1, 0, model.widths[col] ?? null), commit({ row, col: col + 1 })) },
-        { id: "table.alignLeft", label: L.alignLeft, sep: true, on: model.aligns[col] === "left", pick: () => (align(model.aligns[col] === "left" ? "" : "left"), commit()) },
-        { id: "table.alignCenter", label: L.alignCenter, on: model.aligns[col] === "center", pick: () => (align(model.aligns[col] === "center" ? "" : "center"), commit()) },
-        { id: "table.alignRight", label: L.alignRight, on: model.aligns[col] === "right", pick: () => (align(model.aligns[col] === "right" ? "" : "right"), commit()) },
-        { id: "table.sortUp", label: L.sortUp, sep: true, disabled: model.rows.length < 2, pick: () => (sort(1), commit()) },
-        { id: "table.sortDown", label: L.sortDown, disabled: model.rows.length < 2, pick: () => (sort(-1), commit()) },
-        { id: "table.delRow", label: L.delRow, sep: true, disabled: row === 0, pick: () => (model.rows.splice(body, 1), commit()) },
-        { id: "table.delCol", label: L.delCol, disabled: cols <= 1, pick: () => (eachRow((r) => r.splice(col, 1)), model.aligns.splice(col, 1), model.widths.splice(col, 1), commit()) },
-        { id: "table.copy", label: L.copy, sep: true, pick: () => void navigator.clipboard?.writeText(writeTable(model)).catch(() => undefined) },
-        { id: "table.duplicate", label: L.duplicate, pick: () => view.dispatch({ changes: { from: this.from + this.source.length, insert: `\n\n${writeTable(model)}` }, userEvent: "input.table" }) },
-        // (Turn into: a line per row, its cells apart by " — "; the heading row too unless it is only Column 1, Column 2…)
-        ...([["table.toList", L.toList, () => "- "], ["table.toNumbered", L.toNumbered, (i: number) => `${i + 1}. `], ["table.toTasks", L.toTasks, () => "- [ ] "], ["table.toLines", L.toLines, () => ""]] as const).map(
-          ([id, label, mark], i): PopItem => ({ id, label, ...(i === 0 ? { sep: true } : {}), pick: () => {
+        group("table.rowGroup", L.rowGroup, [{ id: "table.rowAbove", label: L.rowAbove, disabled: row === 0, pick: () => (model.rows.splice(body, 0, blank()), commit({ row, col })) }, { id: "table.rowBelow", label: L.rowBelow, pick: () => (model.rows.splice(body + 1, 0, blank()), commit({ row: row + 1, col })) }, { id: "table.rowUp", label: L.rowUp, disabled: body <= 0, pick: () => ([model.rows[body - 1], model.rows[body]] = [model.rows[body]!, model.rows[body - 1]!], commit({ row: row - 1, col })) }, { id: "table.rowDown", label: L.rowDown, disabled: row === 0 || body >= last, pick: () => ([model.rows[body + 1], model.rows[body]] = [model.rows[body]!, model.rows[body + 1]!], commit({ row: row + 1, col })) }, { id: "table.dupRow", label: L.dupRow, disabled: row === 0, pick: () => (model.rows.splice(body + 1, 0, [...model.rows[body]!]), commit({ row: row + 1, col })) }, { id: "table.delRow", label: L.delRow, disabled: row === 0, pick: () => (model.rows.splice(body, 1), commit()) }]),
+        group("table.colGroup", L.colGroup, [{ id: "table.colBefore", label: L.colBefore, pick: () => (eachRow((r) => r.splice(col, 0, "")), model.aligns.splice(col, 0, ""), model.widths.splice(col, 0, null), commit({ row, col })) }, { id: "table.colAfter", label: L.colAfter, pick: () => (eachRow((r) => r.splice(col + 1, 0, "")), model.aligns.splice(col + 1, 0, ""), model.widths.splice(col + 1, 0, null), commit({ row, col: col + 1 })) }, { id: "table.colLeft", label: L.colLeft, disabled: col === 0, pick: () => (swapCols(col, col - 1), commit({ row, col: col - 1 })) }, { id: "table.colRight", label: L.colRight, disabled: col >= cols - 1, pick: () => (swapCols(col, col + 1), commit({ row, col: col + 1 })) }, { id: "table.dupCol", label: L.dupCol, pick: () => (eachRow((r) => r.splice(col + 1, 0, r[col] ?? "")), model.aligns.splice(col + 1, 0, model.aligns[col] ?? ""), model.widths.splice(col + 1, 0, model.widths[col] ?? null), commit({ row, col: col + 1 })) }, { id: "table.delCol", label: L.delCol, disabled: cols <= 1, pick: () => (eachRow((r) => r.splice(col, 1)), model.aligns.splice(col, 1), model.widths.splice(col, 1), commit()) }]),
+        group("table.alignGroup", L.alignGroup, [{ id: "table.alignLeft", label: L.alignLeft, on: model.aligns[col] === "left", pick: () => (align(model.aligns[col] === "left" ? "" : "left"), commit()) }, { id: "table.alignCenter", label: L.alignCenter, on: model.aligns[col] === "center", pick: () => (align(model.aligns[col] === "center" ? "" : "center"), commit()) }, { id: "table.alignRight", label: L.alignRight, on: model.aligns[col] === "right", pick: () => (align(model.aligns[col] === "right" ? "" : "right"), commit()) }], true),
+        group("table.sortGroup", L.sortGroup, [{ id: "table.sortUp", label: L.sortUp, disabled: model.rows.length < 2, pick: () => (sort(1), commit()) }, { id: "table.sortDown", label: L.sortDown, disabled: model.rows.length < 2, pick: () => (sort(-1), commit()) }]),
+        group("table.turnGroup", L.turnGroup, ([["table.toList", L.toList, () => "- "], ["table.toNumbered", L.toNumbered, (i: number) => `${i + 1}. `], ["table.toTasks", L.toTasks, () => "- [ ] "], ["table.toLines", L.toLines, () => ""]] as const).map(
+          ([id, label, mark], i): PopItem => ({ id, label, pick: () => {
             const rows = [...(model.head.every((h, k) => !h || h === `Column ${k + 1}`) ? [] : [model.head]), ...model.rows].map((r) => r.filter(Boolean).join(" — ").replace(/<br\s*\/?>/gi, " ")).filter(Boolean);
             const insert = rows.map((r, k) => `${mark(k)}${r}`).join("\n");
             view.dispatch({ changes: { from: this.from, to: this.from + this.source.length, insert }, selection: { anchor: this.from + insert.length }, userEvent: "input.table" });
             view.focus();
           } }),
-        ),
+        )),
+        { ...{ id: "table.copy", label: L.copy, pick: () => void navigator.clipboard?.writeText(writeTable(model)).catch(() => undefined) }, sep: true },
+        { id: "table.duplicate", label: L.duplicate, pick: () => view.dispatch({ changes: { from: this.from + this.source.length, insert: `\n\n${writeTable(model)}` }, userEvent: "input.table" }) },
+        { id: "table.delete", label: L.deleteTable, danger: true, sep: true, pick: () => {
+          // (the table and the comment after it that keeps its widths, with the line it stood on)
+          const doc = view.state.doc, from = this.from, to = Math.min(doc.length, this.from + this.source.length + (doc.sliceString(this.from + this.source.length, this.from + this.source.length + 1) === "\n" ? 1 : 0));
+          view.dispatch({ changes: { from, to }, selection: { anchor: from }, userEvent: "delete.table" });
+          view.focus();
+        } },
       ];
     };
     const thead = document.createElement("thead");

@@ -28,6 +28,8 @@ export interface MenuItem {
   count?: number;
   /** Its own ⋯ at the end of the row: a menu of what can be done to it (rename, delete). */
   more?: readonly MenuItem[];
+  /** A group of rows: the row opens them beside it (a click, the pointer resting on it, or →), as a submenu. Its `run` is not called. */
+  sub?: readonly MenuItem[];
   /** Names the item for tests and scripts (`data-id`). */
   id?: string;
   /** The id of the command it runs (ADR 0205): every menu row runs one. */
@@ -86,7 +88,7 @@ const closeChild = (refocus = false): void => {
 };
 
 /** A menu row's markup: its icon, label and hint. */
-const rowHtml = (it: MenuItem, i: number): string => `<button type="button" role="${it.checked === undefined ? "menuitem" : "menuitemradio"}"${it.checked === undefined ? "" : ` aria-checked="${it.checked}"`} data-i="${i}"${it.id ? ` data-id="${esc(it.id)}"` : ""}${it.command ? ` data-command="${esc(it.command)}"` : ""} class="${it.danger ? "is-danger" : ""}${it.checked ? " is-checked" : ""}${it.sep && i > 0 ? " has-sep" : ""}"${it.disabled ? " disabled" : ""} aria-label="${esc(it.aria ?? it.label)}">${it.icon ?? ""}${it.hint ? `<span class="menu-text"><span>${esc(it.label)}</span><span class="menu-hint">${esc(it.hint)}</span></span>` : `<span>${esc(it.label)}</span>`}${it.count !== undefined ? `<span class="menu-count">${it.count}</span>` : ""}${it.checked ? `<span class="menu-tick" aria-hidden="true">${ICONS.check}</span>` : ""}</button>`;
+const rowHtml = (it: MenuItem, i: number): string => `<button type="button" role="${it.checked === undefined ? "menuitem" : "menuitemradio"}"${it.checked === undefined ? "" : ` aria-checked="${it.checked}"`} data-i="${i}"${it.sub ? ' aria-haspopup="menu" data-sub' : ""}${it.id ? ` data-id="${esc(it.id)}"` : ""}${it.command ? ` data-command="${esc(it.command)}"` : ""} class="${it.danger ? "is-danger" : ""}${it.checked ? " is-checked" : ""}${it.sep && i > 0 ? " has-sep" : ""}"${it.disabled ? " disabled" : ""} aria-label="${esc(it.aria ?? it.label)}">${it.icon ?? ""}${it.hint ? `<span class="menu-text"><span>${esc(it.label)}</span><span class="menu-hint">${esc(it.hint)}</span></span>` : `<span>${esc(it.label)}</span>`}${it.count !== undefined ? `<span class="menu-count">${it.count}</span>` : ""}${it.checked ? `<span class="menu-tick" aria-hidden="true">${ICONS.check}</span>` : ""}${it.sub ? `<span class="menu-sub-mark" aria-hidden="true">${ICONS.chevronDown}</span>` : ""}</button>`;
 
 export function closeMoreMenu(refocus = false): void {
   closeChild();
@@ -216,9 +218,55 @@ export function openMoreMenu(anchor: HTMLElement, items: readonly MenuItem[], la
   }
   let armed = !opts.needPress;
   menu.addEventListener("pointerdown", () => { armed = true; });
+  /** A group's rows beside the row that holds them (a submenu); a row of it runs its command. */
+  const openSub = (from: HTMLElement, items: readonly MenuItem[], label: string): void => {
+    if (child?.from === from) return;
+    closeChild();
+    const sub = document.createElement("div");
+    sub.className = "pop-menu is-child is-sub";
+    sub.setAttribute("role", "menu");
+    sub.setAttribute("aria-label", label);
+    sub.innerHTML = items.map(rowHtml).join("");
+    // commands: (a row of a group runs its command)
+    sub.addEventListener("click", (ev) => {
+      const b = (ev.target as HTMLElement).closest<HTMLButtonElement>("[data-i]");
+      if (!b || b.disabled) return;
+      const pick = items[Number(b.dataset["i"])]!;
+      closeMoreMenu();
+      pick.run();
+    });
+    popHost().appendChild(sub);
+    placeMenu(sub, from);
+    from.setAttribute("aria-expanded", "true");
+    child = { menu: sub, from };
+  };
+  // view-state: (the pointer resting on a group's row opens it; on another row, the open group closes)
+  let hover = 0;
+  menu.addEventListener("pointerover", (e) => {
+    const row = (e.target as HTMLElement).closest<HTMLElement>("[data-i]");
+    if (!row || row === child?.from) return;
+    window.clearTimeout(hover);
+    hover = window.setTimeout(() => {
+      const it = current[Number(row.dataset["i"])];
+      if (it?.sub && !row.hasAttribute("disabled")) openSub(row, it.sub, it.label);
+      else if (child && !child.from.closest("[data-more-i]")) closeChild();
+    }, 160);
+  });
+  // view-state: (→ on a group's row opens it, its first row focused)
+  menu.addEventListener("keydown", (e) => {
+    const row = (e.target as HTMLElement).closest<HTMLElement>("[data-sub]");
+    if (e.key !== "ArrowRight" || !row) return;
+    const it = current[Number(row.dataset["i"])]!;
+    openSub(row, it.sub!, it.label);
+    child?.menu.querySelector<HTMLElement>("button:not(:disabled)")?.focus({ preventScroll: true });
+    e.preventDefault();
+    e.stopPropagation();
+  });
   // commands: (a row runs its command)
   menu.addEventListener("click", (e) => {
     if (!armed) return;
+    const subOf = (e.target as HTMLElement).closest<HTMLElement>("[data-sub]");
+    if (subOf) return void openSub(subOf, current[Number(subOf.dataset["i"])]!.sub!, current[Number(subOf.dataset["i"])]!.label);
     const moreOf = (e.target as HTMLElement).closest<HTMLElement>("[data-more-i]");
     if (moreOf) {
       const it = current[Number(moreOf.dataset["moreI"])]!;
@@ -294,7 +342,7 @@ export function installMenuKeys(): void {
       items[to]!.focus(); // (a long menu scrolls to it)
       e.preventDefault();
       e.stopPropagation();
-    } else if (e.key === "Escape" && child && inMenu === child.menu) {
+    } else if ((e.key === "Escape" || (e.key === "ArrowLeft" && inMenu.classList.contains("is-sub"))) && child && inMenu === child.menu) {
       closeChild(true);
       e.preventDefault();
       e.stopPropagation();

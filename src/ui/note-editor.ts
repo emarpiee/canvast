@@ -133,6 +133,9 @@ const CHOICE_LOOK: ReadonlyArray<readonly [RegExp, string, string]> = [
   [/^cut$/, ICONS.scissors, "Take the selected words out"], [/^copy$/, ICONS.copy, "Copy the selected words"], [/^paste$/, ICONS.clipboardPaste, "Put in what was copied"],
   [/^toCallout$/, ICONS.speechBalloon, "Make the block a callout"], [/^calloutType$/, ICONS.speechBalloon, "Another kind of callout"], [/^removeCallout$/, ICONS.circleSlash, "Back to plain words"],
   [/^callout\./, ICONS.speechBalloon, "A callout of this kind"], [/^selectAll$/, ICONS.selectAll, "Every word of the note"], [/^undo$/, ICONS.undo, "Take back the last change"], [/^redo$/, ICONS.redo, "Put back what was taken back"],
+  [/^table\.rowGroup$/, ICONS.listPlus, "Add, move, copy or delete this row"], [/^table\.colGroup$/, ICONS.columns3, "Add, move, copy or delete this column"],
+  [/^table\.alignGroup$/, ICONS.textAlignLeft, "Where this column's words stand"], [/^table\.sortGroup$/, ICONS.arrowDownAZ, "The rows in order of this column"],
+  [/^table\.turnGroup$/, ICONS.pilcrow, "The table as a list or lines of text"], [/^table\.delete$/, ICONS.trash, "Take the whole table out of the note"],
   [/^table\.row(Above|Below)$/, ICONS.listPlus, "A new row here"], [/^table\.col(Before|After)$/, ICONS.columns3, "A new column here"],
   [/^table\.row(Up|Down)$/, ICONS.arrowUpDown, "The row one place along"], [/^table\.col(Left|Right)$/, ICONS.arrowLeftRight, "The column one place along"],
   [/^table\.dupRow$/, ICONS.copyPlus, "A copy of the row under it"], [/^table\.dupCol$/, ICONS.copyPlus, "A copy of the column beside it"],
@@ -167,11 +170,13 @@ commands.setProvider("note-editor", () => [
 ]);
 /** The editor's menu host: its choices as the app's menu at a point. */
 function openChoices(at: DOMRect, items: readonly PopItem[], label: string): void {
-  shownChoices = items;
-  const rows: MenuItem[] = items.map((c) => {
+  // (every choice, its groups' too, is a command of its own)
+  shownChoices = items.flatMap((c) => (c.sub ? [c, ...c.sub] : [c]));
+  const row = (c: PopItem): MenuItem => {
     const [icon, hint] = lookOf(c.id);
-    return { id: `note.${c.id}`, command: `note.${c.id}`, label: c.label, hint, icon, ...(c.sep ? { sep: true } : {}), ...(c.disabled ? { disabled: true } : {}), ...(c.on ? { checked: true } : {}), run: () => void commands.press(`note.${c.id}`) };
-  });
+    return { id: `note.${c.id}`, command: `note.${c.id}`, label: c.label, hint, icon, ...(c.sep ? { sep: true } : {}), ...(c.disabled ? { disabled: true } : {}), ...(c.on ? { checked: true } : {}), ...(c.danger ? { danger: true } : {}), ...(c.sub ? { sub: c.sub.map(row) } : {}), run: () => void commands.press(`note.${c.id}`) };
+  };
+  const rows: MenuItem[] = items.map(row);
   showContextMenu(at.left, at.bottom, rows, label);
 }
 

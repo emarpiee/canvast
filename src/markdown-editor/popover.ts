@@ -10,8 +10,12 @@ export interface PopItem {
   disabled?: boolean;
   /** Shown as chosen. */
   on?: boolean;
-  /** Chosen: what it does (it edits the note through the editor, as typing does). */
+  /** Chosen: what it does (it edits the note through the editor, as typing does). A group's own is not called. */
   pick(): void;
+  /** A group of choices, opened beside this one (a submenu). */
+  sub?: readonly PopItem[];
+  /** What takes something away for good (Delete table): shown in red. */
+  danger?: boolean;
 }
 
 let close: (() => void) | null = null;

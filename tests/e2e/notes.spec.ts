@@ -212,6 +212,7 @@ test("a table cell is the note's own words: one selection, the note's keys, its 
   expect(await text(p)).toContain("| **Ink pen** | lines |");
   // A sort from a cell's menu, undone from a cell.
   await cell(0).click({ button: "right" });
+  await p.locator(".pop-menu [data-sub]", { hasText: "Sort" }).click(); // (the table's menu groups its actions: Sort opens beside it)
   await p.locator(".pop-menu [role=menuitem]", { hasText: "Sort column (A → Z)" }).click();
   await expect.poll(() => text(p)).toContain("| Brush | washes |\n| **Ink pen** | lines |");
   await cell(1).click();
@@ -242,11 +243,17 @@ test("a table cell is the note's own words: one selection, the note's keys, its 
   await expect.poll(() => text(p)).toContain("| Brush | washes |");
   // A column aligned from the menu is drawn so at once.
   await cell(1).click({ button: "right" });
+  // (the menu's groups, and Delete table last, in red)
+  await expect(p.locator(".pop-menu:not(.is-child) [role=menuitem]").last()).toHaveText(/Delete table/);
+  await expect(p.locator('.pop-menu [data-id="note.table.delete"]')).toHaveClass(/is-danger/);
+  await p.locator(".pop-menu [data-sub]", { hasText: "Align" }).click();
   await p.locator(".pop-menu [role=menuitem]", { hasText: "Align right" }).click();
   await expect(page(p).locator(".me-table td").nth(1)).toHaveCSS("text-align", "right");
   // Turn into from the table's menu: a line per row.
   await cell(0).click({ button: "right" });
+  await p.locator(".pop-menu [data-sub]", { hasText: "Turn into" }).click();
   await p.locator(".pop-menu [role=menuitem]", { hasText: "Turn into bulleted list" }).click();
+
   await expect.poll(() => text(p)).toContain("- Tool — Use\n- **Ink pen** — lines\n- Brush — washes");
 });
 
@@ -1409,6 +1416,7 @@ test("callouts are cards (typed with [! and its list), a heading folds what is u
   await expect(page(p).locator(".me-callout-warning.me-callout-head")).toContainText("Mind");
   // Sort by the first column from a cell's menu.
   await page(p).locator(".me-table td .me-cell").first().click({ button: "right" });
+  await p.locator(".pop-menu [data-sub]", { hasText: "Sort" }).click(); // (the table's menu groups its actions: Sort opens beside it)
   await p.locator(".pop-menu [role=menuitem]", { hasText: "Sort column (A → Z)" }).click();
   await expect.poll(() => text(p)).toContain("| 1 | y |\n| 2 | x |");
   // A new callout: `[!` in a quote offers the types (a press on the heading: the middle of the note is the table).
