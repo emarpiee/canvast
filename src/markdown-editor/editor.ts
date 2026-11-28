@@ -761,6 +761,8 @@ export function createMarkdownEditor(opts: EditorOptions): MarkdownEditor {
     },
     setMode(m) {
       if (m === mode || plain) return;
+      // (the focus in the note, as after a mode key sent as a command: it stays there, on what is shown now, never on the hidden page)
+      if (el.contains(document.activeElement)) return setModeBy(m);
       mode = m;
       applyMode();
     },
