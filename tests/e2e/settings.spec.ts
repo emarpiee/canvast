@@ -16,7 +16,7 @@ test("every setting says what it is on one short line, the rest under its More; 
   expect(cut).toEqual([]);
   await p.getByRole("tab", { name: "Notes", exact: true }).click();
   const titles = await p.locator('[data-panel="notes"] .set-card > h3').allTextContents();
-  expect(titles).toEqual(["Editor", "New notes", "Cards and previews", "Properties", "File names", "Links in notes"]);
+  expect(titles).toEqual(["Editor", "New notes", "Cards and previews", "Properties", "File names", "Links in notes", "Note styles"]);
   const row = p.locator('[data-row="notes.renameOnSave"]');
   await expect(row.locator(".set-more p")).toBeHidden();
   await row.locator(".set-more summary").click();
