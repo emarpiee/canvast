@@ -822,7 +822,7 @@ dialog.confirm .secret-field .prompt-input { padding-right: calc(var(--icon-xl) 
 /* The text format bar (ui/text-editor.ts) is a bar like the others (ADR 0128): a fixed place, top centre under the Properties bar, never attached to the text, scrolling sideways when it is wider than the room. */
 .text-format { position: absolute; z-index: var(--z-edge); left: 50%; top: calc(var(--bar-bottom, 56px) + var(--near)); transform: translateX(-50%); flex-wrap: nowrap; max-width: calc(100% - 2 * var(--edge)); overflow-x: auto; scrollbar-width: none; }
 .text-format::-webkit-scrollbar { display: none; }
-.text-format.is-near { transform: none; } /* (placed just above the words being typed, as the Properties chips by the selection: placeAbove) */
+.text-format.is-near { transform: none; z-index: var(--z-item-bar); } /* (placed just above the words being typed, as the Properties chips by the selection: placeAbove) */
 
 /* Floating Layers panel (ui/layers-panel.ts) */
 #side-panels, #side-panels-left { position: absolute; top: calc(var(--bar-bottom, 56px) + var(--edge)); right: var(--edge); width: 268px; max-height: calc(100% - 140px); display: flex; flex-direction: column; gap: var(--s-4); pointer-events: none; z-index: var(--z-edge); }
@@ -1037,7 +1037,7 @@ dialog.confirm .secret-field .prompt-input { padding-right: calc(var(--icon-xl) 
 /* The Actions bar and the selection options bar beside it share one parent, which is what is placed (ui/context-bar.ts), so they always line up. */
 .ctx-wrap { position: absolute; left: 50%; bottom: calc(2 * var(--s-14) + var(--edge)); z-index: var(--z-edge); display: flex; align-items: center; gap: var(--near); max-width: calc(100% - 2 * var(--edge)); transform: translateX(-50%); }
 .ctx-wrap.is-empty { display: none; }
-.ctx-wrap.is-following { bottom: auto; transform: none; } /* (placed from the selection) */
+.ctx-wrap.is-following { bottom: auto; transform: none; z-index: var(--z-item-bar); } /* (placed from the selection: it belongs to it, under the edge bars and the panels; at its own place on the bottom edge it is an edge bar) */
 /* (the Actions bar inside a Pins window, along its bottom, while its canvas is the view in use: its own bar only) */
 /* (it floats over the bottom of the canvas, as it does over the main one: the view under it never moves) */
 .pins-panel .panel-body { position: relative; }
@@ -3505,7 +3505,8 @@ button.archive-crumb:hover { background: var(--hud-hover); color: var(--hud-fg);
 .toolbar.is-form .pf-short, .toolbar.is-form .pf-cap[data-quiet] { display: none; }
 .toolbar.is-form .tb-options-row .pf-cap { order: 1; margin-top: var(--s-4); color: var(--hud-muted); font: var(--font-meta); }
 /* Value chips just above the selection: placed by ui/near-selection.ts, as the Actions bar that follows it. */
-.props-near { position: absolute; z-index: var(--z-edge); display: flex; align-items: center; max-width: calc(100% - 2 * var(--edge)); }
+/* (it follows what is selected on the canvas: the item-bar layer, under the edge bars and the panels, ADR 0096) */
+.props-near { position: absolute; z-index: var(--z-item-bar); display: flex; align-items: center; max-width: calc(100% - 2 * var(--edge)); }
 /* (on a small window the chips by the selection scroll sideways, with the cue at the end that has more, as the Actions bar does) */
 .props-near > .props-row { min-width: 0; overflow-x: auto; scrollbar-width: none; }
 .props-near > .props-row::-webkit-scrollbar { display: none; }

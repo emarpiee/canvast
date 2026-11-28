@@ -406,6 +406,24 @@ test("a note on a canvas opens in the note panel (a double-click, or Edit note):
   const box = (await p.locator("canvas").first().boundingBox())!;
   await p.mouse.dblclick(box.x + box.width / 2, box.y + box.height / 2);
   const panel = p.getByTestId("note-panel");
+  // Layers (ADR 0096): the bars that follow the selection (its chips, the Actions bar by it, the text format bar by the words) are drawn
+  // under the panels and the edge bars, never over the note's panel.
+  const z = await p.evaluate(() => {
+    const zOf = (el: Element | null): number => Number(el ? getComputedStyle(el).zIndex : NaN);
+    const probe = (cls: string): number => {
+      const el = document.createElement("div");
+      el.className = cls;
+      document.getElementById("canvas-host")!.append(el);
+      const n = zOf(el);
+      el.remove();
+      return n;
+    };
+    return { near: probe("props-near"), following: probe("ctx-wrap is-following"), words: probe("toolbar text-format is-near"), float: zOf(document.getElementById("dock-float")), toolbar: zOf(document.getElementById("toolbar")) };
+  });
+  for (const bar of [z.near, z.following, z.words]) {
+    expect(bar).toBeLessThan(z.float);
+    expect(bar).toBeLessThan(z.toolbar);
+  }
   await expect(heading(p, 1, panel)).toHaveText("On the canvas");
   // A dock panel like the others: as wide as its place in the dock whatever it holds, its header the same as theirs.
   const widths = () => panel.evaluate((el) => [Math.round(el.getBoundingClientRect().width), Math.round(el.closest(".dock-item")!.getBoundingClientRect().width)]);
