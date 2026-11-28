@@ -347,6 +347,8 @@ input, textarea, [contenteditable="true"], pre, code, .asset-more dd, [data-sele
 /* The one look of a control that cannot be used now: every button, field and box (one value, `--disabled-opacity`). */
 :is(button, input, select, textarea, [role="button"]):disabled { opacity: var(--disabled-opacity); cursor: default; }
 :where(:focus-visible) { outline: 2px solid var(--hud-accent); outline-offset: 1px; }
+/* A text field in use: a thin ring on its own border (the 2 px ring above, outside a border, read too heavy on a field). */
+:where(input:not([type="checkbox"], [type="radio"], [type="range"], [type="color"]), textarea):focus-visible { outline-width: 1px; outline-offset: -1px; }
 dialog:focus-visible { outline: none; }
 input[type="range"], .media-scrub, .tb-count[data-scrub] input, input[data-scrub-input] { touch-action: none; } /* (a number field takes a finger that drags it; its name does not, so a bar that scrolls sideways scrolls from the name) */
 
@@ -2487,7 +2489,7 @@ dialog.rename-dialog { width: min(var(--dlg-l), calc(100vw - 2 * var(--edge))); 
 .rn-link[hidden] { display: none; }
 .rn-field > span, .rn-inline > span { color: var(--hud-muted); font-size: var(--text-sm); }
 .rn-input { min-width: 0; height: var(--list-h); color: inherit; }
-.rn-input:focus, .rn-num:focus, .rn-row select:focus { outline: 2px solid var(--hud-accent); outline-offset: 1px; }
+.rn-input:focus, .rn-num:focus, .rn-row select:focus { outline: 1px solid var(--hud-accent); outline-offset: -1px; }
 .rn-inline { display: flex; align-items: center; justify-content: space-between; gap: var(--s-6); }
 .rn-num { width: 88px; height: var(--list-h); padding: 0 var(--s-4); font: var(--font-control); color: inherit; background: var(--hud-bg); border: 1px solid var(--hud-border); border-radius: var(--r-md); }
 .rn-checks { display: flex; flex-wrap: wrap; gap: var(--s-6); font-size: var(--text-sm); }
@@ -2524,7 +2526,7 @@ dialog.rename-dialog { width: min(var(--dlg-l), calc(100vw - 2 * var(--edge))); 
 .asset-sec .asset-note { font-size: var(--text-xs); line-height: 1.45; }
 .asset-sec .tag-chips { gap: var(--s-2); }
 .asset-inspector .tag-input { flex: 1 1 100%; width: 100%; height: var(--list-h); color: inherit; }
-.asset-inspector .tag-input:focus { outline: 2px solid var(--hud-accent); outline-offset: 1px; }
+.asset-inspector .tag-input:focus { outline: 1px solid var(--hud-accent); outline-offset: -1px; }
 .asset-ctags li { align-items: baseline; }
 .asset-ctags .tag-where { flex: 1 1 8em; }
 /* The folder: a quiet list of choices, scrolling when there are many. */
