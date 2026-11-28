@@ -76,7 +76,7 @@ export interface CellEditor {
 export interface TableWords {
   rowAbove: string; rowBelow: string; colBefore: string; colAfter: string; rowUp: string; rowDown: string; colLeft: string; colRight: string;
   dupRow: string; dupCol: string; alignLeft: string; alignCenter: string; alignRight: string; sortUp: string; sortDown: string;
-  delRow: string; delCol: string; copy: string; duplicate: string;
+  delRow: string; delCol: string; copy: string; duplicate: string; toList: string; toNumbered: string; toTasks: string; toLines: string;
 }
 
 /** Ask for the decorations again (a picture or colours arrived). */

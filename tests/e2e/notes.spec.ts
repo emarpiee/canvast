@@ -225,6 +225,22 @@ test("a table cell is the note's own words: one selection, the note's keys, its 
   await cell(0).click();
   await p.keyboard.press("Escape");
   await expect(page(p).locator(".cm-content").first()).toBeFocused();
+  // A row's grip, clicked: the whole row is selected (as notes apps do); Delete takes it out; Ctrl+Z puts it back.
+  await cell(2).hover();
+  await page(p).locator(".me-table-grip").click();
+  await expect(page(p).locator(".me-table .me-cell-selected")).toHaveCount(2);
+  await p.keyboard.press("Delete");
+  await expect.poll(() => text(p)).not.toContain("| Brush | washes |");
+  await p.keyboard.press("Control+z");
+  await expect.poll(() => text(p)).toContain("| Brush | washes |");
+  // A column aligned from the menu is drawn so at once.
+  await cell(1).click({ button: "right" });
+  await p.locator(".pop-menu [role=menuitem]", { hasText: "Align right" }).click();
+  await expect(page(p).locator(".me-table td").nth(1)).toHaveCSS("text-align", "right");
+  // Turn into from the table's menu: a line per row.
+  await cell(0).click({ button: "right" });
+  await p.locator(".pop-menu [role=menuitem]", { hasText: "Turn into bulleted list" }).click();
+  await expect.poll(() => text(p)).toContain("- Tool — Use\n- **Ink pen** — lines\n- Brush — washes");
 });
 
 test("a note's properties (YAML, as notes apps write them) are its item's tags, note and fields, both ways", async ({ app }) => {

@@ -128,6 +128,8 @@ class TableView {
   model: Model;
   private editing: { row: number; col: number; ed: CellEditor } | null = null;
   private range: { r0: number; c0: number; r1: number; c1: number } | null = null;
+  /** Whole rows or columns selected from their grips (a click; Ctrl+click adds or takes one, Shift+click the ones between). */
+  private lines: { kind: "row" | "col"; set: Set<number>; anchor: number } | null = null;
   private table!: HTMLTableElement;
 
   constructor(readonly view: EditorView, readonly ctx: LiveContext, public source: string, public from: number) {
@@ -141,12 +143,12 @@ class TableView {
 
   /** The note changed: the table's text is now `source`, at `from`. Only what changed is drawn again; the cell being edited follows. */
   update(source: string, from: number): void {
-    const b = { cols: this.model.head.length, rows: this.model.rows.length, aligns: this.model.aligns.join(), widths: this.model.widths.join() };
     this.source = source;
     this.from = from;
-    // (in place: the drawn table's buttons and grips read this one model)
+    // (in place: the drawn table's buttons and grips read this one model; its shape is compared with what was drawn, since the table's
+    // own actions change the model before they write it)
     const m = Object.assign(this.model, parseTable(source));
-    const same = m.head.length === b.cols && m.rows.length === b.rows && m.aligns.join() === b.aligns && m.widths.join() === b.widths;
+    const same = this.shapeOf() === this.drawnShape;
     if (!same) {
       const ed = this.editing;
       this.render();
@@ -318,6 +320,7 @@ class TableView {
 
   // ---- Cells selected together: dragged across, or Shift+clicked (cleared, copied, cut or formatted at once) ----
   private inRange(r: number, c: number): boolean {
+    if (this.lines) return this.lines.set.has(this.lines.kind === "row" ? r : c);
     const g = this.range;
     return !!g && r >= Math.min(g.r0, g.r1) && r <= Math.max(g.r0, g.r1) && c >= Math.min(g.c0, g.c1) && c <= Math.max(g.c0, g.c1);
   }
@@ -326,16 +329,34 @@ class TableView {
   }
   private clearCells(): void {
     this.range = null;
+    this.lines = null;
     this.paintRange();
   }
+  /** Select row (1…: body rows) or column `i` from its grip, as the library selects items: alone, Ctrl to add or take, Shift for a run. */
+  selectLine(kind: "row" | "col", i: number, e: { ctrlKey: boolean; metaKey: boolean; shiftKey: boolean }): void {
+    this.stopEditing();
+    this.range = null;
+    const l = this.lines?.kind === kind ? this.lines : null;
+    if (l && e.shiftKey) for (let k = Math.min(l.anchor, i); k <= Math.max(l.anchor, i); k++) l.set.add(k);
+    else if (l && (e.ctrlKey || e.metaKey)) (l.set.has(i) ? l.set.delete(i) : l.set.add(i), (l.anchor = i));
+    else this.lines = { kind, set: new Set([i]), anchor: i };
+    if (this.lines && !this.lines.set.size) this.lines = null;
+    this.paintRange();
+    this.dom.focus({ preventScroll: true });
+  }
   private eachSelected(f: (r: number, c: number) => void): void {
+    if (this.lines) {
+      const rows = this.model.rows.length, cols = this.model.head.length;
+      for (const k of this.lines.set) for (let j = 0; j < (this.lines.kind === "row" ? cols : rows + 1); j++) this.lines.kind === "row" ? f(k, j) : f(j, k);
+      return;
+    }
     const g = this.range;
     if (!g) return;
     for (let r = Math.min(g.r0, g.r1); r <= Math.max(g.r0, g.r1); r++) for (let c = Math.min(g.c0, g.c1); c <= Math.max(g.c0, g.c1); c++) f(r, c);
   }
   private selectedTable(): string {
     const rows: string[][] = [];
-    const top = Math.min(this.range!.r0, this.range!.r1);
+    const top = this.range ? Math.min(this.range.r0, this.range.r1) : this.lines?.kind === "row" ? Math.min(...this.lines.set) : 0;
     this.eachSelected((r, c) => void (rows[r - top] ??= []).push(this.mdAt(r, c)));
     const head = rows[0] ?? [];
     return [`| ${head.join(" | ")} |`, `| ${head.map(() => "---").join(" | ")} |`, ...rows.slice(1).map((r) => `| ${r.join(" | ")} |`)].join("\n");
@@ -345,11 +366,27 @@ class TableView {
     const FORMAT_KEYS: Record<string, [string, string]> = { b: ["**", "**"], i: ["*", "*"], e: ["`", "`"], S: ["~~", "~~"], H: ["==", "=="] };
     // typing: (keys on cells selected together write the table: clear, cut, a format on each; Ctrl+Z is the note's)
     this.dom.addEventListener("keydown", (e) => {
-      if (!this.range || this.editing) return;
+      if ((!this.range && !this.lines) || this.editing) return;
       const mod = e.ctrlKey || e.metaKey;
       const key = e.shiftKey && mod ? e.key.toUpperCase() : e.key.toLowerCase();
       if (e.key === "Escape") return void (this.clearCells(), this.view.focus(), e.preventDefault());
       if (mod && (key === "z" || key === "y" || key === "Z")) return void (e.preventDefault(), (key === "z" ? undo : redo)(this.view));
+      // (whole rows or columns selected: Backspace or Delete removes them; the heading row stays, and the last column)
+      if (this.lines && (e.key === "Delete" || e.key === "Backspace")) {
+        const { kind, set } = this.lines;
+        if (kind === "row") this.model.rows = this.model.rows.filter((_r, i) => !set.has(i + 1));
+        else if (set.size < this.model.head.length) {
+          const keep = (_x: unknown, i: number): boolean => !set.has(i);
+          this.model.head = this.model.head.filter(keep);
+          this.model.aligns = this.model.aligns.filter(keep);
+          this.model.widths = this.model.widths.filter(keep);
+          this.model.rows = this.model.rows.map((r) => r.filter(keep));
+        }
+        e.preventDefault();
+        e.stopPropagation();
+        this.lines = null;
+        return void this.commit();
+      }
       if (e.key === "Delete" || e.key === "Backspace" || (mod && key === "x")) {
         if (mod) void navigator.clipboard?.writeText(this.selectedTable()).catch(() => undefined);
         this.eachSelected((r, c) => this.set(r, c, ""));
@@ -365,9 +402,10 @@ class TableView {
       } else return;
       e.preventDefault();
       e.stopPropagation();
-      const keep = this.range;
+      const keep = this.range, lines = this.lines;
       this.commit();
       this.range = keep;
+      this.lines = lines;
       this.paintRange();
     });
     const cellOf = (t: EventTarget | null): HTMLElement | null => (t instanceof Element ? t.closest<HTMLElement>(".me-cell") : null);
@@ -413,7 +451,13 @@ class TableView {
     });
   }
 
+  /** The table's shape: what makes it be drawn again whole (its size, alignments and widths). */
+  private shapeOf(): string {
+    return `${this.model.head.length}×${this.model.rows.length}|${this.model.aligns.join()}|${this.model.widths.join()}`;
+  }
+  private drawnShape = "";
   private render(): void {
+    this.drawnShape = this.shapeOf();
     const view = this.view;
     const model = this.model;
     const commit = (next?: { row: number; col: number }): void => this.commit(next);
@@ -450,7 +494,9 @@ class TableView {
         [model.aligns[a], model.aligns[b]] = [model.aligns[b]!, model.aligns[a]!];
         [model.widths[a], model.widths[b]] = [model.widths[b] ?? null, model.widths[a] ?? null];
       };
-      const sort = (dir: 1 | -1): void => void model.rows.sort((a, b) => dir * (a[col] ?? "").localeCompare(b[col] ?? "", undefined, { numeric: true, sensitivity: "base" }));
+      // (by the words as they read: marks, link targets and tags' signs left out)
+      const words = (md: string): string => md.replace(/!?\[\[([^\]|]*)\|?([^\]]*)\]\]/g, (_m, t: string, a: string) => a || t).replace(/!?\[([^\]]*)\]\([^)]*\)/g, "$1").replace(/[*_~=`#>]|<br\s*\/?>/g, "").trim();
+      const sort = (dir: 1 | -1): void => void model.rows.sort((a, b) => dir * words(a[col] ?? "").localeCompare(words(b[col] ?? ""), undefined, { numeric: true, sensitivity: "base" }));
       const align = (a: Align): void => void (model.aligns[col] = a);
       return [
         { id: "table.rowAbove", label: L.rowAbove, disabled: row === 0, pick: () => (model.rows.splice(body, 0, blank()), commit({ row, col })) },
@@ -472,6 +518,15 @@ class TableView {
         { id: "table.delCol", label: L.delCol, disabled: cols <= 1, pick: () => (eachRow((r) => r.splice(col, 1)), model.aligns.splice(col, 1), model.widths.splice(col, 1), commit()) },
         { id: "table.copy", label: L.copy, sep: true, pick: () => void navigator.clipboard?.writeText(writeTable(model)).catch(() => undefined) },
         { id: "table.duplicate", label: L.duplicate, pick: () => view.dispatch({ changes: { from: this.from + this.source.length, insert: `\n\n${writeTable(model)}` }, userEvent: "input.table" }) },
+        // (Turn into: a line per row, its cells apart by " — "; the heading row too unless it is only Column 1, Column 2…)
+        ...([["table.toList", L.toList, () => "- "], ["table.toNumbered", L.toNumbered, (i: number) => `${i + 1}. `], ["table.toTasks", L.toTasks, () => "- [ ] "], ["table.toLines", L.toLines, () => ""]] as const).map(
+          ([id, label, mark], i): PopItem => ({ id, label, ...(i === 0 ? { sep: true } : {}), pick: () => {
+            const rows = [...(model.head.every((h, k) => !h || h === `Column ${k + 1}`) ? [] : [model.head]), ...model.rows].map((r) => r.filter(Boolean).join(" — ").replace(/<br\s*\/?>/gi, " ")).filter(Boolean);
+            const insert = rows.map((r, k) => `${mark(k)}${r}`).join("\n");
+            view.dispatch({ changes: { from: this.from, to: this.from + this.source.length, insert }, selection: { anchor: this.from + insert.length }, userEvent: "input.table" });
+            view.focus();
+          } }),
+        ),
       ];
     };
     const thead = document.createElement("thead");
@@ -585,7 +640,8 @@ class TableView {
         grip.removeEventListener("pointermove", move);
         grip.classList.remove("is-dragging");
         for (const r of bodyRows()) r.classList.remove("me-drop-target");
-        if (to === from) return;
+        // (a click on the grip, not dragged: the row is selected)
+        if (to === from) return void this.selectLine("row", from + 1, e);
         const [row] = model.rows.splice(from, 1);
         model.rows.splice(to, 0, row!);
         commit();
@@ -632,7 +688,7 @@ class TableView {
         colGrip.removeEventListener("pointermove", move);
         colGrip.classList.remove("is-dragging");
         for (const h of htr.cells) h.classList.remove("me-drop-target");
-        if (to === from) return;
+        if (to === from) return void this.selectLine("col", from, e);
         const take = <T,>(list: T[]): void => void list.splice(to, 0, list.splice(from, 1)[0]!);
         [model.head, ...model.rows].forEach(take);
         take(model.aligns);
@@ -700,5 +756,16 @@ export function tableField(ctx: LiveContext): Extension {
     update: (deco, tr) => (tr.docChanged || syntaxTree(tr.startState) !== syntaxTree(tr.state) ? build(tr.state) : deco),
     provide: (f) => [EditorView.decorations.from(f), EditorView.atomicRanges.of((view) => view.state.field(f) as RangeSet<Decoration>)],
   });
-  return field;
+  // (typed right after a table (a note that ends with one) or right before it: on a line of its own there, never into the table's rows;
+  // the drawn table leaves the browser no line to type on)
+  const typing = EditorView.inputHandler.of((view, from, to, text) => {
+    if (from !== to) return false;
+    let edge: "after" | "before" | null = null;
+    view.state.field(field).between(from, from, (a, b) => void (edge = b === from ? "after" : a === from ? "before" : edge));
+    if (!edge) return false;
+    const insert = edge === "after" ? `\n${text}` : `${text}\n`;
+    view.dispatch({ changes: { from, insert }, selection: { anchor: from + (edge === "after" ? insert.length : text.length) }, userEvent: "input.type" });
+    return true;
+  });
+  return [field, typing];
 }

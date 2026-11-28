@@ -117,7 +117,7 @@ export interface EditorLabels {
   today: string; yesterday: string; tomorrow: string; now: string;
   rowAbove: string; rowBelow: string; colBefore: string; colAfter: string; rowUp: string; rowDown: string; colLeft: string; colRight: string;
   dupRow: string; dupCol: string; alignLeft: string; alignCenter: string; alignRight: string; sortUp: string; sortDown: string;
-  delRow: string; delCol: string; copyTable: string; duplicateTable: string; calloutTypes: string;
+  delRow: string; delCol: string; copyTable: string; duplicateTable: string; tableToList: string; tableToNumbered: string; tableToTasks: string; tableToLines: string; calloutTypes: string;
   page: string; pickDate: string; dateLabel: string; insertDate: string;
   open: string; openNote: string; copyLink: string; highlightIn: string; removeHighlight: string; cut: string; copy: string; paste: string;
   toCallout: string; calloutType: string; removeCallout: string; selectAll: string; undo: string; redo: string; menu: string;
@@ -137,7 +137,7 @@ export const DEFAULT_LABELS: EditorLabels = {
   rowAbove: "Add row above", rowBelow: "Add row below", colBefore: "Add column before", colAfter: "Add column after", rowUp: "Move row up", rowDown: "Move row down",
   colLeft: "Move column left", colRight: "Move column right", dupRow: "Duplicate row", dupCol: "Duplicate column", alignLeft: "Align left", alignCenter: "Align center",
   alignRight: "Align right", sortUp: "Sort column (A → Z)", sortDown: "Sort column (Z → A)", delRow: "Delete row", delCol: "Delete column", copyTable: "Copy table as Markdown",
-  duplicateTable: "Duplicate table", calloutTypes: "Callout type",
+  duplicateTable: "Duplicate table", tableToList: "Turn into bulleted list", tableToNumbered: "Turn into numbered list", tableToTasks: "Turn into task list", tableToLines: "Turn into text", calloutTypes: "Callout type",
   page: "Page", pickDate: "Date…", dateLabel: "Pick any date", insertDate: "Insert",
   open: "Open link", openNote: "Open note", copyLink: "Copy link", highlightIn: "Highlight:", removeHighlight: "Remove highlight", cut: "Cut", copy: "Copy", paste: "Paste",
   toCallout: "Turn into callout…", calloutType: "Change callout type…", removeCallout: "Remove callout", selectAll: "Select all", undo: "Undo", redo: "Redo", menu: "Edit",
@@ -260,7 +260,7 @@ export function createMarkdownEditor(opts: EditorOptions): MarkdownEditor {
     ...(host.renderDiagram ? { renderDiagram: host.renderDiagram.bind(host) } : {}),
     taskLabel: labels.task, copyLabel: labels.copyCode, copiedLabel: labels.copied, languageLabel: labels.codeLanguage, addRowLabel: labels.addRow, addColumnLabel: labels.addColumn,
     tableLabel: labels.tableActions, languages: host.languages ?? LANGUAGES, resizeLabel: labels.resize, zoomLabel: labels.zoomPicture, editPictureLabel: labels.editPicture, closeLabel: labels.close, plainLabel: labels.plainText, detectedLabel: labels.detected,
-    tableWords: { rowAbove: labels.rowAbove, rowBelow: labels.rowBelow, colBefore: labels.colBefore, colAfter: labels.colAfter, rowUp: labels.rowUp, rowDown: labels.rowDown, colLeft: labels.colLeft, colRight: labels.colRight, dupRow: labels.dupRow, dupCol: labels.dupCol, alignLeft: labels.alignLeft, alignCenter: labels.alignCenter, alignRight: labels.alignRight, sortUp: labels.sortUp, sortDown: labels.sortDown, delRow: labels.delRow, delCol: labels.delCol, copy: labels.copyTable, duplicate: labels.duplicateTable },
+    tableWords: { rowAbove: labels.rowAbove, rowBelow: labels.rowBelow, colBefore: labels.colBefore, colAfter: labels.colAfter, rowUp: labels.rowUp, rowDown: labels.rowDown, colLeft: labels.colLeft, colRight: labels.colRight, dupRow: labels.dupRow, dupCol: labels.dupCol, alignLeft: labels.alignLeft, alignCenter: labels.alignCenter, alignRight: labels.alignRight, sortUp: labels.sortUp, sortDown: labels.sortDown, delRow: labels.delRow, delCol: labels.delCol, copy: labels.copyTable, duplicate: labels.duplicateTable, toList: labels.tableToList, toNumbered: labels.tableToNumbered, toTasks: labels.tableToTasks, toLines: labels.tableToLines },
   };
   const liveExt = (): Extension => (mode === "live" ? livePreview(liveCtx) : []);
 

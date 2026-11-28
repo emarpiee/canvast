@@ -129,6 +129,7 @@ const CHOICE_LOOK: ReadonlyArray<readonly [RegExp, string, string]> = [
   [/^table\.alignLeft$/, ICONS.textAlignLeft, "Words to the left"], [/^table\.alignCenter$/, ICONS.textAlignCenter, "Words in the middle"], [/^table\.alignRight$/, ICONS.textAlignRight, "Words to the right"],
   [/^table\.sortUp$/, ICONS.arrowDownAZ, "Rows in order of this column"], [/^table\.sortDown$/, ICONS.arrowDownZA, "Rows in reverse order"],
   [/^table\.del(Row|Col)$/, ICONS.trash, "Take it out of the table"], [/^table\.copy$/, ICONS.clipboardCopy, "The table as Markdown text"], [/^table\.duplicate$/, ICONS.copyPlus, "A copy of the table under it"],
+  [/^table\.toList$/, ICONS.list, "A line of the list per row"], [/^table\.toNumbered$/, ICONS.listOrdered, "A numbered line per row"], [/^table\.toTasks$/, ICONS.listChecks, "A task per row"], [/^table\.toLines$/, ICONS.pilcrow, "A line of text per row"],
   [/^language\.none$/, ICONS.fileCode, "No language: plain text"], [/^language\./, ICONS.fileCode, "Colour the code as this"],
 ];
 const lookOf = (id: string): readonly [string, string] => {

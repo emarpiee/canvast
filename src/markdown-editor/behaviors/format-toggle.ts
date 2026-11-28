@@ -95,6 +95,8 @@ export function toggleInline(m: string): Command {
           if (from === to) {
             // (the cursor inside a span of this format: its marks come off)
             const span = spanAt(state, from, m);
+            // (just before the closing mark of the span being typed, `*x|*`: the cursor steps out, as notes apps do)
+            if (span && from === span.to - span.close) return { range: EditorSelection.cursor(span.to) };
             if (span) return { changes: [{ from: span.from, to: span.from + span.open }, { from: span.to - span.close, to: span.to }], range: EditorSelection.cursor(from - span.open) };
             // (in a link, a picture or code: the whole of it, on or off, the cursor kept in it)
             const atom = m === "`" ? null : atomAt(state, from);
