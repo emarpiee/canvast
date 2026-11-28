@@ -66,6 +66,8 @@ export interface NoteHost {
   newNote(): void;
   /** Vim keys in notes (Settings). */
   vim: boolean;
+  /** Play a video of the note (in `box`, under it) with the app's own player. */
+  player?(video: HTMLVideoElement, box: HTMLElement, url: string): void;
 }
 
 export interface NoteEditor {
@@ -228,6 +230,7 @@ export async function mountNoteEditor(el: HTMLElement, opts: { kind: Exclude<Not
     onChange: () => void (dirty = true),
     host: {
       media,
+      ...(host.player ? { player: host.player.bind(host) } : {}),
       open: (f) => host.open(hostLink(f)),
       links: async () => (await host.linkables()).map((l) => ({ target: l.key, label: l.name, ...(l.key !== l.name ? { detail: l.key } : {}) })),
       // (a link to nothing is drawn muted; known once the library's names have been read)

@@ -14,6 +14,8 @@ import { splitFrontmatter, underProps, wholeMarkdown, withFileMeta, withPastedPr
 import { chooseDialog, confirmDialog } from "./confirm";
 import { openLibraryPicker } from "./library-picker";
 import { mountNoteEditor } from "./note-editor";
+import { mountPlayerControls } from "./player-controls";
+import { avEngine } from "./media-player";
 import type { AttachKind, NoteEditor, NoteHost, NoteItem } from "./note-editor";
 
 // A note open in the notes editor: the same for the library's viewer and for the canvas's note panel. Whoever shows it gives a
@@ -238,6 +240,17 @@ export class OpenNote {
       save: () => this.save(),
       refreshWhole: () => this.readWhole(),
       vim: this.deps.settings.get("notes.vim"),
+      // A video in the note plays in the app's own player (the canvas's and the viewer's controls, its device settings).
+      player: (video, box, url) => {
+        const controls = mountPlayerControls(box, this.deps.settings, { extract: () => undefined });
+        controls.el.classList.add("note-media-bar");
+        controls.el.querySelector('[data-cmd="extract"]')?.remove(); // (keeping a frame is the canvas's and the viewer's)
+        const engine = avEngine(video);
+        engine.load({ media: { t: 0, repeat: false, speed: 1 } } as never, url, 0).then(
+          () => controls.show(engine, "video", false),
+          () => void ((video.controls = true), controls.el.remove()),
+        );
+      },
       // A linked note's words (the link popover), under the properties its file has now, as its new version.
       async saveOther(h, words) {
         const rec = await assets.record(h).catch(() => undefined);

@@ -756,16 +756,32 @@ export function tableField(ctx: LiveContext): Extension {
     update: (deco, tr) => (tr.docChanged || syntaxTree(tr.startState) !== syntaxTree(tr.state) ? build(tr.state) : deco),
     provide: (f) => [EditorView.decorations.from(f), EditorView.atomicRanges.of((view) => view.state.field(f) as RangeSet<Decoration>)],
   });
-  // (typed right after a table (a note that ends with one) or right before it: on a line of its own there, never into the table's rows;
-  // the drawn table leaves the browser no line to type on)
-  const typing = EditorView.inputHandler.of((view, from, to, text) => {
-    if (from !== to) return false;
+  // (typed right after a table (a note that ends with one) or right before it: on a line of its own there, never into the table's rows.
+  // The drawn table leaves the browser no place for its caret there, so a key raises no input at all: the key itself is taken.)
+  const edgeOf = (view: EditorView, at: number): "after" | "before" | null => {
     let edge: "after" | "before" | null = null;
-    view.state.field(field).between(from, from, (a, b) => void (edge = b === from ? "after" : a === from ? "before" : edge));
+    view.state.field(field).between(at, at, (a, b) => void (edge = b === at ? "after" : a === at ? "before" : edge));
+    return edge;
+  };
+  const type = (view: EditorView, text: string): boolean => {
+    const sel = view.state.selection.main;
+    const edge = sel.empty ? edgeOf(view, sel.from) : null;
     if (!edge) return false;
     const insert = edge === "after" ? `\n${text}` : `${text}\n`;
-    view.dispatch({ changes: { from, insert }, selection: { anchor: from + (edge === "after" ? insert.length : text.length) }, userEvent: "input.type" });
+    view.dispatch({ changes: { from: sel.from, insert }, selection: { anchor: sel.from + (edge === "after" ? insert.length : text.length) }, scrollIntoView: true, userEvent: "input.type" });
     return true;
-  });
+  };
+  const typing = [
+    EditorView.inputHandler.of((view, from, to, text) => from === to && type(view, text)),
+    EditorView.domEventHandlers({
+      keydown: (e, view) => {
+        if (e.ctrlKey || e.metaKey || e.altKey || e.isComposing) return false;
+        const text = e.key === "Enter" ? "" : e.key.length === 1 ? e.key : null;
+        if (text === null || !type(view, text)) return false;
+        e.preventDefault();
+        return true;
+      },
+    }),
+  ];
   return [field, typing];
 }

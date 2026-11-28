@@ -68,6 +68,8 @@ export interface SlashItem {
 export interface EditorHost {
   /** A picture, video or sound for a link as written, or an embed's target: an address the page can show, and its type. */
   media?(link: string, embed: boolean): Promise<{ url: string; type: string } | null>;
+  /** Play a video (in \`box\`) with the host's own player; without one the browser's controls show. */
+  player?(video: HTMLVideoElement, box: HTMLElement, url: string): void;
   /** Ctrl+click (⌘ on a Mac) on a link in live or source mode, a click in preview mode. */
   open?(link: FollowedLink): void;
   /** The rows of `[[`. */
@@ -255,6 +257,7 @@ export function createMarkdownEditor(opts: EditorOptions): MarkdownEditor {
     ...(host.media ? { media: host.media.bind(host) } : {}),
     ...(host.wikiExists ? { exists: host.wikiExists.bind(host) } : {}),
     ...(host.renderMath ? { renderMath: host.renderMath.bind(host) } : {}),
+    ...(host.player ? { player: host.player.bind(host) } : {}),
     wrapSelection: opts.wrapSelection !== false,
     cellEditor: (parent: HTMLElement, text: string, events: CellEvents) => cellEditor(parent, text, events),
     ...(host.renderDiagram ? { renderDiagram: host.renderDiagram.bind(host) } : {}),

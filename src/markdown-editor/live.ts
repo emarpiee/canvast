@@ -31,8 +31,9 @@ export interface LiveContext {
   renderMath?: (tex: string, display: boolean) => string;
   /** A diagram (a ```mermaid block) as SVG; absent, it stays code. */
   renderDiagram?: (code: string) => Promise<string>;
-  /** A small editor for a table's cell (its Markdown on one line): Tab, Enter and Escape `move` on, undo with nothing left in it is the
-   *  note's. `close` gives its words and removes it. */
+  /** Play a video with the host's own player (else the browser's controls). */
+  player?: (video: HTMLVideoElement, box: HTMLElement, url: string) => void;
+  /** A table cell's editor (a window onto the cell's text in the note): Tab, Enter and Escape \`move\` on. */
   cellEditor?: (parent: HTMLElement, text: string, on: CellEvents) => CellEditor;
   /** Only what is drawn in a line's words (a table cell's editor): no tables or other blocks. */
   inline?: boolean;
@@ -154,7 +155,9 @@ class MediaWidget extends WidgetType {
     if (view && this.at) {
       // view-state: (a press on the picture selects it, as one piece of the note; a press on its buttons or handle is theirs)
       box.addEventListener("mousedown", (e) => {
-        if (e.button !== 0 || (e.target as HTMLElement).closest(".me-media-tools, .me-resize")) return;
+        // (only the picture or video itself: a host's player bar under a video keeps its own presses)
+        const t = e.target as HTMLElement;
+        if (e.button !== 0 || t.closest(".me-media-tools, .me-resize") || !(t === box || t instanceof HTMLImageElement || t instanceof HTMLVideoElement)) return;
         e.preventDefault();
         const at = now().at!;
         view.dispatch({ selection: { anchor: at.from, head: at.to }, effects: setPictureEdit.of(null) });
@@ -168,11 +171,17 @@ class MediaWidget extends WidgetType {
       box.textContent = "";
       const el = kind === "video" ? document.createElement("video") : kind === "audio" ? document.createElement("audio") : document.createElement("img");
       if (el instanceof HTMLImageElement) el.alt = name;
-      else el.controls = true;
-      el.src = got.url;
       if (this.width) el.style.width = `${this.width}px`;
       box.append(el);
-      if (kind === "image" && this.at && view) box.append(this.tools(box, view, now), this.resizer(el as HTMLImageElement, view, now));
+      // (a video plays in the host's player when it has one; a picture and a video are sized by the handle at their corner)
+      if (el instanceof HTMLVideoElement && this.ctx.player) {
+        box.classList.add("is-video");
+        this.ctx.player(el, box, got.url);
+      } else {
+        if (!(el instanceof HTMLImageElement)) el.controls = true;
+        el.src = got.url;
+      }
+      if (kind !== "audio" && this.at && view) box.append(...(kind === "image" ? [this.tools(box, view, now)] : []), this.resizer(el, view, now));
     });
     return box;
   }
@@ -204,7 +213,7 @@ class MediaWidget extends WidgetType {
     return bar;
   }
   /** A handle at the picture's corner: dragged, the picture's width is written into its Markdown (`![alt|300](…)`, `![[cat.png|300]]`). */
-  private resizer(img: HTMLImageElement, view: EditorView, now: () => MediaWidget): HTMLElement {
+  private resizer(img: HTMLElement, view: EditorView, now: () => MediaWidget): HTMLElement {
     const h = document.createElement("span");
     h.className = "me-resize";
     h.title = this.ctx.resizeLabel;

@@ -15,7 +15,7 @@ for (const m of html.matchAll(/(?:url\(\s*["']?|@import\s+["'])((?:https?:)?\/\/
   problems.push(`external CSS reference: ${m[1]}`);
 }
 /** The one address the page may connect to: the canvast tools on this computer, for AI agents (ADR 0205; off until the person turns it on). */
-const LOOPBACK = /^ws:\/\/127\.0\.0\.1:(47380|\$\{\w+\})\/canvast\?/;
+const LOOPBACK = /^ws:\/\/127\.0\.0\.1:(47380|\$\{[\w$]+\})\/canvast\?/; // (a minifier may name the port $x)
 // Module or script loading by URL from inside code.
 for (const m of html.matchAll(/\b(?:import\s*\(|importScripts\s*\(|fetch\s*\(|new\s+(?:Worker|WebSocket|EventSource)\s*\()\s*["'`](https?:|wss?:|\/\/)[^"'`]*/gi)) {
   if (LOOPBACK.test(m[0].replace(/^[^"'`]*["'`]/, ""))) continue; // (the link to AI agents: this computer only, while it is on, ADR 0205)

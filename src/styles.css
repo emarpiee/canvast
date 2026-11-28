@@ -1610,6 +1610,9 @@ button.asset-preview { display: flex; align-items: center; justify-content: cent
 }
 .viewer-note .me { --me-size: calc(var(--text-md) * var(--note-zoom, 1)); } /* (the text size and not `zoom` or a transform: the editor measures what it selects unscaled) */
 .me .me-btn[aria-pressed="true"] { background: var(--hud-accent); color: var(--hud-accent-fg); }
+/* A video in a note plays in the app's own player bar, under it, as wide as the video. */
+.me .me-media.is-video { display: inline-flex; flex-direction: column; max-width: 100%; }
+.me .note-media-bar { position: static; transform: none; width: auto; max-width: none; margin-top: var(--s-2); }
 .me .cm-tooltip-autocomplete { max-width: min(28rem, calc(100vw - var(--sp-8))); }
 .me .cm-tooltip-autocomplete > ul > li { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 ::highlight(canvast-code-keyword) { color: var(--code-keyword); }

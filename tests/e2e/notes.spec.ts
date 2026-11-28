@@ -209,8 +209,7 @@ test("a table cell is the note's own words: one selection, the note's keys, its 
   await cell(1).click();
   await p.keyboard.press("Control+z");
   await expect.poll(() => text(p)).toContain("| **Ink pen** | lines |\n| Brush | washes |");
-  // Cells dragged across are selected together; Delete empties them, Ctrl+Z brings them back.
-  await p.keyboard.press("Escape");
+  // Cells dragged across are selected together (from a cell being edited too); Delete empties them, Ctrl+Z brings them back.
   const a = (await cell(2).boundingBox())!, b = (await cell(3).boundingBox())!;
   await p.mouse.move(a.x + 4, a.y + a.height / 2);
   await p.mouse.down();
