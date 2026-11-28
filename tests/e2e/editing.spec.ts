@@ -1289,7 +1289,8 @@ test("copy, cut, paste and duplicate keep every kind of object whole, on the sam
   expect(await p.evaluate(() => window.__canvastDebug.selection().length), "the path and its words").toBe(2);
   await pathWith(p, "onpath");
   await clear();
-  for (const [a, b, words] of [[[400, 510], [510, 590], "One"], [[560, 510], [670, 590], "Two"]] as const) {
+  // (90 px tall: their words are 10 px, readable, so opening them zooms nothing: under 9 px the text editor zooms to edit)
+  for (const [a, b, words] of [[[400, 510], [510, 600], "One"], [[560, 510], [670, 600], "Two"]] as const) {
     await key(app, "k");
     await drag([...a], [...b]);
     await p.mouse.dblclick((a[0] + b[0]) / 2, (a[1] + b[1]) / 2);
