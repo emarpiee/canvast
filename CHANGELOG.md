@@ -3,10 +3,12 @@
 ## 0.63.20 — Card titles in capitals (2026-11-29)
 
 - **Changed:** every card's title is in capitals, in one rule for the whole app: the Settings cards, the cards beside a file (Properties, Tags, Folder, Linked from, Links, Footnotes…), the library's sidebar sections, the tags panel, the workspace menu and the styles tabs; Show the properties in the note sits at the right end of the Properties title. ([The interface, settings and keys](README.md#the-interface-settings-and-keys))
+- **Changed:** a note's properties are drawn as notes apps draw them: one name column, fields without a frame and one width, a row lit under the pointer and ringed while you type in it, its grip and × shown on that row; Add a property is a quiet button; room between the properties and the note's first line. ([Notes](README.md#notes))
+- **Fixed before release:** properties shown at the top of the note went back to the details when the note was opened again. ([Notes](README.md#notes))
 
 ### For developers
 
-- Tests: the viewer's fade test reads the header's opacity (Back sits in it now), not Back's own.
+- Tests: the viewer's fade test reads the header's opacity (Back sits in it now), not Back's own; the notes properties test opens the note again with them at its top.
 
 ## 0.63.19 — canvast's own Markdown editor (2026-11-28)
 

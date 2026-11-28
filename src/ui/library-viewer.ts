@@ -242,8 +242,8 @@ export function mountLibraryViewer(ctx: ViewerCtx) {
     if (token !== slideToken) return opened.close(false);
     note = opened;
     paintNoteZoom();
-    // (the details were drawn before the view was open: drawn again, with its Bookmark button, which needs the view's place)
-    if (kind.marks) ctx.renderInspector();
+    // (the details were drawn before the view was open: drawn again, with its Bookmark button, which needs the view's place, and its Properties, which go to the note's top when Settings say so)
+    if (kind.marks || opened.propsSlot) ctx.renderInspector();
   };
   /** Before the note is left (another item, Back, Esc): its changes are saved or let go, or it stays open. Whether to go on. */
   const leaveNote = (): Promise<boolean> => (note ? note.leave() : Promise.resolve(true));

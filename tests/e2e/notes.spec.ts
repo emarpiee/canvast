@@ -306,6 +306,11 @@ test("a note's properties (YAML, as notes apps write them) are its item's tags, 
   await p.getByTestId("asset-props-in-note").click();
   await expect(page(p).locator(".note-props-slot [data-testid='asset-notes']")).toHaveCount(1);
   await expect(p.getByTestId("asset-props-in-note")).toHaveAttribute("aria-pressed", "true");
+  // Kept: the note closed and opened again has them at its top at once (the details were drawn before the note was open).
+  await p.locator(".viewer-head .viewer-back").click();
+  await expect(page(p)).toBeHidden();
+  await p.getByTestId("asset-card").first().dblclick();
+  await expect(page(p).locator(".note-props-slot [data-testid='asset-notes']")).toHaveCount(1);
   await page(p).locator(".note-props-slot [data-testid='asset-props-in-note']").click();
   await expect(page(p).locator(".note-props-slot [data-testid='asset-notes']")).toHaveCount(0);
 });
