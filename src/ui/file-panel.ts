@@ -2,6 +2,7 @@ import { openBatchRename } from "./batch-rename";
 import { esc } from "./format";
 import { ICONS } from "./icons";
 import { nextNoteZoom, viewKindOf } from "./file-views";
+import { FileHistory, navButtonsHtml, wireNav } from "./file-history";
 import type { CardActions, FileViewKind, OpenView, ViewDeps, ViewPlace } from "./file-views";
 import { OpenNote } from "./note-session";
 import { panelHtml } from "./panel";
@@ -31,6 +32,10 @@ export function mountFilePanel(
   mode: () => "panel" | "window",
 ): { open(hash: string, card?: CardActions): Promise<boolean>; close(): Promise<boolean>; closeHidden(): void; readonly hash: string | null } {
   let el = hosts.panel; // (the host of the file open now)
+  /** Back and forward through the files opened here (one history for the panel and the window: one place). */
+  const history = new FileHistory("panel", { show: (hash) => open(hash), root: () => el });
+  history.listen(hosts.panel);
+  history.listen(hosts.window);
   /** The file being opened (its view shown, not ready: its hash), and whether Escape came meanwhile. */
   let opening = "", escaped = false;
   let note: OpenView | null = null;
@@ -114,7 +119,7 @@ export function mountFilePanel(
     kind = k;
     name = name0;
     const tools = deps.details ? `<button type="button" class="layer-btn" data-details aria-pressed="false" aria-label="Properties" title="Its properties: the library's details of this ${k.noun}">${ICONS.info}</button>` : "";
-    const lead = deps.session.readOnly ? "" : `<button type="button" class="layer-btn" data-rename aria-label="Rename this ${k.noun}" title="Rename this ${k.noun} (F2)">${ICONS.textCursorInput}</button>`;
+    const lead = navButtonsHtml("panel") + (deps.session.readOnly ? "" : `<button type="button" class="layer-btn" data-rename aria-label="Rename this ${k.noun}" title="Rename this ${k.noun} (F2)">${ICONS.textCursorInput}</button>`);
     el.innerHTML = panelHtml({ title: esc(name0), lead, tools, body: `<div class="viewer-note"${k.id === "note" ? ' data-testid="note-editor"' : ""}><div></div></div><aside class="file-panel-details" data-testid="file-panel-details" hidden><div class="col-grip" data-testid="file-details-grip" role="separator" aria-orientation="vertical" aria-label="Resize the properties" title="Drag to resize the properties (double-click to reset)"></div></aside>` });
     el.setAttribute("aria-label", `${label(k)}: ${name0}`);
     el.querySelector(".panel-head h2")?.setAttribute("title", name0);
@@ -123,6 +128,8 @@ export function mountFilePanel(
     el.querySelector("[data-rename]")?.addEventListener("click", () => void rename()); // view-state: (opens the rename dialog of this file)
     el.querySelector("[data-details]")?.addEventListener("click", () => showDetails(!detailsShown)); // view-state: (shows or hides its details beside it)
     sizeDetails(el.querySelector<HTMLElement>(".file-panel-details")!);
+    history.visit(hash);
+    wireNav(el, history);
     el.hidden = false;
     try {
       opening = hash;

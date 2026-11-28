@@ -417,6 +417,16 @@ test("a lost original is shown as missing and is restored everywhere by importin
   expect(first).not.toContain("missing");
   await p.keyboard.press("ArrowRight");
   await expect(slide.locator("figcaption")).not.toHaveText(first!);
+  const second = (await slide.locator("figcaption").textContent())!;
+  // Navigate back and forward, as notes apps have it: the button goes back to the first, Alt+Right forward again; at the end it is dimmed.
+  const back = slide.locator('[data-nav="viewer"][data-dir="back"]'), forward = slide.locator('[data-nav="viewer"][data-dir="forward"]');
+  await expect(forward).toBeDisabled();
+  await back.click();
+  await expect(slide.locator("figcaption")).toHaveText(first!);
+  await expect(back).toBeDisabled();
+  await slide.focus();
+  await p.keyboard.press("Alt+ArrowRight");
+  await expect(slide.locator("figcaption")).toHaveText(second);
   await p.keyboard.press("Escape");
   await expect(slide).toBeHidden();
   await card(p, GREEN_HASH).click();

@@ -107,7 +107,8 @@ One icon per function: two buttons that do different things never share an icon,
 | `calendar-days` | By date added, newest first (also the library sidebar's sort button) |
 | `calendar-arrow-up` | Oldest first (the library sidebar's sort button) |
 | `camera` | Screenshot (left tool rail, above Search) |
-| `arrow-left` | Back to the library (top left of the library viewer) |
+| `arrow-left` | Navigate back (the Library's viewer and a file's panel on a canvas) |
+| `arrow-right` | Navigate forward (the same places) |
 | `sun-moon` | Background of see-through pictures (library viewer, bottom right) |
 | `eclipse` | See it in greyscale, for now (library viewer, bottom right) |
 | `chevrons-down` | Hide the controls (library viewer) |

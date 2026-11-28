@@ -41,8 +41,10 @@ export const EDITOR_CSS = `
 :where(.me-body.has-outline-left) > .me-outline { left: var(--me-outline-edge); }
 :where(.me-body.has-outline-right) > .me-outline { right: calc(var(--me-outline-edge) + 6px); } /* (clear of the note's scrollbar) */
 :where(.me-outline-list) { flex: 1; min-height: 0; margin: 0; padding: 6px; list-style: none; overflow-y: auto; }
-:where(.me-outline-item) { display: block; width: 100%; box-sizing: border-box; padding: 3px 8px 3px calc(8px + var(--me-outline-depth, 0) * 12px); border: 0; border-radius: 4px; background: none; color: var(--me-muted); font: inherit; font-size: 0.85em; line-height: 1.5; text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer; }
+:where(.me-outline-item) { position: relative; display: block; width: 100%; box-sizing: border-box; padding: 3px 8px 3px calc(8px + var(--me-outline-depth, 0) * 12px); border: 0; border-radius: 4px; background: none; color: var(--me-muted); font: inherit; font-size: 0.85em; line-height: 1.5; text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer; }
 :where(.me-outline-item):hover { background: var(--me-code-bg); color: var(--me-fg); }
+/* (its hierarchy: a thin line down each level it is under, as the layers' and folders' trees draw it) */
+:where(.me-outline-item)::before { content: ""; position: absolute; top: 0; bottom: 0; left: 8px; width: calc(var(--me-outline-depth, 0) * 12px); pointer-events: none; background-image: repeating-linear-gradient(to right, transparent 0 4px, color-mix(in oklch, var(--me-fg) 20%, transparent) 4px 5px, transparent 5px 12px); }
 :where(.me-outline-item.is-active) { color: var(--me-accent); font-weight: 600; }
 :where(.me-outline-empty) { padding: 6px 8px; color: var(--me-faint); font-size: 0.85em; }
 :where(.me-outline-grip) { position: relative; flex: none; height: 10px; border-radius: 0 0 8px 8px; cursor: ns-resize; opacity: 0; touch-action: none; }

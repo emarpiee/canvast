@@ -81,13 +81,39 @@ export function mountOutline(body: HTMLElement, view: EditorView, opts: { previe
     box.style.maxHeight = `${most}px`;
     box.style.height = height === null ? "" : `${Math.min(height, most)}px`;
   };
+  /**
+   * The heading lit: the one whose section is at the top of the view, as outlines do (it follows scrolling). In preview by the drawn
+   * headings' places, else by the line at the top of the editor's view.
+   */
   const active = (): number => {
-    if (opts.previewing()) return -1;
-    const at = view.state.doc.lineAt(view.state.selection.main.head).number;
+    const margin = 8;
+    if (opts.previewing()) {
+      const scroller = opts.page.parentElement!;
+      const top = scroller.getBoundingClientRect().top + margin;
+      let k = -1;
+      opts.page.querySelectorAll<HTMLElement>("h1, h2, h3, h4, h5, h6").forEach((h, i) => void (h.getBoundingClientRect().top <= top && (k = i)));
+      return heads.length ? Math.max(k, 0) : -1;
+    }
+    const at = view.state.doc.lineAt(view.lineBlockAtHeight(view.scrollDOM.scrollTop + margin).from).number;
     let k = -1;
     heads.forEach((h, i) => void (h.line <= at && (k = i)));
-    return k;
+    return heads.length ? Math.max(k, 0) : -1;
   };
+  /** Light the heading of the view's top, kept in sight in the outline (only the lit row changes: nothing is drawn again). */
+  const light = (): void => {
+    const k = active();
+    for (const b of list.querySelectorAll<HTMLElement>(".me-outline-item")) {
+      const on = Number(b.dataset["i"]) === k;
+      if (b.classList.contains("is-active") === on) continue;
+      b.classList.toggle("is-active", on);
+      if (on) b.scrollIntoView({ block: "nearest" });
+    }
+  };
+  let frame = 0;
+  const onScroll = (): void => void (side !== "off" && !frame && (frame = requestAnimationFrame(() => ((frame = 0), light()))));
+  // view-state: (the lit heading follows the scrolling of the words, or of the preview's page)
+  view.scrollDOM.addEventListener("scroll", onScroll, { passive: true });
+  opts.page.parentElement?.addEventListener("scroll", onScroll, { passive: true });
   const draw = (): void => {
     heads = headingsOf(view.state);
     const top = Math.min(...heads.map((h) => h.level), 6);
@@ -107,6 +133,7 @@ export function mountOutline(body: HTMLElement, view: EditorView, opts: { previe
     const line = view.state.doc.line(Math.min(h.line, view.state.doc.lines));
     view.dispatch({ selection: { anchor: line.to }, effects: EditorView.scrollIntoView(line.from, { y: "start", yMargin: 24 }) });
     view.focus();
+    for (const x of list.querySelectorAll(".me-outline-item")) x.classList.toggle("is-active", x === b); // (lit at once: the scroll that follows agrees)
   });
   // view-state: (its height, by the grip at its foot: never more than the view)
   grip.addEventListener("pointerdown", (e) => {
@@ -139,6 +166,8 @@ export function mountOutline(body: HTMLElement, view: EditorView, opts: { previe
     place,
     destroy() {
       sizes.disconnect();
+      view.scrollDOM.removeEventListener("scroll", onScroll);
+      opts.page.parentElement?.removeEventListener("scroll", onScroll);
       box.remove();
       body.classList.remove("has-outline-left", "has-outline-right");
     },

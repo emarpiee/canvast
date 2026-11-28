@@ -1,3 +1,4 @@
+import { FileHistory, wireNav } from "./file-history";
 import { nextNoteZoom } from "./file-views";
 import { groundFill } from "../assets/card";
 import { desktopBridge } from "../storage/desktop-bridge";
@@ -51,6 +52,8 @@ const ZOOM_STEP = 1.25;
  * Library through `ctx` (its getters read the Library's own variables, its setters write them) and gives the Library what it returns.
  */
 export interface ViewerCtx {
+  /** Its back and forward history's place ("viewer"); none for a Pins window's viewer. */
+  readonly navPlace?: string | undefined;
   anchor: string | null;
   readonly applyUi: () => void;
   readonly assets: AssetLibrary;
@@ -662,6 +665,9 @@ export function mountLibraryViewer(ctx: ViewerCtx) {
     else if (goneAt?.hash === from && performance.now() - goneAt.at < 5000 && ctx.viewer.hidden) void showSlide(to);
     goneAt = null;
   });
+  /** Back and forward through the items shown here (file-history.ts): every item shown is a step, by a link, the strip or the arrows. */
+  const history = ctx.navPlace ? new FileHistory(ctx.navPlace, { show: async (h) => (await showSlide(h), slideHash === h && !ctx.viewer.hidden), root: () => ctx.viewer }) : null;
+  if (history) (history.listen(ctx.viewer), wireNav(ctx.viewer, history));
   const showSlide = async (hash: string): Promise<void> => {
     if (!ctx.entryOf(hash)) await ctx.ensure([hash]).catch(() => undefined); // (a long library: what a link points at need not be on a page read yet)
     if (!ctx.entryOf(hash)) {
@@ -679,6 +685,7 @@ export function mountLibraryViewer(ctx: ViewerCtx) {
     if (hash !== slideHash) setGrey(false);
     resetZoom();
     slideHash = hash;
+    history?.visit(hash);
     ctx.body.classList.add("is-viewing");
     ctx.root.classList.add("is-viewing");
     ctx.viewer.hidden = false;
@@ -1027,7 +1034,7 @@ export function mountLibraryViewer(ctx: ViewerCtx) {
       // does for a picture: the selection stays, so its details stay.
       if (e.key === "Escape") {
         if (e.defaultPrevented) return;
-      } else if (typing || (e.target as HTMLElement).isContentEditable || (e.target as HTMLElement).closest('[contenteditable="true"]') || !/^(ArrowLeft|ArrowRight|i|I|f|F)$/.test(e.key) || e.ctrlKey || e.metaKey) return;
+      } else if (typing || (e.target as HTMLElement).isContentEditable || (e.target as HTMLElement).closest('[contenteditable="true"]') || !/^(ArrowLeft|ArrowRight|i|I|f|F)$/.test(e.key) || e.ctrlKey || e.metaKey || e.altKey) return; // (Alt with an arrow: back and forward, file-history.ts)
       // (with the cursor out of the words, as on a button of its toolbar, the viewer's own keys are still the viewer's)
     }
     if (e.key === "Escape") {

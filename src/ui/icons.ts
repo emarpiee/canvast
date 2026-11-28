@@ -305,6 +305,7 @@ import chevronDown from "lucide-static/icons/chevron-down.svg";
 import chevronRight from "lucide-static/icons/chevron-right.svg";
 import chevronLeft from "lucide-static/icons/chevron-left.svg";
 import arrowLeft from "lucide-static/icons/arrow-left.svg";
+import arrowRight from "lucide-static/icons/arrow-right.svg";
 import rulerDimensionLine from "lucide-static/icons/ruler-dimension-line.svg";
 import stretchHorizontal from "lucide-static/icons/stretch-horizontal.svg";
 import stretchVertical from "lucide-static/icons/stretch-vertical.svg";
@@ -659,6 +660,7 @@ export const ICONS = {
   magnet: clean(magnet),
   chevronLeft: clean(chevronLeft),
   arrowLeft: clean(arrowLeft),
+  arrowRight: clean(arrowRight),
   sizeMenu: clean(rulerDimensionLine),
   sameWidth: clean(stretchHorizontal),
   sameHeight: clean(stretchVertical),
