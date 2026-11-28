@@ -4,6 +4,7 @@
 
 - **Changed:** every card's title is in capitals, in one rule for the whole app: the Settings cards, the cards beside a file (Properties, Tags, Folder, Linked from, Links, Footnotes…), the library's sidebar sections, the tags panel, the workspace menu and the styles tabs; Show the properties in the note sits at the right end of the Properties title. ([The interface, settings and keys](README.md#the-interface-settings-and-keys))
 - **Changed:** a note's properties are laid out as notes apps lay them out: one name column for every row and values of one width (a row without × keeps its place); room between the properties and the note's first line. ([Notes](README.md#notes))
+- **Changed:** a text field's edge is soft at rest and full under the pointer, in every part of the app. ([The interface, settings and keys](README.md#the-interface-settings-and-keys))
 - **Changed:** a text field in use has a thin ring on its own border, in every part of the app (it had a thick one outside it). ([The interface, settings and keys](README.md#the-interface-settings-and-keys))
 - **Fixed before release:** properties shown at the top of the note went back to the details when the note was opened again. ([Notes](README.md#notes))
 

@@ -46,6 +46,7 @@
   /* Code in notes: 4.5:1 on a code block in each theme (tests/e2e/contrast.spec.ts). */
   --code-keyword: oklch(0.45 0.16 300); --code-string: oklch(0.43 0.12 150); --code-comment: oklch(0.46 0.03 260); --code-number: oklch(0.47 0.13 50); --code-function: oklch(0.44 0.13 250); --code-tag: oklch(0.46 0.16 20);
   --hud-accent-hover: oklch(0.47 calc(0.1 * var(--vivid)) var(--hue)); /* a primary button under the pointer: further from its text */
+  --hud-edge-soft: oklch(0.25 calc(0.02 * var(--vivid)) var(--hue) / 0.28); /* a field's edge at rest (--hud-edge under the pointer, the ring in use) */
   --hud-edge: oklch(0.25 calc(0.02 * var(--vivid)) var(--hue) / 0.55); /* the edge of a field, where the edge is what shows it: 3:1 */
   --hud-danger: oklch(0.47 0.15 20);
   --hud-danger-fg: oklch(1 0 0);
@@ -220,6 +221,7 @@
     --hud-accent-text: oklch(0.78 calc(0.075 * var(--vivid)) var(--hue));
     --code-keyword: oklch(0.8 0.11 300); --code-string: oklch(0.82 0.12 150); --code-comment: oklch(0.72 0.03 260); --code-number: oklch(0.82 0.11 60); --code-function: oklch(0.8 0.1 240); --code-tag: oklch(0.78 0.12 15);
     --hud-accent-hover: oklch(0.83 calc(0.075 * var(--vivid)) var(--hue));
+    --hud-edge-soft: oklch(0.93 calc(0.014 * var(--vivid)) var(--hue) / 0.22);
     --hud-edge: oklch(0.93 calc(0.014 * var(--vivid)) var(--hue) / 0.45);
     --hud-danger: oklch(0.74 0.14 20);
     --hud-danger-fg: oklch(0.2 0.02 20);
@@ -266,6 +268,7 @@
   --hud-accent-text: oklch(0.78 calc(0.075 * var(--vivid)) var(--hue));
   --code-keyword: oklch(0.8 0.11 300); --code-string: oklch(0.82 0.12 150); --code-comment: oklch(0.72 0.03 260); --code-number: oklch(0.82 0.11 60); --code-function: oklch(0.8 0.1 240); --code-tag: oklch(0.78 0.12 15);
   --hud-accent-hover: oklch(0.83 calc(0.075 * var(--vivid)) var(--hue));
+  --hud-edge-soft: oklch(0.93 calc(0.014 * var(--vivid)) var(--hue) / 0.22);
   --hud-edge: oklch(0.93 calc(0.014 * var(--vivid)) var(--hue) / 0.45);
   --hud-danger: oklch(0.74 0.14 20);
   --hud-danger-fg: oklch(0.2 0.02 20);
@@ -313,7 +316,8 @@ html, body {
 /* A finger that drags a slider or a number's name must not scroll the bar or page under it: the drag is the control's (otherwise the browser takes it and cancels it) */
 /* The theme's controls, never the browser's: a select, a text field or a number field that no rule below styles (a new one, one made in code) still looks like the rest.
    :where() gives it no weight, so every rule of a panel or bar overrides it whatever its place in the file. */
-:where(select, textarea, input:not([type]), input[type="text"], input[type="number"], input[type="search"], input[type="url"], input[type="email"], input[type="date"], input[type="datetime-local"]) { font: var(--font-value); min-height: var(--field-h); box-sizing: border-box; color: var(--hud-fg); background: var(--hud-bg); border: 1px solid var(--hud-edge); border-radius: var(--r-sm); padding: var(--s-2) var(--s-4); }
+:where(select, textarea, input:not([type]), input[type="text"], input[type="number"], input[type="search"], input[type="url"], input[type="email"], input[type="date"], input[type="datetime-local"]) { font: var(--font-value); min-height: var(--field-h); box-sizing: border-box; color: var(--hud-fg); background: var(--hud-bg); border: 1px solid var(--hud-edge-soft); border-radius: var(--r-sm); padding: var(--s-2) var(--s-4); }
+:where(select, textarea, input:not([type]), input[type="text"], input[type="number"], input[type="search"], input[type="url"], input[type="email"], input[type="date"], input[type="datetime-local"]):hover:not(:disabled) { border-color: var(--hud-edge); } /* (soft at rest, its full 3:1 edge under the pointer) */
 /* ONE FIELD STYLE (ADR 0201): every field of the app looks like this one; a place sets only where it sits and how wide it is (a settings row
    or a bar of --ctl may set its height), never its fill, edge, rounding, padding or font. A number reads at the right, in figures of one
    width, with no arrows: it is changed by typing, the arrow keys, or dragging along it (scrub). (`fieldStyleProblems` in tests/e2e/harness.ts) */
