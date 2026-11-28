@@ -1682,7 +1682,6 @@ button.asset-preview { display: flex; align-items: center; justify-content: cent
 .viewer-head > .nav-pair { margin-inline: var(--s-4); }
 .viewer-crumb { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--text-sm); color: var(--hud-muted); }
 .viewer.no-bar > .viewer-head { position: absolute; inset: 0 0 auto 0; opacity: 0; transition: opacity var(--dur-fast) var(--ease-out); }
-.viewer.no-bar.is-note > .viewer-head { position: static; } /* (a note's own toolbar is at its top: the header keeps its row, faded, so shown again it never covers that toolbar) */
 .viewer.no-bar.is-near-top > .viewer-head, .viewer.no-bar > .viewer-head:focus-within { opacity: 1; }
 .viewer.no-bar > .viewer-head > .vbtn { opacity: 1; }
 .viewer-progress { position: absolute; left: 0; top: 0; height: 3px; width: 100%; background: var(--hud-accent); transform-origin: left; transform: scaleX(0); z-index: 1; }
