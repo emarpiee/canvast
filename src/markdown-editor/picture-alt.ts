@@ -15,7 +15,7 @@ const LOOK = /(?:^|\s)(rotate-(?:90|180|270)|flip-x|flip-y)(?=\s|$)/g;
 
 /** Read the part after a picture's target (an embed's text after `|`, or an image's text in `[ ]`). */
 export function readAlt(raw: string): PictureAlt {
-  const parts = raw.split("|");
+  const parts = raw.replace(/\\\|/g, "|").split("|"); // (in a table the bar is written \\|)
   const at = parts.map((p) => SIZE.test(p)).lastIndexOf(true);
   const size = at >= 0 ? SIZE.exec(parts[at]!) : null;
   const words = parts.filter((_p, i) => i !== at).join("|");

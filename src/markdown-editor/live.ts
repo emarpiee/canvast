@@ -7,7 +7,7 @@ import { StateEffect, StateField, type EditorState, type Extension, type Range }
 import { Decoration, EditorView, ViewPlugin, WidgetType, type DecorationSet, type ViewUpdate } from "@codemirror/view";
 import type { SyntaxNode } from "@lezer/common";
 import { toggleTask } from "./behaviors/task-toggle";
-import { deletePicture, duplicatePicture, flipPicture, pictureEdit, selectedPicture, setPictureEdit, setPictureWidth, turnPicture, viewPicture } from "./behaviors/picture-select";
+import { deletePicture, duplicatePicture, flipPicture, resetPicture, pictureEdit, selectedPicture, setPictureEdit, setPictureWidth, turnPicture, viewPicture } from "./behaviors/picture-select";
 import { lookTransform, readAlt } from "./picture-alt";
 import type { LightboxWords } from "./lightbox";
 import { tableField } from "./table";
@@ -46,7 +46,7 @@ export interface LiveContext {
   /** Words for a picture's resize handle and the "no language" choice. */
   resizeLabel: string;
   /** A picture's buttons that change only how it is drawn in the note (its file never): turn, flip, duplicate, take out. */
-  pictureWords: { turnLeft: string; turnRight: string; flipX: string; flipY: string; duplicate: string; remove: string };
+  pictureWords: { turnLeft: string; turnRight: string; flipX: string; flipY: string; reset: string; duplicate: string; remove: string };
   /** A picture's buttons: full size, edit its Markdown; and the full-size view's close button. */
   zoomLabel: string;
   editPictureLabel: string;
@@ -120,6 +120,27 @@ export const touches = (state: EditorState, from: number, to: number): boolean =
 
 const hide = Decoration.replace({});
 
+/**
+ * A picture's turn and flips, drawn: a quarter turn takes the room the turned picture needs (its box as wide as the picture is tall, never
+ * wider than the line), so it never lies over the words round it.
+ */
+function fitTurn(box: HTMLElement, el: HTMLElement, look: string): void {
+  const quarter = /rotate\((90|270)deg\)/.test(look);
+  el.style.transform = quarter ? `translate(-50%, -50%) ${look}` : look;
+  box.classList.toggle("is-turned", quarter);
+  if (!quarter) return void (box.style.width = box.style.height = "");
+  const nw = el instanceof HTMLImageElement ? el.naturalWidth : el instanceof HTMLVideoElement ? el.videoWidth : 0;
+  const nh = el instanceof HTMLImageElement ? el.naturalHeight : el instanceof HTMLVideoElement ? el.videoHeight : 0;
+  if (!nw || !nh) return;
+  const room = box.parentElement?.getBoundingClientRect().width ?? Infinity;
+  // (its width as drawn: the one its link sets, else its own; turned, its height is the box's width, kept inside the line)
+  let w = parseFloat(el.style.width) || nw;
+  if ((w * nh) / nw > room) w = (room * nw) / nh;
+  el.style.width = `${w}px`;
+  box.style.width = `${(w * nh) / nw}px`;
+  box.style.height = `${w}px`;
+}
+
 /** The widget each drawn picture is now (a picture kept on the page as its Markdown moves reads where it is from here). */
 const drawnAs = new WeakMap<HTMLElement, MediaWidget>();
 
@@ -140,7 +161,7 @@ class MediaWidget extends WidgetType {
     const was = drawnAs.get(dom);
     if (!was || was.link !== this.link || was.embed !== this.embed || was.width !== this.width || was.alt !== this.alt) return false;
     const media = dom.querySelector<HTMLElement>("img, video");
-    if (media) media.style.transform = this.look;
+    if (media) fitTurn(dom, media, this.look);
     drawnAs.set(dom, this);
     this.mark(dom);
     return true;
@@ -178,8 +199,9 @@ class MediaWidget extends WidgetType {
       const el = kind === "video" ? document.createElement("video") : kind === "audio" ? document.createElement("audio") : document.createElement("img");
       if (el instanceof HTMLImageElement) el.alt = name;
       if (this.width) el.style.width = `${this.width}px`;
-      if (now().look) el.style.transform = now().look;
       box.append(el);
+      if (el instanceof HTMLImageElement) el.addEventListener("load", () => fitTurn(box, el, now().look), { once: true });
+      else fitTurn(box, el, now().look);
       // (a video plays in the host's player when it has one; a picture and a video are sized by the handle at their corner)
       if (el instanceof HTMLVideoElement && this.ctx.player) {
         box.classList.add("is-video");
@@ -217,6 +239,7 @@ class MediaWidget extends WidgetType {
       button("me-media-right", this.ctx.pictureWords.turnRight, ICON('<path d="M21 12a9 9 0 1 1-3-6.7L21 8"/><path d="M21 3v5h-5"/>'), () => turnPicture(view, at(), 1)),
       button("me-media-flipx", this.ctx.pictureWords.flipX, ICON('<path d="M12 3v18M8 7l-5 5 5 5V7ZM16 7l5 5-5 5V7Z"/>'), () => flipPicture(view, at(), "x")),
       button("me-media-flipy", this.ctx.pictureWords.flipY, ICON('<path d="M3 12h18M7 8l5-5 5 5H7ZM7 16l5 5 5-5H7Z"/>'), () => flipPicture(view, at(), "y")),
+      button("me-media-reset", this.ctx.pictureWords.reset, ICON('<path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/><path d="M9 9l6 6M15 9l-6 6"/>'), () => resetPicture(view, at())),
       button("me-media-copy", this.ctx.pictureWords.duplicate, ICON('<rect x="8" y="8" width="13" height="13" rx="2"/><path d="M4 16V5a1 1 0 0 1 1-1h11"/>'), () => duplicatePicture(view, at())),
       button("me-media-delete", this.ctx.pictureWords.remove, ICON('<path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/>'), () => deletePicture(view, at())),
     );
@@ -253,8 +276,9 @@ class MediaWidget extends WidgetType {
     });
     return h;
   }
-  override ignoreEvent(): boolean {
-    return false;
+  /** A press on the picture is the editor's (it selects it); one on a control (a host's player bar, its sliders, the tools) is the control's. */
+  override ignoreEvent(e: Event): boolean {
+    return e.target instanceof Element && !!e.target.closest("input, button, select, .me-media-tools, .me-resize, [role=toolbar]");
   }
 }
 /** A picture drawn for any widget's page (a table's cells). */

@@ -42,7 +42,8 @@ export function openLightbox(pictures: readonly LightboxPicture[], index: number
   level.className = "me-lightbox-level";
   let at = index, scale = 1, fit = 1, x = 0, y = 0;
   const place = (): void => {
-    img.style.transform = `translate(${x}px, ${y}px) scale(${scale})`;
+    // (centred by its own middle, whatever its size: a grid cannot centre what is larger than the window)
+    img.style.transform = `translate(calc(-50% + ${x}px), calc(-50% + ${y}px)) scale(${scale})`;
     level.textContent = `${Math.round(scale * 100)}%`;
     img.classList.toggle("is-zoomed", scale > fit + 1e-6);
   };

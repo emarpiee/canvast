@@ -64,6 +64,9 @@ export const turnPicture = (view: EditorView, p: { from: number; to: number }, d
 /** Flip the picture across (x) or upside down (y), as it is drawn. */
 export const flipPicture = (view: EditorView, p: { from: number; to: number }, axis: "x" | "y"): void =>
   changeAlt(view, p, (a) => (axis === "x" ? { ...a, flipX: !a.flipX } : { ...a, flipY: !a.flipY }), "input.picture");
+/** The picture as its file is: no turn, no flips. */
+export const resetPicture = (view: EditorView, p: { from: number; to: number }): void =>
+  changeAlt(view, p, (a) => ({ ...a, rotate: 0, flipX: false, flipY: false }), "input.picture");
 /** A copy of the picture's link on a line under it. */
 export function duplicatePicture(view: EditorView, p: { from: number; to: number }): void {
   const src = view.state.sliceDoc(p.from, p.to);

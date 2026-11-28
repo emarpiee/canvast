@@ -1,6 +1,6 @@
 // The Markdown editor: one CodeMirror view for live and source mode, a rendered page for preview mode, a toolbar, and the hooks a host fills in
 // (pictures, links, tags, files, saving). It knows nothing of the app it is in.
-import { autocompletion, type Completion, type CompletionContext, type CompletionResult } from "@codemirror/autocomplete";
+import { autocompletion, completionStatus, type Completion, type CompletionContext, type CompletionResult } from "@codemirror/autocomplete";
 import { defaultKeymap, history, historyKeymap, indentWithTab, redo, undo } from "@codemirror/commands";
 import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
 import { syntaxTree } from "@codemirror/language";
@@ -115,7 +115,7 @@ export interface EditorLabels {
   bulletList: string; orderedList: string; taskList: string; toggleTask: string; quote: string; codeBlock: string; table: string; rule: string;
   picture: string; find: string; save: string; task: string; placeholder: string; toolbar: string; format: string; insert: string;
   turnInto: string; copyCode: string; copied: string; codeLanguage: string; addRow: string; addColumn: string;
-  heading4: string; callout: string; mathBlock: string; math: string; image: string; plainText: string; resize: string; zoomPicture: string; editPicture: string; turnLeft: string; turnRight: string; flipX: string; flipY: string; duplicatePicture: string; removePicture: string; zoomIn: string; zoomOut: string; fit: string; actualSize: string; tableActions: string;
+  heading4: string; callout: string; mathBlock: string; math: string; image: string; plainText: string; resize: string; zoomPicture: string; editPicture: string; turnLeft: string; turnRight: string; flipX: string; flipY: string; resetPicture: string; duplicatePicture: string; removePicture: string; zoomIn: string; zoomOut: string; fit: string; actualSize: string; tableActions: string;
   today: string; yesterday: string; tomorrow: string; now: string;
   rowAbove: string; rowBelow: string; colBefore: string; colAfter: string; rowUp: string; rowDown: string; colLeft: string; colRight: string;
   dupRow: string; dupCol: string; alignLeft: string; alignCenter: string; alignRight: string; sortUp: string; sortDown: string;
@@ -134,7 +134,7 @@ export const DEFAULT_LABELS: EditorLabels = {
   bulletList: "Bulleted list", orderedList: "Numbered list", taskList: "Task list", toggleTask: "Tick task", quote: "Quote", codeBlock: "Code block", table: "Table", rule: "Divider",
   picture: "Picture", find: "Find", save: "Save", task: "Done", placeholder: "Write, or press / for blocks", toolbar: "Formatting", format: "Format", insert: "Insert",
   turnInto: "Turn into", copyCode: "Copy code", copied: "Copied", codeLanguage: "Choose a language", addRow: "Add a row", addColumn: "Add a column",
-  heading4: "Heading 4", callout: "Callout", mathBlock: "Math block", math: "Math", image: "Image", plainText: "text", resize: "Drag to resize", zoomPicture: "View full size", editPicture: "Edit its Markdown", turnLeft: "Rotate left", turnRight: "Rotate right", flipX: "Flip horizontally", flipY: "Flip vertically", duplicatePicture: "Duplicate", removePicture: "Remove from the note", zoomIn: "Zoom in", zoomOut: "Zoom out", fit: "Fit to view", actualSize: "Actual size", tableActions: "Table",
+  heading4: "Heading 4", callout: "Callout", mathBlock: "Math block", math: "Math", image: "Image", plainText: "text", resize: "Drag to resize", zoomPicture: "View full size", editPicture: "Edit its Markdown", turnLeft: "Rotate left", turnRight: "Rotate right", flipX: "Flip horizontally", flipY: "Flip vertically", resetPicture: "Reset turn and flip", duplicatePicture: "Duplicate", removePicture: "Remove from the note", zoomIn: "Zoom in", zoomOut: "Zoom out", fit: "Fit to view", actualSize: "Actual size", tableActions: "Table",
   today: "Today", yesterday: "Yesterday", tomorrow: "Tomorrow", now: "Now",
   rowAbove: "Add row above", rowBelow: "Add row below", colBefore: "Add column before", colAfter: "Add column after", rowUp: "Move row up", rowDown: "Move row down",
   colLeft: "Move column left", colRight: "Move column right", dupRow: "Duplicate row", dupCol: "Duplicate column", alignLeft: "Align left", alignCenter: "Align center",
@@ -266,7 +266,7 @@ export function createMarkdownEditor(opts: EditorOptions): MarkdownEditor {
     cellEditor: (parent: HTMLElement, text: string, events: CellEvents) => cellEditor(parent, text, events),
     ...(host.renderDiagram ? { renderDiagram: host.renderDiagram.bind(host) } : {}),
     taskLabel: labels.task, copyLabel: labels.copyCode, copiedLabel: labels.copied, languageLabel: labels.codeLanguage, addRowLabel: labels.addRow, addColumnLabel: labels.addColumn,
-    tableLabel: labels.tableActions, languages: host.languages ?? LANGUAGES, resizeLabel: labels.resize, pictureWords: { turnLeft: labels.turnLeft, turnRight: labels.turnRight, flipX: labels.flipX, flipY: labels.flipY, duplicate: labels.duplicatePicture, remove: labels.removePicture }, zoomLabel: labels.zoomPicture, editPictureLabel: labels.editPicture, lightboxWords, plainLabel: labels.plainText, detectedLabel: labels.detected,
+    tableLabel: labels.tableActions, languages: host.languages ?? LANGUAGES, resizeLabel: labels.resize, pictureWords: { turnLeft: labels.turnLeft, turnRight: labels.turnRight, flipX: labels.flipX, flipY: labels.flipY, reset: labels.resetPicture, duplicate: labels.duplicatePicture, remove: labels.removePicture }, zoomLabel: labels.zoomPicture, editPictureLabel: labels.editPicture, lightboxWords, plainLabel: labels.plainText, detectedLabel: labels.detected,
     tableWords: { rowAbove: labels.rowAbove, rowBelow: labels.rowBelow, colBefore: labels.colBefore, colAfter: labels.colAfter, rowUp: labels.rowUp, rowDown: labels.rowDown, colLeft: labels.colLeft, colRight: labels.colRight, dupRow: labels.dupRow, dupCol: labels.dupCol, alignLeft: labels.alignLeft, alignCenter: labels.alignCenter, alignRight: labels.alignRight, sortUp: labels.sortUp, sortDown: labels.sortDown, delRow: labels.delRow, delCol: labels.delCol, copy: labels.copyTable, duplicate: labels.duplicateTable, toList: labels.tableToList, toNumbered: labels.tableToNumbered, toTasks: labels.tableToTasks, toLines: labels.tableToLines },
   };
   const liveExt = (): Extension => (mode === "live" ? livePreview(liveCtx) : []);
@@ -465,9 +465,10 @@ export function createMarkdownEditor(opts: EditorOptions): MarkdownEditor {
             { key: "Tab", run: () => (events.move("next"), true) },
             { key: "Shift-Tab", run: () => (events.move("prev"), true) },
             // (Enter on a list's line adds the next item, as in the note; elsewhere it goes down a row. Shift+Enter: a new line in the cell)
-            { key: "Enter", run: (v) => (CELL_LIST.test(v.state.doc.lineAt(v.state.selection.main.head).text) ? false : (events.move("down"), true)) },
+            // (with suggestions open, Enter and Escape are theirs: a [[ link chosen, or the list closed)
+            { key: "Enter", run: (v) => (completionStatus(v.state) === "active" || CELL_LIST.test(v.state.doc.lineAt(v.state.selection.main.head).text) ? false : (events.move("down"), true)) },
             { key: "Shift-Enter", run: (v) => (v.dispatch(v.state.replaceSelection("\n"), { scrollIntoView: true, userEvent: "input" }), true) },
-            { key: "Escape", run: () => (events.move("out"), true) },
+            { key: "Escape", run: (v) => (completionStatus(v.state) ? false : (events.move("out"), true)) },
             { key: "Mod-z", preventDefault: true, run: () => (undo(view), true) },
             { key: "Mod-y", preventDefault: true, run: () => (redo(view), true) },
             { key: "Mod-Shift-z", preventDefault: true, run: () => (redo(view), true) },
@@ -475,17 +476,6 @@ export function createMarkdownEditor(opts: EditorOptions): MarkdownEditor {
           ...editorSetup(true),
           mode === "live" ? livePreview({ ...liveCtx, inline: true }) : [],
           EditorView.theme({ ".cm-content": { padding: "0", maxWidth: "none" }, ".cm-scroller": { padding: "0" }, "&": { background: "transparent" } }),
-          // (a cell is in one line of a table row: a typed or pasted | is written \|; its own lines are the file's <br>)
-          EditorState.transactionFilter.of((tr) => {
-            if (!tr.docChanged || syncing) return tr;
-            let fix = false;
-            tr.changes.iterChanges((_a, _b, _c, _d, ins) => void (fix ||= /(?<!\\)\|/.test(ins.toString())));
-            if (!fix) return tr;
-            const specs: { from: number; to: number; insert: string }[] = [];
-            tr.changes.iterChanges((from, to, _c, _d, ins) => void specs.push({ from, to, insert: ins.toString().replace(/(?<!\\)\|/g, "\\|") }));
-            const changes = tr.startState.changes(specs);
-            return { changes, selection: EditorSelection.cursor(changes.mapPos(tr.startState.selection.main.head, 1)), userEvent: tr.annotation(Transaction.userEvent) ?? "input" };
-          }),
           EditorView.updateListener.of((u) => {
             if (u.docChanged && !syncing) events.change(u.state.doc.toString(), u.transactions.map((t) => t.annotation(Transaction.userEvent)).find(Boolean) ?? "input");
             if (u.focusChanged) activeCell = u.view.hasFocus ? u.view : activeCell === u.view ? null : activeCell;

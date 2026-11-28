@@ -155,3 +155,12 @@ describe("note styles", () => {
     expect(vars).not.toContain("--me-em-fg");
   });
 });
+
+describe("a table's escaped bar", () => {
+  it("is a link's or picture's bar in a cell (\\| as tables write it)", async () => {
+    const { readAlt } = await import("../../src/markdown-editor/picture-alt");
+    expect(renderMarkdown("| a |\n| --- |\n| ![[cat.png\\|120]] |\n")).toContain('<img src="cat.png" alt="cat.png" data-embed="cat.png" width="120">');
+    expect(renderMarkdown("| a |\n| --- |\n| [[Plan\\|shown]] |\n")).toContain('data-wiki="Plan">shown</a>');
+    expect(readAlt("cat\\|200")).toMatchObject({ alt: "cat", width: 200 });
+  });
+});

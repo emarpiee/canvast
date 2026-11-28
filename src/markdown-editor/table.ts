@@ -115,8 +115,9 @@ export function cellRegions(line: string): Array<[number, number]> {
 }
 
 /** A cell's text in the file and in its editor: the editor's lines are the file's `<br>`. */
-const toEditor = (raw: string): string => raw.replace(/<br\s*\/?>/gi, "\n");
-const toFile = (text: string): string => text.replace(/\r?\n/g, "<br>");
+// (and a table's escaped pipe, \\|, is a plain | in the editor: in a link, a picture's size, or as words; it goes back escaped)
+const toEditor = (raw: string): string => raw.replace(/<br\s*\/?>/gi, "\n").replace(/\\\|/g, "|");
+const toFile = (text: string): string => text.replace(/\r?\n/g, "<br>").replace(/(?<!\\)\|/g, "\\|");
 
 /**
  * One drawn table. It stays on the page while the note changes (`update`), so a cell being edited keeps its editor: the cell's editor is a

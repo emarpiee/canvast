@@ -36,10 +36,12 @@ const wiki: MarkdownConfig = {
         const end = wikiEnd(cx, open);
         if (end < 0) return -1;
         const inner = cx.slice(open, end - 2);
-        const bar = inner.indexOf("|");
+        // (in a table the bar is written \\|, so it is no column's edge: the same bar)
+        const bar = inner.search(/\\?\|/);
+        const barLen = bar >= 0 && inner[bar] === "\\" ? 2 : 1;
         const targetEnd = bar < 0 ? end - 2 : open + bar;
         const children = [cx.elt("WikiMark", pos, open), cx.elt("WikiTarget", open, targetEnd)];
-        if (bar >= 0) children.push(cx.elt("WikiMark", targetEnd, targetEnd + 1), cx.elt("WikiAlias", targetEnd + 1, end - 2));
+        if (bar >= 0) children.push(cx.elt("WikiMark", targetEnd, targetEnd + barLen), cx.elt("WikiAlias", targetEnd + barLen, end - 2));
         children.push(cx.elt("WikiMark", end - 2, end));
         return cx.addElement(cx.elt(embed ? "Embed" : "WikiLink", pos, end, children));
       },

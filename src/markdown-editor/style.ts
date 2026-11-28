@@ -122,12 +122,14 @@ export const EDITOR_CSS = `
 :where(.me-media) { position: relative; }
 :where(.me-resize) { position: absolute; right: 4px; bottom: 4px; width: 12px; height: 12px; border-right: 2px solid var(--me-bg); border-bottom: 2px solid var(--me-bg); box-shadow: 1px 1px 0 var(--me-fg); cursor: nwse-resize; opacity: 0; touch-action: none; }
 :where(.me-media:hover, .me-media.is-selected) .me-resize { opacity: 1; }
+:where(.me-media.is-turned) { display: inline-block; position: relative; }
+:where(.me-media.is-turned) > :is(img, video) { position: absolute; left: 50%; top: 50%; max-width: none; }
 :where(.me-media.is-selected) img { outline: 2px solid var(--me-accent); outline-offset: 2px; }
 :where(.me-media-tools) { position: absolute; top: 6px; right: 6px; display: flex; flex-wrap: wrap; justify-content: flex-end; max-width: calc(100% - 12px); gap: 2px; padding: 2px; border-radius: var(--me-radius); background: color-mix(in oklch, var(--me-bg) 85%, transparent); opacity: 0; transition: opacity 0.12s; }
 :where(.me-media:hover, .me-media.is-selected) .me-media-tools { opacity: 1; }
 :where(.me-media-tools) .me-btn { min-width: 24px; height: 24px; color: var(--me-fg); }
 :where(.me-lightbox) { position: fixed; inset: 0; z-index: 1001; display: grid; place-items: center; overflow: hidden; background: color-mix(in oklch, black 82%, transparent); outline: none; }
-:where(.me-lightbox) img { max-width: none; max-height: none; transform-origin: center; cursor: zoom-in; user-select: none; }
+:where(.me-lightbox) img { position: absolute; left: 50%; top: 50%; max-width: none; max-height: none; transform-origin: center; cursor: zoom-in; user-select: none; }
 :where(.me-lightbox) img.is-zoomed { cursor: grab; }
 :where(.me-lightbox-bar) { position: absolute; top: 12px; right: 12px; display: flex; align-items: center; gap: 2px; padding: 4px; border-radius: var(--me-radius); background: color-mix(in oklch, black 60%, transparent); }
 :where(.me-lightbox-bar) .me-btn { color: white; }
