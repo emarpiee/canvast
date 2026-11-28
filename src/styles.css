@@ -2518,6 +2518,7 @@ dialog.rename-dialog { width: min(var(--dlg-l), calc(100vw - 2 * var(--edge))); 
 /* Sections are cards with one heading style, the same as the panels' (Tags, Layers). */
 .asset-sec { margin: 0; padding: var(--s-6); display: grid; gap: var(--s-4); background: color-mix(in oklch, var(--hud-fg) 4%, transparent); border: 1px solid var(--hud-border); border-radius: var(--r-lg); }
 .asset-sec h3 { margin: 0; font-size: var(--text-sm); font-weight: var(--weight-semibold); color: var(--hud-muted); }
+.asset-sec h3 { display: flex; align-items: center; gap: var(--s-2); } .asset-sec h3 > button:first-of-type { margin-left: auto; } /* (a card's button, as Show the properties in the note, at the title's right end) */
 .asset-sec .asset-note { font-size: var(--text-xs); line-height: 1.45; }
 .asset-sec .tag-chips { gap: var(--s-2); }
 .asset-inspector .tag-input { flex: 1 1 100%; width: 100%; height: var(--list-h); color: inherit; }
@@ -2675,7 +2676,7 @@ dialog.rename-dialog { width: min(var(--dlg-l), calc(100vw - 2 * var(--edge))); 
 .set-card-head { display: flex; align-items: center; justify-content: space-between; gap: var(--s-6); margin-bottom: var(--s-4); } .set-card-head > h3 { margin: 0; font-size: var(--text-md); font-weight: var(--weight-semibold); color: var(--hud-muted); } /* (a card's title with its Reset all at the right) */
 .set-card > h3, .set-card > h4 { margin: 0 0 var(--s-4); font-size: var(--text-md); font-weight: var(--weight-semibold); color: var(--hud-muted); }
 /* Every card's title is in capitals, one rule for the app (settings cards, the details cards, the sidebar's sections, the tags panel, the workspace menu, the styles tabs). */
-:is(.set-card > h3, .set-card > h4, .set-card-head > h3, .asset-sec h3, .asset-note-label, .side-head h2, .side-sec-toggle h2, .tags-panel h3, .nav-ws h3, .styles-tab-head h3) { text-transform: uppercase; letter-spacing: 0.04em; }
+:is(.set-card > h3, .set-card > h4, .set-card-head > h3, .asset-sec h3, .side-head h2, .side-sec-toggle h2, .tags-panel h3, .nav-ws h3, .styles-tab-head h3) { text-transform: uppercase; letter-spacing: 0.04em; }
 .set-keys { display: grid; gap: var(--s-6); }
 .set-keys > p, .set-keys > h3 { margin: 0; }
 .set-keys h3.set-sub { font-size: var(--text-xl); margin-top: var(--s-6); }

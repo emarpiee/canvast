@@ -2,7 +2,7 @@
 
 ## 0.63.20 — Card titles in capitals (2026-11-29)
 
-- **Changed:** every card's title is in capitals, in one rule for the whole app: the Settings cards, the cards beside a file (Properties, Description, Tags, Folder, Linked from, Links, Footnotes…), the library's sidebar sections, the tags panel, the workspace menu and the styles tabs. ([The interface, settings and keys](README.md#the-interface-settings-and-keys))
+- **Changed:** every card's title is in capitals, in one rule for the whole app: the Settings cards, the cards beside a file (Properties, Tags, Folder, Linked from, Links, Footnotes…), the library's sidebar sections, the tags panel, the workspace menu and the styles tabs; Show the properties in the note sits at the right end of the Properties title. ([The interface, settings and keys](README.md#the-interface-settings-and-keys))
 
 ### For developers
 
