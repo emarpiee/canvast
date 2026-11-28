@@ -95,6 +95,9 @@ export const EDITOR_CSS = `
 :where(.me-table:hover) .me-table-add, :where(.me-table:focus-within) .me-table-add { opacity: 1; }
 :where(.me-table-add):hover { color: var(--me-fg); background: var(--me-line); }
 :where(.me-table-add-col) { grid-column: 2; grid-row: 2; }
+:where(.me-table-move) { position: absolute; left: -14px; top: 0; width: 12px; height: 12px; display: grid; place-items: center; border-radius: 4px; background: var(--me-code-bg); color: var(--me-faint); cursor: grab; opacity: 0; transition: opacity 0.12s; touch-action: none; z-index: 1; }
+:where(.me-table:hover) .me-table-move { opacity: 1; }
+:where(.me-table-drop) { position: fixed; z-index: 1000; height: 2px; border-radius: 1px; background: var(--me-accent); pointer-events: none; }
 :where(.me-table-grip) { position: absolute; left: -14px; width: 12px; display: grid; place-items: center; border-radius: 4px; background: var(--me-code-bg); color: var(--me-faint); cursor: grab; opacity: 0; transition: opacity 0.12s; touch-action: none; }
 :where(.me-table:hover) .me-table-grip { opacity: 1; }
 :where(.me-table-grip[hidden]) { display: none; }
@@ -122,8 +125,6 @@ export const EDITOR_CSS = `
 :where(.me-media) { position: relative; }
 :where(.me-resize) { position: absolute; right: 4px; bottom: 4px; width: 12px; height: 12px; border-right: 2px solid var(--me-bg); border-bottom: 2px solid var(--me-bg); box-shadow: 1px 1px 0 var(--me-fg); cursor: nwse-resize; opacity: 0; touch-action: none; }
 :where(.me-media:hover, .me-media.is-selected) .me-resize { opacity: 1; }
-:where(.me-media.is-turned) { display: inline-block; position: relative; }
-:where(.me-media.is-turned) > :is(img, video) { position: absolute; left: 50%; top: 50%; max-width: none; }
 :where(.me-media.is-selected) img { outline: 2px solid var(--me-accent); outline-offset: 2px; }
 :where(.me-media-tools) { position: absolute; top: 6px; right: 6px; display: flex; flex-wrap: wrap; justify-content: flex-end; max-width: calc(100% - 12px); gap: 2px; padding: 2px; border-radius: var(--me-radius); background: color-mix(in oklch, var(--me-bg) 85%, transparent); opacity: 0; transition: opacity 0.12s; }
 :where(.me-media:hover, .me-media.is-selected) .me-media-tools { opacity: 1; }

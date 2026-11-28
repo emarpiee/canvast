@@ -466,6 +466,59 @@ class TableView {
     });
   }
 
+  /**
+   * A grip at the table's top-left corner: dragged, the whole table goes where it is let go in the note (a line shows where). Let go inside
+   * a sentence or a paragraph, it splits it: the table stands on lines of its own, blank lines round it, so it stays a table.
+   */
+  private mover(): HTMLElement {
+    const handle = document.createElement("span");
+    handle.className = "me-table-move";
+    handle.title = this.ctx.moveTableLabel;
+    handle.setAttribute("aria-label", this.ctx.moveTableLabel);
+    handle.innerHTML = '<svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor"><circle cx="3" cy="3" r="1.1"/><circle cx="9" cy="3" r="1.1"/><circle cx="3" cy="9" r="1.1"/><circle cx="9" cy="9" r="1.1"/><circle cx="6" cy="6" r="1.1"/></svg>';
+    handle.addEventListener("pointerdown", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      this.stopEditing();
+      handle.setPointerCapture(e.pointerId);
+      const view = this.view;
+      const line = document.createElement("div");
+      line.className = "me-table-drop";
+      line.style.background = getComputedStyle(view.dom).getPropertyValue("--me-accent"); // (on the page's top, outside the editor's tokens)
+      document.body.append(line);
+      let at: number | null = null;
+      const end = (): number => this.from + this.source.length;
+      const move = (ev: PointerEvent): void => {
+        const pos = view.posAtCoords({ x: ev.clientX, y: ev.clientY });
+        // (not on the table itself, nor right at its edges: nowhere it would move)
+        at = pos === null || (pos >= this.from - 1 && pos <= end() + 1) ? null : pos;
+        line.hidden = at === null;
+        if (at === null) return;
+        const c = view.coordsAtPos(at) ?? view.coordsAtPos(view.state.doc.lineAt(at).from);
+        const content = view.contentDOM.getBoundingClientRect();
+        if (!c) return void (line.hidden = true);
+        Object.assign(line.style, { left: `${content.left}px`, width: `${content.width}px`, top: `${c.top - 2}px` });
+      };
+      handle.addEventListener("pointermove", move);
+      handle.addEventListener("pointerup", () => {
+        handle.removeEventListener("pointermove", move);
+        line.remove();
+        if (at === null) return;
+        const doc = view.state.doc;
+        const from = this.from, to = Math.min(doc.length, end() + (doc.sliceString(end(), end() + 1) === "\n" ? 1 : 0));
+        const table = doc.sliceString(this.from, end());
+        const before = doc.sliceString(Math.max(0, at - 2), at), after = doc.sliceString(at, at + 2);
+        const lead = at === 0 ? "" : before.endsWith("\n\n") ? "" : before.endsWith("\n") ? "\n" : "\n\n";
+        const trail = at === doc.length ? "\n" : after.startsWith("\n\n") ? "" : after.startsWith("\n") ? "\n" : "\n\n";
+        const insert = `${lead}${table}${trail}`;
+        const changes = view.state.changes([{ from, to }, { from: at, insert }]);
+        view.dispatch({ changes, selection: { anchor: changes.mapPos(at, 1) }, scrollIntoView: true, userEvent: "move.table" });
+        view.focus();
+      }, { once: true });
+    });
+    return handle;
+  }
+
   /** The table's shape: what makes it be drawn again whole (its size, alignments and widths). */
   private shapeOf(): string {
     return `${this.model.head.length}×${this.model.rows.length}|${this.model.aligns.join()}|${this.model.widths.join()}`;
@@ -711,7 +764,7 @@ class TableView {
         commit({ row: 0, col: to });
       }, { once: true });
     });
-    box.append(grip, colGrip, scroll, addCol, addRow);
+    box.append(grip, colGrip, scroll, addCol, addRow, this.mover());
     this.dom.append(box);
   }
 }

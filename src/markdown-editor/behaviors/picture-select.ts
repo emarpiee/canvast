@@ -58,15 +58,6 @@ function changeAlt(view: EditorView, p: { from: number; to: number }, change: (a
 export function setPictureWidth(view: EditorView, p: { from: number; to: number }, width: number | null): void {
   changeAlt(view, p, (a) => ({ ...a, width: width === null ? null : Math.max(32, Math.round(width)), height: null }), "input.resize");
 }
-/** Turn the picture a quarter left (-1) or right (1), as it is drawn (its file unchanged). */
-export const turnPicture = (view: EditorView, p: { from: number; to: number }, dir: 1 | -1): void =>
-  changeAlt(view, p, (a) => ({ ...a, rotate: (((a.rotate + dir * 90) % 360) + 360) % 360 as PictureAlt["rotate"] }), "input.picture");
-/** Flip the picture across (x) or upside down (y), as it is drawn. */
-export const flipPicture = (view: EditorView, p: { from: number; to: number }, axis: "x" | "y"): void =>
-  changeAlt(view, p, (a) => (axis === "x" ? { ...a, flipX: !a.flipX } : { ...a, flipY: !a.flipY }), "input.picture");
-/** The picture as its file is: no turn, no flips. */
-export const resetPicture = (view: EditorView, p: { from: number; to: number }): void =>
-  changeAlt(view, p, (a) => ({ ...a, rotate: 0, flipX: false, flipY: false }), "input.picture");
 /** A copy of the picture's link on a line under it. */
 export function duplicatePicture(view: EditorView, p: { from: number; to: number }): void {
   const src = view.state.sliceDoc(p.from, p.to);
