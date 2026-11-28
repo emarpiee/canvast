@@ -246,8 +246,14 @@ test("a table cell is the note's own words: one selection, the note's keys, its 
   // (the menu's groups, and Delete table last, in red)
   await expect(p.locator(".pop-menu:not(.is-child) [role=menuitem]").last()).toHaveText(/Delete table/);
   await expect(p.locator('.pop-menu [data-id="note.table.delete"]')).toHaveClass(/is-danger/);
-  await p.locator(".pop-menu [data-sub]", { hasText: "Align" }).click();
-  await p.locator(".pop-menu [role=menuitem]", { hasText: "Align right" }).click();
+  // (a group opens beside the menu when the pointer rests on its row, and stays open on the way to it)
+  await p.locator(".pop-menu [data-sub]", { hasText: "Align" }).hover();
+  const sub = p.locator(".pop-menu.is-sub");
+  await expect(sub).toBeVisible();
+  const [mb, sb] = [(await p.locator(".pop-menu:not(.is-child)").boundingBox())!, (await sub.boundingBox())!];
+  expect(sb.x >= mb.x + mb.width - 1 || sb.x + sb.width <= mb.x + 1, "beside the menu, not over its rows").toBe(true);
+  await sub.locator("[role=menuitem]", { hasText: "Align right" }).hover();
+  await sub.locator("[role=menuitem]", { hasText: "Align right" }).click();
   await expect(page(p).locator(".me-table td").nth(1)).toHaveCSS("text-align", "right");
   // Turn into from the table's menu: a line per row.
   await cell(0).click({ button: "right" });

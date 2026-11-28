@@ -236,7 +236,15 @@ export function openMoreMenu(anchor: HTMLElement, items: readonly MenuItem[], la
       pick.run();
     });
     popHost().appendChild(sub);
-    placeMenu(sub, from);
+    // (beside the menu, level with its row, as submenus stand: to the right, or to the left when the window has no room there; never over
+    // the menu's own rows, which the pointer crosses on its way to it)
+    const m = menu.getBoundingClientRect(), r = from.getBoundingClientRect(), w = sub.offsetWidth, h = sub.offsetHeight;
+    const vw = document.documentElement.clientWidth, vh = document.documentElement.clientHeight, gap = 4;
+    const left = m.right + gap + w <= vw - gap ? m.right + gap : Math.max(gap, m.left - gap - w);
+    const top = Math.max(gap, Math.min(r.top - 4, vh - gap - h));
+    Object.assign(sub.style, { position: "fixed", left: `${left}px`, top: `${top}px` });
+    // view-state: (the pointer reaching the group keeps it open)
+    sub.addEventListener("pointerenter", () => window.clearTimeout(hover));
     from.setAttribute("aria-expanded", "true");
     child = { menu: sub, from };
   };
@@ -250,7 +258,7 @@ export function openMoreMenu(anchor: HTMLElement, items: readonly MenuItem[], la
       const it = current[Number(row.dataset["i"])];
       if (it?.sub && !row.hasAttribute("disabled")) openSub(row, it.sub, it.label);
       else if (child && !child.from.closest("[data-more-i]")) closeChild();
-    }, 160);
+    }, child ? 350 : 160); // (with a group open, a row crossed on the way to it does not close it at once)
   });
   // view-state: (→ on a group's row opens it, its first row focused)
   menu.addEventListener("keydown", (e) => {
