@@ -1,6 +1,7 @@
 // Markdown as HTML, from the same parse tree the editor marks. It needs no DOM (it runs in Node too) and writes only what it was given: raw HTML
 // in the Markdown is escaped unless `html` is on, and then the caller must clean what it shows (the editor's preview does: `cleanHtml`).
 import type { SyntaxNode } from "@lezer/common";
+import { lookTransform, readAlt, type PictureAlt } from "./picture-alt";
 import { parser } from "./syntax";
 
 export interface RenderOptions {
@@ -47,6 +48,12 @@ const MARKS = new Set(["EmphasisMark", "CodeMark", "LinkMark", "HeaderMark", "Qu
  */
 /** The comment after a table that keeps its column widths: `<!-- table-cols: 120,auto,80 -->`. */
 export const WIDTHS_LINE = /^<!--\s*table-cols:\s*([\d\s,auto]+?)\s*-->\s*$/;
+
+/** A picture's size and its turn or flips, as attributes. */
+const pictureAttrs = (a: PictureAlt): string => {
+  const look = lookTransform(a);
+  return `${a.width ? ` width="${a.width}"` : ""}${a.height ? ` height="${a.height}"` : ""}${look ? ` style="transform:${look}"` : ""}`;
+};
 
 export function cellHtml(raw: string, opts: RenderOptions = {}): string | null {
   const lines = raw.split(/<br\s*\/?>/i);
@@ -124,10 +131,8 @@ export function renderMarkdown(md: string, opts: RenderOptions = {}): string {
       case "Embed": {
         const target = child(n, "WikiTarget").trim();
         const alias = child(n, "WikiAlias");
-        const size = alias && /^\d+(x\d+)?$/.test(alias.trim()) ? alias.trim().split("x") : null;
-        const alt = size ? target.split("/").pop()! : (alias ?? target.split("/").pop()!);
-        const dims = size ? ` width="${size[0]}"${size[1] ? ` height="${size[1]}"` : ""}` : "";
-        return `<img src="${escapeHtml(embedSrc(target))}" alt="${escapeHtml(alt)}" data-embed="${escapeHtml(target)}"${dims}>`;
+        const a = readAlt(alias ?? "");
+        return `<img src="${escapeHtml(embedSrc(target))}" alt="${escapeHtml(a.alt || target.split("/").pop()!)}" data-embed="${escapeHtml(target)}"${pictureAttrs(a)}>`;
       }
       case "InlineMath":
         return `<span class="math" data-tex="${escapeHtml(text(n.from + 1, n.to - 1))}">${escapeHtml(text(n.from, n.to))}</span>`;
@@ -165,10 +170,9 @@ export function renderMarkdown(md: string, opts: RenderOptions = {}): string {
     if (!url && !href) return escapeHtml(text(n.from, n.to)); // (a reference never defined: words as written)
     const t = title ? ` title="${escapeHtml(text(title.from + 1, title.to - 1))}"` : "";
     if (n.name === "Image") {
-      const alt = close ? text(marks[0]!.to, close.from) : "";
-      const size = /^(.*?)\|(\d+)(?:x(\d+))?$/.exec(alt); // (`![cat|200](cat.png)`: a width, as notes apps write it)
-      const dims = size ? ` width="${size[2]}"${size[3] ? ` height="${size[3]}"` : ""}` : "";
-      return `<img src="${escapeHtml(safeUrl(href))}" alt="${escapeHtml(size ? size[1]! : alt)}"${t}${dims}>`;
+      // (`![cat|200](cat.png)`: a width, as notes apps write it; turns and flips in its alt text: picture-alt.ts)
+      const a = readAlt(close ? text(marks[0]!.to, close.from) : "");
+      return `<img src="${escapeHtml(safeUrl(href))}" alt="${escapeHtml(a.alt)}"${t}${pictureAttrs(a)}>`;
     }
     return `<a href="${escapeHtml(safeUrl(href))}"${t}>${words}</a>`;
   };

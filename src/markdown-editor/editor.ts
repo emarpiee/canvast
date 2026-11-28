@@ -115,7 +115,7 @@ export interface EditorLabels {
   bulletList: string; orderedList: string; taskList: string; toggleTask: string; quote: string; codeBlock: string; table: string; rule: string;
   picture: string; find: string; save: string; task: string; placeholder: string; toolbar: string; format: string; insert: string;
   turnInto: string; copyCode: string; copied: string; codeLanguage: string; addRow: string; addColumn: string;
-  heading4: string; callout: string; mathBlock: string; math: string; image: string; plainText: string; resize: string; zoomPicture: string; editPicture: string; tableActions: string;
+  heading4: string; callout: string; mathBlock: string; math: string; image: string; plainText: string; resize: string; zoomPicture: string; editPicture: string; turnLeft: string; turnRight: string; flipX: string; flipY: string; duplicatePicture: string; removePicture: string; zoomIn: string; zoomOut: string; fit: string; actualSize: string; tableActions: string;
   today: string; yesterday: string; tomorrow: string; now: string;
   rowAbove: string; rowBelow: string; colBefore: string; colAfter: string; rowUp: string; rowDown: string; colLeft: string; colRight: string;
   dupRow: string; dupCol: string; alignLeft: string; alignCenter: string; alignRight: string; sortUp: string; sortDown: string;
@@ -134,7 +134,7 @@ export const DEFAULT_LABELS: EditorLabels = {
   bulletList: "Bulleted list", orderedList: "Numbered list", taskList: "Task list", toggleTask: "Tick task", quote: "Quote", codeBlock: "Code block", table: "Table", rule: "Divider",
   picture: "Picture", find: "Find", save: "Save", task: "Done", placeholder: "Write, or press / for blocks", toolbar: "Formatting", format: "Format", insert: "Insert",
   turnInto: "Turn into", copyCode: "Copy code", copied: "Copied", codeLanguage: "Choose a language", addRow: "Add a row", addColumn: "Add a column",
-  heading4: "Heading 4", callout: "Callout", mathBlock: "Math block", math: "Math", image: "Image", plainText: "text", resize: "Drag to resize", zoomPicture: "View full size", editPicture: "Edit its Markdown", tableActions: "Table",
+  heading4: "Heading 4", callout: "Callout", mathBlock: "Math block", math: "Math", image: "Image", plainText: "text", resize: "Drag to resize", zoomPicture: "View full size", editPicture: "Edit its Markdown", turnLeft: "Rotate left", turnRight: "Rotate right", flipX: "Flip horizontally", flipY: "Flip vertically", duplicatePicture: "Duplicate", removePicture: "Remove from the note", zoomIn: "Zoom in", zoomOut: "Zoom out", fit: "Fit to view", actualSize: "Actual size", tableActions: "Table",
   today: "Today", yesterday: "Yesterday", tomorrow: "Tomorrow", now: "Now",
   rowAbove: "Add row above", rowBelow: "Add row below", colBefore: "Add column before", colAfter: "Add column after", rowUp: "Move row up", rowDown: "Move row down",
   colLeft: "Move column left", colRight: "Move column right", dupRow: "Duplicate row", dupCol: "Duplicate column", alignLeft: "Align left", alignCenter: "Align center",
@@ -252,6 +252,7 @@ export function createMarkdownEditor(opts: EditorOptions): MarkdownEditor {
   opts.parent.append(el);
 
   const liveLayer = new Compartment();
+  const lightboxWords = { close: labels.close, zoomIn: labels.zoomIn, zoomOut: labels.zoomOut, fit: labels.fit, actualSize: labels.actualSize };
   /** What live mode draws with (the note's and its tables' cells alike). */
   const liveCtx: LiveContext = {
     ...(host.media ? { media: host.media.bind(host) } : {}),
@@ -262,7 +263,7 @@ export function createMarkdownEditor(opts: EditorOptions): MarkdownEditor {
     cellEditor: (parent: HTMLElement, text: string, events: CellEvents) => cellEditor(parent, text, events),
     ...(host.renderDiagram ? { renderDiagram: host.renderDiagram.bind(host) } : {}),
     taskLabel: labels.task, copyLabel: labels.copyCode, copiedLabel: labels.copied, languageLabel: labels.codeLanguage, addRowLabel: labels.addRow, addColumnLabel: labels.addColumn,
-    tableLabel: labels.tableActions, languages: host.languages ?? LANGUAGES, resizeLabel: labels.resize, zoomLabel: labels.zoomPicture, editPictureLabel: labels.editPicture, closeLabel: labels.close, plainLabel: labels.plainText, detectedLabel: labels.detected,
+    tableLabel: labels.tableActions, languages: host.languages ?? LANGUAGES, resizeLabel: labels.resize, pictureWords: { turnLeft: labels.turnLeft, turnRight: labels.turnRight, flipX: labels.flipX, flipY: labels.flipY, duplicate: labels.duplicatePicture, remove: labels.removePicture }, zoomLabel: labels.zoomPicture, editPictureLabel: labels.editPicture, lightboxWords, plainLabel: labels.plainText, detectedLabel: labels.detected,
     tableWords: { rowAbove: labels.rowAbove, rowBelow: labels.rowBelow, colBefore: labels.colBefore, colAfter: labels.colAfter, rowUp: labels.rowUp, rowDown: labels.rowDown, colLeft: labels.colLeft, colRight: labels.colRight, dupRow: labels.dupRow, dupCol: labels.dupCol, alignLeft: labels.alignLeft, alignCenter: labels.alignCenter, alignRight: labels.alignRight, sortUp: labels.sortUp, sortDown: labels.sortDown, delRow: labels.delRow, delCol: labels.delCol, copy: labels.copyTable, duplicate: labels.duplicateTable, toList: labels.tableToList, toNumbered: labels.tableToNumbered, toTasks: labels.tableToTasks, toLines: labels.tableToLines },
   };
   const liveExt = (): Extension => (mode === "live" ? livePreview(liveCtx) : []);
@@ -411,7 +412,7 @@ export function createMarkdownEditor(opts: EditorOptions): MarkdownEditor {
       out.push(markdown({ base: markdownLanguage, extensions: EXTENSIONS, addKeymap: !cell }), markdownLook, selectionBar({ icons, labels: labels as unknown as Record<string, string>, ...(cell ? { turnInto: CELL_BLOCKS } : {}) }), autocompletion({ override: [complete], icons: false, activateOnTyping: true }));
       if (host.codeSpans) out.push(codeColours(host.codeSpans));
       // (pictures: in a table cell's editor too, so a picture in a cell is selected, sized and opened as in the note)
-      if (on("picture-select")) out.push(pictureSelect(labels.close, () => mode === "live"));
+      if (on("picture-select")) out.push(pictureSelect(lightboxWords, () => mode === "live"));
     }
     return out;
   };

@@ -77,7 +77,20 @@ test("a markdown note opens in live mode with its library links, saves exactly w
   await expect.poll(() => text(p)).toBe(MD);
   await p.keyboard.press(" ");
   await expect(p.locator(".me-lightbox img")).toBeVisible();
+  const level = p.locator(".me-lightbox-level");
+  const fitted = await level.textContent();
+  await p.locator(".me-lightbox-in").click();
+  await expect(level).not.toHaveText(fitted!);
+  await p.locator(".me-lightbox-fit").click();
+  await expect(level).toHaveText(fitted!);
   await p.keyboard.press("Escape");
+  // Turned from its buttons, as it is drawn: the file unchanged, the turn written in its link.
+  await pic.hover();
+  await pic.locator(".me-media-right").click();
+  await expect.poll(() => text(p)).toContain("rotate-90");
+  await expect(pic.locator("img")).toHaveCSS("transform", /matrix/);
+  await p.keyboard.press("Control+z");
+  await expect.poll(() => text(p)).toBe(MD);
   await expect(p.locator(".me-lightbox")).toHaveCount(0);
   await p.keyboard.press("Enter");
   await expect(page(p).locator(".cm-line", { hasText: "cat.png" }).first()).toContainText("![");

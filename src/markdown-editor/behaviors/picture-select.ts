@@ -4,7 +4,8 @@
 import { syntaxTree } from "@codemirror/language";
 import { Prec, StateEffect, StateField, type EditorState, type Extension } from "@codemirror/state";
 import { EditorView } from "@codemirror/view";
-import { openLightbox } from "../lightbox";
+import { openLightbox, type LightboxWords } from "../lightbox";
+import { withAlt, type PictureAlt } from "../picture-alt";
 
 export interface PictureRange {
   from: number;
@@ -46,30 +47,47 @@ export const selectPicture = (view: EditorView, p: { from: number; to: number })
   view.focus();
 };
 
-/** The picture's width written into its Markdown (`![alt|300](…)`, `![[cat.png|300]]`), or taken off with null. */
-export function setPictureWidth(view: EditorView, p: PictureRange, width: number | null): void {
+/** The picture's link with its alt part changed (picture-alt.ts), the picture still selected. */
+function changeAlt(view: EditorView, p: { from: number; to: number }, change: (a: PictureAlt) => PictureAlt, userEvent: string): void {
   const src = view.state.sliceDoc(p.from, p.to);
-  const w = width === null ? "" : `|${Math.max(32, Math.round(width))}`;
-  const next = p.embed ? src.replace(/^!\[\[([^\]|]+)(?:\|\d+(?:x\d+)?)?(\|[^\]]*)?\]\]$/, (_m, t: string, rest = "") => `![[${t}${w}${rest}]]`) : src.replace(/^!\[([^\]]*?)(?:\|\d+(?:x\d+)?)?\]/, `![$1${w}]`);
-  if (next === src) return;
-  view.dispatch({ changes: { from: p.from, to: p.to, insert: next }, selection: { anchor: p.from, head: p.from + next.length }, userEvent: "input.resize" });
+  const next = withAlt(src, change);
+  if (next === null || next === src) return;
+  view.dispatch({ changes: { from: p.from, to: p.to, insert: next }, selection: { anchor: p.from, head: p.from + next.length }, userEvent });
 }
+/** The picture's width written into its Markdown (`![alt|300](…)`, `![[cat.png|300]]`), or taken off with null. */
+export function setPictureWidth(view: EditorView, p: { from: number; to: number }, width: number | null): void {
+  changeAlt(view, p, (a) => ({ ...a, width: width === null ? null : Math.max(32, Math.round(width)), height: null }), "input.resize");
+}
+/** Turn the picture a quarter left (-1) or right (1), as it is drawn (its file unchanged). */
+export const turnPicture = (view: EditorView, p: { from: number; to: number }, dir: 1 | -1): void =>
+  changeAlt(view, p, (a) => ({ ...a, rotate: (((a.rotate + dir * 90) % 360) + 360) % 360 as PictureAlt["rotate"] }), "input.picture");
+/** Flip the picture across (x) or upside down (y), as it is drawn. */
+export const flipPicture = (view: EditorView, p: { from: number; to: number }, axis: "x" | "y"): void =>
+  changeAlt(view, p, (a) => (axis === "x" ? { ...a, flipX: !a.flipX } : { ...a, flipY: !a.flipY }), "input.picture");
+/** A copy of the picture's link on a line under it. */
+export function duplicatePicture(view: EditorView, p: { from: number; to: number }): void {
+  const src = view.state.sliceDoc(p.from, p.to);
+  view.dispatch({ changes: { from: p.to, insert: `\n${src}` }, selection: { anchor: p.to + 1, head: p.to + 1 + src.length }, userEvent: "input.picture" });
+}
+/** The picture's link taken out of the note (its file stays in the library). */
+export const deletePicture = (view: EditorView, p: { from: number; to: number }): void =>
+  view.dispatch({ changes: { from: p.from, to: p.to }, selection: { anchor: p.from }, userEvent: "delete.picture" });
 
 /** The note's pictures as drawn, for the full-size view's arrows (`shortcut: only the pictures drawn now, in and near the view; read the
  *  document's pictures if notes with many far-apart pictures need them all`). */
 const drawnPictures = (view: EditorView): HTMLImageElement[] => [...view.contentDOM.querySelectorAll<HTMLImageElement>(".me-media img")];
 
 /** Open the picture at `from` full size. */
-export function viewPicture(view: EditorView, from: number, closeLabel: string): boolean {
+export function viewPicture(view: EditorView, from: number, words: LightboxWords): boolean {
   const all = drawnPictures(view);
   const i = all.findIndex((img) => img.closest<HTMLElement>(".me-media")?.dataset["from"] === String(from));
   if (i < 0) return false;
-  openLightbox(all.map((img) => ({ src: img.src, alt: img.alt })), i, closeLabel);
+  openLightbox(all.map((img) => ({ src: img.src, alt: img.alt })), i, words);
   return true;
 }
 
 /** The behaviour (live mode only). */
-export const pictureSelect = (closeLabel: string, live: () => boolean): Extension => [
+export const pictureSelect = (words: LightboxWords, live: () => boolean): Extension => [
   pictureEdit,
   Prec.high(
     EditorView.domEventHandlers({
@@ -94,7 +112,7 @@ export const pictureSelect = (closeLabel: string, live: () => boolean): Extensio
           case "+": case "=": step(1.1); break;
           case "-": case "_": step(1 / 1.1); break;
           case "0": setPictureWidth(view, p, null); break;
-          case " ": viewPicture(view, p.from, closeLabel); break;
+          case " ": viewPicture(view, p.from, words); break;
           case "ArrowRight": case "ArrowDown": view.dispatch({ selection: { anchor: p.to } }); break;
           case "ArrowLeft": case "ArrowUp": view.dispatch({ selection: { anchor: p.from } }); break;
           case "Escape": view.dispatch({ selection: { anchor: p.to } }); break;

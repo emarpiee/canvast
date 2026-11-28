@@ -7,7 +7,9 @@ import { StateEffect, StateField, type EditorState, type Extension, type Range }
 import { Decoration, EditorView, ViewPlugin, WidgetType, type DecorationSet, type ViewUpdate } from "@codemirror/view";
 import type { SyntaxNode } from "@lezer/common";
 import { toggleTask } from "./behaviors/task-toggle";
-import { pictureEdit, selectedPicture, setPictureEdit, setPictureWidth, viewPicture } from "./behaviors/picture-select";
+import { deletePicture, duplicatePicture, flipPicture, pictureEdit, selectedPicture, setPictureEdit, setPictureWidth, turnPicture, viewPicture } from "./behaviors/picture-select";
+import { lookTransform, readAlt } from "./picture-alt";
+import type { LightboxWords } from "./lightbox";
 import { tableField } from "./table";
 import { openPopover } from "./popover";
 import { guessLanguage } from "./detect";
@@ -43,10 +45,12 @@ export interface LiveContext {
   exists?: (target: string) => boolean | undefined;
   /** Words for a picture's resize handle and the "no language" choice. */
   resizeLabel: string;
+  /** A picture's buttons that change only how it is drawn in the note (its file never): turn, flip, duplicate, take out. */
+  pictureWords: { turnLeft: string; turnRight: string; flipX: string; flipY: string; duplicate: string; remove: string };
   /** A picture's buttons: full size, edit its Markdown; and the full-size view's close button. */
   zoomLabel: string;
   editPictureLabel: string;
-  closeLabel: string;
+  lightboxWords: LightboxWords;
   plainLabel: string;
   detectedLabel: string;
 }
@@ -125,16 +129,18 @@ const drawnAs = new WeakMap<HTMLElement, MediaWidget>();
  * corner sets its width (behaviors/picture-select.ts has its keys).
  */
 class MediaWidget extends WidgetType {
-  constructor(readonly link: string, readonly alt: string, readonly embed: boolean, readonly width: number | null, readonly ctx: LiveContext, readonly at?: { from: number; to: number }, readonly selected = false) {
+  constructor(readonly link: string, readonly alt: string, readonly embed: boolean, readonly width: number | null, readonly ctx: LiveContext, readonly at?: { from: number; to: number }, readonly selected = false, readonly look = "") {
     super();
   }
   override eq(o: MediaWidget): boolean {
-    return o.link === this.link && o.alt === this.alt && o.embed === this.embed && o.width === this.width && o.at?.from === this.at?.from && o.at?.to === this.at?.to && o.selected === this.selected;
+    return o.link === this.link && o.alt === this.alt && o.embed === this.embed && o.width === this.width && o.at?.from === this.at?.from && o.at?.to === this.at?.to && o.selected === this.selected && o.look === this.look;
   }
   /** The same picture moved or (de)selected: kept as it is drawn, not loaded again. */
   override updateDOM(dom: HTMLElement): boolean {
     const was = drawnAs.get(dom);
     if (!was || was.link !== this.link || was.embed !== this.embed || was.width !== this.width || was.alt !== this.alt) return false;
+    const media = dom.querySelector<HTMLElement>("img, video");
+    if (media) media.style.transform = this.look;
     drawnAs.set(dom, this);
     this.mark(dom);
     return true;
@@ -172,6 +178,7 @@ class MediaWidget extends WidgetType {
       const el = kind === "video" ? document.createElement("video") : kind === "audio" ? document.createElement("audio") : document.createElement("img");
       if (el instanceof HTMLImageElement) el.alt = name;
       if (this.width) el.style.width = `${this.width}px`;
+      if (now().look) el.style.transform = now().look;
       box.append(el);
       // (a video plays in the host's player when it has one; a picture and a video are sized by the handle at their corner)
       if (el instanceof HTMLVideoElement && this.ctx.player) {
@@ -202,8 +209,19 @@ class MediaWidget extends WidgetType {
       b.addEventListener("click", (e) => (e.stopPropagation(), run()));
       return b;
     };
+    const at = (): { from: number; to: number } => now().at!;
+    const ICON = (d: string): string => `<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${d}</svg>`;
+    // (what a picture can have done to it without its file changing: turned, flipped, copied, taken out of the note)
     bar.append(
-      button("me-media-zoom", this.ctx.zoomLabel, '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4M11 8v6M8 11h6"/></svg>', () => void viewPicture(view, now().at!.from, this.ctx.closeLabel)),
+      button("me-media-left", this.ctx.pictureWords.turnLeft, ICON('<path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/>'), () => turnPicture(view, at(), -1)),
+      button("me-media-right", this.ctx.pictureWords.turnRight, ICON('<path d="M21 12a9 9 0 1 1-3-6.7L21 8"/><path d="M21 3v5h-5"/>'), () => turnPicture(view, at(), 1)),
+      button("me-media-flipx", this.ctx.pictureWords.flipX, ICON('<path d="M12 3v18M8 7l-5 5 5 5V7ZM16 7l5 5-5 5V7Z"/>'), () => flipPicture(view, at(), "x")),
+      button("me-media-flipy", this.ctx.pictureWords.flipY, ICON('<path d="M3 12h18M7 8l5-5 5 5H7ZM7 16l5 5 5-5H7Z"/>'), () => flipPicture(view, at(), "y")),
+      button("me-media-copy", this.ctx.pictureWords.duplicate, ICON('<rect x="8" y="8" width="13" height="13" rx="2"/><path d="M4 16V5a1 1 0 0 1 1-1h11"/>'), () => duplicatePicture(view, at())),
+      button("me-media-delete", this.ctx.pictureWords.remove, ICON('<path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/>'), () => deletePicture(view, at())),
+    );
+    bar.append(
+      button("me-media-zoom", this.ctx.zoomLabel, '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4M11 8v6M8 11h6"/></svg>', () => void viewPicture(view, now().at!.from, this.ctx.lightboxWords)),
       button("me-media-edit", this.ctx.editPictureLabel, '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m8 7-5 5 5 5M16 7l5 5-5 5M14 4l-4 16"/></svg>', () => {
         const at = now().at!;
         view.dispatch({ effects: setPictureEdit.of(at.from), selection: { anchor: at.to } });
@@ -230,8 +248,7 @@ class MediaWidget extends WidgetType {
       h.addEventListener("pointermove", move);
       h.addEventListener("pointerup", () => {
         h.removeEventListener("pointermove", move);
-        const me = now();
-        setPictureWidth(view, { ...me.at!, embed: me.embed }, w);
+        setPictureWidth(view, now().at!, w);
       }, { once: true });
     });
     return h;
@@ -584,18 +601,16 @@ function decorations(view: EditorView, ctx: LiveContext): DecorationSet {
             const url = n.getChild("URL");
             const close = marks.find((m) => text(m) === "]");
             if (!url || !close) return false;
-            const alt = state.sliceDoc(marks[0]!.to, close.from);
-            const size = /^(.*?)\|(\d+)(?:x\d+)?$/.exec(alt);
-            media(n, (sel) => new MediaWidget(text(url).replace(/^<|>$/g, ""), size ? size[1]! : alt, false, size ? Number(size[2]) : null, ctx, { from: n.from, to: n.to }, sel));
+            const a = readAlt(state.sliceDoc(marks[0]!.to, close.from));
+            media(n, (sel) => new MediaWidget(text(url).replace(/^<|>$/g, ""), a.alt, false, a.width, ctx, { from: n.from, to: n.to }, sel, lookTransform(a)));
             return false;
           }
           case "Embed": {
             const target = n.getChild("WikiTarget");
             if (!target) return false;
             const alias = n.getChild("WikiAlias");
-            const a = alias ? text(alias).trim() : "";
-            const size = /^\d+(?:x\d+)?$/.test(a) ? Number(a.split("x")[0]) : null;
-            media(n, (sel) => new MediaWidget(text(target).trim(), size ? "" : a, true, size, ctx, { from: n.from, to: n.to }, sel));
+            const a = readAlt(alias ? text(alias) : "");
+            media(n, (sel) => new MediaWidget(text(target).trim(), a.alt, true, a.width, ctx, { from: n.from, to: n.to }, sel, lookTransform(a)));
             return false;
           }
           case "WikiLink": {

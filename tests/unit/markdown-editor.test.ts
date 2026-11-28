@@ -127,3 +127,15 @@ describe("Clear formatting", () => {
     expect(stripMarks('**bold** *it* ~~s~~ ==hl== <mark class="hl-red">red</mark> `c` [[Link]] [a](b) snake_case')).toBe("bold it s hl red c [[Link]] [a](b) snake_case");
   });
 });
+
+describe("a picture's link besides its file", () => {
+  it("reads and writes its size, alt text, turn and flips (another notes app reads the size and shows the rest as its alt text)", async () => {
+    const { readAlt, withAlt, lookTransform } = await import("../../src/markdown-editor/picture-alt");
+    expect(readAlt("rotate-90 flip-x|200")).toEqual({ alt: "", width: 200, height: null, rotate: 90, flipX: true, flipY: false });
+    expect(readAlt("A cat|300x200")).toMatchObject({ alt: "A cat", width: 300, height: 200 });
+    expect(withAlt("![[cat.png|200]]", (a) => ({ ...a, rotate: 270 }))).toBe("![[cat.png|rotate-270|200]]");
+    expect(withAlt("![cat|200](cat.png)", (a) => ({ ...a, flipY: true, width: 120 }))).toBe("![cat flip-y|120](cat.png)");
+    expect(withAlt("![[cat.png|rotate-90]]", (a) => ({ ...a, rotate: 0 }))).toBe("![[cat.png]]");
+    expect(lookTransform(readAlt("rotate-180 flip-x"))).toBe("rotate(180deg) scaleX(-1)");
+  });
+});
