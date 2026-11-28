@@ -14,6 +14,8 @@ export interface SelectionBarOptions {
   turnInto?: readonly FormatName[] | false;
 }
 
+/** A selection that is one embed and nothing else: `![[file]]` or `![alt](src)`. */
+const EMBED_ALONE = /^!(\[\[[^\]\n]*\]\]|\[[^\]\n]*\]\([^)\n]*\))$/;
 const INLINE: FormatName[] = ["bold", "italic", "strike", "highlight", "code", "link"];
 const TURN_INTO: FormatName[] = ["paragraph", "heading1", "heading2", "heading3", "bulletList", "orderedList", "taskList", "quote", "callout", "codeBlock", "mathBlock", "table"];
 
@@ -65,7 +67,9 @@ export function selectionBar(opts: SelectionBarOptions): Extension {
   const create = bar(opts);
   const tooltip = (state: EditorState): Tooltip | null => {
     const r = state.selection.main;
-    return r.empty ? null : { pos: r.from, end: r.to, above: true, arrow: false, create };
+    // (an embed selected alone, a picture clicked: its own tools, no format bar over them)
+    if (r.empty || EMBED_ALONE.test(state.sliceDoc(r.from, r.to))) return null;
+    return { pos: r.from, end: r.to, above: true, arrow: false, create };
   };
   const field = StateField.define<Tooltip | null>({
     create: tooltip,

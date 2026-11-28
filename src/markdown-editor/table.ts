@@ -51,9 +51,12 @@ export function parseTable(src: string): Model {
   const widths = w ? w[1]!.split(",").map((x) => (/^\s*\d+\s*$/.test(x) ? Number(x) : null)) : [];
   const head = cellsOf(lines[0] ?? "");
   const aligns = cellsOf(lines[1] ?? "").map((d): Align => (/^:-+:$/.test(d) ? "center" : /-:$/.test(d) ? "right" : /^:-/.test(d) ? "left" : ""));
-  const width = Math.max(head.length, aligns.length);
+  const body = lines.slice(2).filter((l) => l.trim()).map(cellsOf);
+  // (a row with more cells than the heading widens the table: every row as wide as the widest, so no cell goes missing and none is lost;
+  // written back, the table is whole again)
+  const width = Math.max(head.length, aligns.length, ...body.map((r) => r.length));
   const pad = (r: string[]): string[] => [...r, ...Array<string>(Math.max(0, width - r.length)).fill("")];
-  return { head: pad(head), aligns: pad(aligns) as Align[], rows: lines.slice(2).filter((l) => l.trim()).map((l) => pad(cellsOf(l))), widths: Array.from({ length: width }, (_, i) => widths[i] ?? null) };
+  return { head: pad(head), aligns: pad(aligns) as Align[], rows: body.map(pad), widths: Array.from({ length: width }, (_, i) => widths[i] ?? null) };
 }
 
 export function writeTable(m: Model): string {
@@ -151,6 +154,8 @@ class TableView {
     this.dom.tabIndex = -1;
     this.render();
     this.listen();
+    // view-state: (the cells selected together end when the person works elsewhere)
+    document.addEventListener("mousedown", this.outside, true);
   }
 
   /** The note changed: the table's text is now `source`, at `from`. Only what changed is drawn again; the cell being edited follows. */
@@ -191,6 +196,7 @@ class TableView {
   }
 
   destroy(): void {
+    document.removeEventListener("mousedown", this.outside, true);
     this.editing?.ed.destroy();
     this.editing = null;
   }
@@ -358,6 +364,13 @@ class TableView {
     const s = scroll.getBoundingClientRect();
     Object.assign(this.rangeBox.style, { left: `${box.left - s.left + scroll.scrollLeft}px`, top: `${box.top - s.top + scroll.scrollTop}px`, width: `${box.width}px`, height: `${box.height}px` });
   }
+  /** A press anywhere but the table (or a menu it opened) ends the cells selected together. */
+  private readonly outside = (e: MouseEvent): void => {
+    if (!this.range && !this.lines) return;
+    const t = e.target instanceof Element ? e.target : null;
+    if (t && (this.dom.contains(t) || t.closest(".pop-menu, .me-selbar"))) return;
+    this.clearCells();
+  };
   private clearCells(): void {
     this.range = null;
     this.lines = null;

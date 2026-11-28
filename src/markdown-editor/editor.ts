@@ -417,6 +417,9 @@ export function createMarkdownEditor(opts: EditorOptions): MarkdownEditor {
       EditorView.theme(CM_THEME),
       EditorView.lineWrapping,
       EditorView.contentAttributes.of({ spellcheck: "true", autocorrect: "on", autocapitalize: "sentences" }),
+      // (a cell's own editor brings only its cell into view, the least scroll that shows it: never the note's scroll moved by the cell's
+      // measure of itself, which jumped the note when a format or a menu choice was applied in a cell)
+      ...(cell ? [EditorView.scrollHandler.of((v) => (v.dom.closest("td, th")?.scrollIntoView({ block: "nearest", inline: "nearest" }), true))] : []),
       appKeys,
       keymap.of([...(plain ? [] : formatKeys), ...(cell ? [] : searchKeymap), ...historyKeymap, ...defaultKeymap, ...(cell ? [] : [indentWithTab])]),
       ...behaviorExtensions(on, plain),
@@ -596,7 +599,7 @@ export function createMarkdownEditor(opts: EditorOptions): MarkdownEditor {
     input.addEventListener("keydown", (e) => (e.key === "Enter" ? (e.preventDefault(), done(true)) : e.key === "Escape" ? (e.preventDefault(), done(false)) : undefined));
     box.append(input, ok);
     document.body.append(box);
-    input.focus();
+    input.focus({ preventScroll: true }); // (in a box over the words: the note never scrolls for it)
   };
   const pickPicture = async (): Promise<void> => {
     const md = await host.choosePicture?.();

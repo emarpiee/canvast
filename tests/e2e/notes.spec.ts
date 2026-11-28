@@ -474,10 +474,28 @@ test("a note on a canvas opens in the note panel (a double-click, or Edit note):
   // Its header's Properties: the library's details of this note at its right (its name, no preview: the note is open beside it); again, gone.
   const details = p.getByTestId("note-panel").getByTestId("file-panel-details");
   await p.getByTestId("note-panel").locator("[data-details]").click();
-  await expect(details.locator(".asset-insp-head h2")).toHaveText("plan.md");
+  await expect(details.getByTestId("asset-favorite")).toBeVisible();
   await expect(details.getByTestId("asset-preview")).toBeHidden();
+  // (beside the note, which keeps its room: the details are a share of the panel, never as wide as their longest line)
+  const noteBox = (await p.getByTestId("note-panel").locator(".viewer-note").boundingBox())!, sideBox = (await details.boundingBox())!;
+  expect(noteBox.width, "the note keeps most of the panel").toBeGreaterThan(sideBox.width);
   await p.getByTestId("note-panel").locator("[data-details]").click();
   await expect(details).toBeHidden();
+  // Ctrl+= and Ctrl with the wheel zoom the note's text, never the page; Ctrl+0 back. (Real keys: the browser would act on them.)
+  const zoomOf = () => p.getByTestId("note-panel").locator(".viewer-note").evaluate((el) => (el as HTMLElement).style.getPropertyValue("--note-zoom"));
+  await words(p, p.getByTestId("note-panel")).click();
+  const kept = await p.evaluate(() => { const seen: boolean[] = []; window.addEventListener("keydown", (e) => void (!/^(Control|Shift|Alt|Meta)$/.test(e.key) && setTimeout(() => seen.push(e.defaultPrevented))), true); (window as unknown as { seenKeys: boolean[] }).seenKeys = seen; return true; });
+  expect(kept).toBe(true);
+  await p.keyboard.press("Control+=");
+  await expect.poll(zoomOf).toBe("1.25");
+  const wheelKept = p.evaluate(() => new Promise<boolean>((done) => window.addEventListener("wheel", (e) => setTimeout(() => done(e.defaultPrevented)), { once: true, capture: true })));
+  await p.keyboard.down("Control");
+  await p.mouse.wheel(0, 100);
+  await p.keyboard.up("Control");
+  expect(await wheelKept, "Ctrl with the wheel never zooms the page").toBe(true);
+  await expect.poll(zoomOf).toBe("1");
+  await p.keyboard.press("Control+0");
+  expect(await p.evaluate(() => (window as unknown as { seenKeys: boolean[] }).seenKeys.every(Boolean)), "the zoom keys are kept from the browser").toBe(true);
   // The saves are no steps of the canvas's undo: Undo takes back the placing (never back to the old version), Redo places the saved note.
   const saved = await placed();
   await p.evaluate(() => (document.activeElement as HTMLElement | null)?.blur()); // (the keys go to the canvas, not the editor)

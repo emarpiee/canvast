@@ -63,8 +63,9 @@ export const EDITOR_CSS = `
 :where(.me-live) .me-callout { --me-callout: var(--me-grey); background: color-mix(in oklch, var(--me-callout) 8%, transparent); border-left: 1px solid color-mix(in oklch, var(--me-callout) 35%, transparent); border-right: 1px solid color-mix(in oklch, var(--me-callout) 35%, transparent); padding-left: 14px !important; padding-right: 14px !important; }
 :where(.me-live) .me-callout-note { --me-callout: var(--me-blue); } :where(.me-live) .me-callout-tip { --me-callout: var(--me-green); } :where(.me-live) .me-callout-question { --me-callout: var(--me-purple); }
 :where(.me-live) .me-callout-warning { --me-callout: var(--me-yellow); } :where(.me-live) .me-callout-danger { --me-callout: var(--me-red); } :where(.me-live) .me-callout-quote { --me-callout: var(--me-grey); }
-:where(.me-live) .me-callout-head { border-top: 1px solid color-mix(in oklch, var(--me-callout) 35%, transparent); border-top-left-radius: 8px; border-top-right-radius: 8px; padding-top: 4px; font-weight: 600; color: var(--me-callout); }
-:where(.me-live) .me-callout-foot { border-bottom: 1px solid color-mix(in oklch, var(--me-callout) 35%, transparent); border-bottom-left-radius: 8px; border-bottom-right-radius: 8px; padding-bottom: 4px; }
+:where(.me-live) .me-callout-head { border-top: 1px solid color-mix(in oklch, var(--me-callout) 35%, transparent); border-top-left-radius: 8px; border-top-right-radius: 8px; padding-top: 8px; font-weight: 600; color: var(--me-callout); }
+:where(.me-live) .me-callout-head + .me-callout { padding-top: 0.3em; } /* (as the preview's: its title, then its words a little below) */
+:where(.me-live) .me-callout-foot { border-bottom: 1px solid color-mix(in oklch, var(--me-callout) 35%, transparent); border-bottom-left-radius: 8px; border-bottom-right-radius: 8px; padding-bottom: calc(8px + 0.3em); }
 :where(.me-live) .me-callout-title { font-weight: 600; color: var(--me-callout); }
 :where(.me-live) .me-bullet { color: var(--me-muted); display: inline-block; width: 1.1em; }
 :where(.me-live) .me-list-number { color: var(--me-muted); }
@@ -147,6 +148,7 @@ export const EDITOR_CSS = `
 :where(.me-media.is-small) .me-media-tools { top: auto; bottom: calc(100% + 4px); right: 0; max-width: none; flex-wrap: nowrap; z-index: 2; background: var(--me-bg); border: 1px solid var(--me-line); box-shadow: 0 4px 12px color-mix(in oklch, var(--me-fg) 18%, transparent); } /* (above a small picture, where it is readable) */
 :where(.me-media) .me-resize { z-index: 2; } /* (over a video's player bar too) */
 :where(.me-media.is-missing) { display: flex; align-items: center; justify-content: center; box-sizing: border-box; width: 100%; padding: 10px 14px; border-radius: var(--me-radius); background: var(--me-code-bg); color: var(--me-muted); font-size: 0.9em; }
+:where(.me:has(.me-selbar)) .me-media:not(.is-selected) .me-media-tools { opacity: 0; pointer-events: none; } /* (words selected: their bar stands where a small embed's tools do; they step aside) */
 :where(.me-media-tools) .me-btn { min-width: 24px; height: 24px; color: var(--me-fg); }
 :where(.me-lightbox) { position: fixed; inset: 0; z-index: 1001; display: grid; place-items: center; overflow: hidden; background: color-mix(in oklch, black 82%, transparent); outline: none; }
 :where(.me-lightbox) img { position: absolute; left: 50%; top: 50%; max-width: none; max-height: none; transform-origin: center; cursor: zoom-in; user-select: none; }
@@ -174,9 +176,8 @@ export const EDITOR_CSS = `
 :where(.me-table) .me-cell.is-editing { user-select: text; }
 :where(.me-table) .me-cell.is-editing .cm-editor { background: transparent; }
 :where(.me-table) :is(th, td).is-editing { background: color-mix(in oklch, var(--me-accent) 6%, transparent); box-shadow: inset 0 0 0 2px color-mix(in oklch, var(--me-accent) 60%, transparent); }
-:where(.me-table) .me-cell-selected { background: color-mix(in oklch, var(--me-accent) 12%, transparent); }
 :where(.me-table) .me-table-scroll { position: relative; }
-:where(.me-cell-range) { position: absolute; border: 2px solid color-mix(in oklch, var(--me-accent) 75%, transparent); border-radius: 4px; pointer-events: none; box-sizing: border-box; }
+:where(.me-cell-range) { position: absolute; background: color-mix(in oklch, var(--me-accent) 14%, transparent); border: 2px solid color-mix(in oklch, var(--me-accent) 75%, transparent); border-radius: 4px; pointer-events: none; box-sizing: border-box; }
 :where(.me-table:focus) { outline: none; }
 :where(.me-table) th { position: relative; }
 :where(.me-col-resize) { position: absolute; top: 0; right: -3px; width: 6px; cursor: col-resize; z-index: 1; }
@@ -285,6 +286,8 @@ export const CM_THEME: Record<string, Record<string, string>> = {
   "&.cm-focused .cm-activeLine": { backgroundColor: "color-mix(in oklch, var(--me-accent) 6%, transparent)", borderRadius: "4px" },
   ".cm-cursor, .cm-dropCursor": { borderLeftColor: "var(--me-fg)" },
   "&.cm-focused > .cm-scroller > .cm-selectionLayer .cm-selectionBackground, .cm-selectionBackground, .cm-content ::selection": { backgroundColor: "var(--me-select)" },
+  // (a table cell's own editor, inside the note's: the note's selection colour too, never the editor's built-in one)
+  "& .cm-editor.cm-focused > .cm-scroller > .cm-selectionLayer .cm-selectionBackground, & .cm-editor .cm-selectionLayer .cm-selectionBackground": { backgroundColor: "var(--me-select)" },
   ".cm-panels": { backgroundColor: "var(--me-bg)", color: "var(--me-fg)", borderColor: "var(--me-line)" },
   ".cm-panels-top": { borderBottom: "1px solid var(--me-line)" },
   ".cm-panel.me-find": { padding: "var(--me-gap)", fontFamily: "var(--me-font)" },

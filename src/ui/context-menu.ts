@@ -181,7 +181,7 @@ const selectedIn = (f: HTMLElement): string =>
 const inField = (run: (f: HTMLElement) => void) => (): void => {
   const f = fieldAt ?? fieldOf(document.activeElement);
   if (!f) return;
-  f.focus();
+  f.focus({ preventScroll: true });
   run(f);
 };
 

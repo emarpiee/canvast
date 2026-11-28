@@ -172,6 +172,12 @@ describe("a table pasted from another app", () => {
     expect(t.rows[0]).toEqual(["[[x\\|y]]", "z"]);
     expect(writeTable(t)).toContain("| [[x\\|y]] | z |");
   });
+  it("a row with more cells than the heading widens the table: every row as wide, written back whole", async () => {
+    const { parseTable, writeTable } = await import("../../src/markdown-editor/table");
+    const t = parseTable("| A |\n| --- |\n| a | extra |\n| b |");
+    expect([t.head, t.rows]).toEqual([["A", ""], [["a", "extra"], ["b", ""]]]);
+    expect(writeTable(t)).toBe("| A |  |\n| --- | --- |\n| a | extra |\n| b |  |");
+  });
 });
 
 describe("footnotes, as notes apps write them", () => {

@@ -72,7 +72,7 @@ export function openPopover(anchor: HTMLElement | DOMRect, items: readonly PopIt
     } else if (e.key === "ArrowDown" || e.key === "ArrowUp") {
       e.preventDefault();
       e.stopPropagation();
-      buttons[(at + (e.key === "ArrowDown" ? 1 : buttons.length - 1)) % buttons.length]?.focus();
+      buttons[(at + (e.key === "ArrowDown" ? 1 : buttons.length - 1)) % buttons.length]?.focus(); // (a long list scrolls to it)
     }
   };
   setTimeout(() => document.addEventListener("pointerdown", outside, true));

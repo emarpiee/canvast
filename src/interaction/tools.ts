@@ -2922,30 +2922,23 @@ export function attachTools(
     } else if (mod && key === "y") {
       if (g.kind === "none") press("edit.redo");
     } else if (mod && key === "a") {
-      e.preventDefault(); // (not the browser's select-all of the page's text: in Firefox a copy then goes to that text, not to the objects)
       press("edit.selectAll");
     } else if (mod && key === "d") {
-      e.preventDefault(); // not the browser's bookmark
       press("edit.duplicate");
     } else if (mod && e.altKey && key === "g") {
-      e.preventDefault();
       press("edit.sheet");
     } else if (!mod && e.shiftKey && !e.altKey && key === "a") {
-      e.preventDefault();
       press("edit.autoLayout");
     } else if (!mod && e.shiftKey && !e.altKey && (key === "h" || key === "v") && editor.selection.size && g.kind === "none") {
-      e.preventDefault(); // (Shift+H, Shift+V: mirror the selection, ADR 0203)
       press(key === "h" ? "edit.flipH" : "edit.flipV");
     } else if (mod && key === "g") {
       press(e.shiftKey ? "edit.ungroup" : "edit.group");
     } else if (mod && key === "e") {
-      e.preventDefault(); // not the browser's search
       press("edit.flatten");
     } else if (mod && (e.key === "]" || e.key === "[")) {
       press(e.key === "]" ? "edit.front" : "edit.back");
     } else if (mod && e.key === " ") {
       // The focus key (the keymap sends F here as Ctrl+Space) brings the selection into view; again: everything visible at this zoom (the cycle is in item-navigation.ts)
-      e.preventDefault();
       if (!e.repeat && g.kind === "none") press("view.focus");
     } else if (mod || e.altKey) {
       return;
@@ -3002,7 +2995,7 @@ export function attachTools(
     } else {
       return;
     }
-    e.preventDefault();
+    e.preventDefault(); // (one place for every key above; a command's key is also kept from the browser by the keymap: settings/keymap.ts)
   };
 
   const onKeyUp = (e: KeyboardEvent): void => {

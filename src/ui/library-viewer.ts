@@ -1,3 +1,4 @@
+import { nextNoteZoom } from "./file-views";
 import { groundFill } from "../assets/card";
 import { desktopBridge } from "../storage/desktop-bridge";
 import type { LinkCards, LinkRow } from "../app/session";
@@ -39,9 +40,7 @@ const FILM_OVERSCAN = 12;
 
 const LINKS_RETRY_MS = 800;
 
-const NOTE_ZOOM_MAX = 3;
 
-const NOTE_ZOOM_MIN = 0.5;
 
 /** Fields that take typed text: shortcuts keep out of them (a checkbox or a slider is not one). */
 const ZOOM_STEP = 1.25;
@@ -532,8 +531,7 @@ export function mountLibraryViewer(ctx: ViewerCtx) {
   const zoomStep = (dir: 1 | -1 | 0): void => {
     if (note?.zoom) note.zoom(dir);
     else if (note) {
-      const next = dir === 0 ? 1 : Math.max(NOTE_ZOOM_MIN, Math.min(NOTE_ZOOM_MAX, noteZoom * ZOOM_STEP ** dir));
-      noteZoom = Math.abs(next - 1) < 0.02 ? 1 : next;
+      noteZoom = nextNoteZoom(noteZoom, dir);
       paintNoteZoom();
     } else if (dir === 0) resetZoom();
     else zoomAt(zoom.s * ZOOM_STEP ** dir, ...centre());

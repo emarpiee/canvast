@@ -164,7 +164,7 @@ One icon per function: two buttons that do different things never share an icon,
 | `image-plus` | Fill in the missing bookmark pictures; New palette from the picked picture |
 | `images` | Assets view; All assets1 |
 | `infinity` | Canvas view |
-| `info` | Information shown (one icon for every level; a number 0 to 3 in the corner says how much); a file's details in the library |
+| `info` | Information shown (one icon for every level; a number 0 to 3 in the corner says how much); a file's details: the Library's details panel and its button, a file's Properties on a canvas |
 | `lasso` | Lasso |
 | `layers` | Layers panel |
 | `layout-grid` | Thumbnails |
@@ -184,7 +184,7 @@ One icon per function: two buttons that do different things never share an icon,
 | `mouse-pointer-2` | Select |
 | `mouse-pointer-ban` | Ignore the object that fills the view |
 | `move-diagonal` | Thumbnail size |
-| `panel-right` | Details panel |
+| `panel-right` | (no longer used for the details panel: that is `info`, as notes apps show it) |
 | `pen-line` | Ink pen |
 | `pen-tool` | Fine pen |
 | `vector-polygon` | Make editable vector shapes from an SVG picture |

@@ -31,6 +31,12 @@ export type ViewDeps = NoteDeps;
 /** What a card shows of a file, and its size in pixels. */
 export type CardLook = { preview: string; size: { w: number; h: number } };
 
+/** A note's text size, one step bigger (1), smaller (-1) or back to 100% (0): the library's viewer and a file open on a canvas alike. */
+export function nextNoteZoom(z: number, dir: 1 | -1 | 0): number {
+  const next = dir === 0 ? 1 : Math.max(0.5, Math.min(3, z * 1.25 ** dir));
+  return Math.abs(next - 1) < 0.02 ? 1 : next;
+}
+
 export interface OpenView {
   hash: string;
   /** Asks about what would be lost: whether to go on. */

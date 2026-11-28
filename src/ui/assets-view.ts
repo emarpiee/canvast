@@ -366,7 +366,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       <span class="assets-sep" role="separator"></span>
       <button type="button" class="assets-btn is-icon" data-action="slideshow" data-testid="assets-slideshow" aria-label="Slideshow" title="Play the library, or the items you selected, as a slideshow">${ICONS.play}</button>
       <span class="assets-sep" role="separator"></span>
-      <button type="button" class="assets-btn is-icon" data-action="details" aria-pressed="true" aria-label="Details panel" title="Show or hide the details (I)">${ICONS.panelRight}</button>
+      <button type="button" class="assets-btn is-icon" data-action="details" aria-pressed="true" aria-label="Details panel" title="Show or hide the details (I)">${ICONS.info}</button>
       <input type="file" multiple hidden data-testid="assets-import-input">
       <input type="file" multiple hidden webkitdirectory data-testid="assets-import-folder-input">
     </div>
@@ -384,7 +384,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
         <div class="viewer" data-testid="slide-view" role="region" aria-label="Viewer" tabindex="-1" hidden>
           <button type="button" class="vbtn viewer-back" data-act="close" aria-label="Back to the library" title="Back to the library (Esc)">${ICONS.arrowLeft}</button>
           <button type="button" class="vbtn viewer-hide" data-act="bar" aria-label="Hide the controls" title="Hide the controls (F)">${ICONS.chevronsDown}</button>
-          <button type="button" class="vbtn viewer-details" data-act="details" aria-pressed="true" aria-label="Details panel" title="Show or hide the details (I)">${ICONS.panelRight}</button>
+          <button type="button" class="vbtn viewer-details" data-act="details" aria-pressed="true" aria-label="Details panel" title="Show or hide the details (I)">${ICONS.info}</button>
           <div class="viewer-stage"><div class="viewer-picture-tools"><button type="button" class="vbtn viewer-grey" data-act="grey" data-testid="viewer-grey" aria-pressed="false" aria-label="See it in greyscale" title="See it in greyscale, for now: the file stays as it is">${ICONS.eclipse}</button><button type="button" class="vbtn viewer-sample" data-act="sample" data-testid="viewer-sample" aria-label="Sample text" title="Sample text">${ICONS.wholeWord}</button><button type="button" class="vbtn viewer-ground" data-act="ground" aria-label="Background of see-through pictures" title="Background of see-through pictures">${ICONS.sunMoon}</button></div><span class="viewer-progress" hidden></span><div class="viewer-edge is-prev" data-edge="prev" aria-hidden="true"></div><div class="viewer-edge is-next" data-edge="next" aria-hidden="true"></div>
             <figure><div class="viewer-checker" hidden><i></i></div><canvas class="viewer-vec" hidden></canvas><img alt="" draggable="false"><video hidden></video><canvas class="viewer-gif" hidden></canvas><figcaption></figcaption></figure></div>
           <div class="viewer-bar" role="toolbar" aria-label="Viewer controls">
@@ -4518,7 +4518,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       ],
       [
         row("slideshow", "library.slideshowShown", "Slideshow", "One after another", ICONS.play),
-        row("details", "library.details", "Details panel", "Show or hide it", ICONS.panelRight),
+        row("details", "library.details", "Details panel", "Show or hide it", ICONS.info),
       ],
     ]);
   };

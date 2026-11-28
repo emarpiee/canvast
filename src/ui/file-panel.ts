@@ -1,7 +1,7 @@
 import { openBatchRename } from "./batch-rename";
 import { esc } from "./format";
 import { ICONS } from "./icons";
-import { viewKindOf } from "./file-views";
+import { nextNoteZoom, viewKindOf } from "./file-views";
 import type { CardActions, FileViewKind, OpenView, ViewDeps, ViewPlace } from "./file-views";
 import { OpenNote } from "./note-session";
 import { panelHtml } from "./panel";
@@ -92,7 +92,7 @@ export function mountFilePanel(
     const name0 = (await deps.session.catalog?.entry(hash).catch(() => undefined))?.name ?? rec.name;
     kind = k;
     name = name0;
-    const tools = (deps.details ? `<button type="button" class="layer-btn" data-details aria-pressed="false" aria-label="Properties" title="Its properties: the library's details of this ${k.noun}">${ICONS.panelRight}</button>` : "")
+    const tools = (deps.details ? `<button type="button" class="layer-btn" data-details aria-pressed="false" aria-label="Properties" title="Its properties: the library's details of this ${k.noun}">${ICONS.info}</button>` : "")
       + (deps.session.readOnly ? "" : `<button type="button" class="layer-btn" data-rename aria-label="Rename this ${k.noun}" title="Rename this ${k.noun} (F2)">${ICONS.textCursorInput}</button>`);
     el.innerHTML = panelHtml({ title: esc(name0), tools, body: `<div class="viewer-note"${k.id === "note" ? ' data-testid="note-editor"' : ""}><div></div></div><aside class="file-panel-details" data-testid="file-panel-details" hidden></aside>` });
     el.setAttribute("aria-label", `${label(k)}: ${name0}`);
@@ -140,9 +140,25 @@ export function mountFilePanel(
     deps.session.editor.message = `Renamed to “${name}”.`;
     deps.session.editor.changed();
   };
-  for (const host of [hosts.panel, hosts.window])
+  /** The file's zoom, as in the library's viewer: a view's own (a PDF, a model), else a note's text size. */
+  let noteZoom = 1;
+  const zoomFile = (dir: 1 | -1 | 0): void => {
+    if (!note) return;
+    if (note.zoom) return note.zoom(dir);
+    noteZoom = nextNoteZoom(noteZoom, dir);
+    el.querySelector<HTMLElement>(".viewer-note")?.style.setProperty("--note-zoom", String(noteZoom));
+  };
+  for (const host of [hosts.panel, hosts.window]) {
+    // view-state: (Ctrl with the wheel zooms the file, never the page)
+    host.addEventListener("wheel", (e) => {
+      if (!e.ctrlKey || !(e.target instanceof Element) || !e.target.closest(".viewer-note")) return;
+      e.preventDefault();
+      zoomFile(e.deltaY < 0 ? 1 : -1);
+    }, { passive: false });
     host.addEventListener("keydown", (e) => {
       if (e.key === "F2" && !e.ctrlKey && !e.altKey && !e.metaKey) return e.preventDefault(), void rename();
+      // (Ctrl+= and Ctrl+- zoom the file, Ctrl+0 back to 100%, as in the library's viewer)
+      if ((e.ctrlKey || e.metaKey) && !e.altKey && ["=", "+", "-", "0"].includes(e.key)) return e.preventDefault(), e.stopPropagation(), zoomFile(e.key === "0" ? 0 : e.key === "-" ? -1 : 1);
       // (a view's own keys: its pages, Ctrl+S; they stop here, and do not reach the canvas behind)
       if (note?.key?.(e)) {
         e.preventDefault();
@@ -150,6 +166,7 @@ export function mountFilePanel(
         return;
       }
     });
+  }
   // view-state: Escape closes the file open on the canvas (as its × does), asking about unsaved changes. Heard first, before the editor,
   // which takes every Escape for itself: only a menu, list, dialog or find bar of its own (or of the app) that is open takes it instead.
   // (only what opens over the words: the editor's suggestions and its find bar, a menu, a dialog)

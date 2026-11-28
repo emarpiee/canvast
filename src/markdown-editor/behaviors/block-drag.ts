@@ -4,7 +4,7 @@
 import { syntaxTree } from "@codemirror/language";
 import type { EditorState } from "@codemirror/state";
 import { EditorView, ViewPlugin, type ViewUpdate } from "@codemirror/view";
-import { frontmatterLength } from "../render";
+import { WIDTHS_LINE, frontmatterLength } from "../render";
 
 /** A block of the note: where it is in the file, and whether it is a list item (moved among list items with no blank line round it). */
 export interface Block {
@@ -21,7 +21,14 @@ export function blocksOf(state: EditorState): Block[] {
     if (n.to <= skip) continue;
     if (n.name === "BulletList" || n.name === "OrderedList") {
       for (let i = n.firstChild; i; i = i.nextSibling) if (i.name === "ListItem") out.push({ from: state.doc.lineAt(i.from).from, to: state.doc.lineAt(i.to).to, item: true });
-    } else out.push({ from: state.doc.lineAt(n.from).from, to: state.doc.lineAt(n.to).to, item: false });
+    } else {
+      const from = state.doc.lineAt(n.from).from;
+      let to = state.doc.lineAt(n.to).to;
+      // (a table's widths, in a comment line after it, go with it: never left behind as a stray line)
+      const next = n.name === "Table" ? n.nextSibling : null;
+      if (next && WIDTHS_LINE.test(state.doc.sliceString(next.from, next.to).trim())) (to = state.doc.lineAt(next.to).to), (n = next);
+      out.push({ from, to, item: false });
+    }
   }
   return out;
 }
@@ -119,7 +126,7 @@ export function blockHandle(label: string) {
         const pad = parseFloat(getComputedStyle(this.view.contentDOM).paddingLeft) || 0;
         this.grip.hidden = false;
         this.grip.style.top = `${c.top - dom.top + (c.bottom - c.top) / 2 - 7}px`;
-        this.grip.style.left = `${Math.max(0, content.left - dom.left + pad - 18)}px`;
+        this.grip.style.left = `${Math.max(0, content.left - dom.left + pad - 36)}px`; // (left of a heading's fold chevron, which sits just before its words)
       };
       readonly away = (): void => {
         if (this.grip.classList.contains("is-dragging")) return;

@@ -82,7 +82,7 @@ const closeChild = (refocus = false): void => {
   menu.remove();
   from.setAttribute("aria-expanded", "false");
   from.parentElement?.classList.remove("has-open-menu");
-  if (refocus && from.isConnected) from.focus();
+  if (refocus && from.isConnected) from.focus({ preventScroll: true });
 };
 
 /** A menu row's markup: its icon, label and hint. */
@@ -97,7 +97,7 @@ export function closeMoreMenu(refocus = false): void {
   onClose?.();
   anchor.setAttribute("aria-expanded", "false");
   anchor.parentElement?.classList.remove("has-open-menu");
-  if (refocus && anchor.isConnected) anchor.focus();
+  if (refocus && anchor.isConnected) anchor.focus({ preventScroll: true });
 }
 
 /** What a menu or popover should not cover: the box of the selected items on screen (set by the app), or null. */
@@ -242,7 +242,7 @@ export function openMoreMenu(anchor: HTMLElement, items: readonly MenuItem[], la
       placeMenu(sub, moreOf);
       moreOf.setAttribute("aria-expanded", "true");
       child = { menu: sub, from: moreOf };
-      sub.querySelector<HTMLElement>("button:not(:disabled)")?.focus();
+      sub.querySelector<HTMLElement>("button:not(:disabled)")?.focus({ preventScroll: true });
       return;
     }
     const b = (e.target as HTMLElement).closest<HTMLButtonElement>("[data-i]");
@@ -256,7 +256,7 @@ export function openMoreMenu(anchor: HTMLElement, items: readonly MenuItem[], la
         current = opts.refresh(); // (what is ticked or offered has changed)
         if (!current.length) return closeMoreMenu(); // (nothing applies any more: the button is gone too)
         render();
-        if (!opts.keepFocus) (menu.querySelector<HTMLElement>(`[data-i="${index}"]:not(:disabled)`) ?? menu.querySelector<HTMLElement>("button:not(:disabled)"))?.focus(); // (so Escape still reaches the menu)
+        if (!opts.keepFocus) (menu.querySelector<HTMLElement>(`[data-i="${index}"]:not(:disabled)`) ?? menu.querySelector<HTMLElement>("button:not(:disabled)"))?.focus({ preventScroll: true }); // (so Escape still reaches the menu)
       }
       requestAnimationFrame(() => open?.menu === menu && placeMenu(menu, anchor)); // (the selection may have moved)
       return;
@@ -264,7 +264,7 @@ export function openMoreMenu(anchor: HTMLElement, items: readonly MenuItem[], la
     closeMoreMenu();
     item.run();
   });
-  if (!opts.keepFocus) menu.querySelector<HTMLElement>("button:not(:disabled)")?.focus();
+  if (!opts.keepFocus) menu.querySelector<HTMLElement>("button:not(:disabled)")?.focus({ preventScroll: true });
 }
 
 let installed = false;
@@ -291,7 +291,7 @@ export function installMenuKeys(): void {
     else if (e.key === "Home") to = 0;
     else if (e.key === "End") to = items.length - 1;
     if (to !== null && items.length) {
-      items[to]!.focus();
+      items[to]!.focus(); // (a long menu scrolls to it)
       e.preventDefault();
       e.stopPropagation();
     } else if (e.key === "Escape" && child && inMenu === child.menu) {

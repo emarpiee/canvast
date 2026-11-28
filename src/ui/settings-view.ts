@@ -25,6 +25,7 @@ import type { Command, OptionSpec, Risk } from "../commands/types";
 import { photoCraftVersion } from "../artcraft/photocraft/payload";
 import { PREFS_KEY as PHOTOCRAFT_PREFS } from "../artcraft/photocraft/prefs";
 import { markCommands } from "../commands/from-bars";
+import { injectStyles, renderMarkdown } from "../markdown-editor";
 
 /** The desktop build (ADR 0177): the workspace is a folder, so what Settings says about storage, privacy and the page differs. */
 /** A row for something that is not a stored setting (Sharing's), with the settings rows' look. */
@@ -62,6 +63,36 @@ interface Tab {
   readonly label: string;
   readonly rows?: readonly Row[];
 }
+
+/** The Note styles card's sample: every style it sets, drawn as a note's preview is. Its look comes from the same --me-* values the settings
+ *  set on every note, so a change shows at once, with nothing drawn again (the scroll stays where it is). */
+const NOTE_SAMPLE = `# Heading 1
+## Heading 2
+### Heading 3
+#### Heading 4
+##### Heading 5
+###### Heading 6
+
+Words in **bold**, in *italic* and in ***bold italic***, a [[linked note]] and a [web link](https://example.com).
+
+- A list item
+- Another one
+- [ ] A task
+- [x] A task done
+
+| Heading | Cell |
+| --- | --- |
+| A row | A cell |
+| A row | A cell |
+`;
+let noteSample = "";
+const noteSampleHtml = (): string => {
+  if (!noteSample) {
+    injectStyles(); // (the page's look, before any note was opened)
+    noteSample = `<div class="me set-note-sample" data-testid="note-style-sample" aria-label="A sample note in these styles"><div class="me-doc">${renderMarkdown(NOTE_SAMPLE)}</div></div>`;
+  }
+  return noteSample;
+};
 
 /** Cards drawn after a tab's own cards (its Links in notes too): the long list of how notes look, at the bottom of Notes. */
 const LAST_CARDS = new Set(["Note styles"]);
@@ -472,7 +503,7 @@ export function mountSettingsView(root: HTMLElement, settings: SettingsStore, ke
               <div class="set-control">${controlHtml(r, id)}</div><span class="set-scope" title="Where this setting is kept">${scope}</span>
               <button type="button" class="set-reset" data-reset="${r.key}" aria-label="Reset ${esc(r.label)} to its default" title="Reset to the default">${ICONS.settingReset}</button></div>`;
     };
-    const cardHtml = (c: { title?: string; rows: readonly Row[] }): string => `<div class="set-card">${c.title ? `<h3>${esc(c.title)}</h3>` : ""}${c.rows.map(rowHtml).join("")}</div>`;
+    const cardHtml = (c: { title?: string; rows: readonly Row[] }): string => `<div class="set-card">${c.title ? `<h3>${esc(c.title)}</h3>` : ""}${c.title === "Note styles" ? noteSampleHtml() : ""}${c.rows.map(rowHtml).join("")}</div>`;
     const body = t.rows
       ? cardsOf(t.rows)
           .filter((c) => !LAST_CARDS.has(c.title ?? ""))

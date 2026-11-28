@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { KEY_COMMANDS, Keymap, comboOfEvent, eventInit, judge, normalizeCombo, parseCombo, scopesMeet } from "../../src/settings/keymap";
+import { KEY_COMMANDS, Keymap, comboOfEvent, eventInit, judge, keptFromBrowser, normalizeCombo, parseCombo, scopesMeet } from "../../src/settings/keymap";
 import { SettingsStore } from "../../src/settings/settings";
 
 function memory(initial: Record<string, string> = {}) {
@@ -50,13 +50,13 @@ describe("the commands", () => {
 describe("the keymap", () => {
   it("passes a command's own keys through, and sends a rebound key on as the command's own", () => {
     const km = new Keymap(new SettingsStore(null));
-    expect(km.resolve("Ctrl+Z", "canvas")).toEqual({ kind: "pass" });
+    expect(km.resolve("Ctrl+Z", "canvas")).toEqual({ kind: "pass", owned: true });
     km.set("edit.undo", ["Ctrl+Shift+U"]);
     expect(km.resolve("Ctrl+Shift+U", "canvas")).toEqual({ kind: "to", combo: "Ctrl+Z" });
     expect(km.resolve("Ctrl+Z", "canvas"), "the old key is dropped").toEqual({ kind: "swallow" });
     expect(km.resolve("Ctrl+Shift+U", "none"), "nothing is changed while typing or capturing").toEqual({ kind: "pass" });
     km.reset("edit.undo");
-    expect(km.resolve("Ctrl+Z", "canvas")).toEqual({ kind: "pass" });
+    expect(km.resolve("Ctrl+Z", "canvas")).toEqual({ kind: "pass", owned: true });
   });
   it("keeps two keys for a command, and none when they are all taken away", () => {
     const km = new Keymap(new SettingsStore(null));
@@ -107,10 +107,30 @@ describe("a note's keys", () => {
     const km = new Keymap(new SettingsStore(null));
     expect(km.resolve("Ctrl+E", "note")).toEqual({ kind: "to", combo: "Ctrl+Alt+Shift+F9" });
     expect(km.resolve("Ctrl+Shift+E", "note")).toEqual({ kind: "to", combo: "Ctrl+Alt+Shift+F10" });
-    expect(km.resolve("Ctrl+E", "canvas"), "Flatten's on the canvas").toEqual({ kind: "pass" });
+    expect(km.resolve("Ctrl+E", "canvas"), "Flatten's on the canvas").toEqual({ kind: "pass", owned: true });
     km.set("notes.liveOrPreview", ["Ctrl+R"]);
     expect(km.resolve("Ctrl+R", "note")).toEqual({ kind: "to", combo: "Ctrl+Alt+Shift+F9" });
     expect(km.resolve("Ctrl+E", "note")).toEqual({ kind: "pass" });
     expect(km.owners("Ctrl+E", "notes.liveOrPreview").map((c) => c.id), "no clash with Flatten: they never meet").toEqual([]);
+  });
+});
+
+describe("audit: no shortcut of the app reaches the browser", () => {
+  const page = { tagName: "BODY", isContentEditable: false, closest: () => null } as unknown as EventTarget;
+  const field = { tagName: "INPUT", type: "text", isContentEditable: false, closest: () => null } as unknown as EventTarget;
+  // (what a page needs the browser for: its clipboard events; Escape, whose handlers ask who took it)
+  const BROWSERS = new Set(["Ctrl+C", "Ctrl+X", "Ctrl+V", "Ctrl+Shift+V", "Escape"]);
+  const scopesOf = (s: string) => (s === "note" ? (["note"] as const) : s === "global" ? (["canvas", "global", "note"] as const) : (["canvas"] as const));
+  it("every command's keys, in every view it works in, are kept from the browser (its find, print, save, bookmarks, scrolling…)", () => {
+    const km = new Keymap(new SettingsStore(null));
+    const leaks = KEY_COMMANDS.flatMap((c) => km.bindings(c.id).filter((k) => !BROWSERS.has(k)).flatMap((k) => scopesOf(c.scope).filter((v) => !keptFromBrowser(km, k, v, page)).map((v) => `${c.id}: ${k} in ${v}`)));
+    expect(leaks).toEqual([]);
+  });
+  it("a rebound command's new key too; the page's zoom keys always; a text field keeps its own editing keys", () => {
+    const km = new Keymap(new SettingsStore(null));
+    km.set("edit.duplicate", ["Ctrl+Shift+J"]);
+    expect([keptFromBrowser(km, "Ctrl+Shift+J", "canvas", page), keptFromBrowser(km, "Ctrl+D", "canvas", page)]).toEqual([true, true]);
+    expect(["Ctrl+=", "Ctrl+-", "Ctrl+0"].map((k) => keptFromBrowser(km, k, "note", field))).toEqual([true, true, true]);
+    expect([keptFromBrowser(km, "Ctrl+A", "canvas", field), keptFromBrowser(km, "Ctrl+C", "canvas", page)]).toEqual([false, false]);
   });
 });

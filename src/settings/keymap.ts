@@ -335,11 +335,11 @@ export class Keymap {
   }
 
   /** What to do with a key press: leave it, swallow it, or let the handlers see `to` instead. */
-  resolve(combo: Combo, scope: KeyScope | "none"): { kind: "pass" } | { kind: "swallow" } | { kind: "to"; combo: Combo } {
+  resolve(combo: Combo, scope: KeyScope | "none"): { kind: "pass"; owned?: true } | { kind: "swallow" } | { kind: "to"; combo: Combo } {
     // (a note's keys only in a note; there the app's global keys too; the canvas's everywhere on the canvas but in a note)
     const allowed = (c: KeyCommand): boolean => (scope === "note" ? c.scope === "note" || c.scope === "global" : c.scope !== "note" && (scope === "canvas" || (scope === "global" && c.scope === "global")));
     const owner = KEY_COMMANDS.find((c) => allowed(c) && this.bindings(c.id).includes(combo));
-    if (owner) return owner.internal.includes(combo) ? { kind: "pass" } : { kind: "to", combo: owner.internal[0]! };
+    if (owner) return owner.internal.includes(combo) ? { kind: "pass", owned: true } : { kind: "to", combo: owner.internal[0]! };
     // an internal key of a command that has been given other keys no longer works
     const lost = KEY_COMMANDS.find((c) => allowed(c) && c.internal.includes(combo));
     return lost ? { kind: "swallow" } : { kind: "pass" };
@@ -374,8 +374,13 @@ export function installKeymap(map: Keymap, win: Window = window): void {
     if (sending) return;
     const combo = comboOfEvent(e);
     if (!combo) return;
+    // (the page's zoom keys never zoom the app's page: a canvas and a note zoom themselves)
+    if (PAGE_ZOOM.has(combo) && !map.capturing) e.preventDefault();
     const r = map.resolve(combo, scopeOf(e));
-    if (r.kind === "pass") return;
+    // A key that is a command's own here is the app's, never the browser's too (its find, print, save, bookmarks, page scroll…): its
+    // default is stopped here, once, for every command; the handlers still hear it. Left to the browser: what a text field does with it,
+    // the clipboard keys (their copy and paste events are how the app copies), and Escape (whose handlers ask who took it).
+    if (r.kind === "pass") return void (r.owned && keepsOut(combo, e.target) && e.preventDefault());
     e.preventDefault();
     e.stopImmediatePropagation();
     if (r.kind === "swallow") return;
@@ -402,4 +407,28 @@ export function installKeymap(map: Keymap, win: Window = window): void {
   };
   win.addEventListener("keydown", onDown, true);
   win.addEventListener("keyup", onUp, true);
+  // view-state: (Ctrl with the wheel never zooms the app's page: the canvas, a viewer and a note zoom by it themselves)
+  win.addEventListener("wheel", (e) => void (e.ctrlKey && e.preventDefault()), { capture: true, passive: false });
+}
+
+/** The browser's own zoom keys (and Ctrl with the wheel): never the page's zoom in the app. */
+const PAGE_ZOOM = new Set<Combo>(["Ctrl+=", "Ctrl++", "Ctrl+-", "Ctrl+0", "Ctrl+Shift+=", "Ctrl+Shift++"]);
+/** Keys whose browser default the app needs: the clipboard's (its copy, cut and paste events). */
+const BROWSER_NEEDED = new Set<Combo>(["Ctrl+C", "Ctrl+X", "Ctrl+V", "Ctrl+Shift+V", "Escape"]);
+/** Whether a command's key is kept from the browser here: not in a text field (its own editing keys), not one the app needs the browser for. */
+function keepsOut(combo: Combo, target: EventTarget | null): boolean {
+  if (BROWSER_NEEDED.has(combo)) return false;
+  const t = target as HTMLElement | null;
+  if ((combo === "Space" || combo === "Enter") && t?.closest?.("button, a[href], summary, [role='button'], [role='menuitem']")) return false; // (it presses what has the focus)
+  return !(t && (t.isContentEditable || /^(TEXTAREA|SELECT)$/.test(t.tagName) || (t.tagName === "INPUT" && !/^(range|checkbox|radio|button|color)$/.test((t as HTMLInputElement).type))));
+}
+
+/**
+ * What the browser is left with for a key pressed in a view (`scope`) on `target`: false when the app keeps it (a command's key there, or
+ * the page's zoom). One rule for every shortcut, the one `installKeymap` applies: the audit (tests/unit/keymap.test.ts) checks it for all.
+ */
+export function keptFromBrowser(map: Keymap, combo: Combo, scope: KeyScope, target: EventTarget | null): boolean {
+  if (PAGE_ZOOM.has(combo)) return true;
+  const r = map.resolve(combo, scope);
+  return r.kind === "swallow" || r.kind === "to" || (r.kind === "pass" && !!r.owned && keepsOut(combo, target));
 }

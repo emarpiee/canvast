@@ -1454,6 +1454,7 @@ button.asset-preview { display: flex; align-items: center; justify-content: cent
 .asset-note { margin: 0; font-size: var(--text-sm); color: var(--hud-muted); }
 .asset-warn { color: var(--hud-danger); }
 .tag-chips { display: flex; flex-wrap: wrap; gap: var(--s-2); align-items: center; }
+.tag-chips > .tag-chip ~ .tag-input { margin-top: var(--s-4); } /* (room between the tags and the box to add one, on its own line under them) */
 .tag-chip { display: inline-flex; align-items: center; gap: var(--s-1); padding: var(--s-1) var(--s-2) var(--s-1) var(--s-6); font-size: var(--text-sm); background: var(--hud-hover); border-radius: var(--r-pill); }
 .tag-chip button { font: inherit; color: inherit; background: transparent; border: 0; border-radius: var(--r-dot); width: var(--chip-btn); height: var(--chip-btn); cursor: pointer; }
 .tag-chip button:hover:not(:disabled) { background: var(--hud-hover); }
@@ -1609,6 +1610,7 @@ button.asset-preview { display: flex; align-items: center; justify-content: cent
   --me-blue: var(--code-function); --me-green: var(--hud-success); --me-purple: var(--code-keyword); --me-yellow: var(--code-number); --me-red: var(--hud-danger); --me-grey: var(--hud-muted);
   --me-font: var(--font-ui); --me-mono: var(--font-mono); --me-size: var(--text-md); --me-pad: var(--s-10); --me-gap: var(--s-4); --me-radius: var(--r-sm); --me-btn: var(--ctl); --me-icon: var(--icon-sm);
 }
+.me.set-note-sample { display: block; height: auto; max-height: 22rem; overflow-y: auto; margin-bottom: var(--s-8); padding: var(--s-8) var(--s-12); border: 1px solid var(--hud-border); border-radius: var(--r-md); } /* (Settings > Notes > Note styles: the sample, a page of its own) */
 .viewer-note .me { --me-size: calc(var(--text-md) * var(--note-zoom, 1)); } /* (the text size and not `zoom` or a transform: the editor measures what it selects unscaled) */
 .me .me-btn[aria-pressed="true"] { background: var(--hud-accent); color: var(--hud-accent-fg); }
 /* A video in a note plays in the app's own player bar, under it, as wide as the video. */
@@ -1633,10 +1635,10 @@ button.asset-preview { display: flex; align-items: center; justify-content: cent
 .note-window > .note-dock { width: min(60rem, calc(100vw - var(--sp-8))); max-height: calc(100dvh - var(--sp-8)); box-shadow: var(--hud-lift); }
 .note-dock > .panel-body { flex: 1; min-height: 0; display: flex; padding: 0; overflow: hidden; }
 .note-dock > .panel-body > .viewer-note { flex: 1; min-width: 0; }
-.file-panel-details { display: flex; min-height: 0; border-left: 1px solid var(--hud-border); } /* (the library's details of the open file, at its right: its header's Properties) */
+.file-panel-details { display: flex; flex: 0 0 auto; width: min(20rem, 45%); min-height: 0; border-left: 1px solid var(--hud-border); } /* (a share of the panel: never as wide as its longest line, which pressed the file to nothing) */ /* (the library's details of the open file, at its right: its header's Properties) */
 .file-panel-details[hidden] { display: none; }
-.asset-inspector.is-elsewhere { border: 0; border-radius: 0; overflow-y: auto; }
-.asset-inspector.is-elsewhere .asset-preview-box { display: none; } /* (the file is open beside it) */
+.asset-inspector.is-elsewhere { flex: 1 1 auto; min-width: 0; border: 0; border-radius: 0; overflow-y: auto; }
+.asset-inspector.is-elsewhere :is(.asset-preview-box, .asset-insp-head, .asset-file) { display: none; } /* (the file is open beside it, its name in the panel's header) */
 /* A note open in the viewer: the notes editor fills the stage; the picture's own tools are not shown. */
 .viewer-note { flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; }
 .viewer-note > div { flex: 1; min-height: 0; display: flex; flex-direction: column; }
