@@ -63,7 +63,7 @@ export function openLightbox(pictures: readonly LightboxPicture[], index: number
     level,
     button("me-lightbox-in", words.zoomIn, ICON('<circle cx="11" cy="11" r="7"/><path d="m20 20-4-4M11 8v6M8 11h6"/>'), () => zoomTo(scale * 1.25)),
     button("me-lightbox-fit", words.fit, ICON('<path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/>'), toFit),
-    button("me-lightbox-actual", words.actualSize, ICON('<path d="M5 8l2-2v12M13 8l2-2v12M10 10v.01M10 14v.01"/>'), () => zoomTo(1)),
+    button("me-lightbox-actual", words.actualSize, '<span class="me-lightbox-ratio">1:1</span>', () => zoomTo(1)), // (written, not drawn: a drawn 1:1 read as "11")
     button("me-lightbox-close", words.close, ICON('<path d="M18 6 6 18M6 6l12 12"/>'), () => done()),
   );
   box.append(img, bar);

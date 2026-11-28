@@ -83,7 +83,7 @@ export class OpenNote {
     const text = await blob.text();
     const note = new OpenNote(hash, kind, name, blob.type || "text/plain", null, wordsOf(kind, text), deps, place);
     const host = await note.host();
-    note.editor = await mountNoteEditor(el, { kind, text, mode: deps.settings.get("notes.editorMode"), wrapSelection: deps.settings.get("notes.wrapSelection"), codeColours: deps.settings.get("notes.codeColours"), host, title: titleOf(name), root: place.root?.() ?? null, top: note.propsSlot });
+    note.editor = await mountNoteEditor(el, { kind, text, mode: deps.settings.get("notes.editorMode"), wrapSelection: deps.settings.get("notes.wrapSelection"), codeColours: deps.settings.get("notes.codeColours"), host, title: titleOf(name), root: place.root?.() ?? null, top: note.propsSlot, outline: { side: deps.settings.get("notes.outline"), set: (s) => deps.settings.set("notes.outline", s) } });
     open.add(note);
     await note.readWhole();
     if (!followed.has(deps.session)) {

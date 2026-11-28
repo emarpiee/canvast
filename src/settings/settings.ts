@@ -226,6 +226,7 @@ export const SETTINGS = {
   "notes.vim": { scope: "device", default: false, validate: bool, effect: "immediate" } as Def<boolean>,
   // Note styles (Settings > Notes): what the note's words, links, tables and headings look like in the editor, its preview and its card;
   // a colour left empty is the theme's.
+  "notes.outline": { scope: "device", default: "off", validate: oneOf("off", "left", "right"), effect: "immediate" } as Def<"off" | "left" | "right">,
   "ui.chipsGap": { scope: "device", default: 0, validate: range(0, 240), effect: "immediate" } as Def<number>,
   "notes.propertiesInNote": { scope: "device", default: false, validate: bool, effect: "immediate" } as Def<boolean>,
   "notes.style.boldWeight": { scope: "device", default: 700, validate: range(500, 900), effect: "immediate" } as Def<number>,
@@ -242,6 +243,12 @@ export const SETTINGS = {
   "notes.style.tableCellColour": { scope: "device", default: "", validate: colourOrTheme, effect: "immediate" } as Def<string>,
   "notes.style.tableRowColour": { scope: "device", default: "", validate: colourOrTheme, effect: "immediate" } as Def<string>,
   "notes.style.tableColumnColour": { scope: "device", default: "", validate: colourOrTheme, effect: "immediate" } as Def<string>,
+  "notes.style.tableHeaderTextColour": { scope: "device", default: "", validate: colourOrTheme, effect: "immediate" } as Def<string>,
+  "notes.style.tableCellTextColour": { scope: "device", default: "", validate: colourOrTheme, effect: "immediate" } as Def<string>,
+  "notes.style.checkboxColour": { scope: "device", default: "", validate: colourOrTheme, effect: "immediate" } as Def<string>,
+  "notes.style.checkboxRoundness": { scope: "device", default: 4, validate: range(0, 9), effect: "immediate" } as Def<number>,
+  "notes.style.bullet": { scope: "device", default: "disc", validate: oneOf("disc", "circle", "square", "dash", "arrow"), effect: "immediate" } as Def<"disc" | "circle" | "square" | "dash" | "arrow">,
+  "notes.style.numbering": { scope: "device", default: "decimal", validate: oneOf("decimal", "lower-alpha", "upper-alpha", "lower-roman", "upper-roman"), effect: "immediate" } as Def<"decimal" | "lower-alpha" | "upper-alpha" | "lower-roman" | "upper-roman">,
   "notes.style.h1Colour": { scope: "device", default: "", validate: colourOrTheme, effect: "immediate" } as Def<string>,
   "notes.style.h2Colour": { scope: "device", default: "", validate: colourOrTheme, effect: "immediate" } as Def<string>,
   "notes.style.h3Colour": { scope: "device", default: "", validate: colourOrTheme, effect: "immediate" } as Def<string>,

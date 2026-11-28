@@ -198,8 +198,13 @@ const footnotes: MarkdownConfig = {
         const label = cx.elt("FootnoteLabel", start + 2, start + 2 + m[1]!.length);
         const marks = [cx.elt("FootnoteMark", start, start + m[0].length), label];
         let end = cx.lineStart + line.text.length;
-        // (its next lines, indented, are its own)
-        while (cx.nextLine() && /^(\t| {2,})\S/.test(line.text)) end = cx.lineStart + line.text.length;
+        // (its next lines, indented, are its own, paragraphs after a blank line too, as notes apps read them: four spaces or a tab)
+        const indented = (t: string): boolean => /^(\t| {2,})\S/.test(t);
+        while (cx.nextLine()) {
+          if (indented(line.text)) end = cx.lineStart + line.text.length;
+          else if (!line.text.trim() && indented(cx.peekLine())) continue;
+          else break;
+        }
         cx.addElement(cx.elt("FootnoteDef", start, end, marks));
         return true;
       },

@@ -79,7 +79,7 @@ export function renderMarkdown(md: string, opts: RenderOptions = {}): string {
       } else if (n.name === "InlineFootnote") (fnInline.push(text(n.from + 2, n.to - 1)), inlineNumbers.push(++fnCount));
       else if (n.name === "FootnoteDef") {
         const m = /^\[\^([^\]\s]+)\]:[ \t]?/.exec(text(n.from, n.to));
-        if (m) fnDefs.set(m[1]!, text(n.from + m[0].length, n.to).replace(/\n(\t| {2,})/g, "\n"));
+        if (m) fnDefs.set(m[1]!, text(n.from + m[0].length, n.to).replace(/\n(\t| {2,4})/g, "\n"));
       }
     },
   });
@@ -152,12 +152,12 @@ export function renderMarkdown(md: string, opts: RenderOptions = {}): string {
       }
       case "FootnoteRef": {
         const l = text(n.from + 2, n.to - 1), id = encodeURIComponent(l);
-        return `<sup class="footnote-ref"><a href="#fn-${id}" id="fnref-${id}" data-footnote="${escapeHtml(l)}">${fnNumber.get(l) ?? "?"}</a></sup>`;
+        return `<sup class="footnote-ref"><a href="#fn-${id}" id="fnref-${id}" data-footnote="${escapeHtml(l)}">[${fnNumber.get(l) ?? "?"}]</a></sup>`;
       }
       case "InlineFootnote": {
         const k = fnInlineAt++;
         const num = inlineNumbers[k] ?? k + 1;
-        return `<sup class="footnote-ref"><a href="#fn-i${k}" id="fnref-i${k}">${num}</a></sup>`;
+        return `<sup class="footnote-ref"><a href="#fn-i${k}" id="fnref-i${k}">[${num}]</a></sup>`;
       }
       case "InlineMath":
         return `<span class="math" data-tex="${escapeHtml(text(n.from + 1, n.to - 1))}">${escapeHtml(text(n.from, n.to))}</span>`;
@@ -351,10 +351,16 @@ export function renderMarkdown(md: string, opts: RenderOptions = {}): string {
   const body = blocks(tree.topNode);
   if (!fnNumber.size && !fnInline.length) return body;
   // (the footnotes at the end, in their numbers' order, each back to where it is referred to)
-  const sub = (md: string): string => renderMarkdown(md, { ...opts, taskOffsets: false }).replace(/^<p>|<\/p>$/g, "");
+  // (a footnote of one paragraph stands on its number's line; one of several keeps its paragraphs, the first on that line: CSS)
+  const sub = (md: string): string => {
+    const html = renderMarkdown(md, { ...opts, taskOffsets: false });
+    return (html.match(/<p>/g) ?? []).length === 1 && html.startsWith("<p>") && html.endsWith("</p>") ? html.slice(3, -4) : html;
+  };
+  /** A footnote's words with its way back at their end (inside its last paragraph, as notes apps put it). */
+  const withBack = (html: string, back: string): string => (html.endsWith("</p>") ? `${html.slice(0, -4)} ${back}</p>` : `${html} ${back}`);
   const items = [
     ...[...fnNumber].map(([l, n]) => ({ n, id: encodeURIComponent(l), html: fnDefs.has(l) ? sub(fnDefs.get(l)!) : "" })),
     ...fnInline.map((t, k) => ({ n: inlineNumbers[k] ?? k + 1, id: `i${k}`, html: sub(t) })),
   ].sort((a, b) => a.n - b.n);
-  return `${body}<section class="footnotes"><hr><ol>${items.map((f) => `<li id="fn-${f.id}" value="${f.n}">${f.html} <a href="#fnref-${f.id}" class="footnote-backref" aria-label="Back">↩︎</a></li>`).join("")}</ol></section>`;
+  return `${body}<section class="footnotes"><hr><ol>${items.map((f) => `<li id="fn-${f.id}" value="${f.n}">${withBack(f.html, `<a href="#fnref-${f.id}" class="footnote-backref" aria-label="Back">↩︎</a>`)}</li>`).join("")}</ol></section>`;
 }

@@ -2,6 +2,8 @@
 // show their marks (a heading's `#`, `**`, a quote's `>`, a list's `-`, a task's `[ ]`, a picture's source); links, wiki links and
 // highlights show theirs only where the selection touches them. Elsewhere marks are hidden and pictures, task boxes, rules, callouts,
 // code cards and tables are drawn. Source mode is the same editor without this layer.
+import { renderMarkdown } from "./render";
+import { hideFootnote, showFootnote } from "./footnotes";
 import { syntaxTree } from "@codemirror/language";
 import { StateEffect, StateField, type EditorState, type Extension, type Range } from "@codemirror/state";
 import { Decoration, EditorView, ViewPlugin, WidgetType, type DecorationSet, type ViewUpdate } from "@codemirror/view";
@@ -302,8 +304,12 @@ class FootnoteWidget extends WidgetType {
   override toDOM(view: EditorView): HTMLElement {
     const s = document.createElement("sup");
     s.className = "me-fn";
-    s.textContent = String(this.n || "?");
-    if (this.words) s.title = this.words;
+    s.textContent = `[${this.n || "?"}]`;
+    // view-state: (its words in the footnotes' popover while the pointer is on it, as the preview's)
+    if (this.words) {
+      s.addEventListener("mouseenter", () => showFootnote(s, renderMarkdown(this.words, { html: false }).replace(/^<p>/, "").replace(/<\/p>$/, "")));
+      s.addEventListener("mouseleave", () => hideFootnote());
+    }
     if (this.label !== null) {
       const label = this.label;
       // view-state: (goes to the footnote's words: moves the cursor there)
@@ -403,8 +409,24 @@ class BulletWidget extends WidgetType {
   }
   override toDOM(): HTMLElement {
     const s = document.createElement("span");
-    s.className = "me-bullet";
-    s.textContent = "•";
+    s.className = "me-bullet"; // (its mark from the note styles: --me-bullet)
+    return s;
+  }
+}
+
+/** A numbered item's number, counted in the numbering of the note styles (1., a., i., …), the file's own number and mark kept. */
+class NumberWidget extends WidgetType {
+  constructor(readonly n: number, readonly delim: string) {
+    super();
+  }
+  override eq(o: NumberWidget): boolean {
+    return o.n === this.n && o.delim === this.delim;
+  }
+  override toDOM(): HTMLElement {
+    const s = document.createElement("span");
+    s.className = "me-list-number me-ol-mark";
+    s.style.setProperty("--me-n", String(this.n));
+    s.style.setProperty("--me-ol-delim", `"${this.delim}"`);
     return s;
   }
 }
@@ -774,7 +796,11 @@ function decorations(view: EditorView, ctx: LiveContext): DecorationSet {
             if (lineActive(n.from)) return;
             if (n.parent?.getChild("Task") || /^\s*\[[-/>]\]/.test(state.sliceDoc(n.to, lineOf(n.from).to))) hideMark(n.from, n.to, true);
             else if (n.parent?.parent?.name === "BulletList") out.push(Decoration.replace({ widget: new BulletWidget() }).range(n.from, n.to));
-            else out.push(Decoration.mark({ class: "me-list-number" }).range(n.from, n.to));
+            else {
+              // (off its line, the number drawn in the note styles' numbering; the file keeps its own, shown on its line)
+              const m = /^(\d{1,9})([.)])$/.exec(text(n));
+              out.push(m ? Decoration.replace({ widget: new NumberWidget(Number(m[1]), m[2]!) }).range(n.from, n.to) : Decoration.mark({ class: "me-list-number" }).range(n.from, n.to));
+            }
             return;
           }
           case "TaskMarker": {

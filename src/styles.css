@@ -1407,7 +1407,7 @@ body.is-placing :is(#nav, .view-settings, .assets-bar) { visibility: hidden; }
 .side-name { flex: 1; min-width: 0; font: inherit; color: inherit; background: var(--hud-bg); border: 1px solid var(--hud-accent); border-radius: var(--r-sm); padding: var(--s-2) var(--s-4); }
 .side-empty { padding: var(--s-2) var(--s-6); color: var(--hud-muted); font-size: var(--text-sm); }
 /* a long list: its first rows, then one full-width button for the rest (and back) */
-.side-show-row, .tag-cloud .side-show-row { flex: 1 0 100%; }
+.side-show-row, .tag-cloud .side-show-row { flex: 1 0 100%; list-style: none; } /* (the shared Show more button alone, not a row of the list: it looks as it does in every card) */
 /* The one Show more / Show fewer of a long list (src/ui/show-more.ts). */
 .show-more { display: block; width: 100%; margin-top: var(--s-2); padding: var(--s-2) var(--s-6); font: inherit; font-size: var(--text-sm); color: var(--hud-muted); text-align: center; background: transparent; border: 1px dashed var(--hud-border); border-radius: var(--r-sm); cursor: pointer; }
 .show-more:hover { color: var(--hud-fg); background: var(--hud-hover); }
@@ -1612,7 +1612,7 @@ button.asset-preview { display: flex; align-items: center; justify-content: cent
   --me-blue: var(--code-function); --me-green: var(--hud-success); --me-purple: var(--code-keyword); --me-yellow: var(--code-number); --me-red: var(--hud-danger); --me-grey: var(--hud-muted);
   --me-font: var(--font-ui); --me-mono: var(--font-mono); --me-size: var(--text-md); --me-pad: var(--s-10); --me-gap: var(--s-4); --me-radius: var(--r-sm); --me-btn: var(--ctl); --me-icon: var(--icon-sm);
 }
-.me.set-note-sample { display: block; height: auto; max-height: 22rem; overflow-y: auto; margin-bottom: var(--s-8); padding: var(--s-8) var(--s-12); border: 1px solid var(--hud-border); border-radius: var(--r-md); } /* (Settings > Notes > Note styles: the sample, a page of its own) */
+.me.set-note-sample { display: block; height: 22rem; min-height: 22rem; max-height: max-content; resize: vertical; overflow-y: auto; /* (taller by its corner, up to all of it) */ margin-bottom: var(--s-8); padding: var(--s-8) var(--s-12); border: 1px solid var(--hud-border); border-radius: var(--r-md); } /* (Settings > Notes > Note styles: the sample, a page of its own) */
 .viewer-note .me { --me-size: calc(var(--text-md) * var(--note-zoom, 1)); } /* (the text size and not `zoom` or a transform: the editor measures what it selects unscaled) */
 .me .me-btn[aria-pressed="true"] { background: var(--hud-accent); color: var(--hud-accent-fg); }
 /* A video in a note plays in the app's own player bar, under it, as wide as the video. */
@@ -1649,6 +1649,7 @@ button.asset-preview { display: flex; align-items: center; justify-content: cent
 .viewer-note .me { flex: 1; min-height: 0; }
 .viewer.is-note .viewer-stage { display: flex; padding-top: var(--under-viewer-buttons); background: var(--paper); } /* (under the viewer's Back and Details buttons, the same room above and below them, in every density) */
 .viewer.is-note .viewer-stage > figure:not(:where(.viewer-note *)), .viewer.is-note .viewer-edge, .viewer.is-note .viewer-ground { display: none; }
+.viewer.is-note :is(.vbtn.viewer-back, .vbtn.viewer-details, .vbtn.viewer-hide) { color: var(--hud-fg); background: var(--paper); border-color: var(--hud-border); } /* (on a file's page, the page's theme: the stage's dark pill is for pictures) */
 .viewer-progress { position: absolute; left: 0; top: 0; height: 3px; width: 100%; background: var(--hud-accent); transform-origin: left; transform: scaleX(0); z-index: 1; }
 .viewer-progress[hidden] { display: none; }
 .viewer-progress.is-running { animation: show-run var(--ms, 5000ms) linear forwards; }
@@ -2403,11 +2404,11 @@ body[data-viewing] #nav, body[data-viewing] .view-settings { display: none; }
 
 /* Zen mode (ADR 0075): the floating bars and panels fade out and show again while the pointer is over them or the focus is inside. */
 :root[data-zen="on"] #nav, :root[data-zen="on"] #toolbar > .rail, :root[data-zen="on"] #toolbar > .dock, :root[data-zen="on"] #toolbar > .toolbar,
-:root[data-zen="on"] .hud-readout, :root[data-zen="on"] .hud-controls, :root[data-zen="on"] #side-panels, :root[data-zen="on"] #side-panels-left, :root[data-zen="on"] .ctx-bar { opacity: 0; transition: opacity var(--dur-slow) var(--ease-in-out); }
+:root[data-zen="on"] .hud-readout, :root[data-zen="on"] .hud-controls, :root[data-zen="on"] #side-panels, :root[data-zen="on"] #side-panels-left, :root[data-zen="on"] .ctx-wrap > * { opacity: 0; transition: opacity var(--dur-slow) var(--ease-in-out); }
 :root[data-zen="on"] #nav:hover, :root[data-zen="on"] #nav:focus-within, :root[data-zen="on"] #toolbar > .rail:hover, :root[data-zen="on"] #toolbar > .rail:focus-within,
 :root[data-zen="on"] #toolbar > .dock:hover, :root[data-zen="on"] #toolbar > .dock:focus-within, :root[data-zen="on"] #toolbar > .toolbar:hover, :root[data-zen="on"] #toolbar > .toolbar:focus-within,
 :root[data-zen="on"] .hud-readout:hover, :root[data-zen="on"] .hud-readout:focus-within, :root[data-zen="on"] .hud-controls:hover, :root[data-zen="on"] .hud-controls:focus-within,
-:root[data-zen="on"] #side-panels:hover, :root[data-zen="on"] #side-panels:focus-within, :root[data-zen="on"] #side-panels-left:hover, :root[data-zen="on"] #side-panels-left:focus-within, :root[data-zen="on"] .ctx-bar:hover, :root[data-zen="on"] .ctx-bar:focus-within,
+:root[data-zen="on"] #side-panels:hover, :root[data-zen="on"] #side-panels:focus-within, :root[data-zen="on"] #side-panels-left:hover, :root[data-zen="on"] #side-panels-left:focus-within, :root[data-zen="on"] .ctx-wrap > *:hover, :root[data-zen="on"] .ctx-wrap > *:focus-within,
 /* A saving problem is never hidden. */
 :root[data-zen="on"] .hud-readout.has-save-problem { opacity: 1; }
 

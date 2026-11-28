@@ -1,5 +1,7 @@
 // The Markdown editor: one CodeMirror view for live and source mode, a rendered page for preview mode, a toolbar, and the hooks a host fills in
 // (pictures, links, tags, files, saving). It knows nothing of the app it is in.
+import { mountOutline, type Outline, type OutlineSide } from "./outline";
+import { footnoteClick, footnoteHover } from "./footnotes";
 import { autocompletion, completionStatus, type Completion, type CompletionContext, type CompletionResult } from "@codemirror/autocomplete";
 import { defaultKeymap, history, historyKeymap, indentWithTab, redo, undo } from "@codemirror/commands";
 import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
@@ -116,7 +118,7 @@ export interface EditorLabels {
   bulletList: string; orderedList: string; taskList: string; toggleTask: string; quote: string; codeBlock: string; table: string; rule: string;
   picture: string; find: string; save: string; task: string; placeholder: string; toolbar: string; format: string; insert: string;
   turnInto: string; copyCode: string; copied: string; codeLanguage: string; addRow: string; addColumn: string;
-  heading4: string; callout: string; mathBlock: string; math: string; image: string; plainText: string; resize: string; zoomPicture: string; editPicture: string; duplicatePicture: string; removePicture: string; zoomIn: string; zoomOut: string; fit: string; actualSize: string; tableActions: string; moveTable: string; moveBlock: string; missingEmbed: string; openEmbed: string; findField: string; replaceField: string; findNext: string; findPrevious: string; matchCase: string; regexp: string; wholeWord: string; showReplace: string; replaceOne: string; replaceAll: string; findCount: string; findNone: string;
+  heading4: string; callout: string; mathBlock: string; math: string; image: string; plainText: string; resize: string; zoomPicture: string; editPicture: string; duplicatePicture: string; removePicture: string; zoomIn: string; zoomOut: string; fit: string; actualSize: string; tableActions: string; moveTable: string; moveBlock: string; outline: string; outlineOff: string; outlineLeft: string; outlineRight: string; noHeadings: string; outlineResize: string; missingEmbed: string; openEmbed: string; findField: string; replaceField: string; findNext: string; findPrevious: string; matchCase: string; regexp: string; wholeWord: string; showReplace: string; replaceOne: string; replaceAll: string; findCount: string; findNone: string;
   today: string; yesterday: string; tomorrow: string; now: string;
   rowAbove: string; rowBelow: string; colBefore: string; colAfter: string; rowUp: string; rowDown: string; colLeft: string; colRight: string;
   dupRow: string; dupCol: string; alignLeft: string; alignCenter: string; alignRight: string; sortUp: string; sortDown: string;
@@ -135,7 +137,7 @@ export const DEFAULT_LABELS: EditorLabels = {
   bulletList: "Bulleted list", orderedList: "Numbered list", taskList: "Task list", toggleTask: "Tick task", quote: "Quote", codeBlock: "Code block", table: "Table", rule: "Divider",
   picture: "Picture", find: "Find", save: "Save", task: "Done", placeholder: "Write, or press / for blocks", toolbar: "Formatting", format: "Format", insert: "Insert",
   turnInto: "Turn into", copyCode: "Copy code", copied: "Copied", codeLanguage: "Choose a language", addRow: "Add a row", addColumn: "Add a column",
-  heading4: "Heading 4", callout: "Callout", mathBlock: "Math block", math: "Math", image: "Image", plainText: "text", resize: "Drag to resize", zoomPicture: "View full size", editPicture: "Edit its Markdown", duplicatePicture: "Duplicate", removePicture: "Remove from the note", zoomIn: "Zoom in", zoomOut: "Zoom out", fit: "Fit to view", actualSize: "Actual size", tableActions: "Table", moveTable: "Drag to move the table", moveBlock: "Drag to move this block", missingEmbed: "“{name}” could not be found.", openEmbed: "Show the file", findField: "Find", replaceField: "Replace with", findNext: "Next (Enter)", findPrevious: "Previous (Shift+Enter)", matchCase: "Match case", regexp: "Regular expression", wholeWord: "Whole words", showReplace: "Replace", replaceOne: "Replace this one", replaceAll: "Replace all", findCount: "{n} of {m}", findNone: "No results",
+  heading4: "Heading 4", callout: "Callout", mathBlock: "Math block", math: "Math", image: "Image", plainText: "text", resize: "Drag to resize", zoomPicture: "View full size", editPicture: "Edit its Markdown", duplicatePicture: "Duplicate", removePicture: "Remove from the note", zoomIn: "Zoom in", zoomOut: "Zoom out", fit: "Fit to view", actualSize: "Actual size", tableActions: "Table", moveTable: "Drag to move the table", moveBlock: "Drag to move this block", outline: "Outline", outlineOff: "Outline: off (click: on the left)", outlineLeft: "Outline: on the left (click: on the right)", outlineRight: "Outline: on the right (click: off)", noHeadings: "No headings", outlineResize: "Drag to change its height", missingEmbed: "“{name}” could not be found.", openEmbed: "Show the file", findField: "Find", replaceField: "Replace with", findNext: "Next (Enter)", findPrevious: "Previous (Shift+Enter)", matchCase: "Match case", regexp: "Regular expression", wholeWord: "Whole words", showReplace: "Replace", replaceOne: "Replace this one", replaceAll: "Replace all", findCount: "{n} of {m}", findNone: "No results",
   today: "Today", yesterday: "Yesterday", tomorrow: "Tomorrow", now: "Now",
   rowAbove: "Add row above", rowBelow: "Add row below", colBefore: "Add column before", colAfter: "Add column after", rowUp: "Move row up", rowDown: "Move row down",
   colLeft: "Move column left", colRight: "Move column right", dupRow: "Duplicate row", dupCol: "Duplicate column", alignLeft: "Align left", alignCenter: "Align center",
@@ -190,6 +192,9 @@ export interface EditorOptions {
   onChange?(value: string): void;
   /** The person switched the mode. */
   onMode?(mode: EditorMode): void;
+  /** Where the note's outline floats at first ("off": not shown), and where the person put it (to keep it from note to note). */
+  outline?: OutlineSide;
+  onOutline?(side: OutlineSide): void;
 }
 
 export interface MarkdownEditor {
@@ -254,7 +259,8 @@ export function createMarkdownEditor(opts: EditorOptions): MarkdownEditor {
   const preview = document.createElement("div");
   preview.className = "me-preview";
   preview.hidden = true;
-  preview.tabIndex = -1; // (focusable: in preview mode the note's keys are pressed there)
+  preview.tabIndex = -1;
+  footnoteHover(preview); // (focusable: in preview mode the note's keys are pressed there)
   const page = document.createElement("div");
   page.className = "me-page me-doc";
   preview.append(page);
@@ -436,12 +442,19 @@ export function createMarkdownEditor(opts: EditorOptions): MarkdownEditor {
     }
     return out;
   };
+  /** The note's outline (outline.ts): made with the view, below. */
+  let outline: Outline | null = null;
+  let outlineTimer = 0;
+  const outlineSoon = (): void => void (outline?.side !== "off" && (window.clearTimeout(outlineTimer), (outlineTimer = window.setTimeout(() => outline?.update(), 120))));
   const extensions: Extension[] = [
     history(),
     search({ top: true, createPanel: findBar({ find: labels.findField, replace: labels.replaceField, next: labels.findNext, previous: labels.findPrevious, matchCase: labels.matchCase, regexp: labels.regexp, wholeWord: labels.wholeWord, showReplace: labels.showReplace, replaceOne: labels.replaceOne, replaceAll: labels.replaceAll, close: labels.close, count: labels.findCount, none: labels.findNone }) }),
     placeholderExt(labels.placeholder),
     EditorView.updateListener.of((u) => {
       if (u.docChanged && !silent) opts.onChange?.(u.state.sliceDoc());
+      // (the outline follows the headings and the cursor; its place follows the find bar and the editor's size)
+      if (u.docChanged || u.selectionSet) outlineSoon();
+      if (u.geometryChanged) outline?.place();
     }),
     ...editorSetup(false),
     EditorView.domEventHandlers({
@@ -538,6 +551,8 @@ export function createMarkdownEditor(opts: EditorOptions): MarkdownEditor {
   const stateOf = (text: string): EditorState => EditorState.create({ doc: text, extensions: [extensions, lineEnds(text)] });
   const view = new EditorView({ state: stateOf(opts.value ?? ""), parent: body });
   if (!plain) initialFolds(view);
+  outline = plain ? null : mountOutline(body, view, { previewing: () => mode === "preview", page, labels: { outline: labels.outline, noHeadings: labels.noHeadings, resize: labels.outlineResize } });
+  outline?.set(opts.outline ?? "off");
   // The link popover: a wiki link's note in a small editor, to read and write in.
   const popover = !plain && host.linkTarget
     ? linkPopover(view, {
@@ -660,6 +675,7 @@ export function createMarkdownEditor(opts: EditorOptions): MarkdownEditor {
     const a = t.closest<HTMLElement>("a[href], [data-wiki], img[data-embed], img[data-src]");
     if (!a) return;
     e.preventDefault();
+    if (footnoteClick(preview, a)) return; // (a footnote's reference or its way back: the other end, on this page)
     if (a.tagName === "A" && !a.hasAttribute("data-wiki")) host.open?.({ link: a.getAttribute("href") ?? "", wiki: false, media: false });
     else host.open?.(followed(a));
   });
@@ -676,7 +692,7 @@ export function createMarkdownEditor(opts: EditorOptions): MarkdownEditor {
       groups.push(`<div class="me-group" role="group" aria-label="${esc(labels.format)}">${FORMAT_TOOLS.map((n) => btn(n, icons[n], labels[n], KEYS[n])).join("")}</div>`);
       groups.push(`<div class="me-group" role="group" aria-label="${esc(labels.insert)}">${BLOCK_TOOLS.map((n) => btn(n, icons[n], labels[n])).join("")}${host.choosePicture ? btn("picture", icons.picture, labels.picture) : ""}</div>`);
     }
-    groups.push(`<div class="me-group">${btn("find", icons.find, labels.find, KEYS["find"])}${host.save ? btn("save", icons.save, labels.save, KEYS["save"]) : ""}</div>`);
+    groups.push(`<div class="me-group">${plain ? "" : btn("outline", icons.outline, labels.outline)}${btn("find", icons.find, labels.find, KEYS["find"])}${host.save ? btn("save", icons.save, labels.save, KEYS["save"]) : ""}</div>`);
     bar.innerHTML = groups.join("");
     syncBar();
   };
@@ -684,6 +700,12 @@ export function createMarkdownEditor(opts: EditorOptions): MarkdownEditor {
     for (const b of bar.querySelectorAll<HTMLButtonElement>("[data-me]")) {
       const name = b.dataset["me"]!;
       if (name.startsWith("mode:")) b.setAttribute("aria-pressed", String(name.slice(5) === mode));
+      else if (name === "outline") {
+        const side = outline?.side ?? "off";
+        b.setAttribute("aria-pressed", String(side !== "off"));
+        b.dataset["side"] = side;
+        b.title = side === "left" ? labels.outlineLeft : side === "right" ? labels.outlineRight : labels.outlineOff;
+      }
       else if (name !== "save") b.disabled = mode === "preview";
     }
   };
@@ -695,6 +717,13 @@ export function createMarkdownEditor(opts: EditorOptions): MarkdownEditor {
     if (name.startsWith("mode:")) return setModeBy(name.slice(5) as EditorMode);
     if (name === "save") return host.save?.();
     if (name === "find") return void openSearchPanel(view);
+    if (name === "outline" && outline) {
+      // (off, at the left, at the right, off again)
+      const next: OutlineSide = outline.side === "off" ? "left" : outline.side === "left" ? "right" : "off";
+      outline.set(next);
+      opts.onOutline?.(next);
+      return syncBar();
+    }
     if (name === "picture") return void pickPicture();
     // (in a table cell the words' own formats act on the cell; a block's have no place on a cell's line)
     if (activeCell && INLINE_FORMATS.has(name)) return void (COMMANDS[name as FormatName]?.(activeCell), activeCell.focus());
@@ -716,6 +745,8 @@ export function createMarkdownEditor(opts: EditorOptions): MarkdownEditor {
     preview.hidden = !showPreview;
     if (showPreview) drawPreview();
     else if (opts.top && !view.contentDOM.contains(opts.top)) view.dispatch({ effects: placeTop.of(null) });
+    outline?.update();
+    outline?.place();
     syncBar();
   };
   const setModeBy = (m: EditorMode): void => {
@@ -807,6 +838,7 @@ export function createMarkdownEditor(opts: EditorOptions): MarkdownEditor {
       else view.focus();
     },
     destroy() {
+      outline?.destroy();
       popover?.destroy();
       closePopover();
       view.destroy();

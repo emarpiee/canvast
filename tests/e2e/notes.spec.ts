@@ -1350,6 +1350,22 @@ test("lists as notes apps write them: Enter adds the next item right below, numb
   await expect.poll(() => text(p)).toMatch(/^- \[x\] plain\n\n# Lists\n/);
   await p.keyboard.press("Control+z");
   await expect.poll(() => text(p)).toBe(before);
+  // The outline: off, at the left, at the right, off again; its headings; the words never under it; a heading clicked puts the cursor at its line's end.
+  const outlineBtn = note(p).locator('[data-me="outline"]');
+  const outline = note(p).locator(".me-outline");
+  await outlineBtn.click();
+  await expect(outline).toBeVisible();
+  await expect(outline.locator(".me-outline-item")).toHaveText(["Lists"]);
+  const ob = (await outline.boundingBox())!, firstLine = (await heading(p).boundingBox())!;
+  expect(firstLine.x, "the words start right of the outline").toBeGreaterThan(ob.x + ob.width);
+  await page(p).locator(".cm-line", { hasText: "plain" }).click();
+  await outline.locator(".me-outline-item").first().click();
+  await expect(page(p).locator(".cm-activeLine")).toContainText("Lists");
+  await outlineBtn.click();
+  const ob2 = (await outline.boundingBox())!;
+  expect(ob2.x, "now at the right").toBeGreaterThan(firstLine.x);
+  await outlineBtn.click();
+  await expect(outline).toBeHidden();
 });
 
 test("lists in a callout and in a table cell are drawn as lists; Turn into keeps the selected words (code block, table: a row per line)", async ({ app }) => {

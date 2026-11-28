@@ -114,6 +114,13 @@ describe("a format key over links and lines", () => {
     expect(await run("- one\n- two", 0, 11)).toBe("- **one**\n- **two**");
     expect(await run("**one**\n**two**", 0, 15)).toBe("one\ntwo");
   });
+  it("bold and italic combine, in either order, and come off one at a time (1 italic, 2 bold, 3 both)", async () => {
+    expect(await run("**Hello**", 2, 7, "*")).toBe("***Hello***");
+    expect(await run("*Hello*", 1, 6, "**")).toBe("***Hello***");
+    expect(await run("***Hello***", 3, 8, "*")).toBe("**Hello**");
+    expect(await run("***Hello***", 3, 8, "**")).toBe("*Hello*");
+    expect(await run("**Hello**", 0, 9, "*")).toBe("***Hello***");
+  });
   it("plain words: a word with the cursor in it, a selection, an empty pair", async () => {
     expect(await run("good day", 2)).toBe("**good** day");
     expect(await run("good day", 0, 4)).toBe("**good** day");
@@ -183,11 +190,16 @@ describe("a table pasted from another app", () => {
 describe("footnotes, as notes apps write them", () => {
   it("number references by their first use and inline ones where they stand, and list them at the end with a way back", () => {
     const html = renderMarkdown("A[^b] then^[inline *one*] and [^a] and [^b] again.\n\n[^a]: The a.\n[^b]: The b,\n  on two lines.\n");
-    expect(html).toContain('<a href="#fn-b" id="fnref-b" data-footnote="b">1</a>');
-    expect(html).toContain('<a href="#fn-i0" id="fnref-i0">2</a>');
-    expect(html).toContain('<a href="#fn-a" id="fnref-a" data-footnote="a">3</a>');
+    expect(html).toContain('<a href="#fn-b" id="fnref-b" data-footnote="b">[1]</a>');
+    expect(html).toContain('<a href="#fn-i0" id="fnref-i0">[2]</a>');
+    expect(html).toContain('<a href="#fn-a" id="fnref-a" data-footnote="a">[3]</a>');
     expect(html).toMatch(/<section class="footnotes"><hr><ol><li id="fn-b" value="1">The b,<br>on two lines\. <a href="#fnref-b"/);
     expect(html).toContain('<li id="fn-i0" value="2">inline <em>one</em>');
     expect(html).not.toContain("[^a]: The a.");
+    // (a footnote's indented paragraphs after a blank line are its own, never a code block)
+    const big = renderMarkdown("Long one.[^big]\n\n[^big]: First.\n\n    Second paragraph.\n\n    `code`\n\nAfter.");
+    expect(big).toContain('<li id="fn-big" value="1"><p>First.</p><p>Second paragraph.</p><p><code>code</code> <a href="#fnref-big" class="footnote-backref" aria-label="Back">↩︎</a></p></li>');
+    expect(big).not.toContain("<pre");
+    expect(big).toContain("<p>After.</p>");
   });
 });

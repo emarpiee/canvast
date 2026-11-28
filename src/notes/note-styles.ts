@@ -16,6 +16,9 @@ export function headingSizes(h1: number, mode: "steps" | "same"): number[] {
   return [1, 2, 3, 4, 5, 6].map((n) => (mode === "same" ? top : Math.pow(top, (6 - n) / 5)));
 }
 
+/** Each bullet: its mark in live editing, and the list style of a drawn page (the same mark). */
+const BULLETS: Readonly<Record<string, readonly [string, string]>> = { disc: ["•", "disc"], circle: ["◦", "circle"], square: ["▪", "square"], dash: ["–", '"–  "'], arrow: ["›", '"›  "'] };
+
 /** The properties for the note styles chosen now. */
 export function noteStyleVars(get: Get): string {
   const out: string[] = [];
@@ -32,6 +35,13 @@ export function noteStyleVars(get: Get): string {
   colour("td-bg", "notes.style.tableCellColour");
   colour("tr-bg", "notes.style.tableRowColour");
   colour("col-bg", "notes.style.tableColumnColour");
+  colour("th-fg", "notes.style.tableHeaderTextColour");
+  colour("td-fg", "notes.style.tableCellTextColour");
+  colour("check", "notes.style.checkboxColour");
+  out.push(`--me-check-radius: ${Number(get("notes.style.checkboxRoundness") ?? 4)}px;`);
+  const bullet = BULLETS[String(get("notes.style.bullet"))] ?? BULLETS["disc"]!;
+  out.push(`--me-bullet: "${bullet[0]}"; --me-ul-type: ${bullet[1]};`);
+  out.push(`--me-ol-type: ${/^(decimal|lower-alpha|upper-alpha|lower-roman|upper-roman)$/.test(String(get("notes.style.numbering"))) ? String(get("notes.style.numbering")) : "decimal"};`);
   out.push(`--me-strong-weight: ${Number(get("notes.style.boldWeight")) || 700};`);
   out.push(`--me-list-gap: ${Number(get("notes.style.listGap") ?? 0.3)}em;`);
   const rainbow = get("notes.style.headingColours") === "rainbow";

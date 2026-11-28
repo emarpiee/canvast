@@ -35,6 +35,22 @@ export const EDITOR_CSS = `
 :where(.me-btn:disabled) { opacity: 0.4; cursor: default; }
 :where(.me-body) { position: relative; flex: 1; min-height: 0; overflow: hidden; }
 :where(.me-body > .cm-editor) { height: 100%; }
+:where(.me) { --me-outline-w: 220px; --me-outline-edge: 12px; }
+:where(.me-outline) { position: absolute; z-index: 4; display: flex; flex-direction: column; width: var(--me-outline-w); min-height: 80px; box-sizing: border-box; background: var(--me-bg); border: 1px solid var(--me-line); border-radius: 8px; box-shadow: 0 4px 16px rgb(0 0 0 / 0.12); font-family: var(--me-font); }
+:where(.me-outline)[hidden] { display: none; }
+:where(.me-body.has-outline-left) > .me-outline { left: var(--me-outline-edge); }
+:where(.me-body.has-outline-right) > .me-outline { right: calc(var(--me-outline-edge) + 6px); } /* (clear of the note's scrollbar) */
+:where(.me-outline-list) { flex: 1; min-height: 0; margin: 0; padding: 6px; list-style: none; overflow-y: auto; }
+:where(.me-outline-item) { display: block; width: 100%; box-sizing: border-box; padding: 3px 8px 3px calc(8px + var(--me-outline-depth, 0) * 12px); border: 0; border-radius: 4px; background: none; color: var(--me-muted); font: inherit; font-size: 0.85em; line-height: 1.5; text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer; }
+:where(.me-outline-item):hover { background: var(--me-code-bg); color: var(--me-fg); }
+:where(.me-outline-item.is-active) { color: var(--me-accent); font-weight: 600; }
+:where(.me-outline-empty) { padding: 6px 8px; color: var(--me-faint); font-size: 0.85em; }
+:where(.me-outline-grip) { position: relative; flex: none; height: 10px; border-radius: 0 0 8px 8px; cursor: ns-resize; opacity: 0; touch-action: none; }
+:where(.me-outline-grip)::after { content: ""; position: absolute; left: 50%; top: 4px; width: 28px; height: 2px; border-radius: 1px; background: var(--me-faint); transform: translateX(-50%); }
+:where(.me-outline:hover, .me-outline.is-resizing) .me-outline-grip { opacity: 1; }
+/* (room for it beside the words: the text is centred in what is left, never under it; heavier than the editor theme's own padding) */
+.me-body.has-outline-left .cm-scroller, .me-body.has-outline-left > .me-preview { padding-left: calc(var(--me-outline-w) + var(--me-outline-edge) * 2); }
+.me-body.has-outline-right .cm-scroller, .me-body.has-outline-right > .me-preview { padding-right: calc(var(--me-outline-w) + var(--me-outline-edge) * 2 + 6px); }
 /* both editing modes: how Markdown reads (highlight.ts) */
 :where(.me) :is(.me-t-h1, .me-t-h2, .me-t-h3, .me-t-h4, .me-t-h5, .me-t-h6) { font-weight: 700; line-height: 1.3; }
 :where(.me) .me-t-h1 { font-size: var(--me-h1); color: var(--me-h1-fg, inherit); } :where(.me) .me-t-h2 { font-size: var(--me-h2); color: var(--me-h2-fg, inherit); } :where(.me) .me-t-h3 { font-size: var(--me-h3); color: var(--me-h3-fg, inherit); }
@@ -47,6 +63,10 @@ export const EDITOR_CSS = `
 :where(.me-doc) .footnotes { font-size: 0.9em; color: var(--me-muted); }
 :where(.me-doc) .footnotes hr { margin: 1.5em 0 0.6em; }
 :where(.me-doc) .footnote-backref { text-decoration: none; }
+:where(.me-doc) .footnotes li.is-target, :where(.me-doc) .footnote-ref a.is-target { background: color-mix(in oklch, var(--me-yellow) 35%, transparent); border-radius: 4px; transition: background 0.6s; } /* (the footnote gone to, lit a moment) */
+:where(.me-doc) .footnotes li > p { margin: 0.5em 0 0; } :where(.me-doc) .footnotes li > p:first-child { margin-top: 0; } /* (a footnote's paragraphs: the first on its number's line, the next under it) */
+:where(.me-fn-pop) { position: fixed; z-index: 1000; padding: 8px 12px; border: 1px solid var(--me-line); border-radius: var(--me-radius); background: var(--me-bg); color: var(--me-fg); font-size: 0.9em; line-height: 1.5; box-shadow: 0 6px 24px rgb(0 0 0 / 0.18); }
+:where(.me-fn-pop) > p:last-child { margin-bottom: 0; }
 :where(.me) .me-hl-dot { display: inline-block; width: 0.6em; height: 0.6em; margin: 0 0.15em; border-radius: 50%; vertical-align: 0.05em; background: var(--me-hl) !important; }
 :where(.me) .me-t-hl, :where(.me) .me-mark { background: var(--me-mark-bg); color: var(--me-mark-fg); border-radius: 2px; }
 :where(.me) .me-t-link { color: var(--me-accent); }
@@ -68,11 +88,13 @@ export const EDITOR_CSS = `
 :where(.me-live) .me-callout-foot { border-bottom: 1px solid color-mix(in oklch, var(--me-callout) 35%, transparent); border-bottom-left-radius: 8px; border-bottom-right-radius: 8px; padding-bottom: calc(8px + 0.3em); }
 :where(.me-live) .me-callout-title { font-weight: 600; color: var(--me-callout); }
 :where(.me-live) .me-bullet { color: var(--me-muted); display: inline-block; width: 1.1em; }
+:where(.me-live) .me-bullet::before { content: var(--me-bullet, "•"); } /* (Note styles: Bullets) */
+:where(.me-live) .me-ol-mark { counter-set: me-n var(--me-n); } :where(.me-live) .me-ol-mark::before { content: counter(me-n, var(--me-ol-type, decimal)) var(--me-ol-delim, "."); } /* (Note styles: Numbering; the file keeps its numbers) */
 :where(.me-live) .me-list-number { color: var(--me-muted); }
 :where(.me-live) .me-task-box { display: inline-flex; align-items: center; justify-content: center; vertical-align: text-bottom; width: 1.05em; height: 1.05em; margin-right: 0.3em; }
-:where(.me-live) .me-task { appearance: none; -webkit-appearance: none; position: relative; width: 1em; height: 1em; margin: 0; border: 1.5px solid var(--me-line); border-radius: 4px; background: var(--me-bg); cursor: pointer; }
+:where(.me-live) .me-task { appearance: none; -webkit-appearance: none; position: relative; width: 1em; height: 1em; margin: 0; border: 1.5px solid var(--me-line); border-radius: var(--me-check-radius, 4px); background: var(--me-bg); cursor: pointer; }
 :where(.me-live) .me-task:hover { border-color: var(--me-accent); }
-:where(.me-live) .me-task:checked { border-color: var(--me-accent); background: var(--me-accent); }
+:where(.me-live) .me-task:checked { border-color: var(--me-check, var(--me-accent)); background: var(--me-check, var(--me-accent)); }
 :where(.me-live) .me-task:checked::after { content: ""; position: absolute; left: 50%; top: 45%; width: 0.32em; height: 0.6em; border: solid var(--me-bg); border-width: 0 0.16em 0.16em 0; transform: translate(-50%, -55%) rotate(45deg); }
 :where(.me-live) .me-done { color: var(--me-faint); text-decoration: line-through; }
 :where(.me-live) .me-rule { display: inline-block; width: 100%; height: 0; border-top: 2px solid var(--me-line); vertical-align: middle; }
@@ -94,8 +116,8 @@ export const EDITOR_CSS = `
 :where(.me-table-scroll) :is(th, td) { border: 1px solid var(--me-line); padding: 8px 12px; min-width: 6em; height: 2.4em; box-sizing: border-box; text-align: left; vertical-align: top; }
 :where(.me-table-scroll) tr:first-child > * { border-top: 0; } :where(.me-table-scroll) tr:last-child > * { border-bottom: 0; }
 :where(.me-table-scroll) tr > :first-child { border-left: 0; } :where(.me-table-scroll) tr > :last-child { border-right: 0; }
-:where(.me-table-scroll) th { background: var(--me-th-bg, var(--me-code-bg)); font-weight: 600; }
-:where(.me-table-scroll) td { background: var(--me-td-bg, transparent); }
+:where(.me-table-scroll) th { background: var(--me-th-bg, var(--me-code-bg)); color: var(--me-th-fg, inherit); font-weight: 600; }
+:where(.me-table-scroll) td { background: var(--me-td-bg, transparent); color: var(--me-td-fg, inherit); }
 :where(.me-table-scroll) tbody tr:nth-child(even) > td { background: var(--me-tr-bg, var(--me-td-bg, transparent)); }
 :where(.me-table-scroll) tr > td:first-child { background: var(--me-col-bg, var(--me-td-bg, transparent)); }
 :where(.me-table) :is(th, td) { outline: none; cursor: text; }
@@ -132,7 +154,7 @@ export const EDITOR_CSS = `
 :where(.me) .me-fold:hover { color: var(--me-fg); background: var(--me-code-bg); }
 :where(.me) .cm-foldPlaceholder { background: var(--me-code-bg); border: 1px solid var(--me-line); border-radius: 4px; color: var(--me-faint); padding: 0 6px; margin-left: 6px; }
 /* task states, broken links, coloured highlights, resizing pictures */
-:where(.me-live) .me-task-state { box-sizing: border-box; width: 1em; height: 1em; border: 1.5px solid var(--me-line); border-radius: 4px; vertical-align: text-bottom; position: relative; }
+:where(.me-live) .me-task-state { box-sizing: border-box; width: 1em; height: 1em; border: 1.5px solid var(--me-line); border-radius: var(--me-check-radius, 4px); vertical-align: text-bottom; position: relative; }
 :where(.me-live) .me-task-progress { background: linear-gradient(90deg, var(--me-accent) 50%, transparent 50%); border-color: var(--me-accent); cursor: pointer; }
 :where(.me-live) .me-task-cancelled::after { content: ""; position: absolute; inset: 2px; background: var(--me-faint); mask: linear-gradient(45deg, transparent 43%, #000 43% 57%, transparent 57%), linear-gradient(-45deg, transparent 43%, #000 43% 57%, transparent 57%); }
 :where(.me-live) .me-task-forwarded::after { content: ""; position: absolute; inset: 1px; background: var(--me-accent); mask: linear-gradient(#000 0 0) center / 60% 2px no-repeat, linear-gradient(45deg, transparent 50%, #000 50%) right 15% center / 40% 40% no-repeat; }
@@ -150,6 +172,7 @@ export const EDITOR_CSS = `
 :where(.me-media.is-missing) { display: flex; align-items: center; justify-content: center; box-sizing: border-box; width: 100%; padding: 10px 14px; border-radius: var(--me-radius); background: var(--me-code-bg); color: var(--me-muted); font-size: 0.9em; }
 :where(.me:has(.me-selbar)) .me-media:not(.is-selected) .me-media-tools { opacity: 0; pointer-events: none; } /* (words selected: their bar stands where a small embed's tools do; they step aside) */
 :where(.me-media-tools) .me-btn { min-width: 24px; height: 24px; color: var(--me-fg); }
+:where(.me-lightbox-ratio) { font: 600 12px/1 var(--me-font); letter-spacing: -0.02em; }
 :where(.me-lightbox) { position: fixed; inset: 0; z-index: 1001; display: grid; place-items: center; overflow: hidden; background: color-mix(in oklch, black 82%, transparent); outline: none; }
 :where(.me-lightbox) img { position: absolute; left: 50%; top: 50%; max-width: none; max-height: none; transform-origin: center; cursor: zoom-in; user-select: none; }
 :where(.me-lightbox) img.is-zoomed { cursor: grab; }
@@ -245,7 +268,8 @@ export const EDITOR_CSS = `
 :where(.me-doc) mark { background: var(--me-mark-bg); color: var(--me-mark-fg); }
 :where(.me-doc) img, :where(.me-doc) video { max-width: 100%; height: auto; border-radius: var(--me-radius); }
 :where(.me-doc) li.task { list-style: none; margin-left: -1.3em; }
-:where(.me-doc) li.task > input { margin-right: 0.4em; cursor: pointer; }
+:where(.me-doc) li.task > input { margin-right: 0.4em; cursor: pointer; accent-color: var(--me-check, var(--me-accent)); }
+:where(.me-doc) ul { list-style-type: var(--me-ul-type, disc); } :where(.me-doc) ol { list-style-type: var(--me-ol-type, decimal); }
 :where(.me-doc) li.done { color: var(--me-faint); text-decoration: line-through; }
 :where(.me-doc) hr { border: 0; border-top: 1px solid var(--me-line); }
 :where(.me-doc) .callout { --me-callout: var(--me-blue); margin: 0.8em 0; padding: 8px 14px; border: 1px solid color-mix(in oklch, var(--me-callout) 35%, transparent); border-radius: 8px; background: color-mix(in oklch, var(--me-callout) 8%, transparent); }

@@ -74,6 +74,20 @@ function partsOf(state: EditorState, from: number, to: number): Array<{ from: nu
 }
 /** Whether a part already has format `m`: its marks just outside it, or selected with it. */
 const hasMarks = (state: EditorState, p: { from: number; to: number }, m: string): "outside" | "inside" | null => {
+  // (* and _ are both italic's and, doubled, bold's: what a run of them holds is read from its length, so bold and italic combine as notes
+  // apps do: 1 italic, 2 bold, 3 both. Italic on bold words is a third mark, never one of bold's taken away)
+  if (m[0] === "*" || m[0] === "_") {
+    const c = m[0], run = (t: string, back: boolean): number => {
+      let n = 0;
+      while (n < 3 && t[back ? t.length - 1 - n : n] === c) n++;
+      return n;
+    };
+    const holds = (n: number): boolean => (m.length === 1 ? n % 2 === 1 : n >= 2);
+    if (holds(Math.min(run(state.sliceDoc(Math.max(0, p.from - 3), p.from), true), run(state.sliceDoc(p.to, p.to + 3), false)))) return "outside";
+    const t = state.sliceDoc(p.from, p.to);
+    const n = Math.min(run(t, false), run(t, true));
+    return t.length > 2 * n && holds(n) ? "inside" : null;
+  }
   if (state.sliceDoc(p.from - m.length, p.from) === m && state.sliceDoc(p.to, p.to + m.length) === m) return "outside";
   const t = state.sliceDoc(p.from, p.to);
   return t.length >= 2 * m.length && t.startsWith(m) && t.endsWith(m) ? "inside" : null;

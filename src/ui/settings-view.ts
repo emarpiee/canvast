@@ -26,6 +26,7 @@ import { photoCraftVersion } from "../artcraft/photocraft/payload";
 import { PREFS_KEY as PHOTOCRAFT_PREFS } from "../artcraft/photocraft/prefs";
 import { markCommands } from "../commands/from-bars";
 import { injectStyles, renderMarkdown } from "../markdown-editor";
+import { DOC_CSS } from "../markdown-editor/style";
 
 /** The desktop build (ADR 0177): the workspace is a folder, so what Settings says about storage, privacy and the page differs. */
 /** A row for something that is not a stored setting (Sharing's), with the settings rows' look. */
@@ -80,19 +81,23 @@ Words in **bold**, in *italic* and in ***bold italic***, a [[linked note]] and a
 - [ ] A task
 - [x] A task done
 
+1. A numbered item
+2. The next one
+
 | Heading | Cell |
 | --- | --- |
 | A row | A cell |
 | A row | A cell |
 `;
-let noteSample = "";
-const noteSampleHtml = (): string => {
-  if (!noteSample) {
-    injectStyles(); // (the page's look, before any note was opened)
-    noteSample = `<div class="me set-note-sample" data-testid="note-style-sample" inert aria-hidden="true"><div class="me-doc">${renderMarkdown(NOTE_SAMPLE)}</div></div>`;
-  }
-  return noteSample;
-};
+// (its place on the card; the page itself is drawn in a shadow root of its own, `drawNoteSample`, so no rule of the Settings page (its own
+// h2, h3, h4) reaches its headings: what it shows is what a note shows. The --me-* values are inherited through, from the host's `.me`.)
+const noteSampleHtml = (): string => `<div class="me set-note-sample" data-testid="note-style-sample" aria-hidden="true"></div>`;
+function drawNoteSample(root: ParentNode): void {
+  const host = root.querySelector<HTMLElement>(".set-note-sample");
+  if (!host || host.shadowRoot) return;
+  injectStyles(); // (the editor's tokens on .me, before any note was opened)
+  host.attachShadow({ mode: "open" }).innerHTML = `<style>${DOC_CSS}</style><div class="me-doc" inert>${renderMarkdown(NOTE_SAMPLE)}</div>`;
+}
 
 /** Cards drawn after a tab's own cards (its Links in notes too): the long list of how notes look, at the bottom of Notes. */
 const LAST_CARDS = new Set(["Note styles"]);
@@ -230,6 +235,12 @@ export const SETTINGS_TABS: readonly Tab[] = [
       { key: "notes.style.tableCellColour", label: "Table cells", help: "Their background. Empty: none.", control: { kind: "colour" } },
       { key: "notes.style.tableRowColour", label: "Table every other row", help: "A stripe on every second row. Empty: none.", control: { kind: "colour" } },
       { key: "notes.style.tableColumnColour", label: "Table first column", help: "Its background. Empty: none.", control: { kind: "colour" } },
+      { key: "notes.style.tableHeaderTextColour", label: "Table heading text", help: "The words of the heading row. Empty: the text's.", control: { kind: "colour" } },
+      { key: "notes.style.tableCellTextColour", label: "Table cell text", help: "The words of the other cells. Empty: the text's.", control: { kind: "colour" } },
+      { key: "notes.style.checkboxColour", label: "Checkbox colour", help: "A task's box when it is ticked. Empty: the accent.", control: { kind: "colour" } },
+      { key: "notes.style.checkboxRoundness", label: "Checkbox roundness", help: "How round a task's box is in the notes editor, in px (0: square).", control: { kind: "range", min: 0, max: 9, step: 1 } },
+      { key: "notes.style.bullet", label: "Bullets", help: "The mark of a bulleted list's items.", control: { kind: "select", options: [["disc", "• Disc"], ["circle", "◦ Circle"], ["square", "▪ Square"], ["dash", "– Dash"], ["arrow", "› Arrow"]] } },
+      { key: "notes.style.numbering", label: "Numbering", help: "How a numbered list counts. The file keeps its numbers (1., 2.); only how they are shown changes.", control: { kind: "select", options: [["decimal", "1, 2, 3"], ["lower-alpha", "a, b, c"], ["upper-alpha", "A, B, C"], ["lower-roman", "i, ii, iii"], ["upper-roman", "I, II, III"]] } },
       { key: "notes.writeProps", label: "Write tags and properties into note files", help: "On: tags and properties changed in the library also go into the note's file.", more: "On: a note's tags, description and fields changed in the library are written into its file too (its YAML), so other apps see them. Off (the default): they stay in the library and the file changes only when you save its words. What a file's own YAML says is still read into the library.", control: { kind: "toggle" } },
       { key: "notes.autoDates", label: "Automatic created and modified", help: "On: each save writes the modified time, and the created time when there is none.", more: "On: markdown notes always have both properties, which cannot be edited or removed in the details panel. Each save writes the time into the modified one, and into the created one when the note has none (from when it came into the library). A created pasted with a note is kept. Off: they are ordinary properties.", control: { kind: "toggle" } },
       { key: "notes.createdKey", label: "Property for the time it was created", help: "Its name in the note's properties, such as created-on.", control: { kind: "text", max: 64, placeholder: "created" } },
@@ -586,6 +597,7 @@ export function mountSettingsView(root: HTMLElement, settings: SettingsStore, ke
     <button type="button" class="set-done" data-done>Back to canvas</button></div>
     <div class="set-body"><div class="set-tabs" role="tablist" aria-label="Settings" aria-orientation="vertical" data-view-state>${tabsHtml}</div><div class="set-panels">${panelsHtml}<p class="set-none" data-testid="settings-none" role="status" hidden></p></div></div>`;
 
+  drawNoteSample(root);
   const tabs = [...root.querySelectorAll<HTMLButtonElement>('[role="tab"]')];
   const searchEl = root.querySelector<HTMLInputElement>(".set-search")!;
   const clearEl = root.querySelector<HTMLButtonElement>("[data-search-clear]")!;

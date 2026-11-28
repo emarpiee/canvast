@@ -180,11 +180,11 @@ const NOTE_ICONS = {
   live: ICONS.pencilLine, source: ICONS.fileCode, preview: ICONS.eye,
   bold: ICONS.bold, italic: ICONS.italic, strike: ICONS.strikethrough, highlight: ICONS.highlighter, link: ICONS.link,
   heading1: ICONS.heading1, heading2: ICONS.heading2, heading3: ICONS.heading3, bulletList: ICONS.list, orderedList: ICONS.listOrdered, taskList: ICONS.listChecks,
-  table: ICONS.grid3x3, rule: ICONS.minus, picture: ICONS.image, find: ICONS.search, save: ICONS.save, clearFormat: ICONS.eraser, callout: ICONS.speechBalloon,
+  table: ICONS.grid3x3, rule: ICONS.minus, picture: ICONS.image, find: ICONS.search, outline: ICONS.tableOfContents, save: ICONS.save, clearFormat: ICONS.eraser, callout: ICONS.speechBalloon,
 };
 
 /** Open a note in the notes editor inside `el`. Its links to library items show those items (pictures, videos, sounds); files added go into the library. */
-export async function mountNoteEditor(el: HTMLElement, opts: { kind: Exclude<NoteKind, "rich">; text: string; mode: EditorMode; host: NoteHost; /** A sign typed over selected words goes round them (Settings). */ wrapSelection?: boolean; /** Code blocks in a language are coloured (Settings). */ codeColours?: boolean; /** The note's name (no extension), for {{title}}. */ title: string; /** The whole place it is shown in (else the library's viewer). */ root?: HTMLElement | null; /** Shown at the top of the note (its properties, from the details panel). */ top?: HTMLElement }): Promise<NoteEditor> {
+export async function mountNoteEditor(el: HTMLElement, opts: { kind: Exclude<NoteKind, "rich">; text: string; mode: EditorMode; host: NoteHost; /** A sign typed over selected words goes round them (Settings). */ wrapSelection?: boolean; /** Code blocks in a language are coloured (Settings). */ codeColours?: boolean; /** The note's name (no extension), for {{title}}. */ title: string; /** The whole place it is shown in (else the library's viewer). */ root?: HTMLElement | null; /** Shown at the top of the note (its properties, from the details panel). */ top?: HTMLElement; /** Where its outline floats, and where the person puts it (kept: Settings). */ outline?: { side: "off" | "left" | "right"; set(side: "off" | "left" | "right"): void } }): Promise<NoteEditor> {
   const { host } = opts;
   const md = opts.kind === "md";
   /** Each library item shown, by its link as written: its temporary address (let go when the note closes). */
@@ -240,6 +240,7 @@ export async function mountNoteEditor(el: HTMLElement, opts: { kind: Exclude<Not
     parent: el,
     value: md ? splitFrontmatter(opts.text).body : opts.text,
     mode: opts.mode,
+    ...(opts.outline ? { outline: opts.outline.side, onOutline: (s: "off" | "left" | "right") => opts.outline!.set(s) } : {}),
     plain: !md,
     vim: host.vim,
     keyNames: keyNames(),

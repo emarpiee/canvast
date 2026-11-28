@@ -3,7 +3,7 @@ export type IconName =
   | "live" | "source" | "preview"
   | "bold" | "italic" | "strike" | "highlight" | "code" | "link"
   | "heading1" | "heading2" | "heading3" | "bulletList" | "orderedList" | "taskList" | "quote" | "callout" | "codeBlock" | "mathBlock" | "table" | "rule"
-  | "picture" | "find" | "save" | "clearFormat";
+  | "picture" | "find" | "save" | "clearFormat" | "outline";
 
 const svg = (body: string): string => `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${body}</svg>`;
 const heading = (n: number): string => svg(`<path d="M4 12h8M4 18V6M12 18V6"/><text x="15" y="19" font-size="10" font-weight="700" fill="currentColor" stroke="none">${n}</text>`);
@@ -33,5 +33,6 @@ export const DEFAULT_ICONS: Readonly<Record<IconName, string>> = {
   rule: svg('<path d="M5 12h14"/>'),
   picture: svg('<rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.1-3.1a2 2 0 0 0-2.8 0L6 21"/>'),
   find: svg('<circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/>'),
+  outline: svg('<path d="M16 5H3M16 12H3M11 19H3M21 5h.01M21 12h.01M21 19h.01"/>'),
   save: svg('<path d="M15.2 3a2 2 0 0 1 1.4.6l3.8 3.8a2 2 0 0 1 .6 1.4V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2Z"/><path d="M17 21v-7a1 1 0 0 0-1-1H8a1 1 0 0 0-1 1v7M7 3v4a1 1 0 0 0 1 1h7"/>'),
 };
