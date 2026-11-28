@@ -38,6 +38,27 @@ export function mountFilePanel(
   let name = "";
   let hiddenOpen = false; // (the file open is a hidden item)
   const label = (k: FileViewKind): string => k.noun[0]!.toUpperCase() + k.noun.slice(1);
+  /** The properties' width, dragged by their edge as the library's details are (null: their own share); kept from file to file. */
+  let detailsW: number | null = null;
+  const sizeDetails = (side: HTMLElement): void => {
+    const grip = side.querySelector<HTMLElement>(".col-grip")!;
+    if (detailsW !== null) side.style.width = `${detailsW}px`;
+    // view-state: (the width of the properties beside the file)
+    grip.addEventListener("pointerdown", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      grip.setPointerCapture(e.pointerId);
+      grip.classList.add("is-dragging");
+      const x0 = e.clientX, w0 = side.offsetWidth, most = (side.parentElement?.offsetWidth ?? 800) * 0.7;
+      const move = (m: PointerEvent): void => {
+        detailsW = Math.round(Math.max(220, Math.min(most, w0 + x0 - m.clientX)));
+        side.style.width = `${detailsW}px`;
+      };
+      grip.addEventListener("pointermove", move);
+      grip.addEventListener("pointerup", () => (grip.removeEventListener("pointermove", move), grip.classList.remove("is-dragging")), { once: true });
+    });
+    grip.addEventListener("dblclick", () => void ((detailsW = null), side.style.removeProperty("width"))); // view-state: (back to its own share)
+  };
   /** The details of the file open, at the right of its view (its header's Properties button). */
   let detailsShown = false;
   const showDetails = (on: boolean): void => {
@@ -92,15 +113,16 @@ export function mountFilePanel(
     const name0 = (await deps.session.catalog?.entry(hash).catch(() => undefined))?.name ?? rec.name;
     kind = k;
     name = name0;
-    const tools = (deps.details ? `<button type="button" class="layer-btn" data-details aria-pressed="false" aria-label="Properties" title="Its properties: the library's details of this ${k.noun}">${ICONS.info}</button>` : "")
-      + (deps.session.readOnly ? "" : `<button type="button" class="layer-btn" data-rename aria-label="Rename this ${k.noun}" title="Rename this ${k.noun} (F2)">${ICONS.textCursorInput}</button>`);
-    el.innerHTML = panelHtml({ title: esc(name0), tools, body: `<div class="viewer-note"${k.id === "note" ? ' data-testid="note-editor"' : ""}><div></div></div><aside class="file-panel-details" data-testid="file-panel-details" hidden></aside>` });
+    const tools = deps.details ? `<button type="button" class="layer-btn" data-details aria-pressed="false" aria-label="Properties" title="Its properties: the library's details of this ${k.noun}">${ICONS.info}</button>` : "";
+    const lead = deps.session.readOnly ? "" : `<button type="button" class="layer-btn" data-rename aria-label="Rename this ${k.noun}" title="Rename this ${k.noun} (F2)">${ICONS.textCursorInput}</button>`;
+    el.innerHTML = panelHtml({ title: esc(name0), lead, tools, body: `<div class="viewer-note"${k.id === "note" ? ' data-testid="note-editor"' : ""}><div></div></div><aside class="file-panel-details" data-testid="file-panel-details" hidden><div class="col-grip" data-testid="file-details-grip" role="separator" aria-orientation="vertical" aria-label="Resize the properties" title="Drag to resize the properties (double-click to reset)"></div></aside>` });
     el.setAttribute("aria-label", `${label(k)}: ${name0}`);
     el.querySelector(".panel-head h2")?.setAttribute("title", name0);
     // view-state: (closes the panel)
     el.querySelector("[data-close]")!.addEventListener("click", () => void leave());
     el.querySelector("[data-rename]")?.addEventListener("click", () => void rename()); // view-state: (opens the rename dialog of this file)
     el.querySelector("[data-details]")?.addEventListener("click", () => showDetails(!detailsShown)); // view-state: (shows or hides its details beside it)
+    sizeDetails(el.querySelector<HTMLElement>(".file-panel-details")!);
     el.hidden = false;
     try {
       opening = hash;

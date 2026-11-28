@@ -471,6 +471,24 @@ test("a note on a canvas opens in the note panel (a double-click, or Edit note):
   await p.locator('[data-rn="one"]').fill("plan");
   await p.getByTestId("rename-ok").click();
   await expect(p.getByTestId("note-panel").locator(".panel-head h2")).toHaveText("plan.md");
+  // Floating, it sizes from every side and corner: its left edge widens it leftward, its top-left corner both ways (its place follows).
+  const dockBox = () => p.locator('.dock-item[data-dock="note"]').boundingBox().then((b) => b!);
+  const b0 = await dockBox();
+  const edgeAt = async (edge: string) => (await p.locator(`.dock-item[data-dock="note"] > .resize-edge[data-edge="${edge}"]`).boundingBox())!;
+  const w = await edgeAt("w");
+  await p.mouse.move(w.x + w.width / 2, w.y + w.height / 2);
+  await p.mouse.down();
+  await p.mouse.move(w.x + w.width / 2 - 60, w.y + w.height / 2, { steps: 4 });
+  await p.mouse.up();
+  const b1 = await dockBox();
+  expect([Math.round(b1.width - b0.width), Math.round(b0.x - b1.x)], "60 px wider, to the left").toEqual([60, 60]);
+  const nw = await edgeAt("nw");
+  await p.mouse.move(nw.x + nw.width / 2, nw.y + nw.height / 2);
+  await p.mouse.down();
+  await p.mouse.move(nw.x + nw.width / 2 + 30, nw.y + nw.height / 2 + 40, { steps: 4 });
+  await p.mouse.up();
+  const b2 = await dockBox();
+  expect([Math.round(b1.width - b2.width), Math.round(b1.height - b2.height), Math.round(b2.y - b1.y)], "the corner: narrower, lower, its top moved").toEqual([30, 40, 40]);
   // Its header's Properties: the library's details of this note at its right (its name, no preview: the note is open beside it); again, gone.
   const details = p.getByTestId("note-panel").getByTestId("file-panel-details");
   await p.getByTestId("note-panel").locator("[data-details]").click();

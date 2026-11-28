@@ -1,3 +1,4 @@
+import { resizeEdges, resized } from "../ui/resize-edges";
 import { noteStyleVars } from "../notes/note-styles";
 import { setNoteKeyNames } from "../ui/note-editor";
 import { moodboardsToCanvases } from "../pins/migrate";
@@ -969,6 +970,16 @@ async function start(): Promise<void> {
   document.body.append(noteWindow);
   classWhen(noteWindow, "is-empty", () => !!noteWindowEl.hidden, [noteWindowEl], ["hidden"]); // (no scrim while its panel is closed)
   noteWindow.addEventListener("pointerdown", (e) => void (e.target === noteWindow && notePanel.close()));
+  // The window sizes from every side and corner, staying centred (as the floating panels do: ui/resize-edges.ts)
+  let windowSize = { w: 0, h: 0 };
+  resizeEdges(noteWindowEl, {
+    start: () => void (windowSize = { w: noteWindowEl.offsetWidth, h: noteWindowEl.offsetHeight }),
+    move: (dx, dy, edge) => {
+      const r = resized({ x: 0, y: 0, ...windowSize }, edge, edge.includes("w") ? 2 * dx : edge.includes("e") ? 2 * dx : 0, edge.includes("n") || edge.includes("s") ? 2 * dy : 0, { w: 320, h: 200 });
+      noteWindowEl.style.width = `${Math.min(r.w, innerWidth - 16)}px`;
+      noteWindowEl.style.height = `${Math.min(r.h, innerHeight - 16)}px`;
+    },
+  });
   const notePanelReady = (d: FilePanelDeps): void => void (notePanel = mountFilePanel({ panel: notePanelEl, window: noteWindowEl }, d, () => settings.get("notes.panelMode")));
   let newNoteAt: (at: ScreenPoint, widthPx?: number) => Promise<void> = async () => undefined;
   let makeNoteFiles: () => Promise<void> = async () => undefined;

@@ -1,3 +1,4 @@
+import { resizeEdges, resized } from "./resize-edges";
 import type { Command } from "../commands/types";
 /**
  * The panel dock (ADR 0123): one system for every panel that floats over the canvas. A panel is any element with a `<header>` as its title
@@ -145,14 +146,6 @@ export class PanelDock {
     if (!this.state.has(spec.id)) this.state.set(spec.id, { s: spec.everywhere ? "float" : spec.side, w: clamp(spec.width ?? this.sideW[spec.side === "right" ? "right" : "left"], MIN_WIDTH, max), x: 80, y: 120, c: false, ...(spec.height ? { h: spec.height } : {}) });
     else this.state.get(spec.id)!.w = clamp(this.state.get(spec.id)!.w, MIN_WIDTH, max);
     if (spec.everywhere) this.state.get(spec.id)!.s = "float";
-    if (spec.height) {
-      // (its height too: a grip at its bottom corner sizes both)
-      const corner = document.createElement("div");
-      corner.className = "dock-corner";
-      corner.setAttribute("aria-hidden", "true");
-      box.append(corner);
-      corner.addEventListener("pointerdown", (e) => this.resize(item, e, true));
-    }
     if (!this.order.includes(spec.id)) this.order.push(spec.id);
     box.hidden = el.hidden;
     new MutationObserver(() => {
@@ -176,6 +169,22 @@ export class PanelDock {
       if (!this.state.get(spec.id)!.c) this.used(spec.id);
     });
     grip.addEventListener("pointerdown", (e) => this.resize(item, e));
+    // Floating, it sizes from every side and corner (its place moves with the left and top edges); docked, by its grip toward the canvas.
+    let r0 = { x: 0, y: 0, w: 0, h: 0 };
+    resizeEdges(box, {
+      start: () => {
+        const s = this.state.get(spec.id)!, b = box.getBoundingClientRect();
+        r0 = { x: b.left, y: b.top, w: b.width, h: b.height };
+        s.h ??= b.height;
+      },
+      move: (dx, dy, edge) => {
+        const s = this.state.get(spec.id)!;
+        const r = resized(r0, edge, dx, dy, { w: MIN_WIDTH, h: MIN_HEIGHT });
+        Object.assign(s, { x: r.x, y: r.y, w: Math.min(r.w, spec.maxWidth ?? MAX_WIDTH), h: Math.min(r.h, window.innerHeight - 40) });
+        this.layout();
+      },
+      end: () => this.save(),
+    });
     this.layout();
   }
 
@@ -290,8 +299,10 @@ export class PanelDock {
       const s = this.state.get(it.spec.id)!;
       const side = this.effective(s);
       want.get(it.spec.everywhere ? this.top : side === "left" ? this.left : side === "right" ? this.right : this.layer)!.push(it.box);
-      it.box.style.height = it.spec.height && !s.c ? `${s.h ?? it.spec.height}px` : "";
-      it.box.toggleAttribute("data-height", !!it.spec.height);
+      // (a height of its own: a panel made with one, or one sized by an edge while floating)
+      const h = s.c ? undefined : (side === "float" ? s.h : undefined) ?? it.spec.height;
+      it.box.style.height = h ? `${h}px` : "";
+      it.box.toggleAttribute("data-height", !!h);
       it.box.dataset["side"] = side;
       it.box.toggleAttribute("data-folded", s.c && !it.spec.noFold); // (a fold remembered from before it could not be folded is let go)
       const w = side === "float" || it.spec.ownWidth ? s.w : this.sideW[side];
@@ -376,21 +387,19 @@ export class PanelDock {
 
   // ---- Width ----------------------------------------------------------------------------------------------------------------------
 
-  private resize(item: Item, e: PointerEvent, both = false): void {
+  private resize(item: Item, e: PointerEvent): void {
     e.preventDefault();
     e.stopPropagation();
     const s = this.state.get(item.spec.id)!;
     const side = this.effective(s);
     const own = side === "float" || !!item.spec.ownWidth;
     const startX = e.clientX, startW = own ? s.w : this.sideW[side];
-    const startY = e.clientY, startH = s.h ?? item.spec.height ?? 0;
     const grows = side === "right" ? -1 : 1; // the grip is on the edge towards the canvas
     item.box.classList.add("is-resizing");
     const move = (m: PointerEvent): void => {
       const w = clamp(startW + grows * (m.clientX - startX), MIN_WIDTH, item.spec.maxWidth ?? MAX_WIDTH);
       if (own) s.w = w;
       else this.sideW[side] = w; // the stacked panels of this side share one width
-      if (both) s.h = clamp(startH + (m.clientY - startY), MIN_HEIGHT, window.innerHeight - 40);
       this.layout();
     };
     const up = (): void => {
