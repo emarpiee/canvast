@@ -20,9 +20,13 @@ const NEW_CARD_MAX_H = 4000;
 const PAGE_MAX_H = 16000;
 // (the page's look is the notes editor's own, DOC_CSS, the one set of rules its preview and table cells use; here only the page itself,
 // its colours as the editor's tokens, and what only a card has: pictures drawn as data, a video's ▶, a sound's ♪, the properties' badges)
-const CSS = `
+/** The note styles (notes/note-styles.ts) a card draws with, as the editor does: true when they changed (cards are drawn again). */
+let styleVars = "";
+export const setNoteStyles = (vars: string): boolean => (vars === styleVars ? false : ((styleVars = vars), true));
+const css = (): string => `
 .page{box-sizing:border-box;overflow:hidden;padding:26px 30px;${DOC_TOKENS.light}--me-size:15px;background:var(--me-bg);color:var(--me-fg);font:var(--me-size)/var(--me-line-height) var(--me-font);word-wrap:break-word}
 .page.dark{${DOC_TOKENS.dark}}
+.page.me-doc{${styleVars}}
 ${DOC_CSS}
 ul,ol{padding-left:1.4em}
 .media{position:relative;display:inline-block;max-width:100%}.media img{display:block;max-width:100%;height:auto;border-radius:var(--me-radius)}.is-video::after,.is-audio::after{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:2.4em;height:2.4em;border-radius:50%;background:oklch(0.2 0 0 / .6);color:#fff;font-size:1.4em;line-height:2.4em;text-align:center}.is-video::after{content:"▶"}.is-audio::after{content:"♪"}.pic{display:inline-block;padding:.7em 1.1em;border-radius:var(--me-radius);background:var(--me-code-bg);color:var(--me-muted);font-size:.85em}
@@ -151,7 +155,7 @@ export async function notePageHeight(name: string, text: string, width: number, 
   const host = document.createElement("div");
   host.style.cssText = "position:fixed;left:-10000px;top:0;visibility:hidden";
   const root = host.attachShadow({ mode: "open" });
-  root.innerHTML = `<style>${CSS}</style><div class="page me-doc${look === "dark" ? " dark" : ""}" style="width:${width}px">${await pageHtml(name, text, hash)}</div>`;
+  root.innerHTML = `<style>${css()}</style><div class="page me-doc${look === "dark" ? " dark" : ""}" style="width:${width}px">${await pageHtml(name, text, hash)}</div>`;
   document.body.append(host);
   const h = (root.lastElementChild as HTMLElement).scrollHeight;
   host.remove();
@@ -166,7 +170,7 @@ export async function notePicture(name: string, text: string, w: number, h: numb
   const k = w / lw;
   const lh = Math.round(h / k);
   const html = await pageHtml(name, text, hash);
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${lw} ${lh}"><foreignObject width="${lw}" height="${lh}"><div xmlns="http://www.w3.org/1999/xhtml" class="page me-doc${look === "dark" ? " dark" : ""}" style="width:${lw}px;height:${lh}px"><style>${CSS}</style>${html}</div></foreignObject></svg>`;
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${lw} ${lh}"><foreignObject width="${lw}" height="${lh}"><div xmlns="http://www.w3.org/1999/xhtml" class="page me-doc${look === "dark" ? " dark" : ""}" style="width:${lw}px;height:${lh}px"><style>${css()}</style>${html}</div></foreignObject></svg>`;
   const img = new Image();
   img.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
   await img.decode();

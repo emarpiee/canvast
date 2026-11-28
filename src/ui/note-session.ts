@@ -217,6 +217,14 @@ export class OpenNote {
           void this.leave().then(async (ok) => ok && (await session.openCanvas(c.id), this.place.showCanvas()));
           return;
         }
+        // A web address: copied, never opened (canvast does not go online).
+        if (/^([a-z][a-z0-9+.-]*:|www\.)/i.test(link) && !link.startsWith(WIKI) && !/^(file|app|blob|data):/i.test(link)) {
+          void navigator.clipboard?.writeText(link).then(
+            () => void ((session.editor.message = "Link copied: canvast opens nothing on the web."), session.editor.changed()),
+            () => undefined,
+          );
+          return;
+        }
         void (async () => {
           const target = link.startsWith(WIKI) ? null : linkTarget(link, dir);
           const found = link.startsWith(WIKI) ? await host.findWiki(decodeURIComponent(link.slice(WIKI.length))) : target ? await host.find(target) : null;

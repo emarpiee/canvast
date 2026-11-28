@@ -139,3 +139,19 @@ describe("a picture's link besides its file", () => {
     expect(lookTransform(readAlt("rotate-180 flip-x"))).toBe("rotate(180deg) scaleX(-1)");
   });
 });
+
+describe("note styles", () => {
+  it("heading sizes come down from H1's in even steps to the text's size, or are all H1's; H1 is always larger than the text", async () => {
+    const { headingSizes, noteStyleVars } = await import("../../src/notes/note-styles");
+    const s = headingSizes(2, "steps");
+    expect(s[0]).toBeCloseTo(2);
+    expect(s[5]).toBeCloseTo(1);
+    for (let i = 1; i < 6; i++) expect(s[i]!).toBeLessThan(s[i - 1]!);
+    expect(headingSizes(1.5, "same")).toEqual([1.5, 1.5, 1.5, 1.5, 1.5, 1.5]);
+    expect(headingSizes(0.8, "steps")[0]).toBeGreaterThan(1);
+    const vars = noteStyleVars((k) => ({ "notes.style.headingColours": "rainbow", "notes.style.boldColour": "#112233", "notes.style.italicColour": "" } as Record<string, unknown>)[k] ?? (k === "notes.style.h1Size" ? 1.9 : k === "notes.style.boldWeight" ? 700 : ""));
+    expect(vars).toContain("--me-h1-fg: #e5484d;");
+    expect(vars).toContain("--me-strong-fg: #112233;");
+    expect(vars).not.toContain("--me-em-fg");
+  });
+});

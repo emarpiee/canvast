@@ -37,9 +37,10 @@ export const EDITOR_CSS = `
 :where(.me-body > .cm-editor) { height: 100%; }
 /* both editing modes: how Markdown reads (highlight.ts) */
 :where(.me) :is(.me-t-h1, .me-t-h2, .me-t-h3, .me-t-h4, .me-t-h5, .me-t-h6) { font-weight: 700; line-height: 1.3; }
-:where(.me) .me-t-h1 { font-size: var(--me-h1); } :where(.me) .me-t-h2 { font-size: var(--me-h2); } :where(.me) .me-t-h3 { font-size: var(--me-h3); }
-:where(.me) .me-t-h4 { font-size: var(--me-h4); } :where(.me) .me-t-h5 { font-size: var(--me-h5); } :where(.me) .me-t-h6 { font-size: var(--me-h6); color: var(--me-muted); }
-:where(.me) .me-t-em { font-style: italic; } :where(.me) .me-t-strong { font-weight: 700; } :where(.me) .me-t-strike { text-decoration: line-through; }
+:where(.me) .me-t-h1 { font-size: var(--me-h1); color: var(--me-h1-fg, inherit); } :where(.me) .me-t-h2 { font-size: var(--me-h2); color: var(--me-h2-fg, inherit); } :where(.me) .me-t-h3 { font-size: var(--me-h3); color: var(--me-h3-fg, inherit); }
+:where(.me) .me-t-h4 { font-size: var(--me-h4); color: var(--me-h4-fg, inherit); } :where(.me) .me-t-h5 { font-size: var(--me-h5); color: var(--me-h5-fg, inherit); } :where(.me) .me-t-h6 { font-size: var(--me-h6); color: var(--me-h6-fg, var(--me-muted)); }
+:where(.me) .me-t-em { font-style: italic; color: var(--me-em-fg, inherit); } :where(.me) .me-t-strong { font-weight: var(--me-strong-weight, 700); color: var(--me-strong-fg, inherit); }
+:where(.me) :is(.me-t-strong .me-t-em, .me-t-em .me-t-strong) { color: var(--me-strong-em-fg, var(--me-strong-fg, var(--me-em-fg, inherit))); } :where(.me) .me-t-strike { text-decoration: line-through; }
 :where(.me) .me-t-hl, :where(.me) .me-mark { background: var(--me-mark-bg); color: var(--me-mark-fg); border-radius: 2px; }
 :where(.me) .me-t-link { color: var(--me-accent); }
 :where(.me) .me-t-mono { font-family: var(--me-mono); font-size: 0.92em; background: var(--me-code-bg); padding: 1px 4px; border-radius: 4px; }
@@ -49,7 +50,7 @@ export const EDITOR_CSS = `
 :where(.me) .me-code-line, :where(.me) .me-code-line span { font-family: var(--me-mono); }
 :where(.me) .me-code-line .me-t-mono { background: transparent; padding: 0; border-radius: 0; font-size: 0.92em; }
 /* live mode */
-:where(.me-live) .me-link { color: var(--me-accent); text-decoration: underline; text-decoration-color: color-mix(in oklch, var(--me-accent) 40%, transparent); text-underline-offset: 2px; cursor: text; }
+:where(.me-live) .me-link { color: var(--me-link-fg, var(--me-accent)); text-decoration: underline; text-decoration-color: color-mix(in oklch, var(--me-accent) 40%, transparent); text-underline-offset: 2px; cursor: text; }
 :where(.me-live) .me-quote { border-left: 3px solid color-mix(in oklch, var(--me-accent) 45%, transparent); padding-left: 16px !important; color: var(--me-muted); }
 :where(.me-live) .me-quote .me-t-quote, :where(.me-live) .me-callout .me-t-quote { font-style: normal; color: inherit; }
 :where(.me-live) .me-callout { --me-callout: var(--me-grey); background: color-mix(in oklch, var(--me-callout) 8%, transparent); border-left: 1px solid color-mix(in oklch, var(--me-callout) 35%, transparent); border-right: 1px solid color-mix(in oklch, var(--me-callout) 35%, transparent); padding-left: 14px !important; padding-right: 14px !important; }
@@ -85,7 +86,10 @@ export const EDITOR_CSS = `
 :where(.me-table-scroll) :is(th, td) { border: 1px solid var(--me-line); padding: 8px 12px; min-width: 6em; height: 2.4em; box-sizing: border-box; text-align: left; vertical-align: top; }
 :where(.me-table-scroll) tr:first-child > * { border-top: 0; } :where(.me-table-scroll) tr:last-child > * { border-bottom: 0; }
 :where(.me-table-scroll) tr > :first-child { border-left: 0; } :where(.me-table-scroll) tr > :last-child { border-right: 0; }
-:where(.me-table-scroll) th { background: var(--me-code-bg); font-weight: 600; }
+:where(.me-table-scroll) th { background: var(--me-th-bg, var(--me-code-bg)); font-weight: 600; }
+:where(.me-table-scroll) td { background: var(--me-td-bg, transparent); }
+:where(.me-table-scroll) tbody tr:nth-child(even) > td { background: var(--me-tr-bg, var(--me-td-bg, transparent)); }
+:where(.me-table-scroll) tr > td:first-child { background: var(--me-col-bg, var(--me-td-bg, transparent)); }
 :where(.me-table) :is(th, td) { outline: none; cursor: text; }
 :where(.me-table-add) { display: grid; place-items: center; padding: 0; border: 0; border-radius: 4px; background: var(--me-code-bg); color: var(--me-faint); font: inherit; font-size: 11px; line-height: 1; cursor: pointer; opacity: 0; transition: opacity 0.12s; }
 :where(.me-table:hover) .me-table-add, :where(.me-table:focus-within) .me-table-add { opacity: 1; }
@@ -113,6 +117,7 @@ export const EDITOR_CSS = `
 :where(.me-live) .me-task-cancelled::after { content: ""; position: absolute; inset: 2px; background: var(--me-faint); mask: linear-gradient(45deg, transparent 43%, #000 43% 57%, transparent 57%), linear-gradient(-45deg, transparent 43%, #000 43% 57%, transparent 57%); }
 :where(.me-live) .me-task-forwarded::after { content: ""; position: absolute; inset: 1px; background: var(--me-accent); mask: linear-gradient(#000 0 0) center / 60% 2px no-repeat, linear-gradient(45deg, transparent 50%, #000 50%) right 15% center / 40% 40% no-repeat; }
 :where(.me-live) .me-cancelled { color: var(--me-faint); text-decoration: line-through; }
+:where(.me-live) .me-wikilink { color: var(--me-wikilink-fg, var(--me-link-fg, var(--me-accent))); }
 :where(.me-live) .me-wikilink-broken { color: var(--me-faint); text-decoration-style: dashed; text-decoration-color: var(--me-faint); }
 :where(.me-media) { position: relative; }
 :where(.me-resize) { position: absolute; right: 4px; bottom: 4px; width: 12px; height: 12px; border-right: 2px solid var(--me-bg); border-bottom: 2px solid var(--me-bg); box-shadow: 1px 1px 0 var(--me-fg); cursor: nwse-resize; opacity: 0; touch-action: none; }
@@ -193,8 +198,12 @@ export const EDITOR_CSS = `
 :where(.me-doc) :is(h1, h2, h3, h4, h5, h6) { line-height: 1.3; }
 /* (a block's gap is one line, as a blank line between blocks is in the editor) */
 :where(.me-doc) > * { margin-top: 0; margin-bottom: calc(var(--me-size) * var(--me-line-height)); }
-:where(.me-doc) h1 { font-size: var(--me-h1); } :where(.me-doc) h2 { font-size: var(--me-h2); } :where(.me-doc) h3 { font-size: var(--me-h3); }
-:where(.me-doc) a { color: var(--me-accent); cursor: pointer; }
+:where(.me-doc) h1 { font-size: var(--me-h1); color: var(--me-h1-fg, inherit); } :where(.me-doc) h2 { font-size: var(--me-h2); color: var(--me-h2-fg, inherit); } :where(.me-doc) h3 { font-size: var(--me-h3); color: var(--me-h3-fg, inherit); }
+:where(.me-doc) a { color: var(--me-link-fg, var(--me-accent)); cursor: pointer; }
+:where(.me-doc) a[data-wiki] { color: var(--me-wikilink-fg, var(--me-link-fg, var(--me-accent))); }
+:where(.me-doc) strong { font-weight: var(--me-strong-weight, 700); color: var(--me-strong-fg, inherit); }
+:where(.me-doc) em { color: var(--me-em-fg, inherit); }
+:where(.me-doc) :is(strong em, em strong) { color: var(--me-strong-em-fg, var(--me-strong-fg, var(--me-em-fg, inherit))); }
 :where(.me-doc) code { font-family: var(--me-mono); font-size: 0.9em; background: var(--me-code-bg); border-radius: 3px; padding: 0 2px; }
 :where(.me-doc) pre { background: var(--me-code-bg); border-radius: var(--me-radius); padding: 10px 12px; overflow-x: auto; }
 :where(.me-doc) pre code { background: none; padding: 0; }

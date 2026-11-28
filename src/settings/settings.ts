@@ -61,6 +61,8 @@ const objectList = (max: number, ok: (x: Record<string, unknown>) => boolean) =>
 };
 const finiteN = (x: unknown): boolean => typeof x === "number" && Number.isFinite(x);
 const colour = (v: unknown): string | undefined => (typeof v === "string" && /^#[0-9a-f]{6}$/i.test(v) ? v : undefined);
+/** A colour, or "" for the theme's. */
+const colourOrTheme = (v: unknown): string | undefined => (v === "" ? "" : colour(v));
 
 /** Up to eight "#rrggbb" colours, newest first, written as one comma-separated text. */
 const colourList = (v: unknown): string | undefined => (typeof v === "string" && v.length <= 8 * 10 && (v === "" || v.split(",").every((c) => /^#[0-9a-f]{6}([0-9a-f]{2})?$/.test(c))) ? v : undefined);
@@ -222,6 +224,27 @@ export const SETTINGS = {
   "notes.look": { scope: "device", default: "auto", validate: oneOf("auto", "light", "dark"), effect: "immediate" } as Def<"auto" | "light" | "dark">,
   "notes.panelMode": { scope: "device", default: "panel", validate: oneOf("panel", "window"), effect: "immediate" } as Def<"panel" | "window">,
   "notes.vim": { scope: "device", default: false, validate: bool, effect: "immediate" } as Def<boolean>,
+  // Note styles (Settings > Notes): what the note's words, links, tables and headings look like in the editor, its preview and its card;
+  // a colour left empty is the theme's.
+  "notes.style.boldWeight": { scope: "device", default: 700, validate: range(500, 900), effect: "immediate" } as Def<number>,
+  "notes.style.headingColours": { scope: "device", default: "own", validate: oneOf("own", "rainbow"), effect: "immediate" } as Def<"own" | "rainbow">,
+  "notes.style.h1Size": { scope: "device", default: 1.9, validate: range(1.1, 3), effect: "immediate" } as Def<number>,
+  "notes.style.headingSizes": { scope: "device", default: "steps", validate: oneOf("steps", "same"), effect: "immediate" } as Def<"steps" | "same">,
+  "notes.style.boldColour": { scope: "device", default: "", validate: colourOrTheme, effect: "immediate" } as Def<string>,
+  "notes.style.italicColour": { scope: "device", default: "", validate: colourOrTheme, effect: "immediate" } as Def<string>,
+  "notes.style.boldItalicColour": { scope: "device", default: "", validate: colourOrTheme, effect: "immediate" } as Def<string>,
+  "notes.style.internalLinkColour": { scope: "device", default: "", validate: colourOrTheme, effect: "immediate" } as Def<string>,
+  "notes.style.externalLinkColour": { scope: "device", default: "", validate: colourOrTheme, effect: "immediate" } as Def<string>,
+  "notes.style.tableHeaderColour": { scope: "device", default: "", validate: colourOrTheme, effect: "immediate" } as Def<string>,
+  "notes.style.tableCellColour": { scope: "device", default: "", validate: colourOrTheme, effect: "immediate" } as Def<string>,
+  "notes.style.tableRowColour": { scope: "device", default: "", validate: colourOrTheme, effect: "immediate" } as Def<string>,
+  "notes.style.tableColumnColour": { scope: "device", default: "", validate: colourOrTheme, effect: "immediate" } as Def<string>,
+  "notes.style.h1Colour": { scope: "device", default: "", validate: colourOrTheme, effect: "immediate" } as Def<string>,
+  "notes.style.h2Colour": { scope: "device", default: "", validate: colourOrTheme, effect: "immediate" } as Def<string>,
+  "notes.style.h3Colour": { scope: "device", default: "", validate: colourOrTheme, effect: "immediate" } as Def<string>,
+  "notes.style.h4Colour": { scope: "device", default: "", validate: colourOrTheme, effect: "immediate" } as Def<string>,
+  "notes.style.h5Colour": { scope: "device", default: "", validate: colourOrTheme, effect: "immediate" } as Def<string>,
+  "notes.style.h6Colour": { scope: "device", default: "", validate: colourOrTheme, effect: "immediate" } as Def<string>,
   "notes.editorMode": { scope: "device", default: "live", validate: oneOf("live", "source", "preview"), effect: "immediate" } as Def<"live" | "source" | "preview">,
   "assets.edgeWidth": { scope: "device", default: 15, validate: (v: unknown) => (Number.isInteger(v) && (v as number) >= 0 && (v as number) <= 40 ? (v as number) : undefined), effect: "immediate" } as Def<number>,
   "assets.playerHideSeconds": { scope: "device", default: 1.5, validate: (v: unknown) => (typeof v === "number" && v >= 0.5 && v <= 10 ? v : undefined), effect: "immediate" } as Def<number>,

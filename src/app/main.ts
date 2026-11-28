@@ -1,3 +1,4 @@
+import { noteStyleVars } from "../notes/note-styles";
 import { moodboardsToCanvases } from "../pins/migrate";
 import { createCanvasView } from "../canvas/canvas-view";
 import { LIBRARY_DRAG } from "../ui/assets-view";
@@ -22,7 +23,7 @@ import { askHiddenPassword } from "../ui/hidden-access";
 import { noteKindOf, tooBigForNote } from "../notes/note-file";
 import { AUTO_NOTE_SETTINGS, setAutoDates } from "../notes/note-dates";
 import { setPropTypes } from "../notes/prop-types";
-import { CARD_SCALE, notePageHeight, setNoteItemMeta, setNoteLook, setNotePictures, setShownProps } from "../notes/note-preview";
+import { CARD_SCALE, notePageHeight, setNoteItemMeta, setNoteLook, setNotePictures, setNoteStyles, setShownProps } from "../notes/note-preview";
 import { anyNoteDirty, leaveAllNotes } from "../ui/note-session";
 import { mountFilePanel } from "../ui/file-panel";
 import type { FilePanelDeps } from "../ui/file-panel";
@@ -545,6 +546,15 @@ async function start(): Promise<void> {
   let redrawNoteCards = (): void => undefined; // (set once the canvas and the library are there)
   const applyNoteLook = (): void => void (setNoteLook(noteLookNow()) && redrawNoteCards());
   settings.subscribe((key) => (key === "notes.look" || key === "ui.theme") && applyNoteLook());
+  // Note styles (Settings > Notes): set on every notes editor and drawn page (one style element), and on notes' cards.
+  const noteStyleSheet = document.head.appendChild(document.createElement("style"));
+  const applyNoteStyles = (): void => {
+    const vars = noteStyleVars((k) => settings.get(k));
+    noteStyleSheet.textContent = `.me, .me-doc { ${vars} }`;
+    if (setNoteStyles(vars)) redrawNoteCards();
+  };
+  applyNoteStyles();
+  settings.subscribe((key) => key.startsWith("notes.style.") && applyNoteStyles());
   setShownProps(settings.get("notes.cardProps"));
   settings.subscribe((key) => {
     if (key === "notes.cardProps" && setShownProps(settings.get("notes.cardProps"))) redrawNoteCards();

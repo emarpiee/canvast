@@ -236,7 +236,7 @@ test("a table cell is the note's own words: one selection, the note's keys, its 
   // Escape leaves the table: the cursor is in the note after it.
   await cell(0).click();
   await p.keyboard.press("Escape");
-  await expect(page(p).locator(".cm-content").first()).toBeFocused();
+  await expect(page(p)).toBeFocused();
   // A row's grip, clicked: the whole row is selected (as notes apps do); Delete takes it out; Ctrl+Z puts it back.
   await cell(2).hover();
   await page(p).locator(".me-table-grip").click();
@@ -864,6 +864,11 @@ test("Settings > Notes: Save notes on close saves without asking; Notes open in 
   await p.waitForTimeout(300);
   await expect(p.locator(".cm-tooltip-autocomplete")).toHaveCount(0);
   await expect.poll(() => text(p)).toBe("# Keep\n\nWords.\n## and/or");
+  // Note styles: Rainbow headings and H1's size, in the editor at once (H2 a step smaller than H1).
+  await p.evaluate(() => { window.__canvastDebug.setSetting("notes.style.headingColours", "rainbow"); window.__canvastDebug.setSetting("notes.style.h1Size", 2.4); });
+  await expect(page(p).locator(".me-t-h1").first()).toHaveCSS("color", "rgb(229, 72, 77)");
+  const sizes = await page(p).evaluate(() => [".me-t-h1", ".me-t-h2"].map((s) => parseFloat(getComputedStyle(document.querySelector(s)!).fontSize)));
+  expect(sizes[0]).toBeGreaterThan(sizes[1]!);
   // Closed with a change: saved, nothing asked.
   await p.getByTestId("slide-view").locator('[data-act="close"]').click();
   await expect(p.getByTestId("slide-view")).toBeHidden();
