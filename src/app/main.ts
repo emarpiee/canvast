@@ -3385,11 +3385,13 @@ async function start(): Promise<void> {
     return true;
   };
   let clipEventAt = -Infinity;
+  /** What is in a file open beside the canvas (a note, its table) copies and cuts as itself: never the canvas's selected objects too. */
+  const inFilePanel = (t: EventTarget | null): boolean => t instanceof Element && !!t.closest('.note-dock, [data-testid="note-editor"]');
   for (const kind of ["copy", "cut"] as const) {
     document.addEventListener(kind, (e) => {
       clipEventAt = performance.now();
       // (by where the keys are, not the event's target: Firefox names a hidden editable box that holds a selection, while the keys are on the page)
-      if (typing(clipTarget(e)) || appView !== "canvas" || textEditor.isOpen) return;
+      if (typing(clipTarget(e)) || inFilePanel(clipTarget(e)) || inFilePanel(document.activeElement) || appView !== "canvas" || textEditor.isOpen) return;
       if (copyOrCut(kind, e)) e.preventDefault();
     });
   }
@@ -3397,7 +3399,7 @@ async function start(): Promise<void> {
   // copied or cut all the same, right after the keys, when no event came.
   window.addEventListener("keydown", (e) => {
     const k = e.key.toLowerCase();
-    if (!(e.ctrlKey || e.metaKey) || e.altKey || e.shiftKey || (k !== "c" && k !== "x") || typing(e.target) || appView !== "canvas" || focusedCanvasView() !== "main" || textEditor.isOpen || !editor.selection.size) return;
+    if (!(e.ctrlKey || e.metaKey) || e.altKey || e.shiftKey || (k !== "c" && k !== "x") || typing(e.target) || inFilePanel(e.target) || appView !== "canvas" || focusedCanvasView() !== "main" || textEditor.isOpen || !editor.selection.size) return;
     const at = performance.now();
     setTimeout(() => { if (clipEventAt < at && !document.querySelector("dialog:modal")) copyOrCut(k === "c" ? "copy" : "cut"); }, 0);
   }, true);

@@ -33,6 +33,7 @@ export function noteStyleVars(get: Get): string {
   colour("tr-bg", "notes.style.tableRowColour");
   colour("col-bg", "notes.style.tableColumnColour");
   out.push(`--me-strong-weight: ${Number(get("notes.style.boldWeight")) || 700};`);
+  out.push(`--me-list-gap: ${Number(get("notes.style.listGap") ?? 0.3)}em;`);
   const rainbow = get("notes.style.headingColours") === "rainbow";
   for (let i = 1; i <= 6; i++) {
     if (rainbow) out.push(`--me-h${i}-fg: ${RAINBOW[i - 1]};`);

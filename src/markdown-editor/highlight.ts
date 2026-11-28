@@ -73,7 +73,12 @@ const hangingLists = ViewPlugin.fromClass(
           pos = line.to + 1;
           const m = LIST_LINE.exec(line.text);
           // (in a quote or a callout its marks are hidden and the card pads it: the hang is the list's own)
-          if (m) out.push(Decoration.line({ class: "me-list-line", attributes: { style: `--me-hang: ${m[1]!.replace(/^\s*(?:>\s?)+/, "").replace(/\t/g, "    ").length}ch` } }).range(line.from));
+          // (in live mode the marks are drawn: a task's box, a bullet; the hang is what they take, so wrapped words start under the first's)
+          if (!m) continue;
+          const own = m[1]!.replace(/^\s*(?:>\s?)+/, "").replace(/\t/g, "    ");
+          const indent = /^\s*/.exec(own)![0].length;
+          const drawn = /\[[ xX/>-]\]/.test(own) ? "var(--me-task-hang)" : /^\s*[-*+]\s/.test(own) ? "var(--me-bullet-hang)" : `${own.length - indent}ch`;
+          out.push(Decoration.line({ class: "me-list-line", attributes: { style: `--me-hang: ${own.length}ch; --me-hang-live: calc(${indent}ch + ${drawn})` } }).range(line.from));
         }
       }
       return Decoration.set(out, true);

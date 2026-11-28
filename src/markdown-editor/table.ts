@@ -335,8 +335,27 @@ class TableView {
     const g = this.range;
     return !!g && r >= Math.min(g.r0, g.r1) && r <= Math.max(g.r0, g.r1) && c >= Math.min(g.c0, g.c1) && c <= Math.max(g.c0, g.c1);
   }
+  /** The outline round the cells selected together (one, round the whole range, as notes apps draw it). */
+  private rangeBox: HTMLElement | null = null;
   private paintRange(): void {
-    for (const cell of this.table.querySelectorAll<HTMLElement>(".me-cell")) cell.parentElement!.classList.toggle("me-cell-selected", this.inRange(Number(cell.dataset["r"]), Number(cell.dataset["c"])));
+    let box: DOMRect | null = null;
+    for (const cell of this.table.querySelectorAll<HTMLElement>(".me-cell")) {
+      const on = this.inRange(Number(cell.dataset["r"]), Number(cell.dataset["c"]));
+      const td = cell.parentElement!;
+      td.classList.toggle("me-cell-selected", on);
+      if (!on) continue;
+      const r = td.getBoundingClientRect();
+      box = box ? new DOMRect(Math.min(box.left, r.left), Math.min(box.top, r.top), Math.max(box.right, r.right) - Math.min(box.left, r.left), Math.max(box.bottom, r.bottom) - Math.min(box.top, r.top)) : r;
+    }
+    const scroll = this.table.parentElement!;
+    if (!box) return void (this.rangeBox?.remove(), (this.rangeBox = null));
+    if (!this.rangeBox) {
+      this.rangeBox = document.createElement("div");
+      this.rangeBox.className = "me-cell-range";
+    }
+    if (this.rangeBox.parentElement !== scroll) scroll.append(this.rangeBox);
+    const s = scroll.getBoundingClientRect();
+    Object.assign(this.rangeBox.style, { left: `${box.left - s.left + scroll.scrollLeft}px`, top: `${box.top - s.top + scroll.scrollTop}px`, width: `${box.width}px`, height: `${box.height}px` });
   }
   private clearCells(): void {
     this.range = null;
@@ -401,7 +420,7 @@ class TableView {
       if (e.key === "Delete" || e.key === "Backspace" || (mod && key === "x")) {
         if (mod) void navigator.clipboard?.writeText(this.selectedTable()).catch(() => undefined);
         this.eachSelected((r, c) => this.set(r, c, ""));
-      } else if (mod && key === "c") return void (navigator.clipboard?.writeText(this.selectedTable()).catch(() => undefined), e.preventDefault());
+      } else if (mod && key === "c") return void (navigator.clipboard?.writeText(this.selectedTable()).catch(() => undefined), e.preventDefault(), e.stopPropagation()); // (the cells, and nothing else: not the note, not the canvas)
       else if (mod && FORMAT_KEYS[key]) {
         const [a, b] = FORMAT_KEYS[key]!;
         let all = true;
@@ -622,6 +641,8 @@ class TableView {
     [...htr.cells].forEach((th, c) => {
       const grip = document.createElement("span");
       grip.className = "me-col-resize";
+      // (as tall as the table: the column's whole line resizes it)
+      grip.style.height = `${table.offsetHeight || th.offsetHeight}px`;
       grip.contentEditable = "false";
       grip.addEventListener("pointerdown", (e) => {
         e.preventDefault();
@@ -673,6 +694,10 @@ class TableView {
     const scroll = document.createElement("div");
     scroll.className = "me-table-scroll";
     scroll.append(table);
+    // (the column grips follow the table's height as its rows change, their whole line a place to resize)
+    new ResizeObserver(() => {
+      for (const g of table.querySelectorAll<HTMLElement>(".me-col-resize")) g.style.height = `${table.offsetHeight}px`;
+    }).observe(table);
     // A grip at the left of the row under the pointer: dragged up or down, the row moves there.
     const grip = document.createElement("span");
     grip.className = "me-table-grip";

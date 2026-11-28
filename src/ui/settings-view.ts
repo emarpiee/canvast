@@ -188,6 +188,7 @@ export const SETTINGS_TABS: readonly Tab[] = [
       { key: "notes.style.h4Colour", label: "Heading 4 colour", help: "Empty: the theme's.", control: { kind: "colour" } },
       { key: "notes.style.h5Colour", label: "Heading 5 colour", help: "Empty: the theme's.", control: { kind: "colour" } },
       { key: "notes.style.h6Colour", label: "Heading 6 colour", help: "Empty: the theme's.", control: { kind: "colour" } },
+      { key: "notes.style.listGap", label: "Space between list items", help: "The room between the items of a list or a task list, in times the text's size.", control: { kind: "range", min: 0, max: 1.2, step: 0.05, unit: "×" } },
       { key: "notes.style.boldColour", label: "Bold colour", help: "Empty: the text's.", control: { kind: "colour" } },
       { key: "notes.style.boldWeight", label: "Bold thickness", help: "How heavy bold words are.", control: { kind: "range", min: 500, max: 900, step: 100 } },
       { key: "notes.style.italicColour", label: "Italic colour", help: "Empty: the text's.", control: { kind: "colour" } },

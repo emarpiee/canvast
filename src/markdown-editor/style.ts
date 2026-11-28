@@ -41,6 +41,7 @@ export const EDITOR_CSS = `
 :where(.me) .me-t-h4 { font-size: var(--me-h4); color: var(--me-h4-fg, inherit); } :where(.me) .me-t-h5 { font-size: var(--me-h5); color: var(--me-h5-fg, inherit); } :where(.me) .me-t-h6 { font-size: var(--me-h6); color: var(--me-h6-fg, var(--me-muted)); }
 :where(.me) .me-t-em { font-style: italic; color: var(--me-em-fg, inherit); } :where(.me) .me-t-strong { font-weight: var(--me-strong-weight, 700); color: var(--me-strong-fg, inherit); }
 :where(.me) :is(.me-t-strong .me-t-em, .me-t-em .me-t-strong) { color: var(--me-strong-em-fg, var(--me-strong-fg, var(--me-em-fg, inherit))); } :where(.me) .me-t-strike { text-decoration: line-through; }
+:where(.me) .me-hl-dot { display: inline-block; width: 0.6em; height: 0.6em; margin: 0 0.15em; border-radius: 50%; vertical-align: 0.05em; background: var(--me-hl) !important; }
 :where(.me) .me-t-hl, :where(.me) .me-mark { background: var(--me-mark-bg); color: var(--me-mark-fg); border-radius: 2px; }
 :where(.me) .me-t-link { color: var(--me-accent); }
 :where(.me) .me-t-mono { font-family: var(--me-mono); font-size: 0.92em; background: var(--me-code-bg); padding: 1px 4px; border-radius: 4px; }
@@ -107,7 +108,12 @@ export const EDITOR_CSS = `
 :where(.me-table-add-row) { grid-column: 1; grid-row: 3; }
 :where(.me) .me-list-line { padding-left: var(--me-hang) !important; text-indent: calc(-1 * var(--me-hang)); }
 :where(.me) .me-list-line > * { text-indent: 0; }
-:where(.me-live) :is(.me-callout, .me-quote).me-list-line { padding-left: calc(14px + var(--me-hang)) !important; }
+:where(.me) { --me-task-hang: 1.6em; --me-bullet-hang: 1.35em; }
+/* (room between a list's items, as notes apps leave it; Settings > Notes > Note styles) */
+:where(.me) .me-list-line { padding-top: var(--me-list-gap, 0.3em) !important; }
+:where(.me-doc) li + li { margin-top: var(--me-list-gap, 0.3em); } /* (a task's box with its gap and space; a bullet with its space) */
+:where(.me-live) .me-list-line { padding-left: var(--me-hang-live) !important; text-indent: calc(-1 * var(--me-hang-live)); }
+:where(.me-live) :is(.me-callout, .me-quote).me-list-line { padding-left: calc(14px + var(--me-hang-live)) !important; }
 /* folding */
 :where(.me) .me-foldable { position: relative; }
 :where(.me) .me-fold { position: absolute; left: -18px; top: 0.35em; display: inline-grid; place-items: center; width: 16px; height: 16px; border-radius: 4px; color: var(--me-faint); cursor: pointer; opacity: 0; transition: opacity 0.12s, transform 0.12s; text-indent: 0; }
@@ -129,6 +135,9 @@ export const EDITOR_CSS = `
 :where(.me-media.is-selected) img { outline: 2px solid var(--me-accent); outline-offset: 2px; }
 :where(.me-media-tools) { position: absolute; top: 6px; right: 6px; display: flex; flex-wrap: wrap; justify-content: flex-end; max-width: calc(100% - 12px); gap: 2px; padding: 2px; border-radius: var(--me-radius); background: color-mix(in oklch, var(--me-bg) 85%, transparent); opacity: 0; transition: opacity 0.12s; }
 :where(.me-media:hover, .me-media.is-selected) .me-media-tools { opacity: 1; }
+:where(.me-media.is-small) .me-media-tools { top: auto; bottom: calc(100% + 4px); right: 0; max-width: none; flex-wrap: nowrap; z-index: 2; background: var(--me-bg); border: 1px solid var(--me-line); box-shadow: 0 4px 12px color-mix(in oklch, var(--me-fg) 18%, transparent); } /* (above a small picture, where it is readable) */
+:where(.me-media) .me-resize { z-index: 2; } /* (over a video's player bar too) */
+:where(.me-media.is-missing) { display: flex; align-items: center; justify-content: center; box-sizing: border-box; width: 100%; padding: 10px 14px; border-radius: var(--me-radius); background: var(--me-code-bg); color: var(--me-muted); font-size: 0.9em; }
 :where(.me-media-tools) .me-btn { min-width: 24px; height: 24px; color: var(--me-fg); }
 :where(.me-lightbox) { position: fixed; inset: 0; z-index: 1001; display: grid; place-items: center; overflow: hidden; background: color-mix(in oklch, black 82%, transparent); outline: none; }
 :where(.me-lightbox) img { position: absolute; left: 50%; top: 50%; max-width: none; max-height: none; transform-origin: center; cursor: zoom-in; user-select: none; }
@@ -156,10 +165,13 @@ export const EDITOR_CSS = `
 :where(.me-table) .me-cell.is-editing { user-select: text; }
 :where(.me-table) .me-cell.is-editing .cm-editor { background: transparent; }
 :where(.me-table) :is(th, td).is-editing { box-shadow: inset 0 0 0 2px color-mix(in oklch, var(--me-accent) 60%, transparent); }
-:where(.me-table) .me-cell-selected { background: color-mix(in oklch, var(--me-accent) 14%, transparent); box-shadow: inset 0 0 0 1px color-mix(in oklch, var(--me-accent) 70%, transparent); }
+:where(.me-table) .me-cell-selected { background: color-mix(in oklch, var(--me-accent) 12%, transparent); }
+:where(.me-table) .me-table-scroll { position: relative; }
+:where(.me-cell-range) { position: absolute; border: 2px solid color-mix(in oklch, var(--me-accent) 75%, transparent); border-radius: 4px; pointer-events: none; box-sizing: border-box; }
 :where(.me-table:focus) { outline: none; }
 :where(.me-table) th { position: relative; }
-:where(.me-col-resize) { position: absolute; top: 0; right: -3px; bottom: 0; width: 6px; cursor: col-resize; z-index: 1; }
+:where(.me-col-resize) { position: absolute; top: 0; right: -3px; width: 6px; cursor: col-resize; z-index: 1; }
+:where(.me-table) th:last-child .me-col-resize { right: 0; } /* (inside the table: past it, the table would scroll for nothing) */
 :where(.me-col-resize):hover { background: color-mix(in oklch, var(--me-accent) 40%, transparent); }
 :where(.me-col-grip) { position: absolute; top: 0; height: 12px; display: grid; place-items: center; border-radius: 4px; background: var(--me-code-bg); color: var(--me-faint); cursor: grab; opacity: 0; transition: opacity 0.12s; touch-action: none; }
 :where(.me-col-grip[hidden]) { display: none; }
@@ -238,14 +250,14 @@ export const EDITOR_CSS = `
 :where(.me-doc) .task-progress { background: linear-gradient(90deg, var(--me-accent) 50%, transparent 50%); border-color: var(--me-accent); }
 :where(.me-doc) li.cancelled { color: var(--me-faint); text-decoration: line-through; }
 :where(.me-doc) mark[class^="hl-"] { color: inherit; }
-:where(.me-doc) .hl-red, :where(.me) .me-hl-red { background: color-mix(in oklch, var(--me-red) 30%, transparent); }
-:where(.me-doc) .hl-orange, :where(.me) .me-hl-orange { background: color-mix(in oklch, var(--me-yellow) 40%, var(--me-red) 20%); }
-:where(.me-doc) .hl-yellow, :where(.me) .me-hl-yellow { background: color-mix(in oklch, var(--me-yellow) 38%, transparent); }
-:where(.me-doc) .hl-green, :where(.me) .me-hl-green { background: color-mix(in oklch, var(--me-green) 30%, transparent); }
-:where(.me-doc) .hl-blue, :where(.me) .me-hl-blue { background: color-mix(in oklch, var(--me-blue) 30%, transparent); }
-:where(.me-doc) .hl-purple, :where(.me) .me-hl-purple { background: color-mix(in oklch, var(--me-purple) 30%, transparent); }
-:where(.me-doc) .hl-pink, :where(.me) .me-hl-pink { background: color-mix(in oklch, var(--me-red) 18%, var(--me-purple) 14%); }
-:where(.me-doc) .hl-gray, :where(.me) .me-hl-gray { background: color-mix(in oklch, var(--me-grey) 30%, transparent); }
+:where(.me-doc) .hl-red, :where(.me) .me-hl-red { --me-hl: var(--me-red); background: color-mix(in oklch, var(--me-hl) 26%, transparent); border-radius: 3px; }
+:where(.me-doc) .hl-orange, :where(.me) .me-hl-orange { --me-hl: color-mix(in oklch, var(--me-yellow), var(--me-red)); background: color-mix(in oklch, var(--me-hl) 26%, transparent); border-radius: 3px; }
+:where(.me-doc) .hl-yellow, :where(.me) .me-hl-yellow { --me-hl: var(--me-yellow); background: color-mix(in oklch, var(--me-hl) 26%, transparent); border-radius: 3px; }
+:where(.me-doc) .hl-green, :where(.me) .me-hl-green { --me-hl: var(--me-green); background: color-mix(in oklch, var(--me-hl) 26%, transparent); border-radius: 3px; }
+:where(.me-doc) .hl-blue, :where(.me) .me-hl-blue { --me-hl: var(--me-blue); background: color-mix(in oklch, var(--me-hl) 26%, transparent); border-radius: 3px; }
+:where(.me-doc) .hl-purple, :where(.me) .me-hl-purple { --me-hl: var(--me-purple); background: color-mix(in oklch, var(--me-hl) 26%, transparent); border-radius: 3px; }
+:where(.me-doc) .hl-pink, :where(.me) .me-hl-pink { --me-hl: color-mix(in oklch, var(--me-red), var(--me-purple)); background: color-mix(in oklch, var(--me-hl) 26%, transparent); border-radius: 3px; }
+:where(.me-doc) .hl-gray, :where(.me) .me-hl-gray { --me-hl: var(--me-grey); background: color-mix(in oklch, var(--me-hl) 26%, transparent); border-radius: 3px; }
 :where(.me-doc) .tag { color: var(--me-tag-fg); background: var(--me-tag-bg); border-radius: 4px; padding: 0 3px; }
 .me.me-plain .cm-editor .cm-scroller { font-family: var(--me-mono); }
 /* (preview mode: CodeMirror's own sheet keeps its editor shown, hidden attribute or not) */

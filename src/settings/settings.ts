@@ -230,6 +230,7 @@ export const SETTINGS = {
   "notes.style.boldWeight": { scope: "device", default: 700, validate: range(500, 900), effect: "immediate" } as Def<number>,
   "notes.style.headingColours": { scope: "device", default: "own", validate: oneOf("own", "rainbow"), effect: "immediate" } as Def<"own" | "rainbow">,
   "notes.style.h1Size": { scope: "device", default: 1.9, validate: range(1.1, 3), effect: "immediate" } as Def<number>,
+  "notes.style.listGap": { scope: "device", default: 0.3, validate: range(0, 1.2), effect: "immediate" } as Def<number>,
   "notes.style.headingSizes": { scope: "device", default: "steps", validate: oneOf("steps", "same"), effect: "immediate" } as Def<"steps" | "same">,
   "notes.style.boldColour": { scope: "device", default: "", validate: colourOrTheme, effect: "immediate" } as Def<string>,
   "notes.style.italicColour": { scope: "device", default: "", validate: colourOrTheme, effect: "immediate" } as Def<string>,

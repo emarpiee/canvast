@@ -48,7 +48,11 @@ export interface LiveContext {
   /** Words for a picture's resize handle and the "no language" choice. */
   resizeLabel: string;
   /** A picture's buttons (its file never changes): duplicate it, take it out of the note. */
-  pictureWords: { duplicate: string; remove: string };
+  pictureWords: { open: string; duplicate: string; remove: string };
+  /** Show the item an embed or picture is (the library's file), from its tools. */
+  openMedia?: (link: string, embed: boolean) => void;
+  /** What an embed that finds nothing says: "“{name}” could not be found." */
+  missingLabel: string;
   /** A picture's buttons: full size, edit its Markdown; and the full-size view's close button. */
   zoomLabel: string;
   editPictureLabel: string;
@@ -171,7 +175,9 @@ class MediaWidget extends WidgetType {
       });
     }
     void this.ctx.media?.(this.link, this.embed).then((got) => {
-      if (!got || !box.isConnected) return;
+      if (!box.isConnected) return;
+      // (a picture or file that is nowhere: a box that says so, as notes apps show it)
+      if (!got) return void (box.classList.add("is-missing"), (box.textContent = this.ctx.missingLabel.replace("{name}", name)));
       const kind = got.type.split("/")[0];
       if (kind !== "image" && kind !== "video" && kind !== "audio") return;
       box.textContent = "";
@@ -187,12 +193,17 @@ class MediaWidget extends WidgetType {
         if (!(el instanceof HTMLImageElement)) el.controls = true;
         el.src = got.url;
       }
-      if (kind !== "audio" && this.at && view) box.append(...(kind === "image" ? [this.tools(box, view, now)] : []), this.resizer(el, view, now));
+      // (one frame for a picture and a video alike: its tools and its handle; on a small one the tools stand above it, readable)
+      if (kind !== "audio" && this.at && view) {
+        box.append(this.tools(box, view, now, kind === "image"), this.resizer(el, view, now));
+        const small = (): void => void box.classList.toggle("is-small", el.getBoundingClientRect().width < 260);
+        new ResizeObserver(small).observe(el);
+      }
     });
     return box;
   }
   /** The buttons on a picture: full size, and edit its Markdown. */
-  private tools(box: HTMLElement, view: EditorView, now: () => MediaWidget): HTMLElement {
+  private tools(box: HTMLElement, view: EditorView, now: () => MediaWidget, picture = true): HTMLElement {
     const bar = document.createElement("span");
     bar.className = "me-media-tools";
     const button = (cls: string, label: string, icon: string, run: () => void): HTMLButtonElement => {
@@ -212,11 +223,13 @@ class MediaWidget extends WidgetType {
     const ICON = (d: string): string => `<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${d}</svg>`;
     // (what a picture can have done to it without its file changing: copied, taken out of the note)
     bar.append(
+      ...(this.ctx.openMedia ? [button("me-media-open", this.ctx.pictureWords.open, ICON('<path d="M15 3h6v6M10 14 21 3M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>'), () => this.ctx.openMedia!(now().link, now().embed))] : []),
       button("me-media-copy", this.ctx.pictureWords.duplicate, ICON('<rect x="8" y="8" width="13" height="13" rx="2"/><path d="M4 16V5a1 1 0 0 1 1-1h11"/>'), () => duplicatePicture(view, at())),
       button("me-media-delete", this.ctx.pictureWords.remove, ICON('<path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/>'), () => deletePicture(view, at())),
     );
     bar.append(
-      button("me-media-zoom", this.ctx.zoomLabel, '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4M11 8v6M8 11h6"/></svg>', () => void viewPicture(view, now().at!.from, this.ctx.lightboxWords)),
+      // (full size: a picture's; a video plays where it is)
+      ...(picture ? [button("me-media-zoom", this.ctx.zoomLabel, '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4M11 8v6M8 11h6"/></svg>', () => void viewPicture(view, now().at!.from, this.ctx.lightboxWords))] : []),
       button("me-media-edit", this.ctx.editPictureLabel, '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m8 7-5 5 5 5M16 7l5 5-5 5M14 4l-4 16"/></svg>', () => {
         const at = now().at!;
         view.dispatch({ effects: setPictureEdit.of(at.from), selection: { anchor: at.to } });
@@ -255,6 +268,27 @@ class MediaWidget extends WidgetType {
 }
 /** A picture drawn for any widget's page (a table's cells). */
 export const mediaElement = (ctx: LiveContext, link: string, alt: string, embed: boolean, width: number | null = null): HTMLElement => new MediaWidget(link, alt, embed, width, ctx).toDOM();
+
+/** A coloured highlight's tag at the cursor, drawn as notes apps show it: `==` and, at its start, a dot of its colour. */
+class HighlightMark extends WidgetType {
+  constructor(readonly colour: string, readonly open: boolean) {
+    super();
+  }
+  override eq(o: HighlightMark): boolean {
+    return o.colour === this.colour && o.open === this.open;
+  }
+  override toDOM(): HTMLElement {
+    const s = document.createElement("span");
+    s.className = "me-t-mark me-hl-tag";
+    s.textContent = "==";
+    if (this.open) {
+      const dot = document.createElement("span");
+      dot.className = `me-hl-dot me-hl-${this.colour}`;
+      s.append(dot);
+    }
+    return s;
+  }
+}
 
 /** A task's box: a click ticks it in the text. */
 class TaskWidget extends WidgetType {
@@ -720,7 +754,9 @@ function decorations(view: EditorView, ctx: LiveContext): DecorationSet {
         const a = line.from + m.index!, b = a + m[0].length;
         const open = m[0].indexOf(">") + 1;
         out.push(Decoration.mark({ class: `me-mark me-hl-${m[1]}` }).range(a + open, b - 7));
+        // (off the cursor its tags go; at the cursor they read as a highlight's marks do, ==, with a dot of its colour, not as HTML)
         if (!touches(state, a, b)) (hideMark(a, a + open), hideMark(b - 7, b));
+        else out.push(Decoration.replace({ widget: new HighlightMark(m[1]!, true) }).range(a, a + open), Decoration.replace({ widget: new HighlightMark(m[1]!, false) }).range(b - 7, b));
       }
     }
   }
