@@ -5277,8 +5277,12 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
         inspectorHome.parent.insertBefore(inspector, inspectorHome.next);
         return renderInspector();
       }
+      // (read now, the library closed or not: its listing may not hold the file yet, or an old name of it)
+      const was = visible;
+      visible = true;
+      await refresh().finally(() => void (visible = was));
+      pagedCache.delete(hash);
       await ensure([hash]);
-      if (!entryOf(hash)) await refresh().then(() => ensure([hash]));
       picked.clear();
       picked.add(hash);
       selected = anchor = hash;
