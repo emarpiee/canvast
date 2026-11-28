@@ -30,6 +30,7 @@
     "check:name-rules": "node scripts/check-name-rules.mjs",
     "check:components": "node scripts/check-components.mjs",
     "check:commands": "node scripts/check-commands.mjs",
+    "audit:commands": "node scripts/check-commands.mjs --audit",
     "test": "npm run typecheck && npm run test:unit && node scripts/test-affected.mjs && npm run check:tokens && npm run check:storage && npm run check:picker && npm run check:markdown-editor && npm run check:patterns",
     "test:affected": "node scripts/test-affected.mjs",
     "test:group": "node scripts/test-affected.mjs --groups",

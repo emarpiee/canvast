@@ -44,6 +44,10 @@ jobs:
       - run: npm run check:repro
       - if: always()
         run: npm run check:commands
+      # (a warning until every action is a command, BACKLOG B40; then it runs with --strict and fails the build)
+      - if: always()
+        name: Command-first audit (warns)
+        run: npm run audit:commands
       - name: Keep the built file
         uses: actions/upload-artifact@v4
         with:

@@ -198,6 +198,56 @@ function importProblems() {
   return out;
 }
 
+// ---- the audit (warnings for now) ----------------------------------------------------------------------------------------------------
+// `--audit` lists every action that is not a command yet, which the check above lets through: what is marked as typing (an edit made in the
+// page, as a format button of the notes editor), key and pointer listeners that run no command, and key bindings that run code (CodeMirror's
+// `{ key, run }`). It only warns, so the app moves to commands one part at a time (BACKLOG B40); `--strict` fails on any, and CI runs it so
+// once none is left.
+function auditProblems(path) {
+  const src = readFileSync(path, "utf8");
+  const text = blank(src);
+  const lines = src.split("\n");
+  const found = [];
+  const near = (at) => [lines[lineOf(src, at) - 1] ?? "", lines[lineOf(src, at) - 2] ?? ""].join("\n");
+  for (const m of src.matchAll(/addEventListener\(\s*"(click|dblclick|contextmenu|change|input|submit)"/g)) {
+    if (!text.startsWith("addEventListener", m.index)) continue;
+    const body = src.slice(m.index, close(text, m.index + "addEventListener".length) + 1);
+    if (!RUNS.test(body) && /\/\/\s*typing:/.test(near(m.index))) found.push({ line: lineOf(src, m.index), what: `a "${m[1]}" listener marked typing that edits without a command` });
+  }
+  for (const m of src.matchAll(/addEventListener\(\s*"(keydown|keyup|mousedown|pointerdown|pointerup|wheel)"/g)) {
+    if (!text.startsWith("addEventListener", m.index)) continue;
+    const body = src.slice(m.index, close(text, m.index + "addEventListener".length) + 1);
+    if (!RUNS.test(body) && !/\/\/\s*(view-state|commands):/.test(near(m.index))) found.push({ line: lineOf(src, m.index), what: `a "${m[1]}" listener that runs no command` });
+  }
+  for (const m of text.matchAll(/(?<![\w$.])key\s*:/g)) {
+    const open = openerOf(text, m.index - 1);
+    if (open < 0) continue;
+    const keys = topKeys(text, open, close(text, open));
+    if (keys.has("key") && keys.has("run") && !RUNS.test(src.slice(open, close(text, open) + 1))) found.push({ line: lineOf(src, open), what: "a key binding that runs code, not a command" });
+  }
+  return found;
+}
+if (process.argv.includes("--audit")) {
+  const strict = process.argv.includes("--strict");
+  const rows = [];
+  let n = 0;
+  for (const rel of SCAN.flatMap((d) => files(join(ROOT, d))).map((p) => relative(ROOT, p)).filter((p) => !SKIP.some((r) => r.test(p))).sort()) {
+    const found = auditProblems(join(ROOT, rel));
+    if (!found.length) continue;
+    n += found.length;
+    rows.push([rel, found.length]);
+    if (process.argv.includes("--list")) for (const f of found) console.log(`${rel}:${f.line}: ${f.what}`);
+  }
+  for (const [rel, k] of rows) console.log(`  ${String(k).padStart(4)}  ${rel}`);
+  const say = n ? `audit:commands: ${n} actions are not commands yet, in ${rows.length} files (ADR 0205, BACKLOG B40; --list shows each).` : "audit:commands: every action is a command: CI can run this with --strict now.";
+  console.log(say);
+  if (process.env.GITHUB_ACTIONS && n) {
+    console.log(`::warning title=Command-first audit::${n} actions are not commands yet, in ${rows.length} files (BACKLOG B40)`);
+    if (process.env.GITHUB_STEP_SUMMARY) writeFileSync(process.env.GITHUB_STEP_SUMMARY, `### Command-first audit\n\n${n} actions are not commands yet (BACKLOG B40).\n\n| File | Actions |\n| --- | --- |\n${rows.map(([f, k]) => `| \`${f}\` | ${k} |`).join("\n")}\n`, { flag: "a" });
+  }
+  process.exit(strict && n ? 1 : 0);
+}
+
 const shrink = process.argv.includes("--shrink");
 const list = process.argv.includes("--list");
 const todo = existsSync(TODO) ? JSON.parse(readFileSync(TODO, "utf8")) : { files: {} }; // (the list of actions made before the rule: gone once it was empty)
