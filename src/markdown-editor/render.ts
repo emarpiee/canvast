@@ -65,6 +65,25 @@ export function renderMarkdown(md: string, opts: RenderOptions = {}): string {
   const wikiHref = opts.wikiHref ?? ((t: string) => `#${encodeURIComponent(t)}`);
   const embedSrc = opts.embedSrc ?? ((t: string) => t);
   const text = (from: number, to: number): string => src.slice(from, to);
+  // Footnotes, as notes apps number them: by their first reference; inline ones numbered where they stand; definitions drawn at the end.
+  const fnNumber = new Map<string, number>();
+  const fnDefs = new Map<string, string>();
+  const fnInline: string[] = [];
+  const inlineNumbers: number[] = [];
+  let fnCount = 0;
+  tree.iterate({
+    enter: (n) => {
+      if (n.name === "FootnoteRef") {
+        const l = text(n.from + 2, n.to - 1);
+        if (!fnNumber.has(l)) fnNumber.set(l, ++fnCount);
+      } else if (n.name === "InlineFootnote") (fnInline.push(text(n.from + 2, n.to - 1)), inlineNumbers.push(++fnCount));
+      else if (n.name === "FootnoteDef") {
+        const m = /^\[\^([^\]\s]+)\]:[ \t]?/.exec(text(n.from, n.to));
+        if (m) fnDefs.set(m[1]!, text(n.from + m[0].length, n.to).replace(/\n(\t| {2,})/g, "\n"));
+      }
+    },
+  });
+  let fnInlineAt = 0;
 
   /** The inline content of `node` between `from` and `to`: its text with its children rendered. */
   const inline = (node: SyntaxNode, from = node.from, to = node.to): string => {
@@ -130,6 +149,15 @@ export function renderMarkdown(md: string, opts: RenderOptions = {}): string {
         const alias = child(n, "WikiAlias");
         const a = readAlt(alias ?? "");
         return `<img src="${escapeHtml(embedSrc(target))}" alt="${escapeHtml(a.alt || target.split("/").pop()!)}" data-embed="${escapeHtml(target)}"${pictureAttrs(a)}>`;
+      }
+      case "FootnoteRef": {
+        const l = text(n.from + 2, n.to - 1), id = encodeURIComponent(l);
+        return `<sup class="footnote-ref"><a href="#fn-${id}" id="fnref-${id}" data-footnote="${escapeHtml(l)}">${fnNumber.get(l) ?? "?"}</a></sup>`;
+      }
+      case "InlineFootnote": {
+        const k = fnInlineAt++;
+        const num = inlineNumbers[k] ?? k + 1;
+        return `<sup class="footnote-ref"><a href="#fn-i${k}" id="fnref-i${k}">${num}</a></sup>`;
       }
       case "InlineMath":
         return `<span class="math" data-tex="${escapeHtml(text(n.from + 1, n.to - 1))}">${escapeHtml(text(n.from, n.to))}</span>`;
@@ -261,7 +289,7 @@ export function renderMarkdown(md: string, opts: RenderOptions = {}): string {
         return opts.html ? text(n.from, n.to) : `<p>${escapeHtml(text(n.from, n.to))}</p>`;
       case "Table":
         return table(n);
-      case "LinkReference": case "CommentBlock": case "ProcessingInstructionBlock":
+      case "LinkReference": case "CommentBlock": case "ProcessingInstructionBlock": case "FootnoteDef": // (a footnote's words: at the end)
         return "";
       default:
         return blocks(n);
@@ -320,5 +348,13 @@ export function renderMarkdown(md: string, opts: RenderOptions = {}): string {
     return `<div class="me-table-scroll"><table${cols ? ' style="table-layout:fixed"' : ""}>${cols}${head ? `<thead>${row(head, "th")}</thead>` : ""}${body.length ? `<tbody>${body.map((r) => row(r, "td")).join("")}</tbody>` : ""}</table></div>`;
   };
 
-  return blocks(tree.topNode);
+  const body = blocks(tree.topNode);
+  if (!fnNumber.size && !fnInline.length) return body;
+  // (the footnotes at the end, in their numbers' order, each back to where it is referred to)
+  const sub = (md: string): string => renderMarkdown(md, { ...opts, taskOffsets: false }).replace(/^<p>|<\/p>$/g, "");
+  const items = [
+    ...[...fnNumber].map(([l, n]) => ({ n, id: encodeURIComponent(l), html: fnDefs.has(l) ? sub(fnDefs.get(l)!) : "" })),
+    ...fnInline.map((t, k) => ({ n: inlineNumbers[k] ?? k + 1, id: `i${k}`, html: sub(t) })),
+  ].sort((a, b) => a.n - b.n);
+  return `${body}<section class="footnotes"><hr><ol>${items.map((f) => `<li id="fn-${f.id}" value="${f.n}">${f.html} <a href="#fnref-${f.id}" class="footnote-backref" aria-label="Back">↩︎</a></li>`).join("")}</ol></section>`;
 }

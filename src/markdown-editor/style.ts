@@ -41,6 +41,12 @@ export const EDITOR_CSS = `
 :where(.me) .me-t-h4 { font-size: var(--me-h4); color: var(--me-h4-fg, inherit); } :where(.me) .me-t-h5 { font-size: var(--me-h5); color: var(--me-h5-fg, inherit); } :where(.me) .me-t-h6 { font-size: var(--me-h6); color: var(--me-h6-fg, var(--me-muted)); }
 :where(.me) .me-t-em { font-style: italic; color: var(--me-em-fg, inherit); } :where(.me) .me-t-strong { font-weight: var(--me-strong-weight, 700); color: var(--me-strong-fg, inherit); }
 :where(.me) :is(.me-t-strong .me-t-em, .me-t-em .me-t-strong) { color: var(--me-strong-em-fg, var(--me-strong-fg, var(--me-em-fg, inherit))); } :where(.me) .me-t-strike { text-decoration: line-through; }
+:where(.me-live) .me-fn { color: var(--me-accent); font-size: 0.75em; padding: 0 1px; cursor: pointer; }
+:where(.me-live) .me-fn-label { color: var(--me-faint); font-size: 0.8em; }
+:where(.me-doc) .footnote-ref a { text-decoration: none; font-size: 0.8em; }
+:where(.me-doc) .footnotes { font-size: 0.9em; color: var(--me-muted); }
+:where(.me-doc) .footnotes hr { margin: 1.5em 0 0.6em; }
+:where(.me-doc) .footnote-backref { text-decoration: none; }
 :where(.me) .me-hl-dot { display: inline-block; width: 0.6em; height: 0.6em; margin: 0 0.15em; border-radius: 50%; vertical-align: 0.05em; background: var(--me-hl) !important; }
 :where(.me) .me-t-hl, :where(.me) .me-mark { background: var(--me-mark-bg); color: var(--me-mark-fg); border-radius: 2px; }
 :where(.me) .me-t-link { color: var(--me-accent); }

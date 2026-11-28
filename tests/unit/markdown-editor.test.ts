@@ -173,3 +173,15 @@ describe("a table pasted from another app", () => {
     expect(writeTable(t)).toContain("| [[x\\|y]] | z |");
   });
 });
+
+describe("footnotes, as notes apps write them", () => {
+  it("number references by their first use and inline ones where they stand, and list them at the end with a way back", () => {
+    const html = renderMarkdown("A[^b] then^[inline *one*] and [^a] and [^b] again.\n\n[^a]: The a.\n[^b]: The b,\n  on two lines.\n");
+    expect(html).toContain('<a href="#fn-b" id="fnref-b" data-footnote="b">1</a>');
+    expect(html).toContain('<a href="#fn-i0" id="fnref-i0">2</a>');
+    expect(html).toContain('<a href="#fn-a" id="fnref-a" data-footnote="a">3</a>');
+    expect(html).toMatch(/<section class="footnotes"><hr><ol><li id="fn-b" value="1">The b,<br>on two lines\. <a href="#fnref-b"/);
+    expect(html).toContain('<li id="fn-i0" value="2">inline <em>one</em>');
+    expect(html).not.toContain("[^a]: The a.");
+  });
+});

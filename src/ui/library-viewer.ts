@@ -172,10 +172,23 @@ export function mountLibraryViewer(ctx: ViewerCtx) {
     const lost = cards.missing.map((m) => `<li class="asset-link-missing" title="Nothing in the library has this name">${ICONS.fileIcon}<span class="asset-place-name">${esc(m)}</span></li>`);
     fill("asset-outlinks", isNote, cards.to.length + cards.missing.length, "out", [...cards.to.map(rowOf), ...lost], "This note links to nothing.");
   };
+  /** A note's footnotes in its details (an outline of them, as notes apps keep one): each row goes to its words in the note. */
+  const fillFootnotes = async (hash: string): Promise<void> => {
+    const sec = ctx.inspector.querySelector<HTMLElement>('[data-testid="asset-footnotes"]');
+    if (!sec) return;
+    if (noteKindOf(ctx.entryOf(hash)?.name ?? "") !== "md") return void (sec.hidden = true);
+    const words = await ctx.assets.record(hash).then((r) => r?.blob.text(), () => undefined);
+    if (words === undefined || ctx.inspector.dataset["hash"] !== hash) return;
+    const defs = [...words.matchAll(/^\[\^([^\]\s]+)\]:[ \t]?(.*)$/gm)];
+    sec.hidden = !defs.length;
+    sec.querySelector<HTMLElement>("[data-count]")!.textContent = String(defs.length);
+    sec.querySelector("ul")!.innerHTML = defs.map((m) => `<li><button type="button" class="asset-link-row assets-link" data-action="go-footnote" data-fn="${esc(m[1]!)}" title="Go to footnote ${esc(m[1]!)}"><span class="asset-place-total">${esc(m[1]!)}</span><span class="asset-place-name">${esc(m[2]!.slice(0, 120))}</span></button></li>`).join("");
+  };
   // (the details draw many times over one change: one lookup at a time, and one more after it for what came meanwhile)
   let linksBusy = false;
   let linksNext: string | null = null;
   const fillLinks = async (hash: string, again = false): Promise<void> => {
+    void fillFootnotes(hash);
     if (lastLinks?.hash === hash && lastLinks.hiddenMode === ctx.hiddenMode && ctx.inspector.dataset["hash"] === hash) paintLinks(hash, lastLinks.cards); // (at once, so a card does not go and come back)
     if (linksBusy) return void (linksNext = hash);
     linksBusy = true;

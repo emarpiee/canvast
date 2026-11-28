@@ -207,6 +207,8 @@ export interface MarkdownEditor {
   insert(markdown: string): void;
   /** The selected text, as written. */
   selection(): string;
+  /** Put the cursor just after the first place `text` is written, in view (a footnote's definition from an outline). */
+  reveal(text: string): boolean;
   /** Whether all of the text is selected. */
   allSelected(): boolean;
   /** Open the find bar (not in preview mode). */
@@ -768,6 +770,14 @@ export function createMarkdownEditor(opts: EditorOptions): MarkdownEditor {
     },
     insert(md) {
       insertAt(view, md);
+    },
+    reveal(text) {
+      const at = view.state.doc.toString().indexOf(text);
+      if (at < 0) return false;
+      if (mode === "preview") setModeBy("live");
+      view.dispatch({ selection: { anchor: at + text.length }, scrollIntoView: true });
+      view.focus();
+      return true;
     },
     selection() {
       return view.state.selection.ranges.map((r) => view.state.sliceDoc(r.from, r.to)).join("\n");

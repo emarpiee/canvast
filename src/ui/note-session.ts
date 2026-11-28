@@ -373,6 +373,11 @@ export class OpenNote {
   }
 
   /** Before the note is left (another item, Back, Esc, the window closed): its changes are saved or let go, or it stays open. Whether to go on. */
+  /** Go to a place in the note by its words (OpenView.goToText). */
+  goToText(text: string): boolean {
+    return this.editor?.reveal(text) ?? false;
+  }
+
   async leave(): Promise<boolean> {
     if (this.pending) await this.pending.catch(() => false); // (a save on its way ends first: what it saved is no unsaved change)
     if (!this.dirty) return true;

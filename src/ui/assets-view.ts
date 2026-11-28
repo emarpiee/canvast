@@ -2346,7 +2346,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       file: () => `${e ? marksHtml(e) : ""}${e && noteKindOf(e.name) ? `<section class="asset-sec asset-file" data-testid="asset-file-info"><h3>A note</h3><p class="asset-note">Open it (double-click) to read and write it in the notes editor. Its file stays plain text other apps read. Tag it <em>template</em> to offer it in the / menu of every note.</p></section>` : e && viewKindNamed(e.name) ? `<section class="asset-sec asset-file" data-testid="asset-file-info"><h3>${esc(describeFile(e.name, e.type).category)}</h3><p class="asset-note">Open it (double-click) to see it here. It is kept exactly as it is. If it cannot be read, its card is shown.</p></section>` : e && isCard(e) && !isFontFile(e) ? (() => { const d = describeFile(e.name, e.type); return `<section class="asset-sec asset-file" data-testid="asset-file-info"><h3>${isArtFile(e.name) ? "An art file" : "No preview for this file"}</h3><p class="asset-note">${isAutoCopy(e.name) ? `${AUTO_COPY_NOTE} ` : ""}${esc(d.category)} (${esc(d.chip)}). It is kept exactly as it is and shown as ${isArtFile(e.name) ? "the picture it keeps, when it keeps one" : "a card"}. ${esc(d.todo)}</p></section>`; })() : ""}`,
       organize: () => (e ? organizeHtml(e) : ""),
       notes: () => (e ? notesHtml(e) : ""),
-      links: () => `<section class="asset-sec" data-testid="asset-backlinks" hidden><h3>Linked from <span class="layer-count" data-count></span></h3><ul class="asset-places"></ul></section><section class="asset-sec" data-testid="asset-outlinks" hidden><h3>Links <span class="layer-count" data-count></span></h3><ul class="asset-places"></ul></section>`,
+      links: () => `<section class="asset-sec" data-testid="asset-backlinks" hidden><h3>Linked from <span class="layer-count" data-count></span></h3><ul class="asset-places"></ul></section><section class="asset-sec" data-testid="asset-outlinks" hidden><h3>Links <span class="layer-count" data-count></span></h3><ul class="asset-places"></ul></section><section class="asset-sec" data-testid="asset-footnotes" hidden><h3>Footnotes <span class="layer-count" data-count></span></h3><ul class="asset-places"></ul></section>`,
       where: () => `${copiesHtml(e)}<section class="asset-sec asset-where">
         <h3 data-testid="asset-usage">${instances ? `Used on ${plural(places.length || (e?.canvases ?? m!.canvases), "canvas", "canvases")} <span class="asset-place-total">(${plural(instances, "time")})</span>` : "Where it is used"}</h3>
         ${instances ? `<ul class="asset-places" data-testid="asset-places">${placeRows}</ul>
@@ -3173,6 +3173,14 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       case "go-copy":
         void view.reveal([c.data["hash"]!]);
         break;
+      case "go-footnote": {
+        // (a footnote of the open note: its words, in the editor; a note not open opens first)
+        const hash = inspector.dataset["hash"], label = c.data["fn"]!;
+        if (!hash) break;
+        if (vw.note?.hash === hash) vw.note.goToText?.(`[^${label}]:`);
+        else void vw.showSlide(hash).then(() => window.setTimeout(() => vw.note?.goToText?.(`[^${label}]:`), 300));
+        break;
+      }
       case "go-mark": {
         // Opens at it, when it is not open.
         const hash = inspector.dataset["hash"], at = c.data["at"]!;

@@ -57,6 +57,8 @@ export interface OpenView {
   changeMarks?: MarksChange;
   /** A note's place at its top for its properties: the details panel puts its Properties there when Settings say so. */
   readonly propsSlot?: HTMLElement;
+  /** Goes to the first place these words are written (a note's footnote, from the details' outline). */
+  goToText?(text: string): boolean;
 }
 
 export interface FileFacts {

@@ -269,6 +269,59 @@ class MediaWidget extends WidgetType {
 /** A picture drawn for any widget's page (a table's cells). */
 export const mediaElement = (ctx: LiveContext, link: string, alt: string, embed: boolean, width: number | null = null): HTMLElement => new MediaWidget(link, alt, embed, width, ctx).toDOM();
 
+/** The note's footnotes: each reference's number (by its first use, inline ones counted where they stand), and each definition's words and place. */
+interface Footnotes {
+  number: Map<string, number>;
+  inline: Map<number, number>;
+  defs: Map<string, { text: string; at: number }>;
+}
+const footnoteCache = new WeakMap<object, Footnotes>();
+function footnotesOf(state: EditorState): Footnotes {
+  const hit = footnoteCache.get(state.doc);
+  if (hit) return hit;
+  const f: Footnotes = { number: new Map(), inline: new Map(), defs: new Map() };
+  const doc = state.doc.toString();
+  let n = 0;
+  for (const m of doc.matchAll(/\[\^([^\]\s]+)\](?!:)|\^\[/g)) {
+    if (m[1] === undefined) f.inline.set(m.index!, ++n);
+    else if (!f.number.has(m[1])) f.number.set(m[1], ++n);
+  }
+  for (const m of doc.matchAll(/^\[\^([^\]\s]+)\]:[ \t]?(.*)$/gm)) f.defs.set(m[1]!, { text: m[2]!, at: m.index! });
+  footnoteCache.set(state.doc, f);
+  return f;
+}
+
+/** A footnote's number, raised: its words on hover; a click on a reference goes to its definition. */
+class FootnoteWidget extends WidgetType {
+  constructor(readonly n: number, readonly words: string, readonly label: string | null) {
+    super();
+  }
+  override eq(o: FootnoteWidget): boolean {
+    return o.n === this.n && o.words === this.words && o.label === this.label;
+  }
+  override toDOM(view: EditorView): HTMLElement {
+    const s = document.createElement("sup");
+    s.className = "me-fn";
+    s.textContent = String(this.n || "?");
+    if (this.words) s.title = this.words;
+    if (this.label !== null) {
+      const label = this.label;
+      // view-state: (goes to the footnote's words: moves the cursor there)
+      s.addEventListener("mousedown", (e) => {
+        const def = footnotesOf(view.state).defs.get(label);
+        if (!def) return;
+        e.preventDefault();
+        view.dispatch({ selection: { anchor: def.at + `[^${label}]: `.length }, scrollIntoView: true });
+        view.focus();
+      });
+    }
+    return s;
+  }
+  override ignoreEvent(): boolean {
+    return false;
+  }
+}
+
 /** A coloured highlight's tag at the cursor, drawn as notes apps show it: `==` and, at its start, a dot of its colour. */
 class HighlightMark extends WidgetType {
   constructor(readonly colour: string, readonly open: boolean) {
@@ -642,6 +695,23 @@ function decorations(view: EditorView, ctx: LiveContext): DecorationSet {
             const a = readAlt(alias ? text(alias) : "");
             media(n, (sel) => new MediaWidget(text(target).trim(), a.alt, true, a.width, ctx, { from: n.from, to: n.to }, sel));
             return false;
+          }
+          case "FootnoteRef": case "InlineFootnote": {
+            // (off the cursor, a footnote is its number, small and raised, as notes apps draw it: its words on hover, a click goes to them)
+            if (touches(state, n.from, n.to)) return false;
+            const fn = footnotesOf(state);
+            const inline = name === "InlineFootnote";
+            const label = inline ? "" : text(n).slice(2, -1);
+            const num = inline ? fn.inline.get(n.from) ?? 0 : fn.number.get(label) ?? 0;
+            const words = inline ? text(n).slice(2, -1) : fn.defs.get(label)?.text ?? "";
+            out.push(Decoration.replace({ widget: new FootnoteWidget(num, words, inline ? null : label) }).range(n.from, n.to));
+            return false;
+          }
+          case "FootnoteDef": {
+            // (a definition's label drawn as the footnote's number off the cursor's line)
+            const mark = n.getChild("FootnoteMark");
+            if (mark && !lineActive(n.from)) out.push(Decoration.mark({ class: "me-fn-label" }).range(mark.from, mark.to));
+            return;
           }
           case "WikiLink": {
             const target = n.getChild("WikiTarget");

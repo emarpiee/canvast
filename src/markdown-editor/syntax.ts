@@ -150,8 +150,65 @@ const math: MarkdownConfig = {
   ],
 };
 
+const CARET = 94;
+/**
+ * Footnotes, as notes apps write them: a reference `[^1]` (any label), an inline footnote `^[its words]`, and a definition `[^1]: words` on a
+ * line of its own (its next lines indented belong to it).
+ */
+const footnotes: MarkdownConfig = {
+  defineNodes: [{ name: "FootnoteRef", style: tags.link }, { name: "InlineFootnote", style: tags.link }, { name: "FootnoteDef", block: true }, { name: "FootnoteLabel", style: tags.labelName }, { name: "FootnoteMark", style: tags.processingInstruction }],
+  parseInline: [
+    {
+      name: "FootnoteRef",
+      before: "Link",
+      parse(cx, next, pos) {
+        if (next !== OPEN || cx.char(pos + 1) !== CARET) return -1;
+        for (let p = pos + 2; p < cx.end; p++) {
+          const c = cx.char(p);
+          if (c === 10 || c === 32 || c === OPEN) return -1;
+          if (c === CLOSE) return p > pos + 2 && cx.char(p + 1) !== 58 ? cx.addElement(cx.elt("FootnoteRef", pos, p + 1, [cx.elt("FootnoteMark", pos, pos + 2), cx.elt("FootnoteLabel", pos + 2, p), cx.elt("FootnoteMark", p, p + 1)])) : -1;
+        }
+        return -1;
+      },
+    },
+    {
+      name: "InlineFootnote",
+      before: "Link",
+      parse(cx, next, pos) {
+        if (next !== CARET || cx.char(pos + 1) !== OPEN) return -1;
+        let depth = 0;
+        for (let p = pos + 1; p < cx.end; p++) {
+          const c = cx.char(p);
+          if (c === 10) return -1;
+          if (c === OPEN) depth++;
+          else if (c === CLOSE && --depth === 0) return p > pos + 2 ? cx.addElement(cx.elt("InlineFootnote", pos, p + 1, [cx.elt("FootnoteMark", pos, pos + 2), cx.elt("FootnoteMark", p, p + 1)])) : -1;
+        }
+        return -1;
+      },
+    },
+  ],
+  parseBlock: [
+    {
+      name: "FootnoteDef",
+      before: "LinkReference",
+      parse(cx, line) {
+        const m = /^\[\^([^\]\s]+)\]:[ \t]?/.exec(line.text.slice(line.pos));
+        if (!m) return false;
+        const start = cx.lineStart + line.pos;
+        const label = cx.elt("FootnoteLabel", start + 2, start + 2 + m[1]!.length);
+        const marks = [cx.elt("FootnoteMark", start, start + m[0].length), label];
+        let end = cx.lineStart + line.text.length;
+        // (its next lines, indented, are its own)
+        while (cx.nextLine() && /^(\t| {2,})\S/.test(line.text)) end = cx.lineStart + line.text.length;
+        cx.addElement(cx.elt("FootnoteDef", start, end, marks));
+        return true;
+      },
+    },
+  ],
+};
+
 /** Every extension, for `markdown({ extensions })` in the editor and for the renderer's parser. */
-export const EXTENSIONS: MarkdownConfig[] = [...GFM, wiki, hashTag, highlight, math];
+export const EXTENSIONS: MarkdownConfig[] = [...GFM, wiki, hashTag, highlight, math, footnotes];
 
 /** The parser the renderer uses: the same one the editor's language is built from. */
 export const parser = baseParser.configure(EXTENSIONS);

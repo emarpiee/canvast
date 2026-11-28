@@ -77,6 +77,8 @@ export interface NoteEditor {
   readonly dirty: boolean;
   /** The note's words as its file keeps them (a markdown note's without its properties). */
   text(): string;
+  /** Go to the first place `text` is written in the note (a footnote from the details' outline). */
+  reveal(text: string): boolean;
   /** The editor's content now (given to `saved`, for what was saved). */
   current(): string;
   /** The note was saved (`as` this content, else as it is now): what was typed since stays a change. */
@@ -404,6 +406,7 @@ export async function mountNoteEditor(el: HTMLElement, opts: { kind: Exclude<Not
       return dirty && editor.value !== savedText;
     },
     text: () => editor.value,
+    reveal: (t) => editor.reveal(t),
     pastedProps() {
       // (undone or deleted, all of what came with them: they went too. Nothing but properties was pasted: nothing to tell by, they stay.)
       const now = bare(editor.value);
