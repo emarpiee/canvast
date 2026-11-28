@@ -5,7 +5,7 @@ import { EditorView, ViewPlugin, showTooltip, type Tooltip, type ViewUpdate } fr
 import { COMMANDS, type FormatName } from "./commands";
 import { HIGHLIGHTS, highlightItems } from "./context-menu";
 import { clearFormat } from "./behaviors/clear-format";
-import { openPopover } from "./popover";
+import { openPopover, type PopItem } from "./popover";
 
 export interface SelectionBarOptions {
   icons: Readonly<Record<string, string>>;
@@ -36,19 +36,11 @@ function bar(opts: SelectionBarOptions): (view: EditorView) => { dom: HTMLElemen
     const turn = btn("turn", `<span>${opts.labels["turnInto"] ?? "Turn into"}</span>`, opts.labels["turnInto"] ?? "Turn into");
     turn.classList.add("me-selbar-turn");
     turn.setAttribute("aria-expanded", "false");
-    // (a group of the block buttons the Turn into button shows and hides: the package carries no menu of its own)
-    const menu = document.createElement("div");
-    menu.className = "me-selbar-menu";
-    menu.setAttribute("role", "group");
-    menu.setAttribute("aria-label", opts.labels["turnInto"] ?? "Turn into");
-    menu.hidden = true;
-    for (const name of opts.turnInto || TURN_INTO) {
-      const item = btn(name, `${opts.icons[name] ?? ""}<span>${opts.labels[name] ?? name}</span>`, opts.labels[name] ?? name);
-      item.className = "me-selbar-item";
-      menu.append(item);
-    }
+    turn.setAttribute("aria-haspopup", "menu");
+    /** Turn into's blocks, in the editor's one list of choices (the host's menu: inside the window, above every bar). */
+    const turnItems = (): PopItem[] => (opts.turnInto || TURN_INTO).map((name) => ({ id: `turn.${name}`, label: opts.labels[name] ?? name, pick: () => (COMMANDS[name]?.(view), view.focus()) }));
     const clear = btn("clearFormat", opts.icons["clearFormat"] ?? "", opts.labels["clearFormat"] ?? "Clear formatting");
-    dom.append(...(opts.turnInto === false ? [] : [turn]), ...INLINE.map((n) => btn(n, opts.icons[n] ?? n, opts.labels[n] ?? n)), clear, menu);
+    dom.append(...(opts.turnInto === false ? [] : [turn]), ...INLINE.map((n) => btn(n, opts.icons[n] ?? n, opts.labels[n] ?? n)), clear);
     // view-state: (a press on the bar keeps the selection in the text)
     dom.addEventListener("mousedown", (e) => e.preventDefault());
     // typing: (the bar's buttons write the note's Markdown; Turn into only opens its list)
@@ -56,9 +48,7 @@ function bar(opts: SelectionBarOptions): (view: EditorView) => { dom: HTMLElemen
       const b = (e.target as HTMLElement).closest<HTMLElement>("[data-me]");
       if (!b) return;
       const name = b.dataset["me"]!;
-      if (name === "turn") return void ((menu.hidden = !menu.hidden), turn.setAttribute("aria-expanded", String(!menu.hidden)));
-      menu.hidden = true;
-      turn.setAttribute("aria-expanded", "false");
+      if (name === "turn") return void openPopover(turn, turnItems(), opts.labels["turnInto"] ?? "Turn into");
       // (Highlight: its colours, as notes apps offer them; Clear formatting: the words' marks off)
       if (name === "highlight") return void openPopover(b, highlightItems(view, { highlight: opts.labels["highlight"] ?? "Highlight", removeHighlight: opts.labels["removeHighlight"] ?? "Remove highlight", colours: Object.fromEntries(HIGHLIGHTS.map((c) => [c, opts.labels[c] ?? c])) }), opts.labels["highlight"] ?? "Highlight");
       if (name === "clearFormat") return void (clearFormat(view), view.focus());

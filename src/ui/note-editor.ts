@@ -141,6 +141,8 @@ const CHOICE_LOOK: ReadonlyArray<readonly [RegExp, string, string]> = [
   [/^language\.none$/, ICONS.fileCode, "No language: plain text"], [/^language\./, ICONS.fileCode, "Colour the code as this"],
 ];
 const lookOf = (id: string): readonly [string, string] => {
+  // (Turn into's blocks: each with its own toolbar icon)
+  if (id.startsWith("turn.")) return [(NOTE_ICONS as Record<string, string>)[id.slice(5)] ?? ICONS.pilcrow, "The selected lines become this block"];
   const hit = CHOICE_LOOK.find(([re]) => re.test(id));
   return hit ? [hit[1], hit[2]] : [ICONS.fileCode, "Choose it"];
 };

@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import type { Locator, Page } from "@playwright/test";
-import { chooseInMenu, expect, test } from "./harness";
+import { chooseInMenu, expect, outOfView, test } from "./harness";
 import { makePng } from "./png";
 
 /** The notes editor (src/markdown-editor/) in the library viewer and beside a canvas: markdown and plain text notes, their links to library items. */
@@ -1315,7 +1315,7 @@ test("lists in a callout and in a table cell are drawn as lists; Turn into keeps
   await p.keyboard.press("Shift+ArrowDown");
   await p.keyboard.press("Shift+End");
   await note(p).locator(".me-selbar .me-selbar-turn").click();
-  await note(p).locator('.me-selbar-item[data-me="codeBlock"]').click();
+  await p.locator('.pop-menu [data-command="note.turn.codeBlock"]').click(); // (Turn into is the app's menu)
   await expect.poll(() => text(p)).toContain("```\nlet a = 1;\nlet b = 2;\n```");
   // Turn into Table: one row per line.
   await page(p).locator(".cm-line", { hasText: /^Ink$/ }).click();
@@ -1323,7 +1323,7 @@ test("lists in a callout and in a table cell are drawn as lists; Turn into keeps
   await p.keyboard.press("Shift+ArrowDown");
   await p.keyboard.press("Shift+End");
   await note(p).locator(".me-selbar .me-selbar-turn").click();
-  await note(p).locator('.me-selbar-item[data-me="table"]').click();
+  await p.locator('.pop-menu [data-command="note.turn.table"]').click();
   await expect.poll(() => text(p)).toContain("| Column 1 |\n| --- |\n| Ink |\n| Paper |");
 });
 
@@ -1379,4 +1379,34 @@ test("the right-click menu highlights in colours; the link popover opens a linke
   await p.mouse.click(line.x + 8, line.y + line.height / 2, { button: "right" });
   await p.locator(".pop-menu [role=menuitem]", { hasText: "Highlight: Red" }).click();
   await expect.poll(() => text(p)).toContain('<mark class="hl-red">last</mark>');
+});
+
+test("no menu, toolbar or popup runs out of the app's window: Turn into and the right-click menu at a note's last line, the canvas's menu at its corner", async ({ app }) => {
+  const p = app.page;
+  const NOTE = `# Edge\n\n${"A line of words.\n\n".repeat(40)}Last words here.\n`;
+  await p.getByTestId("view-assets").click();
+  await p.getByTestId("assets-import-input").setInputFiles({ name: "edge.md", mimeType: "text/markdown", buffer: Buffer.from(NOTE) });
+  await card(p, hashOf(NOTE)).dblclick();
+  await expect(heading(p)).toHaveText("Edge");
+  // (the last line at the bottom of the window)
+  const last = page(p).locator(".cm-line", { hasText: "Last words here." });
+  await page(p).click();
+  await p.keyboard.press("Control+End");
+  await last.scrollIntoViewIfNeeded();
+  await last.dblclick();
+  await note(p).locator(".me-selbar .me-selbar-turn").click();
+  await expect(p.locator(".pop-menu")).toBeVisible();
+  expect(await outOfView(p), "Turn into at the bottom").toEqual([]);
+  await p.keyboard.press("Escape");
+  const b = (await last.boundingBox())!;
+  await p.mouse.click(b.x + b.width - 4, b.y + b.height / 2, { button: "right" });
+  await expect(p.locator(".pop-menu")).toBeVisible();
+  expect(await outOfView(p), "the note's right-click menu at the bottom").toEqual([]);
+  await p.keyboard.press("Escape");
+  await p.getByTestId("slide-view").locator('[data-act="close"]').click();
+  await p.getByTestId("view-canvas").click();
+  const c = (await p.locator("canvas").first().boundingBox())!;
+  await p.mouse.click(c.x + c.width - 6, c.y + c.height - 60, { button: "right" });
+  await expect(p.locator(".pop-menu")).toBeVisible();
+  expect(await outOfView(p), "the canvas's menu at its corner").toEqual([]);
 });

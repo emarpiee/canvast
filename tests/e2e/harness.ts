@@ -421,6 +421,22 @@ export async function themeProblems(page: Page): Promise<string[]> {
   });
 }
 
+/**
+ * Every menu, toolbar and popover on show that runs out of the app's window (a rule of every floating thing: CLAUDE.md, Floating bars):
+ * the app's menus, a chip's popover and the colour picker, the bars by the selection, the notes editor's tooltips, link popover and lists.
+ */
+export async function outOfView(p: Page): Promise<string[]> {
+  return p.evaluate(() => {
+    const sel = ".pop-menu, .vchip-pop, .colour-pop, .props-near, .ctx-wrap, .text-format, .cm-tooltip, .me-link-pop, .me-pop, .note-link-peek, .lib-pick";
+    return [...document.querySelectorAll<HTMLElement>(sel)]
+      .filter((el) => {
+        const r = el.getBoundingClientRect();
+        return r.width > 0 && r.height > 0 && getComputedStyle(el).visibility !== "hidden" && (r.left < -1 || r.top < -1 || r.right > innerWidth + 1 || r.bottom > innerHeight + 1);
+      })
+      .map((el) => `${el.className.split(" ")[0]} runs out of the window`);
+  });
+}
+
 export async function floatingProblems(page: Page): Promise<string[]> {
   const contrast = (await lowContrast(page, ".vchip-pop, .props-near, .props-chips")).map((m) => `contrast: ${m}`);
   return [...contrast, ...(await floatingRules(page))];

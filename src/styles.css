@@ -72,6 +72,7 @@
   --z-item-bar: 6;
   --z-item-pop: 7;
   --z-edge: 10;
+  --z-float: 11; /* a panel floated where you put it (the free layer of the dock, a note open beside the canvas): over the edge bars, under popovers */
   --z-view: 2; /* a view of the app under its top bar (Settings, PhotoCraft): above the canvas, under the bars and the menus */
   --z-pop: 60; /* menus and popovers opened from a button: above the edge bars, the panels and the Settings view */
   --z-reference: 50; /* the reference windows (ADR 0207): over every view, the bars and the panels; under menus, popovers and dialogs */
@@ -2949,7 +2950,7 @@ input[data-scrub-input]:focus { cursor: text; }
 .dock-item:not([data-side="right"]) > .dock-grip::after { right: 0; }
 .dock-grip:hover::after, .dock-item.is-resizing > .dock-grip::after { background: var(--hud-accent); }
 .dock-item[data-folded] > .dock-grip { display: none; }
-#dock-float { position: fixed; inset: 0; pointer-events: none; z-index: var(--z-edge); }
+#dock-float { position: fixed; inset: 0; pointer-events: none; z-index: var(--z-float); }
 #dock-float > .dock-item { position: absolute; }
 /* (a panel that floats above every view, the Library too: a pinned view, Pins) */
 #dock-top { position: fixed; inset: 0; pointer-events: none; z-index: var(--z-reference); }

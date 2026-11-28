@@ -189,9 +189,6 @@ export const EDITOR_CSS = `
 :where(.me-blurred) .me-selbar { display: none; }
 :where(.me-selbar) { position: relative; display: flex; align-items: center; gap: 2px; padding: 3px; }
 :where(.me-selbar-turn) { padding: 0 8px; font-size: 0.85em; color: var(--me-fg); }
-:where(.me-selbar-menu) { position: absolute; top: 100%; left: 0; margin-top: 4px; display: flex; flex-direction: column; min-width: 12em; padding: 4px; background: var(--me-bg); border: 1px solid var(--me-line); border-radius: var(--me-radius); box-shadow: 0 6px 20px color-mix(in oklch, var(--me-fg) 18%, transparent); }
-:where(.me-selbar-menu[hidden]) { display: none; }
-:where(.me-selbar-item) { display: flex; align-items: center; gap: 8px; padding: 4px 8px; border: 0; border-radius: var(--me-radius); background: none; color: var(--me-fg); font: inherit; font-size: 0.9em; text-align: left; cursor: pointer; }
 :where(.me-find) { display: flex; flex-direction: column; gap: var(--me-gap); }
 :where(.me-find-row) { display: flex; align-items: center; gap: 2px; }
 :where(.me-find-row[hidden]) { display: none; }
@@ -204,8 +201,6 @@ export const EDITOR_CSS = `
 :where(.me-find-box) .me-btn { min-width: 24px; height: 24px; font-size: 0.75em; font-family: var(--me-mono); }
 :where(.me-find) .me-btn[aria-pressed="true"] { background: var(--me-select); color: var(--me-fg); }
 :where(.me-find-more[aria-expanded="true"]) svg { transform: rotate(90deg); }
-:where(.me-selbar-item):hover { background: var(--me-code-bg); }
-:where(.me-selbar-item) svg { width: var(--me-icon); height: var(--me-icon); color: var(--me-muted); }
 :where(.me .me-tok-keyword) { color: var(--me-tok-keyword); } :where(.me .me-tok-string) { color: var(--me-tok-string); } :where(.me .me-tok-comment) { color: var(--me-tok-comment); font-style: italic; }
 :where(.me .me-tok-number) { color: var(--me-tok-number); } :where(.me .me-tok-function) { color: var(--me-tok-function); } :where(.me .me-tok-tag) { color: var(--me-tok-tag); }
 /* preview mode */
