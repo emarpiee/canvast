@@ -994,6 +994,9 @@ export function mountLibraryViewer(ctx: ViewerCtx) {
     else if (act === "favorite" || act === "place") ctx.inspector.querySelector<HTMLButtonElement>(`[data-action="${act}"]`)?.click();
   });
   const viewerKey = (e: KeyboardEvent): void => {
+    // (an Escape something in the file already used is never the viewer's: a table cell's editor that let go of the table is gone from the
+    // page by the time the key gets here, so where it came from can no longer be told)
+    if (e.key === "Escape" && e.defaultPrevented) return;
     const typing = (e.target as HTMLElement).closest(TYPING);
     if (note?.key?.(e)) {
       e.preventDefault();
