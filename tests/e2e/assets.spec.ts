@@ -429,6 +429,12 @@ test("a lost original is shown as missing and is restored everywhere by importin
   await expect(slide.locator("figcaption")).toHaveText(second);
   await p.keyboard.press("Escape");
   await expect(slide).toBeHidden();
+  // (closed, its history ends: opened again, there is nothing to go back to, as a new tab)
+  await card(p, HASH).dblclick();
+  await expect(slide).toBeVisible();
+  await expect(back).toBeDisabled();
+  await p.keyboard.press("Escape");
+  await expect(slide).toBeHidden();
   await card(p, GREEN_HASH).click();
   await p.getByTestId("asset-delete").click();
   await p.getByTestId("confirm-ok").click();

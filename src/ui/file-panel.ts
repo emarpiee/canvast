@@ -73,7 +73,9 @@ export function mountFilePanel(
     if (side) side.hidden = !on;
     void deps.details?.(on && side && note ? side : null, note?.hash, note ?? undefined);
   };
-  const shut = (): void => {
+  /** Close the file open (`end`: the panel or window is closed, its back and forward history with it; else another file takes its place). */
+  const shut = (end = true): void => {
+    if (end) history.reset();
     if (detailsShown) void deps.details?.(null); // (back in the library; shown again for the next file opened here)
     note?.close(true);
     note = null;
@@ -81,9 +83,9 @@ export function mountFilePanel(
     el.hidden = true;
     el.replaceChildren();
   };
-  const leave = async (): Promise<boolean> => {
+  const leave = async (end = true): Promise<boolean> => {
     if (note && !(await note.leave())) return false;
-    shut();
+    shut(end);
     return true;
   };
   const place: ViewPlace = {
@@ -112,7 +114,7 @@ export function mountFilePanel(
       deps.session.editor.changed();
       return true;
     }
-    if (!(await leave())) return true;
+    if (!(await leave(false))) return true; // (another file in its place: a step of its history)
     el = hosts[mode()];
     hiddenOpen = !!e?.hidden;
     const name0 = (await deps.session.catalog?.entry(hash).catch(() => undefined))?.name ?? rec.name;

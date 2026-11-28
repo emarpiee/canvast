@@ -893,6 +893,7 @@ export function mountLibraryViewer(ctx: ViewerCtx) {
   });
   ctx.viewer.addEventListener("pointerleave", () => ctx.viewer.classList.remove("is-near-top", "is-near-bottom"));
   const closeSlide = (): void => {
+    history?.reset(); // (the viewer closed: its back and forward history ends with it)
     setGrey(false);
     const was = slideHash;
     stopShow();

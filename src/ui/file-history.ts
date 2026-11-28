@@ -29,6 +29,13 @@ export class FileHistory {
     this.next = [];
     this.sync();
   }
+  /** The place was closed: its history ends with it (a history is one opening's, as a tab's: never the files of an earlier one). */
+  reset(): void {
+    this.past = [];
+    this.next = [];
+    this.now = null;
+    this.sync();
+  }
   get canBack(): boolean {
     return this.past.length > 0;
   }
