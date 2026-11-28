@@ -1640,7 +1640,7 @@ button.asset-preview { display: flex; align-items: center; justify-content: cent
 .viewer.is-note .viewer-stage > figure:not(:where(.viewer-note *)), .viewer.is-note .viewer-edge, .viewer.is-note .viewer-ground { display: none; }
 /* The viewer's header (every kind): Library, back and forward, folder / name, then hide the controls and the details. In the theme's
    colours, one row in the viewer's flow (nothing floats over the picture or the page); with the controls hidden it shows near the top. */
-.viewer-head { flex: none; display: flex; align-items: center; gap: var(--s-6); min-height: var(--bar-h); padding: 0 var(--s-6); background: var(--hud-bg); color: var(--hud-fg); border-bottom: 1px solid var(--hud-border); z-index: var(--z-item-bar); }
+.viewer-head { flex: none; display: flex; align-items: center; gap: var(--s-6); min-height: var(--bar-h); padding: 0 var(--edge); background: var(--hud-bg); color: var(--hud-fg); border-bottom: 1px solid var(--hud-border); z-index: var(--z-item-bar); } /* (its ends in line with the picture's own tools under it: --edge) */
 .viewer-head > .vbtn.viewer-back, .viewer-head > .vbtn.viewer-hide, .viewer-head > .vbtn.viewer-details { position: static; color: var(--hud-fg); background: transparent; border-color: transparent; }
 .viewer-head > .vbtn.viewer-back { width: auto; gap: var(--s-2); padding: 0 var(--s-4); }
 .viewer-head > .vbtn:is(.viewer-back, .viewer-hide, .viewer-details):hover:not(:disabled) { color: var(--hud-fg); background: var(--hud-hover); }

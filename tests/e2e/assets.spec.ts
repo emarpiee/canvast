@@ -1270,8 +1270,7 @@ test("gallery viewer: the view tabs, the workspace menu and the Settings button 
   const showB = (await viewer.getByRole("button", { name: "Show the controls" }).boundingBox())!;
   expect(Math.abs(showB.x - hb.x) + Math.abs(showB.y - hb.y), "the show button is the same button, in the same place").toBeLessThan(2);
   for (const el of away) await expect(el).toBeHidden();
-  await expect(back, "faded out with the controls").toHaveCSS("opacity", "0");
-  await expect(details).toHaveCSS("opacity", "0");
+  await expect(viewer.locator(".viewer-head"), "the header, Back and Details in it, faded out with the controls").toHaveCSS("opacity", "0");
   // (Firefox in the test harness sends a pointerleave right after every mouse move, which undoes the state: there the pointer events are sent as events)
   const firefox = p.context().browser()?.browserType().name() === "firefox";
   const pointerAt = async (y: number): Promise<void> => {
@@ -2711,7 +2710,7 @@ test("what a file says about itself is shown in its details (camera, settings, o
   expect(app.consoleErrors).toEqual([]);
 });
 
-test("the viewer's top buttons and the room left for them follow Density", async ({ app }) => {
+test("the viewer's header and its buttons follow Density", async ({ app }) => {
   const p = app.page;
   await p.getByTestId("view-assets").click();
   await p.getByTestId("assets-import-input").setInputFiles({ name: "a.md", mimeType: "text/markdown", buffer: Buffer.from("# A\n") });
@@ -2722,7 +2721,7 @@ test("the viewer's top buttons and the room left for them follow Density", async
     await p.evaluate((d) => window.__canvastDebug.setSetting("ui.density", d as "dense"), density);
     await p.waitForTimeout(100);
     const [b, v] = [await back.boundingBox(), await p.getByTestId("slide-view").boundingBox()];
-    const room = await p.locator(".viewer.is-note .viewer-stage").evaluate((e) => parseFloat(getComputedStyle(e).paddingTop));
+    const room = await p.locator(".viewer-head").evaluate((e) => e.getBoundingClientRect().height); // (the header row's height)
     return { top: b!.y - v!.y, size: b!.height, room };
   };
   const [dense, comfortable] = [await measure("dense"), await measure("comfortable")];

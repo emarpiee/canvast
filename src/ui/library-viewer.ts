@@ -1026,6 +1026,8 @@ export function mountLibraryViewer(ctx: ViewerCtx) {
     // page by the time the key gets here, so where it came from can no longer be told)
     if (e.key === "Escape" && e.defaultPrevented) return;
     const typing = (e.target as HTMLElement).closest(TYPING);
+    // (Alt with an arrow is back and forward, file-history.ts: never a step to the next item)
+    if (e.altKey && !e.ctrlKey && !e.metaKey && (e.key === "ArrowLeft" || e.key === "ArrowRight")) return;
     if (note?.key?.(e)) {
       e.preventDefault();
       e.stopPropagation();
