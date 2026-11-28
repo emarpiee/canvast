@@ -98,6 +98,9 @@
   --ring-w-strong: 3px;   /* the ring of a selected card */
   --ring-offset: 1px;     /* a focus ring's gap outside a control */
   --ring-offset-far: 2px; /* a gap outside a round or drawn control */
+  /* An icon and its words in one control (a button, a menu row, a list row, a chip): the room between them, and at the control's ends. */
+  --pair-gap: var(--s-4);  /* icon to words */
+  --pair-pad: var(--s-6);  /* before the first and after the last, at the control's ends */
   --edge-rest: var(--hud-edge-soft);  /* normal */
   --edge-hover: var(--hud-edge);      /* under the pointer */
   --edge-focus: var(--hud-accent);    /* in use (keyboard or typing) */
@@ -500,7 +503,7 @@ input[type="range"], .media-scrub, .tb-count[data-scrub] input, input[data-scrub
 :is(.tb-options-row, .ctx-bar, .props-near > .props-row, .hud-controls, #toolbar > .dock, .set-tabs) { scroll-padding-inline: var(--sp-10); }
 /* Switched off: for another kind of item than the one being edited (ui/toolbar.ts). */
 [data-off], [data-sec-off] { display: none !important; }
-.toolbar .tb-chip { display: inline-flex; align-items: center; gap: var(--s-2); width: auto; padding: 0 var(--s-6); font: var(--font-meta); }
+.toolbar .tb-chip { display: inline-flex; align-items: center; gap: var(--pair-gap); width: auto; padding: 0 var(--pair-pad); font: var(--font-meta); }
 .toolbar .tb-chip svg { width: var(--icon-sm); height: var(--icon-sm); }
 .tb-group { display: flex; gap: var(--s-1); align-items: center; }
 .tb-group[hidden] { display: none; }
@@ -613,9 +616,9 @@ input[type="range"], .media-scrub, .tb-count[data-scrub] input, input[data-scrub
 /* The infinity button is the Canvas view's tab and the only boxed part; the name and its arrow float beside it as one control. */
 .nav-crumb { display: inline-flex; flex: none; align-items: center; justify-content: center; width: var(--bar-h); height: var(--bar-h); box-sizing: border-box; padding: 0; color: inherit; background: var(--hud-bg); border: var(--line-w) solid var(--hud-border); border-radius: var(--r-lg); box-shadow: var(--hud-lift); backdrop-filter: blur(6px); cursor: pointer; }
 .nav-crumb svg { flex: none; width: var(--icon-lg); height: var(--icon-lg); }
-.nav-name-btn { display: inline-flex; align-items: center; gap: var(--s-4); min-width: 0; height: var(--bar-h); padding: 0 var(--s-4); color: inherit; font: inherit; background: transparent; border: 0; border-radius: var(--r-md); cursor: pointer; text-shadow: 0 0 var(--sp-3) var(--canvas-bg), 0 0 var(--sp-6) var(--canvas-bg); }
+.nav-name-btn { display: inline-flex; align-items: center; gap: var(--pair-gap); min-width: 0; height: var(--bar-h); padding: 0 var(--pair-pad); color: inherit; font: inherit; background: transparent; border: 0; border-radius: var(--r-md); cursor: pointer; text-shadow: 0 0 var(--sp-3) var(--canvas-bg), 0 0 var(--sp-6) var(--canvas-bg); }
 .nav-name-btn svg { flex: none; width: var(--icon-md); height: var(--icon-md); color: var(--hud-muted); }
-.nav-crumb-text { display: flex; align-items: center; gap: var(--s-4); min-width: 0; }
+.nav-crumb-text { display: flex; align-items: center; gap: var(--pair-gap); min-width: 0; }
 .nav-crumb-board, .nav-crumb-canvas { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .nav-crumb-board { flex: 0 1 auto; max-width: 6em; }
 .nav-crumb-canvas { flex: 0 1 auto; max-width: 10em; }
@@ -1187,7 +1190,7 @@ input[type="radio"]:checked::before { content: ""; width: var(--sp-3); height: v
 .rail button, .ctx-bar button { width: var(--ctl); padding: 0; }
 .rail button svg, .dock button svg, .toolbar button svg, .ctx-bar button svg, .hud-controls button svg { width: 18px; height: 18px; }
 .hud-controls button { box-sizing: border-box; width: var(--ctl); padding: 0; } /* (one square button, in both status bars) */
-.view-switch button { padding: 0 var(--s-6); gap: var(--s-4); }
+.view-switch button { padding: 0 var(--pair-pad); gap: var(--pair-gap); }
 .view-switch button svg { width: var(--icon-md); height: var(--icon-md); }
 .nav-pill { height: var(--bar-h); }
 /* The buttons that change the view (Library, Canvas, Settings) have a look of their own, a tint of the accent, so they read apart from the tools. Library and Canvas are joined as one set; the one in use is filled. */
@@ -1355,7 +1358,7 @@ body.is-placing :is(#nav, .view-settings, .assets-bar) { visibility: hidden; }
 .assets-size { display: inline-flex; align-items: center; gap: var(--s-4); padding: 0 var(--s-4); color: var(--hud-muted); }
 .assets-size svg { width: 16px; height: 16px; }
 .assets-size input { width: var(--size-slider-w); }
-.assets-btn { display: inline-flex; align-items: center; justify-content: center; gap: var(--s-4); min-height: var(--ctl); padding: 0 var(--s-6); font: var(--weight-medium) var(--text-md) var(--font-ui); color: inherit; background: var(--hud-bg); border: var(--line-w) solid var(--hud-border); border-radius: var(--r-md); cursor: pointer; }
+.assets-btn { display: inline-flex; align-items: center; justify-content: center; gap: var(--pair-gap); min-height: var(--ctl); padding: 0 var(--pair-pad); font: var(--weight-medium) var(--text-md) var(--font-ui); color: inherit; background: var(--hud-bg); border: var(--line-w) solid var(--hud-border); border-radius: var(--r-md); cursor: pointer; }
 .assets-btn svg { width: 16px; height: 16px; flex: none; }
 .assets-btn.is-icon { width: var(--ctl); padding: 0; }
 .assets-btn:hover:not(:disabled) { background: var(--hud-hover); }
@@ -1416,7 +1419,7 @@ body.is-placing :is(#nav, .view-settings, .assets-bar) { visibility: hidden; }
 .side-list { list-style: none; margin: 0 0 var(--s-4); padding: 0; }
 .folder-group, .folder-group-list { display: contents; } /* (a top-level folder and its subfolders, together: a theme may draw them as one box) */
 .side-row { display: flex; align-items: center; gap: var(--s-1); padding-left: calc(var(--depth, 0) * var(--sp-7)); }
-.side-item { flex: 1; min-width: 0; display: flex; justify-content: space-between; gap: var(--s-4); padding: var(--s-4) var(--s-6); font: inherit; color: inherit; text-align: left; background: transparent; border: 0; border-radius: var(--r-md); cursor: pointer; }
+.side-item { flex: 1; min-width: 0; display: flex; justify-content: space-between; gap: var(--pair-gap); padding: var(--s-4) var(--pair-pad); font: inherit; color: inherit; text-align: left; background: transparent; border: 0; border-radius: var(--r-md); cursor: pointer; }
 .side-item:hover { background: var(--hud-hover); }
 .side-item.is-active { background: var(--hud-accent); color: var(--hud-accent-fg); }
 .side-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -1454,7 +1457,7 @@ button.asset-preview { display: flex; align-items: center; justify-content: cent
 .asset-sec[hidden] { display: none; } /* (a section with nothing to say: Linked from) */
 .assets-link { padding: 0; color: var(--hud-accent-text); text-align: left; background: none; border: 0; cursor: pointer; } /* (a name that opens what it names: Linked from) */
 .assets-link:hover, .assets-link:focus-visible { text-decoration: underline; }
-.asset-link-row, .asset-link-missing { display: flex; align-items: center; gap: var(--s-4); width: 100%; min-width: 0; }
+.asset-link-row, .asset-link-missing { display: flex; align-items: center; gap: var(--pair-gap); width: 100%; min-width: 0; }
 :is(.asset-link-row, .asset-link-missing) > svg { flex: none; width: var(--icon-sm); height: var(--icon-sm); }
 .asset-link-missing { color: var(--hud-muted); }
 .asset-link-folder { display: block; overflow: hidden; font-size: var(--text-sm); color: var(--hud-muted); text-overflow: ellipsis; white-space: nowrap; }
@@ -1570,7 +1573,7 @@ button.asset-preview { display: flex; align-items: center; justify-content: cent
 .vbtn.viewer-ground[data-ground="white"]::after { background: var(--ground-white); }
 .viewer.no-bar .viewer-back, .viewer.no-bar .viewer-details, .viewer.no-bar .viewer-hide, .viewer.no-bar .viewer-ground, .viewer.no-bar .viewer-grey, .viewer.no-bar .viewer-sample { opacity: 0; transition: opacity var(--dur-base) var(--ease-out); }
 .viewer.no-bar.is-near-top .viewer-back, .viewer.no-bar.is-near-top .viewer-details, .viewer.no-bar.is-near-top .viewer-hide, .viewer.no-bar .viewer-hide:hover, .viewer.no-bar .viewer-hide:focus-visible, .viewer.no-bar.is-near-bottom .viewer-ground, .viewer.no-bar .viewer-ground:hover, .viewer.no-bar.is-near-bottom .viewer-grey, .viewer.no-bar .viewer-grey:hover, .viewer.no-bar .viewer-back:hover, .viewer.no-bar .viewer-details:hover, .viewer.no-bar .viewer-back:focus-visible, .viewer.no-bar .viewer-details:focus-visible { opacity: 1; }
-.vbtn { display: inline-flex; align-items: center; justify-content: center; gap: var(--s-4); min-width: var(--ctl); height: var(--ctl); padding: 0 var(--s-6); font: var(--weight-medium) var(--text-md) var(--font-ui); color: inherit; background: transparent; border: 0; border-radius: var(--r-md); cursor: pointer; }
+.vbtn { display: inline-flex; align-items: center; justify-content: center; gap: var(--pair-gap); min-width: var(--ctl); height: var(--ctl); padding: 0 var(--pair-pad); font: var(--weight-medium) var(--text-md) var(--font-ui); color: inherit; background: transparent; border: 0; border-radius: var(--r-md); cursor: pointer; }
 .vbtn svg { width: 18px; height: 18px; }
 .vbtn:hover:not(:disabled) { background: var(--v-hover); }
 .vbtn[aria-pressed="true"] { box-shadow: inset 0 0 0 var(--state-w) var(--edge-active); }
@@ -1672,7 +1675,7 @@ button.asset-preview { display: flex; align-items: center; justify-content: cent
    colours, one row in the viewer's flow (nothing floats over the picture or the page); with the controls hidden it shows near the top. */
 .viewer-head { flex: none; display: flex; align-items: center; gap: var(--s-6); min-height: var(--bar-h); padding: 0 var(--edge); background: var(--hud-bg); color: var(--hud-fg); border-bottom: var(--line-w) solid var(--hud-border); z-index: var(--z-item-bar); } /* (its ends in line with the picture's own tools under it: --edge) */
 .viewer-head > .vbtn.viewer-back, .viewer-head > .vbtn.viewer-hide, .viewer-head > .vbtn.viewer-details { position: static; color: var(--icon-btn-rest); background: transparent; border-color: transparent; }
-.viewer-head > .vbtn.viewer-back { width: auto; gap: var(--s-2); padding: 0 var(--s-4); }
+.viewer-head > .vbtn.viewer-back { width: auto; gap: var(--pair-gap); padding: 0 var(--pair-pad); }
 .viewer-head > .vbtn:is(.viewer-back, .viewer-hide, .viewer-details):hover:not(:disabled) { color: var(--icon-btn-hover); background: var(--hud-hover); }
 .viewer-head > .vbtn.viewer-details[aria-pressed="true"] { box-shadow: inset 0 0 0 var(--state-w) var(--edge-active); }
 .nav-pair { display: inline-flex; flex: none; align-items: center; gap: var(--s-2); } /* (back and forward: one pair, in every header) */
@@ -1695,7 +1698,7 @@ button.asset-preview { display: flex; align-items: center; justify-content: cent
 /* Comfortable density: the roomier grid (compact is the default). */
 :root[data-density="comfortable"] { --scroll-size: 12px; --row-btn: 30px; --chip-btn: 24px; --tree-indent: 24px; --icon-sm: 16px; --icon-md: 18px; --icon-lg: 20px; --icon-xl: 22px; --tree-row-h: 30px; --s-1: 2px; --s-2: 6px; --s-4: 12px; --s-6: 16px; --s-8: 20px; --s-10: 28px; --s-12: 36px; --s-13: 44px; --s-14: 48px; --s-15: 64px; --edge: 12px; --ctl: 36px; --pad: 4px; --gap: 2px; --near: 12px; --r-lg: 12px; --r-md: 8px; --ctl-r: 8px; --field-h: var(--sp-12); --menu-h: 38px; --list-h: calc(var(--sp-12) + var(--sp-2)); }
 /* Dense: the smallest the interface goes. The tokens above drive the bars, fields and menu rows; the rest is the paddings that are not tokens. */
-:root[data-density="dense"] { --scroll-size: 8px; --scroll-inset: var(--sp-1); --row-btn: 22px; --chip-btn: 16px; --tree-indent: 16px; --icon-sm: 12px; --icon-md: 14px; --icon-lg: 16px; --icon-xl: 18px; --tree-row-h: 22px; --s-1: 1px; --s-2: 2px; --s-4: 4px; --s-6: 8px; --s-8: 12px; --s-10: 16px; --s-12: 24px; --s-13: 32px; --s-14: 36px; --s-15: 48px; --edge: 4px; --ctl: 26px; --pad: 2px; --gap: 0px; --near: 4px; --r-lg: 8px; --r-md: 6px; --ctl-r: 6px; --field-h: var(--sp-10); --menu-h: 28px; --list-h: calc(var(--sp-10) + var(--sp-1)); }
+:root[data-density="dense"] { --pair-gap: calc(var(--s-4) + var(--s-2)); --scroll-size: 8px; --scroll-inset: var(--sp-1); --row-btn: 22px; --chip-btn: 16px; --tree-indent: 16px; --icon-sm: 12px; --icon-md: 14px; --icon-lg: 16px; --icon-xl: 18px; --tree-row-h: 22px; --s-1: 1px; --s-2: 2px; --s-4: 4px; --s-6: 8px; --s-8: 12px; --s-10: 16px; --s-12: 24px; --s-13: 32px; --s-14: 36px; --s-15: 48px; --edge: 4px; --ctl: 26px; --pad: 2px; --gap: 0px; --near: 4px; --r-lg: 8px; --r-md: 6px; --ctl-r: 6px; --field-h: var(--sp-10); --menu-h: 28px; --list-h: calc(var(--sp-10) + var(--sp-1)); }
 :root[data-density="dense"] :is(.rail, .dock, .toolbar, .ctx-bar, .hud-controls, .view-switch, .view-settings, .nav-pill, .win-row) button svg { width: 14px; height: 14px; }
 :root[data-density="dense"] .panel-head { min-height: 26px; }
 :root[data-density="dense"] .asset-inspector { flex-basis: 248px; }
@@ -1882,7 +1885,7 @@ body[data-viewing] #nav, body[data-viewing] .view-settings { display: none; }
 /* Whole-workspace actions at the foot of the workspace menu, and the export choice dialog */
 .nav-ws { margin-top: var(--s-4); padding-top: var(--s-4); border-top: var(--line-w) solid var(--hud-border); display: grid; gap: var(--s-1); }
 .nav-ws h3 { margin: 0 0 var(--s-2); font-size: var(--text-sm); font-weight: 600; color: var(--hud-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.nav-ws button { display: flex; align-items: center; gap: var(--s-4); width: 100%; min-height: var(--list-h); padding: 0 var(--s-4); text-align: left; background: transparent; border: 0; border-radius: var(--r-md); color: inherit; font: inherit; cursor: pointer; }
+.nav-ws button { display: flex; align-items: center; gap: var(--pair-gap); width: 100%; min-height: var(--list-h); padding: 0 var(--pair-pad); text-align: left; background: transparent; border: 0; border-radius: var(--r-md); color: inherit; font: inherit; cursor: pointer; }
 .nav-ws button:hover:not(:disabled) { background: var(--hud-hover); }
 .nav-ws svg { width: 16px; height: 16px; flex: none; }
 .choose-list { display: grid; gap: var(--s-4); margin: var(--s-6) 0; }
@@ -1897,7 +1900,7 @@ body[data-viewing] #nav, body[data-viewing] .view-settings { display: none; }
 .side-collapse { display: none; }
 .side-views { margin-bottom: var(--s-2); }
 .side-item svg { width: 16px; height: 16px; flex: none; opacity: 0.75; }
-.side-item { justify-content: flex-start; align-items: center; gap: var(--s-4); border-radius: var(--r-sm); }
+.side-item { justify-content: flex-start; align-items: center; gap: var(--pair-gap); border-radius: var(--r-sm); }
 .side-item .side-label { flex: 1; }
 .side-item.is-active svg { opacity: 1; }
 .side-row { position: relative; }
@@ -1914,7 +1917,7 @@ body[data-viewing] #nav, body[data-viewing] .view-settings { display: none; }
 /* Tags are chips that wrap, not a list. */
 .tag-cloud { list-style: none; margin: var(--s-2) 0 var(--s-4); padding: 0 var(--s-4); display: flex; flex-wrap: wrap; gap: var(--s-4); }
 .tag-cloud .side-row { padding-left: 0; flex: 0 1 auto; max-width: 100%; }
-.tag-cloud .side-item { flex: 0 1 auto; min-height: var(--field-h); padding: var(--s-2) var(--s-6); gap: var(--s-4); background: var(--hud-hover); border-radius: var(--r-pill); font-size: var(--text-sm); }
+.tag-cloud .side-item { flex: 0 1 auto; min-height: var(--field-h); padding: var(--s-2) var(--pair-pad); gap: var(--pair-gap); background: var(--hud-hover); border-radius: var(--r-pill); font-size: var(--text-sm); }
 .tag-cloud .side-item.is-active { background: var(--hud-accent); }
 .tag-cloud .side-more { width: var(--chip-btn); height: var(--chip-btn); margin-left: -4px; }
 .tag-cloud .side-n { font-size: var(--text-xs); }
@@ -1951,7 +1954,7 @@ body[data-viewing] #nav, body[data-viewing] .view-settings { display: none; }
 .place-menu { position: fixed; z-index: 40; width: 320px; font: var(--text-md) var(--font-ui); max-height: min(70vh, 460px); overflow: auto; display: grid; gap: var(--s-1); padding: var(--s-4); background: var(--hud-bg); border: var(--line-w) solid var(--hud-border); border-radius: var(--r-lg); box-shadow: var(--hud-lift); backdrop-filter: blur(12px); }
 .place-menu[hidden] { display: none; }
 .pm-title { margin: var(--s-1) var(--s-4) var(--s-2); font-size: var(--text-sm); color: var(--hud-muted); }
-.place-menu > button:not(.nav-add) { display: flex; align-items: center; gap: var(--s-4); min-height: var(--list-h); padding: 0 var(--s-4); font: inherit; color: inherit; text-align: left; background: transparent; border: 0; border-radius: var(--r-sm); cursor: pointer; }
+.place-menu > button:not(.nav-add) { display: flex; align-items: center; gap: var(--pair-gap); min-height: var(--list-h); padding: 0 var(--pair-pad); font: inherit; color: inherit; text-align: left; background: transparent; border: 0; border-radius: var(--r-sm); cursor: pointer; }
 .place-menu > button:not(.nav-add):hover, .place-menu > button:not(.nav-add):focus-visible { background: var(--hud-hover); }
 
 /* ---- Workspace menu (ADR 0059): boards are cards, canvases hang under a guide line, "new board" is not "new canvas" ---- */
@@ -2058,7 +2061,7 @@ body[data-viewing] #nav, body[data-viewing] .view-settings { display: none; }
 .cs-box input { flex: 1; min-width: 0; height: calc(var(--ctl) + var(--sp-5)); font: inherit; color: inherit; background: transparent; border: 0; outline: 0; }
 .cs-box input::placeholder { color: var(--hud-muted); }
 .cs-modes { display: flex; gap: var(--s-2); padding: 0 var(--s-4) var(--s-4); border-bottom: var(--line-w) solid var(--hud-border); }
-.cs-modes button { display: inline-flex; align-items: center; gap: var(--s-4); height: var(--row-btn); padding: 0 var(--s-6); font: inherit; color: var(--hud-muted); background: transparent; border: 0; border-radius: var(--ctl-r); cursor: pointer; }
+.cs-modes button { display: inline-flex; align-items: center; gap: var(--pair-gap); height: var(--row-btn); padding: 0 var(--pair-pad); font: inherit; color: var(--hud-muted); background: transparent; border: 0; border-radius: var(--ctl-r); cursor: pointer; }
 .cs-modes button:hover { background: var(--hud-hover); color: var(--hud-fg); }
 .cs-modes button[aria-selected="true"] { color: var(--hud-accent-fg); background: var(--hud-accent); }
 .cs kbd { font: inherit; font-size: var(--text-sm); color: var(--hud-muted); }
@@ -2310,7 +2313,7 @@ body[data-viewing] #nav, body[data-viewing] .view-settings { display: none; }
 .me.me-link-pop { z-index: 60; }
 .menu-sub-mark { display: inline-flex; margin-left: auto; padding-left: var(--s-6); transform: rotate(-90deg); color: var(--hud-muted); } /* (a row that opens a group beside it) */
 .pop-menu { position: fixed; z-index: 60; min-width: 190px; max-width: min(320px, calc(100vw - 16px)); display: grid; gap: 1px; padding: var(--s-2); }
-.pop-menu button { display: flex; align-items: center; gap: var(--s-6); width: 100%; min-height: var(--menu-h); padding: 0 var(--s-6); font: var(--font-control); color: inherit; text-align: left; background: transparent; border: 0; border-radius: var(--r-md); cursor: pointer; }
+.pop-menu button { display: flex; align-items: center; gap: var(--pair-gap); width: 100%; min-height: var(--menu-h); padding: 0 var(--pair-pad); font: var(--font-control); color: inherit; text-align: left; background: transparent; border: 0; border-radius: var(--r-md); cursor: pointer; }
 .pop-menu button:hover:not(:disabled), .pop-menu button:focus-visible { background: var(--hud-hover); outline: 0; }
 /* A menu never grows past the window: it scrolls. A compact one has closer rows (a long list to choose from). */
 .pop-menu { max-height: calc(100dvh - 2 * var(--edge)); overflow-y: auto; }
@@ -2348,7 +2351,7 @@ body[data-viewing] #nav, body[data-viewing] .view-settings { display: none; }
 .tree .tg-own.is-last { background: color-mix(in oklch, var(--hud-fg) 28%, transparent); }
 .layers-panel .layer-name { flex: 1; }
 .layers-do { display: flex; gap: var(--s-2); padding: var(--s-4) var(--s-4) 0; }
-.layers-do button { flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: var(--s-4); height: var(--row-btn); padding: 0 var(--s-4); font: inherit; color: inherit; background: color-mix(in oklch, var(--hud-fg) 8%, transparent); border: 0; border-radius: var(--r-sm); cursor: pointer; }
+.layers-do button { flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: var(--pair-gap); height: var(--row-btn); padding: 0 var(--pair-pad); font: inherit; color: inherit; background: color-mix(in oklch, var(--hud-fg) 8%, transparent); border: 0; border-radius: var(--r-sm); cursor: pointer; }
 .layers-do button:hover:not(:disabled) { background: var(--hud-hover); }
 .layers-do svg { width: 14px; height: 14px; flex: none; }
 .layers-tags { padding-top: var(--s-4); }
@@ -2419,7 +2422,7 @@ body[data-viewing] #nav, body[data-viewing] .view-settings { display: none; }
 .assets-filtered[hidden] { display: none; }
 .assets-filtered-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 :is(.assets-hidden-bar, .assets-filtered, .assets-to-top) > svg { width: var(--icon-sm); height: var(--icon-sm); flex: none; }
-:is(.assets-hidden-bar, .assets-filtered) button { display: inline-flex; align-items: center; gap: var(--s-1); padding: var(--s-1) var(--s-4); font: inherit; font-weight: var(--weight-semibold); color: inherit; background: none; border: var(--line-w) solid color-mix(in oklch, var(--hud-accent-fg) 55%, transparent); border-radius: var(--r-pill); cursor: pointer; }
+:is(.assets-hidden-bar, .assets-filtered) button { display: inline-flex; align-items: center; gap: var(--pair-gap); padding: var(--s-1) var(--pair-pad); font: inherit; font-weight: var(--weight-semibold); color: inherit; background: none; border: var(--line-w) solid color-mix(in oklch, var(--hud-accent-fg) 55%, transparent); border-radius: var(--r-pill); cursor: pointer; }
 :is(.assets-hidden-bar, .assets-filtered) button:hover, .assets-hidden-bar button[aria-pressed="true"] { background: color-mix(in oklch, var(--hud-accent-fg) 22%, transparent); }
 :is(.assets-hidden-bar, .assets-filtered) button svg { width: var(--icon-sm); height: var(--icon-sm); }
 @media (max-width: 640px) { .assets-hidden-label, .assets-hidden-bar [data-action="hidden-stay"] { display: none; } }
@@ -2450,7 +2453,7 @@ body[data-viewing] #nav, body[data-viewing] .view-settings { display: none; }
 .tags-canvas .layers-filter { padding: 0 0 var(--s-4); }
 .tag-row { display: flex; align-items: center; gap: var(--s-1); border-radius: var(--r-md); }
 .tag-row:hover { background: var(--hud-hover); }
-.tag-row-main { flex: 1; min-width: 0; display: flex; align-items: center; justify-content: space-between; gap: var(--s-4); min-height: var(--list-h); padding: 0 var(--s-6); font: var(--font-control); color: inherit; text-align: left; background: transparent; border: 0; border-radius: var(--r-md); cursor: pointer; }
+.tag-row-main { flex: 1; min-width: 0; display: flex; align-items: center; justify-content: space-between; gap: var(--pair-gap); min-height: var(--list-h); padding: 0 var(--pair-pad); font: var(--font-control); color: inherit; text-align: left; background: transparent; border: 0; border-radius: var(--r-md); cursor: pointer; }
 .tag-row-main:focus-visible { outline: var(--ring-w) solid var(--edge-focus); outline-offset: calc(-1 * var(--ring-w)); }
 .tag-row-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tag-row-n { flex: none; color: var(--hud-muted); font-variant-numeric: tabular-nums; }
@@ -2760,7 +2763,7 @@ button, select, input, textarea, summary, [role="tab"] { transition: background-
 /* ---- Settings: the tabs in groups, and a search across all of them (ADR 0094) ---- */
 .set-tabs-h { padding: var(--s-6) var(--s-6) var(--s-2); color: var(--hud-muted); font: var(--weight-semibold) var(--text-xs)/1.3 var(--font-ui); letter-spacing: 0.04em; text-transform: uppercase; }
 .set-tabs-h:first-child { padding-top: 0; }
-.set-tabs button { display: flex; align-items: center; justify-content: space-between; gap: var(--s-4); }
+.set-tabs button { display: flex; align-items: center; justify-content: space-between; gap: var(--pair-gap); }
 .set-hits { min-width: var(--icon-md); padding: 0 var(--s-4); font: var(--weight-semibold) var(--text-xs)/1.6 var(--font-ui); text-align: center; color: var(--hud-accent-fg); background: var(--hud-accent); border-radius: var(--r-pill); }
 .set-hits:empty { display: none; }
 .set-tabs button[aria-selected="true"] .set-hits { color: var(--hud-accent-text); background: var(--hud-accent-fg); }
@@ -2877,11 +2880,11 @@ input[data-scrub-input]:focus { cursor: text; }
 .op-unit { display: none; }
 .op-note { margin: 0; font: var(--font-meta); color: var(--hud-muted); }
 .tex-editor { display: grid; gap: var(--s-4); min-width: 15rem; }
-.tex-source { display: flex; flex-wrap: wrap; gap: var(--s-4); align-items: center; }
+.tex-source { display: flex; flex-wrap: wrap; gap: var(--pair-gap); align-items: center; }
 .tex-fields { display: grid; gap: var(--s-4); }
 .tex-fields[hidden] { display: none; }
 .tex-random { display: flex; justify-content: flex-end; }
-.tex-random button { display: inline-flex; align-items: center; gap: var(--s-4); }
+.tex-random button { display: inline-flex; align-items: center; gap: var(--pair-gap); }
 .tex-random svg { width: var(--icon-sm); height: var(--icon-sm); }
 /* Vary each copy (ADR 0173): a heading over its rows, and New seed beside the seed */
 .tex-vary-title { margin: var(--s-4) 0 0; padding-top: var(--s-4); border-top: var(--line-w) solid var(--hud-border); font: var(--font-meta); font-weight: var(--weight-semibold); color: var(--hud-fg); }
@@ -3020,7 +3023,7 @@ input[data-scrub-input]:focus { cursor: text; }
 .pins-mark { display: inline-flex; flex: none; }
 .pins-mark svg { width: var(--icon-md); height: var(--icon-md); fill: currentColor; }
 .pins-panel .panel-head h2 { display: flex; align-items: center; gap: var(--s-6); min-width: 0; white-space: nowrap; }
-.pins-source { display: inline-flex; align-items: center; gap: var(--s-4); min-width: 0; height: var(--row-btn); padding: 0 var(--s-2); font: inherit; color: inherit; background: transparent; border: 0; border-radius: var(--ctl-r); cursor: pointer; }
+.pins-source { display: inline-flex; align-items: center; gap: var(--pair-gap); min-width: 0; height: var(--row-btn); padding: 0 var(--pair-pad); font: inherit; color: inherit; background: transparent; border: 0; border-radius: var(--ctl-r); cursor: pointer; }
 .pins-source:hover, .pins-source[aria-expanded="true"] { background: var(--hud-hover); }
 .pins-source > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .pins-source svg { flex: none; width: var(--icon-sm); height: var(--icon-sm); }
@@ -3111,14 +3114,14 @@ dialog.export-dlg { width: min(var(--dlg-3xl), calc(100vw - 2 * var(--edge))); m
 .ex-label { color: var(--hud-muted); font: var(--font-meta); align-self: center; }
 /* One segmented control (a row of choices, one of them on): the export dialog, the paint modes and options of the colour picker, the Styles panel's target. */
 .seg { display: inline-flex; gap: var(--s-1); padding: var(--s-1); background: var(--hud-hover); border-radius: var(--r-sm); }
-.seg button { display: inline-flex; align-items: center; justify-content: center; gap: var(--s-4); height: var(--field-h); padding: 0 var(--s-6); color: var(--hud-muted); background: transparent; border: 0; border-radius: var(--r-xs); font: var(--font-value); cursor: pointer; }
+.seg button { display: inline-flex; align-items: center; justify-content: center; gap: var(--pair-gap); height: var(--field-h); padding: 0 var(--pair-pad); color: var(--hud-muted); background: transparent; border: 0; border-radius: var(--r-xs); font: var(--font-value); cursor: pointer; }
 .seg button:hover:not(:disabled) { color: var(--hud-fg); }
 .seg button[aria-checked="true"], .seg button[aria-selected="true"] { color: var(--hud-accent-fg); background: var(--hud-accent); }
 .ex-readout { flex: 1; min-width: 0; margin: 0; text-align: right; color: var(--hud-muted); font: var(--font-meta); font-variant-numeric: tabular-nums; }
 .ex-readout b { color: var(--hud-fg); font: var(--font-value); }
 .ex-at { color: var(--hud-muted); }
 .ex-chips { display: flex; flex-wrap: wrap; gap: var(--s-4); }
-.ex-chip { display: inline-flex; flex-direction: column; align-items: flex-start; gap: var(--s-1); padding: var(--s-4) var(--s-6); color: var(--hud-fg); background: var(--hud-bg); border: var(--line-w) solid var(--hud-border); border-radius: var(--r-sm); cursor: pointer; text-align: left; }
+.ex-chip { display: inline-flex; flex-direction: column; align-items: flex-start; gap: var(--pair-gap); padding: var(--s-4) var(--s-6); color: var(--hud-fg); background: var(--hud-bg); border: var(--line-w) solid var(--hud-border); border-radius: var(--r-sm); cursor: pointer; text-align: left; }
 .ex-chip b { font: var(--font-value); }
 .ex-chip span { color: var(--hud-muted); font: var(--font-meta); font-variant-numeric: tabular-nums; }
 .ex-chip.is-exact { border-color: color-mix(in oklch, var(--hud-accent) 55%, var(--hud-border)); }
@@ -3134,7 +3137,7 @@ dialog.export-dlg { width: min(var(--dlg-3xl), calc(100vw - 2 * var(--edge))); m
 .ex-warn[hidden] { display: none; }
 .ex-note { min-height: var(--sp-9); margin: 0; padding: 0 var(--s-10); color: var(--hud-muted); font: var(--font-meta); }
 .ex-foot { margin-top: 0; padding: var(--s-6) var(--s-10) var(--s-8); }
-.confirm-actions button.has-icon { display: inline-flex; align-items: center; gap: var(--s-4); }
+.confirm-actions button.has-icon { display: inline-flex; align-items: center; gap: var(--pair-gap); }
 .confirm-actions button svg { width: var(--icon-md); height: var(--icon-md); }
 dialog.export-dlg.is-busy .ex-foot button { opacity: 0.6; pointer-events: none; }
 @media (max-width: 720px) {
@@ -3224,7 +3227,7 @@ dialog.export-dlg.is-multi[open] { display: flex; flex-direction: column; height
 .adj-row[data-lv-row] { grid-template-columns: minmax(0, 1fr) 3.75rem; row-gap: var(--s-4); }
 .adj-group > .adj-row.has-select { display: flex; align-items: center; justify-content: space-between; gap: var(--s-4); }
 .adj-group > .adj-row.has-select button { flex: none; white-space: nowrap; }
-#settings-view .storage-actions button { gap: var(--s-4); }
+#settings-view .storage-actions button { gap: var(--pair-gap); }
 #settings-view .storage-actions button svg { flex: none; width: var(--icon-md); height: var(--icon-md); }
 #settings-view button.is-danger { color: var(--hud-danger-fg); background: var(--hud-danger); border-color: var(--hud-danger); }
 .set-danger { border-color: var(--hud-danger); }
@@ -3293,7 +3296,7 @@ dialog.reset-dialog h3 { margin: var(--s-6) 0 var(--s-4); font-size: var(--text-
 .pg-seed, .pg-actions { display: flex; align-items: center; gap: var(--s-4); flex-wrap: wrap; }
 .pg-seed label { display: flex; align-items: center; gap: var(--s-4); color: var(--hud-muted); font: var(--font-meta); }
 .pg-seed .adj-num { width: 6rem; }
-.pg-foot button { display: inline-flex; align-items: center; gap: var(--s-2); height: var(--field-h); padding: 0 var(--s-6); color: var(--hud-fg); background: none; border: var(--line-w) solid var(--hud-border); border-radius: var(--r-sm); cursor: pointer; font: var(--font-value); }
+.pg-foot button { display: inline-flex; align-items: center; gap: var(--pair-gap); height: var(--field-h); padding: 0 var(--pair-pad); color: var(--hud-fg); background: none; border: var(--line-w) solid var(--hud-border); border-radius: var(--r-sm); cursor: pointer; font: var(--font-value); }
 .pg-foot button:hover:not(:disabled) { background: var(--hud-hover); }
 .pg-foot button.is-primary { color: var(--hud-accent-fg); background: var(--hud-accent); border-color: transparent; }
 .pg-foot button svg { width: var(--icon-sm); height: var(--icon-sm); }
@@ -3319,7 +3322,7 @@ dialog.reset-dialog h3 { margin: var(--s-6) 0 var(--s-4); font-size: var(--text-
 .tree-row { position: relative; display: flex; align-items: center; gap: var(--s-2); min-height: var(--tree-row-h); padding: 0 var(--sp-2) 0 calc(var(--sp-3) + var(--depth, 0) * var(--tree-indent)); border-radius: var(--r-sm); }
 .tree-row > .tree-twist { flex: none; }
 .side-row.tree-row { padding: 0 var(--sp-2) 0 calc(var(--sp-3) + var(--depth, 0) * var(--tree-indent)); gap: var(--s-2); }
-.side-row.tree-row .side-item { min-height: var(--tree-row-h); padding: 0 var(--s-2); gap: var(--s-4); }
+.side-row.tree-row .side-item { min-height: var(--tree-row-h); padding: 0 var(--pair-pad); gap: var(--pair-gap); }
 .side-row.tree-row .side-item svg { width: var(--icon-sm); height: var(--icon-sm); }
 .side-add + .side-add { margin-left: 0; }
 .tree-twist.is-empty { pointer-events: none; }
@@ -3372,7 +3375,7 @@ dialog.choice-dialog .confirm-actions { margin-top: var(--s-8); }
 .choice-name span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .choice-name svg { flex: none; width: var(--icon-sm); height: var(--icon-sm); }
 .choice-chips { display: flex; flex-wrap: wrap; gap: var(--s-4); }
-.choice-chip { display: inline-flex; align-items: center; gap: var(--s-2); max-width: 100%; padding: var(--s-1) var(--s-4); background: var(--hud-hover); border-radius: var(--r-pill); }
+.choice-chip { display: inline-flex; align-items: center; gap: var(--pair-gap); max-width: 100%; padding: var(--s-1) var(--s-4); background: var(--hud-hover); border-radius: var(--r-pill); }
 .choice-empty { color: var(--hud-muted); }
 .choice-make { margin-top: var(--s-4); }
 
@@ -3405,7 +3408,7 @@ button.archive-crumb:hover { background: var(--hud-hover); color: var(--hud-fg);
 .archive-sep svg { width: var(--icon-sm); height: var(--icon-sm); }
 .archive-list, .archive-file { flex: 1; min-height: 0; overflow: auto; }
 .archive-list:focus, .archive-file:focus, .archive-pages:focus { outline: none; }
-.archive-row { display: grid; grid-template-columns: var(--icon-md) minmax(0, 1fr) auto auto auto; align-items: center; gap: var(--s-4); min-height: var(--list-h); padding: 0 var(--s-4); cursor: default; }
+.archive-row { display: grid; grid-template-columns: var(--icon-md) minmax(0, 1fr) auto auto auto; align-items: center; gap: var(--pair-gap); min-height: var(--list-h); padding: 0 var(--pair-pad); cursor: default; }
 .archive-row:hover { background: var(--hud-hover); }
 .archive-row[aria-selected="true"] { background: var(--hud-accent); color: var(--hud-accent-fg); }
 .archive-row[aria-selected="true"] :is(.archive-facts, .archive-date, .archive-lock) { color: var(--hud-accent-fg); }
@@ -3466,7 +3469,7 @@ button.archive-crumb:hover { background: var(--hud-hover); color: var(--hud-fg);
 .props-row { display: flex; align-items: center; gap: var(--gap); }
 .props-row .tb-group { flex: none; }
 /* A chip: the section's icon and what it is set to; it opens its options. As compact as an Actions bar button. */
-.vchip { display: inline-flex; flex: none; align-items: center; gap: var(--s-2); height: var(--ctl); padding: 0 var(--s-4); color: inherit; font: var(--font-control); white-space: nowrap; background: transparent; border: var(--line-w) solid transparent; border-radius: var(--ctl-r, var(--r-md)); cursor: pointer; }
+.vchip { display: inline-flex; flex: none; align-items: center; gap: var(--pair-gap); height: var(--ctl); padding: 0 var(--s-4); color: inherit; font: var(--font-control); white-space: nowrap; background: transparent; border: var(--line-w) solid transparent; border-radius: var(--ctl-r, var(--r-md)); cursor: pointer; }
 .vchip-ic { display: inline-flex; margin-inline-end: var(--s-4); } /* (room between the section's icon and what it shows) */
 .vchip .vchip-ic svg { width: var(--icon-md); height: var(--icon-md); }
 .vchip:hover { background: var(--hud-hover); }
