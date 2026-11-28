@@ -738,8 +738,8 @@ test("panning while dragging goes by the pointer: near an edge of the view it pa
     await p.mouse.move(toX, y, { steps: 6 });
     await p.waitForTimeout(hold); // (the pointer rests)
     const moved = (await centerX()) !== c0;
-    const right = (await box()).maxX;
     await p.mouse.up();
+    const right = (await box()).maxX; // (a drag shows its move; the object takes it when let go)
     return { moved, right };
   };
   // Grabbed near its left side (clear of the side handle), dragged so its right side goes past the edge with the pointer far from it: no

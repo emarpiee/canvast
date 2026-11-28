@@ -317,7 +317,8 @@ export async function mountNoteEditor(el: HTMLElement, opts: { kind: Exclude<Not
     // (the mode keys, as the keymap sends them on (settings/keymap.ts), with the focus elsewhere in the note, the preview's page: the same commands as in its words)
     // (at the note: pressed in it last, or the focus in it now, as after a mode key: no click needed)
     const here = atNote || (e.target instanceof Node && root.contains(e.target));
-    if (here && root.isConnected && !editor.view.hasFocus && e.ctrlKey && e.altKey && e.shiftKey && (e.key === "F9" || e.key === "F10")) {
+    // (one place for the mode keys, the focus in the words or not: the editor's own key table may never see a key the keymap sent on)
+    if (here && root.isConnected && e.ctrlKey && e.altKey && e.shiftKey && (e.key === "F9" || e.key === "F10")) {
       e.preventDefault();
       e.stopImmediatePropagation();
       return void commands.press(e.key === "F10" ? "notes.source" : "notes.liveOrPreview");
