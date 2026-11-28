@@ -12,7 +12,7 @@ import { readdir } from "node:fs/promises";
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const baselinePath = resolve(root, "scripts/token-baseline.json");
 const css = (await readFile(resolve(root, "src/styles.css"), "utf8")).replace(/\/\*[\s\S]*?\*\//g, (m) => m.replace(/[^\n]/g, " "));
-const found = { colour: [], text: [], radius: [], space: [], inline: [], notOklch: [], offGrid: [] };
+const found = { colour: [], text: [], radius: [], space: [], inline: [], notOklch: [], offGrid: [], line: [] };
 // Spacing is on one grid, set by Density: gaps, paddings and margins use only --s-* (the fixed --sp-* are for what is not spacing), and offsets from an edge use tokens. A tree's indent is its own.
 const SPACING = /^(row-gap|column-gap|gap|padding|margin)(-(top|right|bottom|left|inline|block)(-start|-end)?)?$/;
 const OFF_GRID = /--sp-\d/; // (the density's tokens, --s-*, not the fixed lengths)
@@ -31,6 +31,8 @@ for (const m of css.matchAll(decl)) {
   if ((SPACING.test(prop) && OFF_GRID.test(value) && !value.includes("--depth") && !value.includes("--l)")) || (/^(top|right|bottom|left)$/.test(prop) && RAW_OFFSET.test(value))) found.offGrid.push(`${at}: ${prop}: ${value.trim()}`);
   if (/oklch\((?!var\()|#[0-9a-fA-F]{3,8}\b|rgba?\(/.test(value)) found.colour.push(`${at}: ${prop}: ${value.trim()}`);
   if ((prop === "font-size" || prop === "font") && /(?<![\w-])\d+(\.\d+)?px/.test(value.replace(/var\([^)]*\)/g, ""))) found.text.push(`${at}: ${prop}: ${value.trim()}`);
+  // Edges and rings take their width from --line-w / --ring-w* (a drawn glyph of 1.5px is not an edge)
+  if (/^(border(-(top|right|bottom|left))?|border-width|outline|outline-width|outline-offset|box-shadow)$/.test(prop) && /(?<![\w.-])-?[1-3]px\b/.test(value.replace(/var\([^)]*\)/g, ""))) found.line.push(`${at}: ${prop}: ${value.trim()}`);
   if (prop === "border-radius" && /(?<![\w-])[1-9]\d*px/.test(value.replace(/var\([^)]*\)/g, ""))) found.radius.push(`${at}: ${prop}: ${value.trim()}`);
   if (/^(padding|margin|gap|row-gap|column-gap)(-(top|right|bottom|left|inline|block))?$/.test(prop) && /(?<![\w-])([2-9]|[1-9]\d+)px/.test(value.replace(/var\([^)]*\)/g, ""))) found.space.push(`${at}: ${prop}: ${value.trim()}`);
 }
