@@ -5,6 +5,7 @@ import { defaultKeymap, history, historyKeymap, indentWithTab, redo, undo } from
 import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
 import { syntaxTree } from "@codemirror/language";
 import { openSearchPanel, search, searchKeymap } from "@codemirror/search";
+import { findBar } from "./search-panel";
 import { Compartment, EditorSelection, EditorState, Prec, StateEffect, StateField, Transaction, type Extension } from "@codemirror/state";
 import { Decoration, EditorView, WidgetType, drawSelection, keymap, placeholder as placeholderExt, type DecorationSet } from "@codemirror/view";
 import { codeColours, type CodeSpans } from "./code";
@@ -115,7 +116,7 @@ export interface EditorLabels {
   bulletList: string; orderedList: string; taskList: string; toggleTask: string; quote: string; codeBlock: string; table: string; rule: string;
   picture: string; find: string; save: string; task: string; placeholder: string; toolbar: string; format: string; insert: string;
   turnInto: string; copyCode: string; copied: string; codeLanguage: string; addRow: string; addColumn: string;
-  heading4: string; callout: string; mathBlock: string; math: string; image: string; plainText: string; resize: string; zoomPicture: string; editPicture: string; duplicatePicture: string; removePicture: string; zoomIn: string; zoomOut: string; fit: string; actualSize: string; tableActions: string; moveTable: string;
+  heading4: string; callout: string; mathBlock: string; math: string; image: string; plainText: string; resize: string; zoomPicture: string; editPicture: string; duplicatePicture: string; removePicture: string; zoomIn: string; zoomOut: string; fit: string; actualSize: string; tableActions: string; moveTable: string; findField: string; replaceField: string; findNext: string; findPrevious: string; matchCase: string; regexp: string; wholeWord: string; showReplace: string; replaceOne: string; replaceAll: string; findCount: string; findNone: string;
   today: string; yesterday: string; tomorrow: string; now: string;
   rowAbove: string; rowBelow: string; colBefore: string; colAfter: string; rowUp: string; rowDown: string; colLeft: string; colRight: string;
   dupRow: string; dupCol: string; alignLeft: string; alignCenter: string; alignRight: string; sortUp: string; sortDown: string;
@@ -134,7 +135,7 @@ export const DEFAULT_LABELS: EditorLabels = {
   bulletList: "Bulleted list", orderedList: "Numbered list", taskList: "Task list", toggleTask: "Tick task", quote: "Quote", codeBlock: "Code block", table: "Table", rule: "Divider",
   picture: "Picture", find: "Find", save: "Save", task: "Done", placeholder: "Write, or press / for blocks", toolbar: "Formatting", format: "Format", insert: "Insert",
   turnInto: "Turn into", copyCode: "Copy code", copied: "Copied", codeLanguage: "Choose a language", addRow: "Add a row", addColumn: "Add a column",
-  heading4: "Heading 4", callout: "Callout", mathBlock: "Math block", math: "Math", image: "Image", plainText: "text", resize: "Drag to resize", zoomPicture: "View full size", editPicture: "Edit its Markdown", duplicatePicture: "Duplicate", removePicture: "Remove from the note", zoomIn: "Zoom in", zoomOut: "Zoom out", fit: "Fit to view", actualSize: "Actual size", tableActions: "Table", moveTable: "Drag to move the table",
+  heading4: "Heading 4", callout: "Callout", mathBlock: "Math block", math: "Math", image: "Image", plainText: "text", resize: "Drag to resize", zoomPicture: "View full size", editPicture: "Edit its Markdown", duplicatePicture: "Duplicate", removePicture: "Remove from the note", zoomIn: "Zoom in", zoomOut: "Zoom out", fit: "Fit to view", actualSize: "Actual size", tableActions: "Table", moveTable: "Drag to move the table", findField: "Find", replaceField: "Replace with", findNext: "Next (Enter)", findPrevious: "Previous (Shift+Enter)", matchCase: "Match case", regexp: "Regular expression", wholeWord: "Whole words", showReplace: "Replace", replaceOne: "Replace this one", replaceAll: "Replace all", findCount: "{n} of {m}", findNone: "No results",
   today: "Today", yesterday: "Yesterday", tomorrow: "Tomorrow", now: "Now",
   rowAbove: "Add row above", rowBelow: "Add row below", colBefore: "Add column before", colAfter: "Add column after", rowUp: "Move row up", rowDown: "Move row down",
   colLeft: "Move column left", colRight: "Move column right", dupRow: "Duplicate row", dupCol: "Duplicate column", alignLeft: "Align left", alignCenter: "Align center",
@@ -425,7 +426,7 @@ export function createMarkdownEditor(opts: EditorOptions): MarkdownEditor {
   };
   const extensions: Extension[] = [
     history(),
-    search({ top: true }),
+    search({ top: true, createPanel: findBar({ find: labels.findField, replace: labels.replaceField, next: labels.findNext, previous: labels.findPrevious, matchCase: labels.matchCase, regexp: labels.regexp, wholeWord: labels.wholeWord, showReplace: labels.showReplace, replaceOne: labels.replaceOne, replaceAll: labels.replaceAll, close: labels.close, count: labels.findCount, none: labels.findNone }) }),
     placeholderExt(labels.placeholder),
     EditorView.updateListener.of((u) => {
       if (u.docChanged && !silent) opts.onChange?.(u.state.sliceDoc());

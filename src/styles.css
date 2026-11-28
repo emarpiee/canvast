@@ -62,7 +62,7 @@
   --s-1: 2px; --s-2: 4px; --s-4: 8px; --s-6: 12px; --s-8: 16px; --s-10: 24px; --s-12: 32px; --s-13: 40px; --s-14: 44px; --s-15: 60px;
   --view-tint: color-mix(in oklch, var(--hud-accent) 14%, var(--paper)); /* the buttons that change the view */
   --view-tint-hover: color-mix(in oklch, var(--hud-accent) 26%, var(--paper));
-  --view-edge: color-mix(in oklch, var(--hud-accent) 40%, var(--hud-border));
+  --view-edge: var(--hud-border); /* (the top bar's view buttons, left and right: the border every bar has) */
   --size-slider-w: 160px; /* the library's thumbnail size */
   --hud-scrim: oklch(0.2 calc(0.02 * var(--vivid)) var(--hue) / 0.4);
   --hud-scrim-soft: oklch(0.2 calc(0.02 * var(--vivid)) var(--hue) / 0.15); /* (a dimming the app shows through: the desktop welcome) */
@@ -1198,7 +1198,7 @@ input[type="radio"]:checked::before { content: ""; width: var(--sp-3); height: v
 .agent-chip::after { content: ""; position: absolute; right: var(--sp-2); bottom: var(--sp-2); width: var(--sp-4); height: var(--sp-4); border-radius: var(--r-dot); background: var(--hud-muted); outline: var(--sp-1) solid var(--hud-bg); }
 .agent-chip[data-state="connected"]::after { background: var(--hud-success); }
 :root.has-agent-chip { --gear-w: calc(2 * var(--bar-h) + var(--s-4)); }
-.view-settings button { display: inline-flex; align-items: center; justify-content: center; width: var(--bar-h); height: var(--bar-h); padding: 0; box-sizing: border-box; color: inherit; background: var(--hud-bg); border: 1px solid var(--hud-border); border-radius: var(--r-lg); box-shadow: var(--hud-lift); backdrop-filter: blur(8px); cursor: pointer; }
+.view-settings button { display: inline-flex; align-items: center; justify-content: center; width: var(--bar-h); height: var(--bar-h); padding: 0; box-sizing: border-box; color: inherit; background: var(--hud-bg); box-shadow: var(--hud-lift); /* (its border and corners: the one rule of the top bar's view buttons, above) */ backdrop-filter: blur(8px); cursor: pointer; }
 .view-settings button svg { width: 18px; height: 18px; }
 .view-settings button:hover { background: var(--hud-hover); }
 /* A pressed button of a bar is filled with the accent: one rule for every bar (what a bar adds to it is kept with the bar). */

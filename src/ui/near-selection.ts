@@ -96,13 +96,8 @@ export function boxOfElementIn(host: HTMLElement, el: HTMLElement): ScreenBox {
  */
 export function placeAbove(el: HTMLElement, b: ScreenBox): void {
   const host = el.offsetParent instanceof HTMLElement ? el.offsetParent : el.parentElement;
-  const avoid = host ? edgeBarsIn(host, el) : [];
-  const at = placeBy(b, el.offsetWidth, el.offsetHeight, "above", clearOfHandles(6), 6, avoid);
+  const at = placeBy(b, el.offsetWidth, el.offsetHeight, "above", clearOfHandles(6), 6, host ? edgeBarsIn(host, el) : []);
   const [l, t] = [`${Math.round(at.left)}px`, `${Math.round(at.top)}px`];
   if (el.style.left !== l) el.style.left = l;
   if (el.style.top !== t) el.style.top = t;
-  // (no clear place round it: what is selected is under a bar or a note's window, so its bar waits, never over one)
-  const clear = avoid.every((r) => at.left >= r.right || at.left + el.offsetWidth <= r.left || at.top >= r.bottom || at.top + el.offsetHeight <= r.top);
-  const v = clear ? "" : "hidden";
-  if (el.style.visibility !== v) el.style.visibility = v;
 }

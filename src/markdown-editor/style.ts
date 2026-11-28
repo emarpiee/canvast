@@ -192,6 +192,18 @@ export const EDITOR_CSS = `
 :where(.me-selbar-menu) { position: absolute; top: 100%; left: 0; margin-top: 4px; display: flex; flex-direction: column; min-width: 12em; padding: 4px; background: var(--me-bg); border: 1px solid var(--me-line); border-radius: var(--me-radius); box-shadow: 0 6px 20px color-mix(in oklch, var(--me-fg) 18%, transparent); }
 :where(.me-selbar-menu[hidden]) { display: none; }
 :where(.me-selbar-item) { display: flex; align-items: center; gap: 8px; padding: 4px 8px; border: 0; border-radius: var(--me-radius); background: none; color: var(--me-fg); font: inherit; font-size: 0.9em; text-align: left; cursor: pointer; }
+:where(.me-find) { display: flex; flex-direction: column; gap: var(--me-gap); }
+:where(.me-find-row) { display: flex; align-items: center; gap: 2px; }
+:where(.me-find-row[hidden]) { display: none; }
+:where(.me-find-row.is-replace) { padding-left: calc(var(--me-btn) + 2px); }
+:where(.me-find-box) { flex: 1; min-width: 0; display: flex; align-items: center; gap: 2px; height: var(--me-btn); padding: 0 2px 0 8px; border: 1px solid var(--me-line); border-radius: var(--me-radius); background: var(--me-bg); }
+:where(.me-find-box:focus-within) { border-color: var(--me-accent); }
+:where(.me-find-field) { flex: 1; min-width: 4em; border: 0; outline: none; background: none; color: var(--me-fg); font: inherit; font-size: 0.9em; }
+:where(.me-find-count) { flex: none; padding: 0 4px; color: var(--me-faint); font-size: 0.8em; font-variant-numeric: tabular-nums; white-space: nowrap; }
+:where(.me-find.is-none) .me-find-count { color: var(--me-red); }
+:where(.me-find-box) .me-btn { min-width: 24px; height: 24px; font-size: 0.75em; font-family: var(--me-mono); }
+:where(.me-find) .me-btn[aria-pressed="true"] { background: var(--me-select); color: var(--me-fg); }
+:where(.me-find-more[aria-expanded="true"]) svg { transform: rotate(90deg); }
 :where(.me-selbar-item):hover { background: var(--me-code-bg); }
 :where(.me-selbar-item) svg { width: var(--me-icon); height: var(--me-icon); color: var(--me-muted); }
 :where(.me .me-tok-keyword) { color: var(--me-tok-keyword); } :where(.me .me-tok-string) { color: var(--me-tok-string); } :where(.me .me-tok-comment) { color: var(--me-tok-comment); font-style: italic; }
@@ -256,8 +268,7 @@ export const CM_THEME: Record<string, Record<string, string>> = {
   ".cm-activeLine": { backgroundColor: "transparent" },
   ".cm-panels": { backgroundColor: "var(--me-bg)", color: "var(--me-fg)", borderColor: "var(--me-line)" },
   ".cm-panels-top": { borderBottom: "1px solid var(--me-line)" },
-  ".cm-panel.cm-search": { padding: "var(--me-gap)", fontFamily: "var(--me-font)" },
-  ".cm-panel input, .cm-panel button": { font: "inherit", color: "var(--me-fg)", backgroundColor: "var(--me-code-bg)", backgroundImage: "none", border: "1px solid var(--me-line)", borderRadius: "var(--me-radius)" },
+  ".cm-panel.me-find": { padding: "var(--me-gap)", fontFamily: "var(--me-font)" },
   ".cm-searchMatch": { backgroundColor: "var(--me-mark-bg)" },
   ".cm-tooltip": { backgroundColor: "var(--me-bg)", color: "var(--me-fg)", border: "1px solid var(--me-line)", borderRadius: "var(--me-radius)" },
   ".cm-tooltip-autocomplete > ul > li": { padding: "2px var(--me-gap)" },

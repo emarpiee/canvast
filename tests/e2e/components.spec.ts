@@ -412,7 +412,8 @@ async function browserMenus(p: Page): Promise<string[]> {
     }
     return [...out];
   });
-  for (let i = 0; i < 3; i++) await p.keyboard.press("Escape");
+  // (the menus the sweep opened closed: Escape only while one is open, since in an open note Escape also closes the viewer)
+  for (let i = 0; i < 3 && (await p.locator(".pop-menu").count()); i++) await p.keyboard.press("Escape");
   return left;
 }
 

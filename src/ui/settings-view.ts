@@ -63,6 +63,9 @@ interface Tab {
   readonly rows?: readonly Row[];
 }
 
+/** Cards drawn after a tab's own cards (its Links in notes too): the long list of how notes look, at the bottom of Notes. */
+const LAST_CARDS = new Set(["Note styles"]);
+
 /** Where a card of rows begins: a row named here starts a new card, titled so, and the rows after it stay in that card. A tab with none is one card. */
 const CARD_STARTS: Partial<Record<SettingKey, string>> = {
   "pen.kind": "Drawing",
@@ -468,9 +471,11 @@ export function mountSettingsView(root: HTMLElement, settings: SettingsStore, ke
               <div class="set-control">${controlHtml(r, id)}</div><span class="set-scope" title="Where this setting is kept">${scope}</span>
               <button type="button" class="set-reset" data-reset="${r.key}" aria-label="Reset ${esc(r.label)} to its default" title="Reset to the default">${ICONS.settingReset}</button></div>`;
     };
+    const cardHtml = (c: { title?: string; rows: readonly Row[] }): string => `<div class="set-card">${c.title ? `<h3>${esc(c.title)}</h3>` : ""}${c.rows.map(rowHtml).join("")}</div>`;
     const body = t.rows
       ? cardsOf(t.rows)
-          .map((c) => `<div class="set-card">${c.title ? `<h3>${esc(c.title)}</h3>` : ""}${c.rows.map(rowHtml).join("")}</div>`)
+          .filter((c) => !LAST_CARDS.has(c.title ?? ""))
+          .map(cardHtml)
           .join("") +
         (t.id === "privacy"
           ? `<div class="set-card" data-concealed-card><h3>Concealed folders</h3>${plainRowHtml({ label: "Concealed folders", help: "Their items are listed only when the folder is opened. Conceal or reveal one from its ⋯ menu in the Library.", control: `<span class="set-scope" data-concealed-n></span><button type="button" class="set-reset" data-concealed-show data-testid="concealed-show">Show…</button>` })}</div>` + (DESKTOP
@@ -490,7 +495,8 @@ export function mountSettingsView(root: HTMLElement, settings: SettingsStore, ke
           : t.id === "develop"
           ? `<div class="set-info set-card" data-develop><dl><dt>Version</dt><dd>${esc(document.documentElement.dataset["version"] ?? "")}</dd><dt>Build</dt><dd>${DESKTOP ? "The desktop app runs the same single file as the browser build." : "One file: this page. There is no separate debug build."}</dd></dl>
              <p class="set-note" data-dev-note role="status" hidden>Reload to apply the change. <button type="button" class="set-done" data-reload>Reload now</button></p></div>`
-          : "")
+          : "") +
+        cardsOf(t.rows).filter((c) => LAST_CARDS.has(c.title ?? "")).map(cardHtml).join("")
       : t.id === "sharing"
         ? ""
       : t.id === "shortcuts"

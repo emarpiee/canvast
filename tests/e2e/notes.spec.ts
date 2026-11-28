@@ -1081,7 +1081,7 @@ test("a note's Links card lists what it links to, pictures too, and links that f
 test("Ctrl+F in an open note finds in that note with the focus off its words, in the library's viewer and beside a canvas", async ({ app }) => {
   const p = app.page;
   const NOTE = `# Find here\n\n${"Some words of the page.\n\n".repeat(30)}`;
-  const inFind = () => p.evaluate(() => !!document.activeElement?.closest(".cm-search"));
+  const inFind = () => p.evaluate(() => !!document.activeElement?.closest(".me-find"));
   await p.getByTestId("view-assets").click();
   await p.getByTestId("assets-import-input").setInputFiles({ name: "find.md", mimeType: "text/markdown", buffer: Buffer.from(NOTE) });
   await card(p, hashOf(NOTE)).dblclick();
@@ -1089,6 +1089,12 @@ test("Ctrl+F in an open note finds in that note with the focus off its words, in
   await p.locator(".viewer-details").click();
   await p.keyboard.press("Control+f");
   await expect.poll(inFind).toBe(true);
+  // The find bar says how many there are and which one is shown; Enter goes to the next.
+  await p.keyboard.type("words");
+  await expect(p.locator(".me-find-count")).toHaveText(/^(–|1) of 30$/);
+  await p.keyboard.press("Enter");
+  await p.keyboard.press("Enter");
+  await expect(p.locator(".me-find-count")).toHaveText(/^\d+ of 30$/);
   await expect(p.locator(".assets-body.is-viewing")).toBeVisible();
   await p.locator(".viewer-details").click(); // (back on: Place is in the details)
   await p.locator(".viewer-back").click();
