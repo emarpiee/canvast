@@ -4,13 +4,14 @@
 
 - **Changed:** every card's title is in small capitals, in one rule for the whole app: the Settings cards, the cards beside a file (Properties, Tags, Folder, Linked from, Links, Footnotes…), the library's sidebar sections, the tags panel, the workspace menu and the styles tabs; Show the properties in the note sits at the right end of the Properties title. ([The interface, settings and keys](README.md#the-interface-settings-and-keys))
 - **Changed:** a note's properties are laid out as notes apps lay them out: one name column for every row and values of one width (a row without × keeps its place); room between the properties and the note's first line. ([Notes](README.md#notes))
+- **Changed:** icon buttons have one colour per state across the app: quieter than the text at rest, as the text under the pointer and when pressed or open, fainter (still seen) when they cannot be used; a pressed button's edge is as thin as its other states. ([The interface, settings and keys](README.md#the-interface-settings-and-keys))
 - **Changed:** a text field's edge is soft at rest and full under the pointer, in every part of the app. ([The interface, settings and keys](README.md#the-interface-settings-and-keys))
 - **Changed:** a text field in use has a thin ring on its own border, in every part of the app (it had a thick one outside it). ([The interface, settings and keys](README.md#the-interface-settings-and-keys))
 - **Fixed before release:** properties shown at the top of the note went back to the details when the note was opened again. ([Notes](README.md#notes))
 
 ### For developers
 
-- Styles: edges and rings come from one set of tokens in `:root`: widths `--line-w`, `--ring-w-field`, `--ring-w`, `--ring-w-strong`, `--ring-offset`, `--ring-offset-far`; colours per state `--edge-rest`, `--edge-hover`, `--edge-focus`, `--edge-active`, `--edge-unfocused`; an edge's strength per theme `--edge-a-rest`, `--edge-a-hover`. Every border, outline and ring of the app and of the notes editor (`--me-line-w`, `--me-ring-w`) uses them; `check:tokens` has a `line` count (a width in px on a border, outline or ring fails it).
+- Styles: edges and rings come from one set of tokens in `:root`: widths `--line-w`, `--ring-w-field`, `--ring-w`, `--ring-w-strong`, `--ring-offset`, `--ring-offset-far`; one edge width for a control in every state `--state-w` (a keyboard focus ring stays `--ring-w`); icon button colours `--icon-btn-rest`, `--icon-btn-hover`, `--icon-btn-active` and `--icon-btn-disabled` (opacity); colours per state `--edge-rest`, `--edge-hover`, `--edge-focus`, `--edge-active`, `--edge-unfocused`; an edge's strength per theme `--edge-a-rest`, `--edge-a-hover`. Every border, outline and ring of the app and of the notes editor (`--me-line-w`, `--me-ring-w`) uses them; `check:tokens` has a `line` count (a width in px on a border, outline or ring fails it).
 - Tests: the viewer's fade test reads the header's opacity (Back sits in it now), not Back's own; the notes properties test opens the note again with them at its top.
 
 ## 0.63.19 — canvast's own Markdown editor (2026-11-28)

@@ -103,6 +103,12 @@
   --edge-focus: var(--hud-accent);    /* in use (keyboard or typing) */
   --edge-active: var(--hud-accent);   /* pressed, selected */
   --edge-unfocused: var(--hud-edge);  /* selected while the focus is elsewhere */
+  --state-w: var(--line-w);           /* the edge of a control in every state (normal, hover, pressed): its state shows by colour, never by a thicker edge; only a keyboard focus ring is --ring-w */
+  /* An icon button's colour per state (one rule near the end of the file). */
+  --icon-btn-rest: var(--hud-muted);     /* normal: quieter than the text */
+  --icon-btn-hover: var(--hud-fg);       /* under the pointer: as the text */
+  --icon-btn-active: var(--hud-fg);      /* pressed or open: as the text */
+  --icon-btn-disabled: 0.55;             /* opacity when it cannot be used: fainter than normal, still seen */
   --r-2xs: 3px;
   --r-xs: 4px;
   --r-sm: 6px; --prop-key-w: 9em; /* (the name column of a note's properties, as notes apps) */
@@ -525,7 +531,7 @@ input[type="range"], .media-scrub, .tb-count[data-scrub] input, input[data-scrub
 .toolbar .swatch-current span { width: var(--icon-md); height: var(--icon-md); box-shadow: 0 0 0 var(--ring-w) var(--hud-bg), 0 0 0 var(--ring-w-strong) var(--hud-fg); }
 .toolbar .size { width: 84px; accent-color: var(--hud-accent); }
 .toolbar .size-out { font: var(--font-value); min-width: 38px; text-align: right; opacity: 0.8; } /* (the spare room is beside the slider, never at the bar's edge) */
-.toolbar .swatch.is-on, .toolbar .width.is-on { box-shadow: inset 0 0 0 var(--ring-w) var(--edge-active); }
+.toolbar .swatch.is-on, .toolbar .width.is-on { box-shadow: inset 0 0 0 var(--state-w) var(--edge-active); }
 /* One meaning for "on" in every bar: a filled button. A ring means "this colour or size" (a choice among swatches), never a switch. */
 .toolbar button[aria-pressed="true"], .dock button[aria-pressed="true"] { box-shadow: none; }
 .toolbar .width span { width: 16px; border-radius: var(--r-xs); background: currentColor; }
@@ -1355,7 +1361,7 @@ body.is-placing :is(#nav, .view-settings, .assets-bar) { visibility: hidden; }
 .assets-btn:hover:not(:disabled) { background: var(--hud-hover); }
 .assets-btn.is-primary { color: var(--hud-accent-fg); background: var(--hud-accent); border-color: var(--hud-accent); }
 .assets-btn.is-primary:hover:not(:disabled) { background: var(--hud-accent-hover); }
-.assets-btn[aria-pressed="true"].is-icon, .panel-head .layer-btn[aria-pressed="true"] { box-shadow: inset 0 0 0 var(--ring-w) var(--edge-active); } /* (an icon button that is on: the Library's details, a file's Properties on a canvas) */
+.assets-btn[aria-pressed="true"].is-icon, .panel-head .layer-btn[aria-pressed="true"] { box-shadow: inset 0 0 0 var(--state-w) var(--edge-active); } /* (an icon button that is on: the Library's details, a file's Properties on a canvas) */
 .assets-btn.is-danger:not(:disabled) { color: var(--hud-danger); }
 .assets-body { flex: 1; min-height: 0; display: flex; gap: var(--s-8); padding-top: var(--s-6); }
 .assets-main { position: relative; flex: 1; min-width: 0; }
@@ -1567,7 +1573,7 @@ button.asset-preview { display: flex; align-items: center; justify-content: cent
 .vbtn { display: inline-flex; align-items: center; justify-content: center; gap: var(--s-4); min-width: var(--ctl); height: var(--ctl); padding: 0 var(--s-6); font: var(--weight-medium) var(--text-md) var(--font-ui); color: inherit; background: transparent; border: 0; border-radius: var(--r-md); cursor: pointer; }
 .vbtn svg { width: 18px; height: 18px; }
 .vbtn:hover:not(:disabled) { background: var(--v-hover); }
-.vbtn[aria-pressed="true"] { box-shadow: inset 0 0 0 var(--ring-w) var(--edge-active); }
+.vbtn[aria-pressed="true"] { box-shadow: inset 0 0 0 var(--state-w) var(--edge-active); }
 .vbtn[data-act="favorite"][aria-pressed="true"] svg { fill: var(--hud-star); color: var(--hud-star); }
 .vbtn.is-primary { color: var(--hud-accent-fg); background: var(--hud-accent); }
 .vbtn.is-primary:hover:not(:disabled) { background: var(--hud-accent-hover); }
@@ -1665,10 +1671,10 @@ button.asset-preview { display: flex; align-items: center; justify-content: cent
 /* The viewer's header (every kind): Library, back and forward, folder / name, then hide the controls and the details. In the theme's
    colours, one row in the viewer's flow (nothing floats over the picture or the page); with the controls hidden it shows near the top. */
 .viewer-head { flex: none; display: flex; align-items: center; gap: var(--s-6); min-height: var(--bar-h); padding: 0 var(--edge); background: var(--hud-bg); color: var(--hud-fg); border-bottom: var(--line-w) solid var(--hud-border); z-index: var(--z-item-bar); } /* (its ends in line with the picture's own tools under it: --edge) */
-.viewer-head > .vbtn.viewer-back, .viewer-head > .vbtn.viewer-hide, .viewer-head > .vbtn.viewer-details { position: static; color: var(--hud-fg); background: transparent; border-color: transparent; }
+.viewer-head > .vbtn.viewer-back, .viewer-head > .vbtn.viewer-hide, .viewer-head > .vbtn.viewer-details { position: static; color: var(--icon-btn-rest); background: transparent; border-color: transparent; }
 .viewer-head > .vbtn.viewer-back { width: auto; gap: var(--s-2); padding: 0 var(--s-4); }
-.viewer-head > .vbtn:is(.viewer-back, .viewer-hide, .viewer-details):hover:not(:disabled) { color: var(--hud-fg); background: var(--hud-hover); }
-.viewer-head > .vbtn.viewer-details[aria-pressed="true"] { box-shadow: inset 0 0 0 var(--ring-w) var(--edge-active); }
+.viewer-head > .vbtn:is(.viewer-back, .viewer-hide, .viewer-details):hover:not(:disabled) { color: var(--icon-btn-hover); background: var(--hud-hover); }
+.viewer-head > .vbtn.viewer-details[aria-pressed="true"] { box-shadow: inset 0 0 0 var(--state-w) var(--edge-active); }
 .nav-pair { display: inline-flex; flex: none; align-items: center; gap: var(--s-2); } /* (back and forward: one pair, in every header) */
 .viewer-head > .nav-pair { margin-inline: var(--s-4); }
 .viewer-crumb { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--text-sm); color: var(--hud-muted); }
@@ -2058,7 +2064,7 @@ body[data-viewing] #nav, body[data-viewing] .view-settings { display: none; }
 .cs ul { list-style: none; margin: 0; padding: var(--s-2); max-height: min(50vh, 360px); overflow: auto; }
 .cs-row { display: flex; align-items: center; gap: var(--s-6); min-height: var(--menu-h); padding: 0 var(--s-6); border-radius: var(--r-md); cursor: pointer; }
 .cs-row.is-active, .cs-row:hover { background: var(--hud-hover); }
-.cs-row.is-active { box-shadow: inset 0 0 0 var(--ring-w) var(--edge-active); }
+.cs-row.is-active { box-shadow: inset 0 0 0 var(--state-w) var(--edge-active); }
 .cs-icon { display: inline-flex; flex: none; color: var(--hud-muted); }
 .cs-icon svg { width: 16px; height: 16px; }
 .cs-label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -3562,3 +3568,11 @@ button.archive-crumb:hover { background: var(--hud-hover); color: var(--hud-fg);
 /* ---- Reference windows (ADR 0207): a floating panel of the theme (its header, the Styles panel's chooser and search, its spacing),
    over every view; moved by the header, resized by the corner. Opaque, with no blur of what is behind: over a canvas drawn every frame,
    a backdrop blur is drawn again every frame. */
+
+/* ICON BUTTONS: one colour per state for every icon button of the app (tokens --icon-btn-*): normal quieter than the text, under the pointer
+   and pressed or open as the text, and fainter (still seen) when it cannot be used. Last in the file, so a place's own rule does not undo it. */
+:is(.assets-btn.is-icon:not(.is-primary, .is-danger), .viewer-head > .vbtn, .panel-head .layer-btn, .asset-sec h3 > .layer-btn, .more-btn, .nav-more, .side-more, .side-add, .search-help-btn, .field-type, .field-grip) { color: var(--icon-btn-rest); }
+:is(.assets-btn.is-icon:not(.is-primary, .is-danger), .viewer-head > .vbtn, .panel-head .layer-btn, .asset-sec h3 > .layer-btn, .more-btn, .nav-more, .side-more, .side-add, .search-help-btn, .field-type, .field-grip):hover:not(:disabled), :is(.assets-btn.is-icon:not(.is-primary, .is-danger), .viewer-head > .vbtn, .panel-head .layer-btn, .asset-sec h3 > .layer-btn, .more-btn, .nav-more, .side-more, .side-add, .search-help-btn, .field-type, .field-grip):is([aria-pressed="true"], [aria-expanded="true"]) { color: var(--icon-btn-active); }
+:is(.assets-btn.is-icon:not(.is-primary, .is-danger), .viewer-head > .vbtn, .panel-head .layer-btn, .asset-sec h3 > .layer-btn, .more-btn, .nav-more, .side-more, .side-add, .search-help-btn, .field-type, .field-grip):hover:not(:disabled):not([aria-pressed="true"]) { color: var(--icon-btn-hover); }
+:is(.assets-btn.is-icon:not(.is-primary, .is-danger), .viewer-head > .vbtn, .panel-head .layer-btn, .asset-sec h3 > .layer-btn, .more-btn, .nav-more, .side-more, .side-add, .search-help-btn, .field-type, .field-grip):disabled { opacity: var(--icon-btn-disabled); }
+:is(.panel-head, .asset-sec h3) .layer-btn[aria-pressed="false"] { opacity: 1; } /* (an off switch is shown by its colour here, not faded as a layer's eye) */
