@@ -1460,10 +1460,11 @@ button.asset-preview { display: flex; align-items: center; justify-content: cent
 /* the note (plain text) and the fields the user names: a name and a value per row, × to remove one, "Add a field" below */
 .asset-note-box { display: block; width: 100%; min-height: calc(var(--sp-15) + var(--sp-8)); resize: vertical; box-sizing: border-box; }
 .asset-fields { list-style: none; margin: var(--s-4) 0 0; padding: 0; display: grid; gap: var(--s-6); container-type: inline-size; }
-.asset-field { display: grid; grid-template: auto auto / auto auto minmax(0, 2fr) minmax(0, 3fr) auto; grid-template-areas: "grip type key value remove" ". . warn warn warn"; gap: var(--s-4); align-items: start; }
+.asset-field { display: grid; grid-template: auto auto / auto auto minmax(0, var(--prop-key-w)) minmax(0, 1fr) var(--ctl); grid-template-areas: "grip type key value remove" ". . warn warn warn"; gap: var(--s-4); align-items: start; }
 .asset-field > .field-grip { grid-area: grip; }
 .asset-field > .field-type { grid-area: type; }
 .asset-fields .field-key { background: transparent; border-color: transparent; font-weight: inherit; }
+.asset-fields .field-key:not([readonly]):hover, .asset-fields .field-key:not([readonly]):focus { border-color: var(--hud-border); }
 .asset-fields .field-value[readonly] { color: var(--hud-muted); }
 .asset-fields [data-action="field-remove"] { height: var(--ctl); background: transparent; border-color: transparent; }
 .asset-fields [data-action="field-remove"]:hover:not(:disabled) { background: var(--hud-hover); }
@@ -1497,18 +1498,7 @@ button.asset-preview { display: flex; align-items: center; justify-content: cent
 .asset-field input { min-width: 0; }
 .asset-field .field-key { color: var(--hud-muted); }
 .asset-notes > .assets-btn[data-action="field-add"] { margin-top: var(--s-4); }
-/* Properties as notes apps draw them: one name column for every row, borderless fields, a row lit on hover and ringed while one of its fields is in use; the grip and × show on the row in use (their columns are kept, so every field has one width). */
-.asset-fields { gap: var(--s-1); }
-.asset-field { grid-template-columns: auto auto minmax(0, var(--prop-key-w)) minmax(0, 1fr) var(--ctl); column-gap: var(--s-2); align-items: center; padding: 0 var(--s-1); border-radius: var(--r-sm); }
-.asset-field:hover { box-shadow: 0 0 0 1px var(--hud-border); }
-.asset-field:focus-within { background: var(--hud-hover); box-shadow: 0 0 0 2px var(--hud-accent); }
-.asset-field :is(input:not([type="checkbox"]), textarea):focus-visible { outline: none; } /* (the row's ring shows it) */
-.asset-fields :is(.field-key, .field-value:not([type="checkbox"]), .field-list) { background: transparent; border-color: transparent; }
-.asset-fields :is(.field-key:not([readonly]), .field-value:not([type="checkbox"]):not([readonly]), .field-list):hover { background: var(--hud-hover); border-color: transparent; }
-.asset-field > :is(.field-grip, [data-action="field-remove"]) { opacity: 0; }
-.asset-field:is(:hover, :focus-within) > :is(.field-grip, [data-action="field-remove"]) { opacity: 1; }
-.asset-notes > .assets-btn[data-action="field-add"] { justify-self: start; width: auto; color: var(--hud-muted); background: transparent; border-color: transparent; }
-.asset-notes > .assets-btn[data-action="field-add"]:hover:not(:disabled) { color: var(--hud-fg); background: var(--hud-hover); }
+/* Properties laid out as notes apps: one name column for every row, the value fills the rest, the × column kept on every row (so every value has one width). */
 .note-props-slot:not(:empty) { padding-bottom: var(--s-12); } /* (room between the note's Properties and its first line) */
 
 /* The viewer: the original large, the details beside it (they can be hidden), the controls below (they can be hidden). */
